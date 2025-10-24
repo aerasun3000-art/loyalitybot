@@ -187,14 +187,27 @@ const Home = () => {
                   className="flex-shrink-0 w-[85vw] cursor-pointer transform hover:-translate-y-1 active:scale-98 transition-all duration-300"
                 >
                   <div className={`bg-gradient-to-br ${gradient} rounded-3xl overflow-hidden card-shadow hover:card-shadow-hover`}>
-                    {/* Изображение-placeholder */}
-                    <div className="h-48 bg-white/10 backdrop-blur-sm flex items-center justify-center relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
-                      <span className="text-9xl opacity-30 absolute">{icon}</span>
-                      <div className="relative z-10 text-center">
-                        <span className="text-7xl drop-shadow-lg">{icon}</span>
+                    {/* Изображение */}
+                    {promo.image_url ? (
+                      // Реальное фото
+                      <div className="h-48 relative overflow-hidden">
+                        <img 
+                          src={promo.image_url} 
+                          alt={promo.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                       </div>
-                    </div>
+                    ) : (
+                      // Placeholder с градиентом
+                      <div className="h-48 bg-white/10 backdrop-blur-sm flex items-center justify-center relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
+                        <span className="text-9xl opacity-30 absolute">{icon}</span>
+                        <div className="relative z-10 text-center">
+                          <span className="text-7xl drop-shadow-lg">{icon}</span>
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Контент */}
                     <div className="p-6">
@@ -381,19 +394,39 @@ const Home = () => {
                   className="flex-shrink-0 w-72 cursor-pointer group"
                 >
                   <div className="bg-white rounded-2xl overflow-hidden card-shadow group-hover:card-shadow-hover transition-all duration-300 active:scale-98">
-                    {/* Изображение-placeholder */}
-                    <div className={`h-40 bg-gradient-to-br ${imageGradient} flex items-center justify-center relative overflow-hidden`}>
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                      <span className="text-8xl opacity-20 absolute">{dealIcon}</span>
-                      <span className="text-6xl relative z-10 drop-shadow-lg">{dealIcon}</span>
-                      
-                      {/* Бэдж скидки (если есть) */}
-                      {promo.required_points === 0 && (
-                        <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                          FREE
-                        </div>
-                      )}
-                    </div>
+                    {/* Изображение */}
+                    {promo.image_url ? (
+                      // Реальное фото
+                      <div className="h-40 relative overflow-hidden">
+                        <img 
+                          src={promo.image_url} 
+                          alt={promo.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                        
+                        {/* Бэдж скидки (если есть) */}
+                        {promo.required_points === 0 && (
+                          <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                            FREE
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      // Placeholder с градиентом
+                      <div className={`h-40 bg-gradient-to-br ${imageGradient} flex items-center justify-center relative overflow-hidden`}>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                        <span className="text-8xl opacity-20 absolute">{dealIcon}</span>
+                        <span className="text-6xl relative z-10 drop-shadow-lg">{dealIcon}</span>
+                        
+                        {/* Бэдж скидки (если есть) */}
+                        {promo.required_points === 0 && (
+                          <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                            FREE
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
                     {/* Контент */}
                     <div className="p-4 bg-white">

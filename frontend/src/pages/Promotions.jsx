@@ -175,36 +175,66 @@ const Promotions = () => {
                     }`}
                   >
                   {/* Баннер с изображением */}
-                  <div className={`h-48 bg-gradient-to-br ${gradient} flex items-center justify-center relative overflow-hidden`}>
-                    {/* Фоновые эффекты */}
-                    <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                    
-                    {/* Фоновая иконка */}
-                    <span className="text-9xl opacity-20 absolute">{icon}</span>
-                    
-                    {/* Основная иконка */}
-                    <div className="relative z-10 text-center">
-                      <span className="text-8xl drop-shadow-2xl">{icon}</span>
-                    </div>
-                    
-                    {/* Бэджи */}
-                    <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
-                      {/* Бэдж "Заканчивается" */}
-                      {daysLeft <= 3 && (
-                        <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
-                          {daysLeft === 0 ? '🔥 Последний день!' : `⏰ ${daysLeft} дн.`}
-                        </div>
-                      )}
+                  {promo.image_url ? (
+                    // Реальное фото
+                    <div className="h-48 relative overflow-hidden">
+                      <img 
+                        src={promo.image_url} 
+                        alt={promo.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                       
-                      {/* Бэдж "Бесплатно" */}
-                      {promo.required_points === 0 && (
-                        <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto">
-                          🎁 FREE
-                        </div>
-                      )}
+                      {/* Бэджи */}
+                      <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-10">
+                        {/* Бэдж "Заканчивается" */}
+                        {daysLeft <= 3 && (
+                          <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                            {daysLeft === 0 ? '🔥 Последний день!' : `⏰ ${daysLeft} дн.`}
+                          </div>
+                        )}
+                        
+                        {/* Бэдж "Бесплатно" */}
+                        {promo.required_points === 0 && (
+                          <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto">
+                            🎁 FREE
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    // Placeholder с градиентом
+                    <div className={`h-48 bg-gradient-to-br ${gradient} flex items-center justify-center relative overflow-hidden`}>
+                      {/* Фоновые эффекты */}
+                      <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                      
+                      {/* Фоновая иконка */}
+                      <span className="text-9xl opacity-20 absolute">{icon}</span>
+                      
+                      {/* Основная иконка */}
+                      <div className="relative z-10 text-center">
+                        <span className="text-8xl drop-shadow-2xl">{icon}</span>
+                      </div>
+                      
+                      {/* Бэджи */}
+                      <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
+                        {/* Бэдж "Заканчивается" */}
+                        {daysLeft <= 3 && (
+                          <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                            {daysLeft === 0 ? '🔥 Последний день!' : `⏰ ${daysLeft} дн.`}
+                          </div>
+                        )}
+                        
+                        {/* Бэдж "Бесплатно" */}
+                        {promo.required_points === 0 && (
+                          <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto">
+                            🎁 FREE
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Контент */}
                   <div className="p-4">
