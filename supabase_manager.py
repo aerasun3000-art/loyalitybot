@@ -618,6 +618,7 @@ class SupabaseManager:
             'discount_value': discount_value,
             'start_date': start_date,
             'end_date': end_date,
+            'is_active': True,  # Акция активна по умолчанию
         }
         
         # Добавляем image_url если есть
