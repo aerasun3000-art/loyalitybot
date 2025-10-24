@@ -102,7 +102,8 @@ export const getApprovedServices = async () => {
       *,
       partner:partners!services_partner_chat_id_fkey(name, company_name)
     `)
-    .eq('status', 'Approved')
+    .eq('approval_status', 'Approved')
+    .eq('is_active', true)
     .order('price_points', { ascending: true })
   
   if (error) {

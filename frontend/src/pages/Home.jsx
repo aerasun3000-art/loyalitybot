@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Title, Text, Button, Avatar } from '@telegram-apps/telegram-ui'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
 import { getClientBalance, getActivePromotions, getApprovedServices } from '../services/supabase'
+import { getServiceIcon, defaultServiceIcons } from '../utils/serviceIcons'
 import Loader from '../components/Loader'
 
 const Home = () => {
@@ -183,29 +184,36 @@ const Home = () => {
 
         {/* Сетка услуг 4x2 */}
         <div className="grid grid-cols-4 gap-4 mb-8">
-          {services.slice(0, 8).map((service, index) => (
-            <div
-              key={service.id}
-              onClick={() => handleServiceClick(service.id)}
-              className="flex flex-col items-center cursor-pointer"
-            >
-              <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mb-2 relative">
-                <span className="text-3xl">
-                  {['🧹', '🔧', '🏠', '💼', '🚗', '📦', '🎨', '💆'][index % 8]}
-                </span>
-                {index < 2 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                    NEW
+          {(services.length > 0 ? services.slice(0, 8) : defaultServiceIcons.slice(0, 8)).map((item, index) => {
+            const isService = services.length > 0
+            const serviceIcon = isService ? getServiceIcon(item.title || item.name) : item.icon
+            const serviceName = isService ? (item.title || item.name) : (language === 'ru' ? item.name : item.nameEn)
+            const serviceId = isService ? item.id : null
+            
+            return (
+              <div
+                key={serviceId || index}
+                onClick={() => isService && handleServiceClick(serviceId)}
+                className={`flex flex-col items-center ${isService ? 'cursor-pointer' : ''}`}
+              >
+                <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mb-2 relative hover:bg-orange-200 transition-colors">
+                  <span className="text-3xl">
+                    {serviceIcon}
                   </span>
-                )}
+                  {isService && index < 2 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                      NEW
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-center text-gray-700 leading-tight">
+                  {serviceName?.length > 15 
+                    ? serviceName.substring(0, 15) + '...' 
+                    : serviceName}
+                </span>
               </div>
-              <span className="text-[11px] text-center text-gray-700 leading-tight">
-                {service.name?.length > 15 
-                  ? service.name.substring(0, 15) + '...' 
-                  : service.name}
-              </span>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Секция bRewards (акции с баллами) */}

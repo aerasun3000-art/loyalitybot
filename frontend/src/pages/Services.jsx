@@ -69,7 +69,7 @@ const Services = () => {
     }
 
     showConfirm(
-      `Обменять ${selectedService.price_points} баллов на "${selectedService.name}"?`,
+      `Обменять ${selectedService.price_points} баллов на "${selectedService.title}"?`,
       (confirmed) => {
         if (confirmed) {
           // TODO: Реализовать обмен через API
@@ -189,7 +189,7 @@ const Services = () => {
                   {/* Информация */}
                   <div className="p-3">
                     <h3 className="font-bold text-gray-800 text-sm mb-1 line-clamp-2 min-h-[2.5rem]">
-                      {service.name}
+                      {service.title}
                     </h3>
                     
                     <p className="text-xs text-gray-600 mb-2 line-clamp-2">
@@ -239,7 +239,7 @@ const Services = () => {
               </div>
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-gray-800 mb-1">
-                  {selectedService.name}
+                  {selectedService.title}
                 </h2>
                 <p className="text-sm text-gray-600">
                   {selectedService.partner?.company_name || selectedService.partner?.name}
