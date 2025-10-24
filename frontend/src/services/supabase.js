@@ -79,7 +79,7 @@ export const getActivePromotions = async () => {
     .from('promotions')
     .select(`
       *,
-      partner:partners!promotions_partner_chat_id_fkey(name, company_name)
+      partners(name, company_name)
     `)
     .eq('is_active', true)
     .gte('end_date', today)
@@ -90,7 +90,11 @@ export const getActivePromotions = async () => {
     return []
   }
   
-  return data
+  // Переименовываем partners в partner для совместимости с кодом
+  return data?.map(promo => ({
+    ...promo,
+    partner: promo.partners
+  })) || []
 }
 
 /**
