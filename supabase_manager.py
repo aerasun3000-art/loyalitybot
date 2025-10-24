@@ -580,7 +580,8 @@ class SupabaseManager:
 
         # Простейшая валидация обязательных полей
         if not title or not description or not discount_value or not partner_chat_id or not end_date:
-            logging.error("add_promotion: missing required fields")
+            logging.error(f"add_promotion: missing required fields. title={title}, description={description}, discount_value={discount_value}, partner_chat_id={partner_chat_id}, end_date={end_date}")
+            print(f"ERROR: add_promotion missing required fields")
             return False
 
         # Предварительная проверка существования партнера в таблице partners (для FK)
@@ -588,9 +589,11 @@ class SupabaseManager:
             check = self.client.from_('partners').select('chat_id').eq('chat_id', partner_chat_id).limit(1).execute()
             if not check.data:
                 logging.error(f"add_promotion: partner {partner_chat_id} not found in 'partners' (FK)")
+                print(f"ERROR: partner {partner_chat_id} not found in partners table")
                 return False
         except Exception as e:
             logging.error(f"add_promotion: partners precheck failed: {e}")
+            print(f"ERROR: partners precheck failed: {e}")
             return False
 
         # Нормализация дат: если нет start_date, ставим сегодня; конвертируем к YYYY-MM-DD
@@ -602,8 +605,9 @@ class SupabaseManager:
                 start_date = parser.isoparse(start_date).date().strftime("%Y-%m-%d")
 
             end_date = parser.isoparse(end_date).date().strftime("%Y-%m-%d")
-        except Exception:
-            logging.error("add_promotion: invalid date format for start_date/end_date")
+        except Exception as e:
+            logging.error(f"add_promotion: invalid date format for start_date/end_date. Error: {e}")
+            print(f"ERROR: invalid date format: {e}")
             return False
 
         # Формируем запись для БД строго по колонкам promotions
@@ -615,7 +619,6 @@ class SupabaseManager:
             'start_date': start_date,
             'end_date': end_date,
             'is_active': True,  # Акция активна по умолчанию
-            'required_points': promo_data.get('required_points', 0),  # Баллы для активации
         }
         
         # Добавляем image_url если есть
@@ -623,13 +626,19 @@ class SupabaseManager:
             record['image_url'] = promo_data.get('image_url')
 
         try:
-            self.client.from_('promotions').insert(record).execute()
+            result = self.client.from_('promotions').insert(record).execute()
+            print(f"SUCCESS: Promotion inserted successfully. Result: {result}")
+            logging.info(f"Promotion inserted successfully for partner {partner_chat_id}")
             return True
         except APIError as e:
             logging.error(f"Error adding promotion (API): {e}")
+            print(f"ERROR: API error adding promotion: {e}")
             return False
         except Exception as e:
             logging.error(f"Error adding promotion: {e}")
+            print(f"ERROR: Exception adding promotion: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def add_service(self, service_data: dict) -> bool:

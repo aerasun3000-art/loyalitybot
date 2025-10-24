@@ -548,11 +548,15 @@ def save_promotion(chat_id):
     if not promo_data:
         bot.send_message(chat_id, "❌ Ошибка сессии. Попробуйте начать снова: /start")
         return
+    
+    # Логируем данные акции для отладки
+    logger.info(f"Saving promotion data: {promo_data}")
         
     try:
         success = sm.add_promotion(promo_data)
         
         if success:
+            logger.info(f"Promotion saved successfully for partner {chat_id}")
             if promo_data.get('image_url'):
                 bot.send_message(
                     chat_id, 
@@ -568,10 +572,11 @@ def save_promotion(chat_id):
                     parse_mode='Markdown'
                 )
         else:
+            logger.error(f"Failed to save promotion for partner {chat_id}. Data: {promo_data}")
             bot.send_message(chat_id, "❌ Ошибка при сохранении акции. Проверьте логи.")
 
     except Exception as e:
-        logger.error(f"Error saving promotion: {e}")
+        logger.error(f"Exception saving promotion for partner {chat_id}: {e}")
         bot.send_message(chat_id, "❌ Произошла системная ошибка при сохранении акции.")
 
     partner_main_menu(chat_id)
