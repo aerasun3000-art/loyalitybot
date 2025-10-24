@@ -2,25 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Telegram Web App переменные */
+/* Telegram Web App переменные - Розовая женственная тема */
 :root {
   --tg-theme-bg-color: #ffffff;
   --tg-theme-text-color: #000000;
   --tg-theme-hint-color: #999999;
-  --tg-theme-link-color: #2481cc;
-  --tg-theme-button-color: #2481cc;
+  --tg-theme-link-color: #FF69B4;
+  --tg-theme-button-color: #FF69B4;
   --tg-theme-button-text-color: #ffffff;
-  --tg-theme-secondary-bg-color: #f4f4f5;
+  --tg-theme-secondary-bg-color: #FFF0F5;
 }
 
 .dark {
-  --tg-theme-bg-color: #18222d;
+  --tg-theme-bg-color: #2D1B2E;
   --tg-theme-text-color: #ffffff;
-  --tg-theme-hint-color: #7d8b99;
-  --tg-theme-link-color: #5eabe1;
-  --tg-theme-button-color: #5eabe1;
+  --tg-theme-hint-color: #C9A0DC;
+  --tg-theme-link-color: #FF69B4;
+  --tg-theme-button-color: #E6B3E6;
   --tg-theme-button-text-color: #ffffff;
-  --tg-theme-secondary-bg-color: #131415;
+  --tg-theme-secondary-bg-color: #3D2640;
 }
 
 body {
@@ -73,4 +73,71 @@ html {
            transition-colors;
   }
 }
+
+/* Улучшенные тени с розовым оттенком */
+.card-shadow {
+  box-shadow: 
+    0 1px 3px rgba(255, 105, 180, 0.1),
+    0 4px 12px rgba(255, 105, 180, 0.15),
+    0 16px 32px rgba(255, 105, 180, 0.1);
+}
+
+.card-shadow-hover {
+  box-shadow: 
+    0 4px 8px rgba(255, 105, 180, 0.15),
+    0 8px 24px rgba(255, 105, 180, 0.2),
+    0 24px 48px rgba(255, 105, 180, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Градиентные кнопки */
+.btn-gradient {
+  background: linear-gradient(135deg, #FF69B4 0%, #FF1493 100%);
+  transition: all 0.3s ease;
+}
+
+.btn-gradient:hover {
+  background: linear-gradient(135deg, #FF1493 0%, #FF69B4 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 105, 180, 0.3);
+}
+
+.btn-gradient:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Анимированный градиент */
+.bg-animated-gradient {
+  background: linear-gradient(270deg, #FF69B4, #FF1493, #E6B3E6);
+  background-size: 600% 600%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Плавное появление */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+/* Задержки для каскадного появления */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
 

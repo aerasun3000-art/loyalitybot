@@ -54,7 +54,7 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Шапка с градиентом */}
-      <div className="bg-gradient-to-br from-orange-500 to-orange-600 px-4 pt-6 pb-16">
+      <div className="bg-gradient-to-br from-pink-400 to-rose-500 px-4 pt-6 pb-16">
         <div className="flex items-center justify-between mb-8">
           <button
             onClick={() => navigate('/')}
@@ -109,7 +109,7 @@ const Profile = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center">
               <div className="text-3xl mb-1">💰</div>
-              <div className="text-2xl font-bold text-orange-500">
+              <div className="text-2xl font-bold text-pink-500">
                 {clientData?.balance || 0}
               </div>
               <div className="text-xs text-gray-500">Баллов на счёте</div>
@@ -231,11 +231,11 @@ const Profile = () => {
         </div>
 
         {/* Статус клиента */}
-        <div className="bg-gradient-to-br from-orange-100 to-orange-200 rounded-2xl p-4 mb-4">
+        <div className="bg-gradient-to-br from-pink-100 to-pink-200 rounded-2xl p-4 mb-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-gray-800 mb-1">Статус</h3>
-              <p className="text-orange-600 font-semibold">
+              <p className="text-pink-600 font-semibold">
                 {clientData?.status === 'active' ? '✓ Активный' : 'Неактивный'}
               </p>
             </div>

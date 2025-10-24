@@ -32,7 +32,7 @@ except Exception as e:
     log_exception(logger, e, "Ошибка инициализации SupabaseManager")
     raise
 
-BASE_DOMAIN = "https://tma-bot-rewards.lovable.app"
+BASE_DOMAIN = "https://loyalitybot.vercel.app"
 
 # Регулярное выражение для парсинга реферальной ссылки
 # Ожидаемый формат: /start partner_<ID>
@@ -178,32 +178,45 @@ def handle_new_user_start(message):
 
         # ---------------------------------------------
 
-        CLIENT_URL = f"{BASE_DOMAIN}/client-dashboard?chat_id={chat_id}#home"
         markup = types.InlineKeyboardMarkup()
-        btn_dashboard = types.InlineKeyboardButton("🔑 Открыть Личный Кабинет", url=CLIENT_URL)
-        markup.add(btn_dashboard)
+        webapp_btn = types.InlineKeyboardButton(
+            "🚀 Открыть приложение",
+            web_app=types.WebAppInfo(url=BASE_DOMAIN)
+        )
+        markup.add(webapp_btn)
 
-        client_bot.send_message(chat_id,
-                                 "👋 Здравствуйте! Для всех операций используйте ваш **Личный Кабинет** (Frontend):",
-                                 reply_markup=markup,
-                                 parse_mode='Markdown')
+        client_bot.send_message(
+            chat_id,
+            "👋 **Добро пожаловать в LoyalityBot!**\n\n"
+            "💰 Накапливайте баллы за покупки\n"
+            "🎁 Обменивайте на услуги и скидки\n"
+            "📊 Отслеживайте историю операций\n\n"
+            "Нажмите кнопку ниже для открытия приложения:",
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
         return
 
     # --- 4. ЛОГИКА: НЕЗАРЕГИСТРИРОВАННЫЙ КЛИЕНТ (БЕЗ РЕФЕРАЛА) ---
-    # 2. Если клиент НЕ существует: Предлагаем регистрацию или заявку партнера
-    CLIENT_URL = f"{BASE_DOMAIN}/register?chat_id={chat_id}&role=client"
-    PARTNER_URL = f"{BASE_DOMAIN}/partner-apply?chat_id={chat_id}&role=partner"
-
+    # Предлагаем открыть приложение для регистрации
     markup = types.InlineKeyboardMarkup()
-    btn_client = types.InlineKeyboardButton("✅ Я Клиент (Начать регистрацию)", url=CLIENT_URL)
-    btn_partner = types.InlineKeyboardButton("🤝 Я Хочу стать Партнером", url=PARTNER_URL)
-    markup.add(btn_client)
-    markup.add(btn_partner)
+    webapp_btn = types.InlineKeyboardButton(
+        "🚀 Открыть приложение",
+        web_app=types.WebAppInfo(url=BASE_DOMAIN)
+    )
+    markup.add(webapp_btn)
 
-    client_bot.send_message(chat_id,
-                             "👋 Добро пожаловать! Для начала работы нажмите кнопку ниже.",
-                             reply_markup=markup,
-                             parse_mode='Markdown')
+    client_bot.send_message(
+        chat_id,
+        "👋 **Добро пожаловать в LoyalityBot!**\n\n"
+        "🎯 Присоединяйтесь к программе лояльности:\n"
+        "• Накапливайте баллы за каждую покупку\n"
+        "• Получайте эксклюзивные скидки\n"
+        "• Обменивайте баллы на услуги\n\n"
+        "Нажмите кнопку ниже для начала:",
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
 
 @client_bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):

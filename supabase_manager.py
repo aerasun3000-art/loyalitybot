@@ -658,7 +658,7 @@ class SupabaseManager:
         """Получает услуги на модерации для админа."""
         if not self.client: return pd.DataFrame()
         try:
-            response = self.client.from_('services').select('*').eq('status', 'Pending').execute()
+            response = self.client.from_('services').select('*').eq('approval_status', 'Pending').execute()
             return pd.DataFrame(response.data) if response.data else pd.DataFrame()
         except Exception as e:
             logging.error(f"Error getting pending services: {e}")
@@ -668,7 +668,7 @@ class SupabaseManager:
         """Обновляет статус одобрения услуги."""
         if not self.client: return False
         try:
-            self.client.from_('services').update({'status': new_status}).eq('id', service_id).execute()
+            self.client.from_('services').update({'approval_status': new_status}).eq('id', service_id).execute()
             return True
         except Exception as e:
             logging.error(f"Error updating service status: {e}")

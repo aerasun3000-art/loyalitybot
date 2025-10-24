@@ -83,7 +83,29 @@ const Services = () => {
   const serviceIcons = ['🧹', '🔧', '🏠', '💼', '🚗', '📦', '🎨', '💆', '🍕', '☕', '🎁', '🎮']
 
   if (loading) {
-    return <Loader text="Загрузка услуг..." />
+    return (
+      <div className="min-h-screen bg-gray-50 pb-20">
+        <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 pt-6 pb-8">
+          <div className="flex items-center mb-6">
+            <div className="w-6 h-6 bg-white/50 rounded animate-pulse mr-3" />
+            <div className="h-8 bg-white/50 rounded w-32 animate-pulse" />
+          </div>
+          <div className="h-4 bg-white/30 rounded w-48 animate-pulse" />
+        </div>
+
+        <div className="px-4 -mt-4 pb-20">
+          <div className="grid grid-cols-2 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl p-4 animate-pulse">
+                <div className="w-16 h-16 bg-pink-100 rounded-2xl mx-auto mb-3" />
+                <div className="h-4 bg-pink-100 rounded w-3/4 mx-auto mb-2" />
+                <div className="h-3 bg-pink-50 rounded w-1/2 mx-auto" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const filteredServices = getFilteredServices()
@@ -91,7 +113,7 @@ const Services = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Шапка */}
-      <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-4 pt-6 pb-8">
+      <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 pt-6 pb-8">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
             <button
@@ -120,7 +142,7 @@ const Services = () => {
             onClick={() => handleFilterChange('all')}
             className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap ${
               filter === 'all'
-                ? 'bg-white text-orange-500'
+                ? 'bg-white text-pink-500'
                 : 'bg-white/20 text-white'
             }`}
           >
@@ -130,7 +152,7 @@ const Services = () => {
             onClick={() => handleFilterChange('affordable')}
             className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap ${
               filter === 'affordable'
-                ? 'bg-white text-orange-500'
+                ? 'bg-white text-pink-500'
                 : 'bg-white/20 text-white'
             }`}
           >
@@ -140,7 +162,7 @@ const Services = () => {
             onClick={() => handleFilterChange('expensive')}
             className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap ${
               filter === 'expensive'
-                ? 'bg-white text-orange-500'
+                ? 'bg-white text-pink-500'
                 : 'bg-white/20 text-white'
             }`}
           >
@@ -171,11 +193,11 @@ const Services = () => {
                   key={service.id}
                   onClick={() => handleServiceClick(service)}
                   className={`bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer transition-all ${
-                    isHighlighted ? 'ring-2 ring-orange-500' : ''
+                    isHighlighted ? 'ring-2 ring-pink-500' : ''
                   } ${!isAffordable ? 'opacity-60' : ''}`}
                 >
                   {/* Иконка */}
-                  <div className="h-32 bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center relative">
+                  <div className="h-32 bg-gradient-to-br from-pink-100 to-pink-200 flex items-center justify-center relative">
                     <span className="text-6xl">
                       {serviceIcons[index % serviceIcons.length]}
                     </span>
@@ -198,11 +220,11 @@ const Services = () => {
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
-                        <span className="text-orange-500 font-bold text-lg">
+                        <span className="text-pink-500 font-bold text-lg">
                           🪙
                         </span>
                         <span className={`font-bold ${
-                          isAffordable ? 'text-orange-500' : 'text-gray-400'
+                          isAffordable ? 'text-pink-500' : 'text-gray-400'
                         }`}>
                           {service.price_points}
                         </span>
@@ -232,7 +254,7 @@ const Services = () => {
             <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6" />
             
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center">
+              <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center">
                 <span className="text-4xl">
                   {serviceIcons[services.indexOf(selectedService) % serviceIcons.length]}
                 </span>
@@ -255,7 +277,7 @@ const Services = () => {
               <span className="text-gray-600">Стоимость:</span>
               <div className="flex items-center gap-2">
                 <span className="text-3xl">🪙</span>
-                <span className="text-2xl font-bold text-orange-500">
+                <span className="text-2xl font-bold text-pink-500">
                   {selectedService.price_points}
                 </span>
               </div>
@@ -273,7 +295,7 @@ const Services = () => {
                 disabled={balance < selectedService.price_points}
                 className={`flex-1 py-4 rounded-xl font-semibold ${
                   balance >= selectedService.price_points
-                    ? 'bg-orange-500 text-white'
+                    ? 'bg-pink-500 text-white'
                     : 'bg-gray-200 text-gray-400'
                 }`}
               >
