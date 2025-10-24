@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Telegram Web App переменные */
+:root {
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-text-color: #000000;
+  --tg-theme-hint-color: #999999;
+  --tg-theme-link-color: #2481cc;
+  --tg-theme-button-color: #2481cc;
+  --tg-theme-button-text-color: #ffffff;
+  --tg-theme-secondary-bg-color: #f4f4f5;
+}
+
+.dark {
+  --tg-theme-bg-color: #18222d;
+  --tg-theme-text-color: #ffffff;
+  --tg-theme-hint-color: #7d8b99;
+  --tg-theme-link-color: #5eabe1;
+  --tg-theme-button-color: #5eabe1;
+  --tg-theme-button-text-color: #ffffff;
+  --tg-theme-secondary-bg-color: #131415;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--tg-theme-bg-color);
+  color: var(--tg-theme-text-color);
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Убираем стандартные стили браузера */
+* {
+  box-sizing: border-box;
+}
+
+/* Плавная прокрутка */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Стили для кнопок в стиле Telegram */
+@layer components {
+  .tg-button {
+    @apply bg-tg-button text-tg-button-text rounded-lg px-4 py-3 font-medium 
+           hover:opacity-90 active:opacity-80 transition-opacity;
+  }
+  
+  .tg-button-secondary {
+    @apply bg-tg-secondary-bg text-tg-text rounded-lg px-4 py-3 font-medium
+           hover:opacity-90 active:opacity-80 transition-opacity;
+  }
+  
+  .tg-card {
+    @apply bg-tg-secondary-bg rounded-2xl p-4 shadow-sm;
+  }
+  
+  .tg-input {
+    @apply w-full bg-tg-secondary-bg text-tg-text rounded-lg px-4 py-3
+           border-2 border-transparent focus:border-tg-button outline-none
+           transition-colors;
+  }
+}
+

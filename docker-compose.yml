@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # Партнёрский бот
+  partner-bot:
+    build: .
+    container_name: loyalitybot-partner
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: python bot.py
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - loyalitybot-network
+
+  # Клиентский бот
+  client-bot:
+    build: .
+    container_name: loyalitybot-client
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: python client_handler.py
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - loyalitybot-network
+
+  # Админ бот
+  admin-bot:
+    build: .
+    container_name: loyalitybot-admin
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: python admin_bot.py
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - loyalitybot-network
+
+  # Streamlit админ-панель
+  admin-dashboard:
+    build: .
+    container_name: loyalitybot-dashboard
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: streamlit run admin_dashboard.py --server.port=8501 --server.address=0.0.0.0
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - loyalitybot-network
+
+  # Redis для хранения состояний (опционально)
+  redis:
+    image: redis:7-alpine
+    container_name: loyalitybot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - loyalitybot-network
+
+networks:
+  loyalitybot-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+

@@ -1,0 +1,811 @@
+import telebot
+from telebot import types
+import os
+import sys
+import time
+import datetime
+from dotenv import load_dotenv
+from logger_config import get_bot_logger, log_exception
+
+load_dotenv()
+
+sys.path.append(os.path.dirname(__file__))
+# Предполагается, что 'supabase_manager' существует и содержит необходимые методы.
+from supabase_manager import SupabaseManager
+
+# Инициализация логгера
+logger = get_bot_logger('partner_bot')
+
+# --- Инициализация ---
+PARTNER_TOKEN = os.environ.get('TOKEN_PARTNER')
+if not PARTNER_TOKEN:
+    logger.critical("TOKEN_PARTNER не найден в окружении")
+    raise ValueError("FATAL: TOKEN_PARTNER не найден в окружении.")
+
+logger.info("Инициализация партнёрского бота...")
+bot = telebot.TeleBot(PARTNER_TOKEN)
+
+try:
+    sm = SupabaseManager()
+    logger.info("SupabaseManager успешно инициализирован")
+except Exception as e:
+    log_exception(logger, e, "Ошибка инициализации SupabaseManager")
+    raise
+
+# НОВАЯ ЛОГИКА: ЗАГРУЗКА БОНУСА ИЗ .ENV
+try:
+    # Загружаем из .env. Если переменной нет, используем 100 по умолчанию.
+    WELCOME_BONUS_AMOUNT = int(os.environ.get('WELCOME_BONUS_AMOUNT', 100))
+except ValueError:
+    print("WARNING: Переменная WELCOME_BONUS_AMOUNT некорректна или не число. Установлено 100.")
+    WELCOME_BONUS_AMOUNT = 100 
+# --------------------------------------------------
+
+# Глобальные переменные для диалогов
+USER_STATE = {}
+TEMP_DATA = {}
+
+
+# --- УВЕДОМЛЕНИЕ ДЛЯ КЛИЕНТСКОГО БОТА (имитация) ---
+try:
+    from client_handler import send_nps_request
+except ImportError:
+    def send_nps_request(chat_id: str, partner_chat_id: str):
+        print(f"DEBUG: NPS request sent to client {chat_id} (Partner: {partner_chat_id})")
+
+# ------------------------------------
+# КЛАВИАТУРЫ И УВЕДОМЛЕНИЯ
+# ------------------------------------
+
+def get_partner_keyboard():
+    """Главная клавиатура Партнера, включая Акции и Услуги."""
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    btn_add = types.KeyboardButton("➕ Начислить баллы")
+    btn_subtract = types.KeyboardButton("➖ Списать баллы")
+    btn_promo = types.KeyboardButton("🌟 Акции")
+    btn_service = types.KeyboardButton("🛠️ Услуги") 
+    btn_invite = types.KeyboardButton("👥 Пригласить клиента")
+    btn_stats = types.KeyboardButton("📊 Моя статистика")
+    btn_find = types.KeyboardButton("👤 Найти клиента")
+    btn_settings = types.KeyboardButton("⚙️ Настройки")
+
+    markup.add(btn_add, btn_subtract)
+    markup.add(btn_promo, btn_service)
+    markup.add(btn_invite, btn_stats)
+    markup.add(btn_find, btn_settings)
+    return markup
+
+def partner_main_menu(chat_id, message_text="Выберите следующее действие:"):
+    """Возвращает партнера в главное меню."""
+    markup = get_partner_keyboard()
+    bot.send_message(chat_id, message_text, reply_markup=markup, parse_mode='Markdown')
+
+
+# ------------------------------------
+# ГЛАВНЫЙ ОБРАБОТЧИК /START
+# ------------------------------------
+
+@bot.message_handler(commands=['start', 'partner_start'])
+def handle_partner_start(message):
+    chat_id = message.chat.id
+    payload = message.text.replace('/start', '').replace('/partner_start', '').strip()
+    
+    logger.info(f"Партнёр {chat_id} запустил бота с payload: {payload}")
+
+    if payload == 'partner_applied':
+        bot.send_message(chat_id, "⏳ Ваша заявка принята и ожидает одобрения.")
+        return
+
+    try:
+        if sm.partner_exists(chat_id):
+            status = sm.get_partner_status(chat_id)
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка проверки существования партнёра {chat_id}")
+        bot.send_message(chat_id, "Произошла ошибка при доступе к системе. Попробуйте позже.")
+        return
+    
+    if sm.partner_exists(chat_id):
+        status = sm.get_partner_status(chat_id)
+
+        if status == 'Approved':
+            partner_main_menu(chat_id, "🤝 **Добро пожаловать в рабочее меню партнера!**")
+            return
+
+        elif status == 'Pending':
+            bot.send_message(chat_id, "⏳ Ваша заявка находится на рассмотрении.", reply_markup=types.ReplyKeyboardRemove())
+            return
+        elif status == 'Rejected':
+            bot.send_message(chat_id, "❌ Ваша заявка была отклонена. Свяжитесь с администратором.", reply_markup=types.ReplyKeyboardRemove())
+            return
+
+    # Если не партнер: Запуск регистрации (оставлено в качестве заглушки)
+    bot.send_message(chat_id, "Для начала работы нажмите ссылку на регистрацию Партнера.", reply_markup=types.ReplyKeyboardRemove())
+    # Здесь должна быть ссылка на фронтенд /partner-apply
+
+
+# ------------------------------------
+# ФУНКЦИОНАЛ: ОБЩИЕ КНОПКИ МЕНЮ
+# ------------------------------------
+@bot.message_handler(func=lambda message: message.text in ["➕ Начислить баллы", "➖ Списать баллы", "📊 Моя статистика", "👤 Найти клиента", "⚙️ Настройки"])
+def handle_partner_menu_buttons(message):
+    chat_id = message.chat.id
+
+    if not sm.partner_exists(chat_id) or sm.get_partner_status(chat_id) != 'Approved':
+        bot.send_message(chat_id, "У вас нет прав для выполнения этой операции.")
+        return
+
+    if message.text == "➕ Начислить баллы":
+        USER_STATE[chat_id] = 'awaiting_client_id_issue'
+        bot.send_message(chat_id, "Введите *Chat ID клиента* или *ID телефона клиента*.", parse_mode="Markdown")
+        return
+
+    if message.text == "➖ Списать баллы":
+        USER_STATE[chat_id] = 'awaiting_client_id_spend'
+        bot.send_message(chat_id, "Введите *Chat ID клиента* или *ID телефона клиента* для списания баллов.", parse_mode="Markdown")
+        return
+
+    if message.text == "📊 Моя статистика":
+        handle_partner_stats(message)
+        return
+
+    if message.text == "👤 Найти клиента":
+        handle_find_client(message)
+        return
+    
+    if message.text == "⚙️ Настройки":
+        handle_partner_settings(message)
+        return
+
+
+# ------------------------------------
+# ФУНКЦИОНАЛ: ПРИГЛАШЕНИЕ КЛИЕНТА
+# ------------------------------------
+
+@bot.message_handler(func=lambda message: message.text == '👥 Пригласить клиента')
+def handle_invite_start(message):
+    chat_id = message.chat.id
+    if not sm.partner_exists(chat_id) or sm.get_partner_status(chat_id) != 'Approved':
+        bot.send_message(chat_id, "У вас нет прав для выполнения этой операции.")
+        return
+
+    # Меню с реферальной ссылкой
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    btn_link = types.InlineKeyboardButton("🔗 Получить реферальную ссылку", callback_data="invite_by_link")
+    markup.add(btn_link)
+
+    bot.send_message(
+        chat_id,
+        "Получите реферальную ссылку для приглашения клиентов:",
+        reply_markup=markup
+    )
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('invite_'))
+def handle_invite_callbacks(call):
+    chat_id = call.message.chat.id
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None) 
+    except Exception:
+        pass
+
+    if call.data == 'invite_by_link':
+        partner_id = str(chat_id)
+        # Ссылка на клиентский бот @mindbeatybot
+        link = f"https://t.me/mindbeatybot?start=partner_{partner_id}" 
+        bot.send_message(
+            chat_id,
+            f"🔗 **Ваша реферальная ссылка:**\n\n`{link}`\n\n📱 Отправьте эту ссылку клиенту. При переходе по ссылке клиент автоматически получит приветственные баллы!",
+            parse_mode='Markdown'
+        )
+        partner_main_menu(chat_id)
+        
+
+
+
+# ------------------------------------
+# ЛОГИКА ТРАНЗАКЦИЙ ПАРТНЕРА (ОСТАВЛЕНО)
+# ------------------------------------
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) in ['awaiting_client_id_issue', 'awaiting_client_id_spend'])
+def process_client_id(message):
+    chat_id = message.chat.id
+    client_id_input = message.text.strip()
+
+    client_id = client_id_input
+    if client_id_input.isdigit() and len(client_id_input) >= 10:
+        if not sm.client_exists(client_id_input):
+            client_id = f"VIA_PARTNER_{client_id_input}"
+
+    if not sm.client_exists(client_id):
+        bot.send_message(chat_id, "❌ Клиент с таким ID не найден. Попробуйте снова.")
+        USER_STATE.pop(chat_id, None)
+        return
+
+    TEMP_DATA[chat_id] = {
+        'client_id': client_id,
+        'txn_type': 'accrual' if USER_STATE[chat_id] == 'awaiting_client_id_issue' else 'spend'
+    }
+    USER_STATE[chat_id] = 'awaiting_amount'
+
+    prompt = ""
+    current_balance = sm.get_client_balance(client_id)
+    if TEMP_DATA[chat_id]['txn_type'] == 'accrual':
+        prompt = f"Текущий баланс клиента: **{current_balance}** баллов.\nВведите *сумму чека (в рублях)* для начисления баллов:"
+    else:
+        prompt = f"Текущий баланс клиента: **{current_balance}** баллов.\nВведите *количество баллов* для списания:"
+
+    bot.send_message(chat_id, prompt, parse_mode="Markdown")
+
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_amount')
+def process_amount(message):
+    chat_id = message.chat.id
+
+    try:
+        amount = float(message.text.strip().replace(',', '.'))
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        bot.send_message(chat_id, "❌ Неверный формат суммы. Введите корректное число.")
+        return
+
+    txn_data = TEMP_DATA.pop(chat_id, None)
+    USER_STATE.pop(chat_id, None)
+
+    if not txn_data or 'client_id' not in txn_data:
+        bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать снова: /start")
+        return
+
+    try:
+        logger.info(f"Партнёр {chat_id} инициирует транзакцию: тип={txn_data['txn_type']}, клиент={txn_data['client_id']}, сумма={amount}")
+        result = sm.execute_transaction(txn_data['client_id'], str(chat_id), txn_data['txn_type'], amount)
+
+        if result['success']:
+            msg = f"✅ **Транзакция успешна!**\n"
+            if txn_data['txn_type'] == 'accrual':
+                msg += f"Начислено: **{result.get('points', 0)}** баллов.\n"
+            else:
+                msg += f"Списано: **{amount}** баллов.\n"
+
+            msg += f"Текущий баланс клиента: **{result.get('new_balance', 'N/A')}**."
+            bot.send_message(chat_id, msg, parse_mode="Markdown")
+            logger.info(f"Транзакция успешна: {txn_data['txn_type']} для клиента {txn_data['client_id']}")
+
+            # --- КЛЮЧЕВОЙ ШАГ: ЗАПРОС NPS (Отправляется в Клиентский бот) ---
+            if not str(txn_data['client_id']).startswith('VIA_PARTNER_'):
+                try:
+                    send_nps_request(txn_data['client_id'], str(chat_id))
+                    logger.info(f"NPS запрос отправлен клиенту {txn_data['client_id']}")
+                except Exception as e:
+                    log_exception(logger, e, f"Ошибка отправки NPS запроса клиенту {txn_data['client_id']}")
+
+        else:
+            error_msg = result.get('error', 'Неизвестная ошибка')
+            logger.warning(f"Транзакция не удалась для клиента {txn_data['client_id']}: {error_msg}")
+            bot.send_message(chat_id, f"❌ Ошибка транзакции: {error_msg}")
+
+    except Exception as e:
+        log_exception(logger, e, f"Критическая ошибка при выполнении транзакции партнёра {chat_id}")
+        bot.send_message(chat_id, "Произошла системная ошибка при проведении транзакции. Обратитесь в поддержку.")
+
+    partner_main_menu(chat_id)
+
+
+# ------------------------------------
+# ФУНКЦИОНАЛ: СТАТИСТИКА ПАРТНЕРА (ОСТАВЛЕНО)
+# ------------------------------------
+
+def handle_partner_stats(message):
+    """Выводит ключевую статистику Партнера."""
+    chat_id = str(message.chat.id)
+    bot.send_message(chat_id, "⏳ Собираю данные по вашему партнерству...")
+
+    stats = sm.get_partner_stats(chat_id)
+
+    total_ratings = stats['promoters'] + stats['detractors'] + (stats['total_transactions'] - stats['promoters'] - stats['detractors']) if stats['total_transactions'] > 0 else 0
+
+    nps_score = 0
+    if total_ratings > 0:
+        nps_score = round(((stats['promoters'] - stats['detractors']) / total_ratings) * 100, 0)
+
+
+    response_text = f"""
+**📊 Ваша Статистика**
+---
+**Привлечение:**
+👥 Привлечено клиентов (referral): **{stats['total_referrals']}** чел.
+---
+**Финансы:**
+💰 Общий оборот (по чекам, рубли): **{stats['total_spent_rub']:,.0f}** руб.
+🎁 Всего начислено баллов: **{stats['total_accrued_points']:,.0f}**
+🧾 Общее количество транзакций: **{stats['total_transactions']}**
+---
+**Качество (NPS):**
+⭐ Средняя оценка (A. Rating): **{stats['avg_nps_rating']:.2f}**
+📈 Чистый NPS: **{nps_score:,.0f}**
+🟢 Промоутеры (9-10): **{stats['promoters']}**
+🔴 Детракторы (0-6): **{stats['detractors']}**
+"""
+
+    bot.send_message(chat_id, response_text, parse_mode='Markdown')
+    partner_main_menu(chat_id)
+
+
+# ------------------------------------
+# ФУНКЦИОНАЛ: УПРАВЛЕНИЕ АКЦИЯМИ (ОСТАВЛЕНО)
+# ------------------------------------
+
+@bot.message_handler(func=lambda message: message.text == "🌟 Акции")
+def handle_promotions_menu(message):
+    chat_id = message.chat.id
+    if not sm.partner_exists(chat_id) or sm.get_partner_status(chat_id) != 'Approved':
+        bot.send_message(chat_id, "У вас нет прав для выполнения этой операции.")
+        return
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    btn_add = types.InlineKeyboardButton("➕ Создать новую акцию", callback_data="promo_add")
+    btn_manage = types.InlineKeyboardButton("⚙️ Редактировать / Удалить", callback_data="promo_manage")
+    btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
+    markup.add(btn_add, btn_manage, btn_back)
+
+    bot.send_message(chat_id, "*Управление Акциями:*\nВыберите действие:", reply_markup=markup, parse_mode='Markdown')
+
+# Обработка Callback-запросов
+@bot.callback_query_handler(func=lambda call: call.data.startswith('promo_'))
+def handle_promo_callbacks(call):
+    chat_id = call.message.chat.id
+    
+    # Пытаемся удалить Inline-клавиатуру, чтобы избежать повторных нажатий
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)  
+    except Exception:
+        pass
+
+    if call.data == 'promo_add':
+        USER_STATE[chat_id] = 'awaiting_promo_title'
+        # Заполняем TEMP_DATA начальными данными
+        TEMP_DATA[chat_id] = {
+            'partner_chat_id': str(chat_id), 
+            'start_date': datetime.datetime.now().strftime("%Y-%m-%d")
+        } 
+        
+        msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 1 из 4):*\n\n1. Введите **Заголовок** акции (например: 'Скидка 20% на десерты'):", parse_mode='Markdown')
+        bot.register_next_step_handler(msg, process_promo_title)
+    
+    elif call.data == 'promo_manage':
+        handle_promo_manage_list(chat_id)
+        
+    elif call.data == 'partner_main_menu':
+        partner_main_menu(chat_id)
+    
+    # Важно: отвечаем на callback query
+    bot.answer_callback_query(call.id)
+
+def process_promo_title(message):
+    chat_id = message.chat.id
+    if len(message.text.strip()) < 3:
+        msg = bot.send_message(chat_id, "Заголовок слишком короткий. Введите более подробный заголовок:")
+        bot.register_next_step_handler(msg, process_promo_title)
+        return
+
+    TEMP_DATA[chat_id]['title'] = message.text.strip()
+    USER_STATE[chat_id] = 'awaiting_promo_description'
+    
+    msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 2 из 4):*\n\n2. Введите **Описание** акции (подробности и условия):", parse_mode='Markdown')
+    bot.register_next_step_handler(msg, process_promo_description)
+
+def process_promo_description(message):
+    chat_id = message.chat.id
+    TEMP_DATA[chat_id]['description'] = message.text.strip()
+    USER_STATE[chat_id] = 'awaiting_promo_discount'
+    
+    msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 3 из 4):*\n\n3. Введите **Размер скидки/Бонуса** (например: '20%' или 'x2 бонуса'):", parse_mode='Markdown')
+    bot.register_next_step_handler(msg, process_promo_discount)
+
+def process_promo_discount(message):
+    chat_id = message.chat.id
+    TEMP_DATA[chat_id]['discount_value'] = message.text.strip()
+    USER_STATE[chat_id] = 'awaiting_promo_end_date'
+    
+    msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 4 из 4):*\n\n4. Введите **Дату окончания** акции в формате *ДД.ММ.ГГГГ* (например: 31.12.2025):", parse_mode='Markdown')
+    bot.register_next_step_handler(msg, process_promo_end_date)
+
+def process_promo_end_date(message):
+    chat_id = message.chat.id
+    date_str = message.text.strip()
+    
+    try:
+        # Проверяем формат и конвертируем в формат YYYY-MM-DD для БД
+        end_date = datetime.datetime.strptime(date_str, "%d.%m.%Y")
+        db_date_format = end_date.strftime("%Y-%m-%d")
+
+        # Проверка, что дата не в прошлом
+        if end_date.date() < datetime.date.today():
+             msg = bot.send_message(chat_id, "❌ Дата окончания не может быть в прошлом. Пожалуйста, введите корректную дату:", parse_mode='Markdown')
+             bot.register_next_step_handler(msg, process_promo_end_date)
+             return
+
+        TEMP_DATA[chat_id]['end_date'] = db_date_format
+    except ValueError:
+        msg = bot.send_message(chat_id, "❌ Неверный формат даты. Пожалуйста, введите дату в формате *ДД.ММ.ГГГГ* (например: 31.12.2025):", parse_mode='Markdown')
+        bot.register_next_step_handler(msg, process_promo_end_date)
+        return
+
+    # Завершаем сбор данных и сохраняем в БД
+    promo_data = TEMP_DATA.pop(chat_id, None)
+    USER_STATE.pop(chat_id, None)
+
+    if not promo_data:
+        bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать снова: /start")
+        return
+        
+    try:
+        success = sm.add_promotion(promo_data)
+        
+        if success:
+            bot.send_message(chat_id, "🎉 **Акция успешно создана!** Она будет немедленно отображена в Клиентском Web App.", parse_mode='Markdown')
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при сохранении акции. Проверьте логи.")
+
+    except Exception as e:
+        print(f"Error saving promotion: {e}")
+        bot.send_message(chat_id, "Произошла системная ошибка при проведении транзакции.")
+
+    partner_main_menu(chat_id)
+
+
+# ------------------------------------
+# ФУНКЦИОНАЛ: УПРАВЛЕНИЕ УСЛУГАМИ (ОСТАВЛЕНО)
+# ------------------------------------
+
+@bot.message_handler(func=lambda message: message.text == "🛠️ Услуги")
+def handle_services_menu(message):
+    chat_id = message.chat.id
+    if not sm.partner_exists(chat_id) or sm.get_partner_status(chat_id) != 'Approved':
+        bot.send_message(chat_id, "У вас нет прав для выполнения этой операции.")
+        return
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    btn_add = types.InlineKeyboardButton("➕ Добавить новую услугу", callback_data="service_add")
+    btn_manage = types.InlineKeyboardButton("🔍 Мои услуги (статус)", callback_data="service_status")
+    btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
+    markup.add(btn_add, btn_manage, btn_back)
+
+    bot.send_message(chat_id, "*Управление Услугами:*\nСоздайте услугу, которая будет доступна для обмена баллов клиентами (требуется одобрение Администратора).", reply_markup=markup, parse_mode='Markdown')
+
+# Обработка Callback-запросов для Услуг
+@bot.callback_query_handler(func=lambda call: call.data.startswith('service_'))
+def handle_service_callbacks(call):
+    chat_id = call.message.chat.id
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None) 
+    except Exception:
+        pass
+        
+    if call.data == 'service_add':
+        USER_STATE[chat_id] = 'awaiting_service_title'
+        TEMP_DATA[chat_id] = {
+            'partner_chat_id': str(chat_id),
+            'status': 'Pending'  # Явно устанавливаем статус
+        }
+        
+        msg = bot.send_message(chat_id, "✍️ *Создание Услуги (Шаг 1 из 3):*\n\n1. Введите **Название** услуги (например: 'Бесплатный кофе', 'Скидка 500 руб.'):", parse_mode='Markdown')
+        bot.register_next_step_handler(msg, process_service_title)
+    
+    elif call.data == 'service_status':
+        handle_service_status_list(chat_id)
+
+    elif call.data == 'partner_main_menu':
+        partner_main_menu(chat_id)
+    
+    # Важно: отвечаем на callback query
+    bot.answer_callback_query(call.id)
+
+def process_service_title(message):
+    chat_id = message.chat.id
+    TEMP_DATA[chat_id]['title'] = message.text.strip()
+    USER_STATE[chat_id] = 'awaiting_service_description'
+    
+    msg = bot.send_message(chat_id, "✍️ *Создание Услуги (Шаг 2 из 3):*\n\n2. Введите **Описание** услуги (подробности, ограничения, как получить):", parse_mode='Markdown')
+    bot.register_next_step_handler(msg, process_service_description)
+
+def process_service_description(message):
+    chat_id = message.chat.id
+    TEMP_DATA[chat_id]['description'] = message.text.strip()
+    USER_STATE[chat_id] = 'awaiting_service_price'
+    
+    msg = bot.send_message(chat_id, "✍️ *Создание Услуги (Шаг 3 из 3):*\n\n3. Введите **Стоимость** услуги в *баллах* (целое число, например: 100):", parse_mode='Markdown')
+    bot.register_next_step_handler(msg, process_service_price)
+
+def process_service_price(message):
+    chat_id = message.chat.id
+    
+    try:
+        price = int(message.text.strip())
+        if price <= 0:
+            raise ValueError
+        TEMP_DATA[chat_id]['price_points'] = price
+    except ValueError:
+        msg = bot.send_message(chat_id, "❌ Неверный формат. Введите *целое число* баллов больше нуля.")
+        bot.register_next_step_handler(msg, process_service_price)
+        return
+
+    # Сохраняем Услугу со статусом 'Pending'
+    service_data = TEMP_DATA.pop(chat_id, None)
+    USER_STATE.pop(chat_id, None)
+
+    if not service_data:
+        bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать снова: /start")
+        return
+
+    try:
+        success = sm.add_service(service_data)
+
+        if success:
+            bot.send_message(chat_id, "✅ **Услуга отправлена на модерацию!**\nАдминистратор рассмотрит вашу заявку и одобрит услугу, после чего она станет доступна клиентам.", parse_mode='Markdown')
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при сохранении услуги. Проверьте логи.")
+            
+    except Exception as e:
+        print(f"Error saving service: {e}")
+        bot.send_message(chat_id, "Произошла системная ошибка при сохранении услуги.")
+
+    partner_main_menu(chat_id)
+
+
+# ------------------------------------
+# ФУНКЦИОНАЛ: ПОИСК КЛИЕНТА (НОВОЕ)
+# ------------------------------------
+
+def handle_find_client(message):
+    """Поиск клиента по номеру телефона."""
+    chat_id = message.chat.id
+    USER_STATE[chat_id] = 'awaiting_client_phone_search'
+    bot.send_message(chat_id, "📱 Введите номер телефона клиента для поиска (например: 79991234567):")
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_client_phone_search')
+def process_client_phone_search(message):
+    chat_id = message.chat.id
+    phone = message.text.strip().replace('+', '').replace(' ', '').replace('-', '')
+    
+    try:
+        client_data = sm.get_client_by_phone(phone)
+        
+        if client_data:
+            balance = client_data.get('balance', 0)
+            name = client_data.get('name', 'Не указано')
+            status = client_data.get('status', 'Неизвестно')
+            client_chat_id = client_data.get('chat_id', 'N/A')
+            
+            response = f"✅ **Клиент найден:**\n\n"
+            response += f"👤 Имя: {name}\n"
+            response += f"📱 Телефон: {phone}\n"
+            response += f"💰 Баланс: {balance} баллов\n"
+            response += f"📊 Статус: {status}\n"
+            response += f"🆔 Chat ID: `{client_chat_id}`"
+            
+            bot.send_message(chat_id, response, parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} нашёл клиента {client_chat_id} по телефону")
+        else:
+            bot.send_message(chat_id, f"❌ Клиент с номером **{phone}** не найден в системе.", parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} не нашёл клиента по телефону {phone}")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка поиска клиента партнёром {chat_id}")
+        bot.send_message(chat_id, "Произошла ошибка при поиске клиента.")
+    
+    USER_STATE.pop(chat_id, None)
+    partner_main_menu(chat_id)
+
+
+# ------------------------------------
+# ФУНКЦИОНАЛ: НАСТРОЙКИ ПАРТНЕРА (НОВОЕ)
+# ------------------------------------
+
+def handle_partner_settings(message):
+    """Показывает меню настроек партнёра."""
+    chat_id = message.chat.id
+    
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    btn_bonus = types.InlineKeyboardButton("🎁 Изменить приветственный бонус", callback_data="settings_bonus")
+    btn_info = types.InlineKeyboardButton("ℹ️ Моя информация", callback_data="settings_info")
+    btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
+    markup.add(btn_bonus, btn_info, btn_back)
+    
+    bot.send_message(chat_id, "*⚙️ Настройки партнёра:*\nВыберите действие:", reply_markup=markup, parse_mode='Markdown')
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('settings_'))
+def handle_settings_callbacks(call):
+    chat_id = call.message.chat.id
+    
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    
+    if call.data == 'settings_info':
+        try:
+            # Получаем информацию о партнёре из БД
+            partner_data = sm.get_all_partners()
+            partner_info = partner_data[partner_data['chat_id'] == str(chat_id)]
+            
+            if not partner_info.empty:
+                partner = partner_info.iloc[0]
+                info_text = f"**Информация о вашем аккаунте:**\n\n"
+                info_text += f"👤 Имя: {partner.get('name', 'Не указано')}\n"
+                info_text += f"🏢 Компания: {partner.get('company_name', 'Не указано')}\n"
+                info_text += f"📱 Телефон: {partner.get('phone', 'Не указан')}\n"
+                info_text += f"📊 Статус: {partner.get('status', 'Неизвестно')}\n"
+                info_text += f"🆔 Chat ID: `{chat_id}`"
+                
+                bot.send_message(chat_id, info_text, parse_mode='Markdown')
+                logger.info(f"Партнёр {chat_id} просмотрел свою информацию")
+            else:
+                bot.send_message(chat_id, "Информация о партнёре не найдена.")
+        except Exception as e:
+            log_exception(logger, e, f"Ошибка получения информации партнёра {chat_id}")
+            bot.send_message(chat_id, "Ошибка при получении информации.")
+        
+        partner_main_menu(chat_id)
+    
+    elif call.data == 'settings_bonus':
+        bot.send_message(chat_id, 
+            f"ℹ️ Текущий приветственный бонус для новых клиентов: **{WELCOME_BONUS_AMOUNT}** баллов.\n\n"
+            "Для изменения этой настройки обратитесь к администратору системы.",
+            parse_mode='Markdown'
+        )
+        partner_main_menu(chat_id)
+    
+    bot.answer_callback_query(call.id)
+
+
+# ------------------------------------
+# ФУНКЦИОНАЛ: УПРАВЛЕНИЕ АКЦИЯМИ - ПРОСМОТР/УДАЛЕНИЕ (НОВОЕ)
+# ------------------------------------
+
+def handle_promo_manage_list(chat_id):
+    """Показывает список акций партнёра для управления."""
+    try:
+        # Получаем все акции партнёра
+        all_promos = sm.client.from_('promotions').select('*').eq('partner_chat_id', str(chat_id)).execute()
+        
+        if not all_promos.data:
+            bot.send_message(chat_id, "У вас пока нет созданных акций.")
+            partner_main_menu(chat_id)
+            return
+        
+        response = "**📋 Ваши акции:**\n\n"
+        for promo in all_promos.data:
+            promo_id = promo.get('id')
+            title = promo.get('title', 'Без названия')
+            end_date = promo.get('end_date', 'N/A')
+            
+            response += f"• **{title}**\n"
+            response += f"  ID: `{promo_id}` | До: {end_date}\n\n"
+        
+        response += "\n💡 Для удаления акции отправьте команду:\n`/delete_promo ID_АКЦИИ`"
+        
+        bot.send_message(chat_id, response, parse_mode='Markdown')
+        logger.info(f"Партнёр {chat_id} просмотрел список своих акций")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка получения списка акций партнёра {chat_id}")
+        bot.send_message(chat_id, "Ошибка при получении списка акций.")
+    
+    partner_main_menu(chat_id)
+
+
+@bot.message_handler(commands=['delete_promo'])
+def handle_delete_promo(message):
+    """Удаляет акцию по ID."""
+    chat_id = message.chat.id
+    
+    try:
+        promo_id = message.text.replace('/delete_promo', '').strip()
+        
+        if not promo_id.isdigit():
+            bot.send_message(chat_id, "❌ Неверный формат. Используйте: /delete_promo ID")
+            return
+        
+        # Проверяем, принадлежит ли акция этому партнёру
+        promo_check = sm.client.from_('promotions').select('*').eq('id', int(promo_id)).eq('partner_chat_id', str(chat_id)).execute()
+        
+        if not promo_check.data:
+            bot.send_message(chat_id, "❌ Акция не найдена или не принадлежит вам.")
+            return
+        
+        # Удаляем акцию
+        sm.client.from_('promotions').delete().eq('id', int(promo_id)).execute()
+        
+        bot.send_message(chat_id, f"✅ Акция ID {promo_id} успешно удалена!")
+        logger.info(f"Партнёр {chat_id} удалил акцию {promo_id}")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка удаления акции партнёром {chat_id}")
+        bot.send_message(chat_id, "Произошла ошибка при удалении акции.")
+    
+    partner_main_menu(chat_id)
+
+
+# ------------------------------------
+# ФУНКЦИОНАЛ: ПРОСМОТР СТАТУСА УСЛУГ (НОВОЕ)
+# ------------------------------------
+
+def handle_service_status_list(chat_id):
+    """Показывает список услуг партнёра с их статусами."""
+    try:
+        # Получаем все услуги партнёра
+        all_services = sm.client.from_('services').select('*').eq('partner_chat_id', str(chat_id)).execute()
+        
+        if not all_services.data:
+            bot.send_message(chat_id, "У вас пока нет созданных услуг.")
+            partner_main_menu(chat_id)
+            return
+        
+        response = "**📋 Ваши услуги:**\n\n"
+        
+        for service in all_services.data:
+            service_id = service.get('id')
+            title = service.get('title', 'Без названия')
+            price = service.get('price_points', 0)
+            status = service.get('status', 'Unknown')
+            
+            # Эмодзи в зависимости от статуса
+            status_emoji = {
+                'Pending': '⏳',
+                'Approved': '✅',
+                'Rejected': '❌'
+            }.get(status, '❓')
+            
+            response += f"{status_emoji} **{title}**\n"
+            response += f"   💎 Стоимость: {price} баллов | Статус: {status}\n\n"
+        
+        bot.send_message(chat_id, response, parse_mode='Markdown')
+        logger.info(f"Партнёр {chat_id} просмотрел статус своих услуг")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка получения статуса услуг партнёра {chat_id}")
+        bot.send_message(chat_id, "Ошибка при получении статуса услуг.")
+    
+    partner_main_menu(chat_id)
+
+
+# ------------------------------------
+# ОБРАБОТЧИК ПРОЧИХ СООБЩЕНИЙ (ОСТАВЛЕНО)
+# ------------------------------------
+@bot.message_handler(func=lambda message: True)
+def handle_partner_all_messages(message):
+    chat_id = message.chat.id
+
+    if chat_id not in USER_STATE and not sm.partner_exists(chat_id):
+        bot.send_message(chat_id, "Пожалуйста, начните с команды /start.")
+        return
+
+    if sm.partner_exists(chat_id) and sm.get_partner_status(chat_id) == 'Approved':
+        if chat_id not in USER_STATE:
+            partner_main_menu(chat_id, "Используйте меню Партнера.")
+
+    elif chat_id in USER_STATE:
+        pass # Ожидаем ввода в рамках текущего шага диалога
+
+
+# ------------------------------------
+# ЗАПУСК БОТА (ОСТАВЛЕНО)
+# ------------------------------------
+def run_bot():
+    logger.info("=== Партнёрский бот запущен ===")
+    while True:
+        try:
+            bot.polling(none_stop=True, interval=1, timeout=20)
+        except KeyboardInterrupt:
+            logger.info("Бот остановлен пользователем (KeyboardInterrupt)")
+            break
+        except Exception as e:
+            log_exception(logger, e, "Ошибка соединения с Telegram API")
+            logger.warning("Переподключение через 5 секунд...")
+            time.sleep(5)
+
+if __name__ == '__main__':
+    try:
+        run_bot()
+    except Exception as e:
+        log_exception(logger, e, "Критическая ошибка при запуске бота")
+        raise

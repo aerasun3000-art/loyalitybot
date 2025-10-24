@@ -1,0 +1,24 @@
+[Unit]
+Description=LoyalityBot Admin Bot
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/path/to/loyalitybot
+Environment="PATH=/path/to/loyalitybot/venv/bin"
+ExecStart=/path/to/loyalitybot/venv/bin/python admin_bot.py
+Restart=always
+RestartSec=10
+
+# Логирование
+StandardOutput=append:/var/log/loyalitybot/admin.log
+StandardError=append:/var/log/loyalitybot/admin.error.log
+
+# Безопасность
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+
