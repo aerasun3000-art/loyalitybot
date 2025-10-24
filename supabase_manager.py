@@ -614,7 +614,13 @@ class SupabaseManager:
             'discount_value': discount_value,
             'start_date': start_date,
             'end_date': end_date,
+            'is_active': True,  # Акция активна по умолчанию
+            'required_points': promo_data.get('required_points', 0),  # Баллы для активации
         }
+        
+        # Добавляем image_url если есть
+        if promo_data.get('image_url'):
+            record['image_url'] = promo_data.get('image_url')
 
         try:
             self.client.from_('promotions').insert(record).execute()

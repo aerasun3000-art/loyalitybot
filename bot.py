@@ -6,6 +6,7 @@ import time
 import datetime
 from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
+from image_handler import process_photo_for_promotion
 
 load_dotenv()
 
@@ -364,10 +365,11 @@ def handle_promo_callbacks(call):
         # Заполняем TEMP_DATA начальными данными
         TEMP_DATA[chat_id] = {
             'partner_chat_id': str(chat_id), 
-            'start_date': datetime.datetime.now().strftime("%Y-%m-%d")
+            'start_date': datetime.datetime.now().strftime("%Y-%m-%d"),
+            'image_url': None  # Для хранения URL изображения
         } 
         
-        msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 1 из 4):*\n\n1. Введите **Заголовок** акции (например: 'Скидка 20% на десерты'):", parse_mode='Markdown')
+        msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 1 из 5):*\n\n1. Введите **Заголовок** акции (например: 'Скидка 20% на десерты'):", parse_mode='Markdown')
         bot.register_next_step_handler(msg, process_promo_title)
     
     elif call.data == 'promo_manage':
@@ -389,7 +391,7 @@ def process_promo_title(message):
     TEMP_DATA[chat_id]['title'] = message.text.strip()
     USER_STATE[chat_id] = 'awaiting_promo_description'
     
-    msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 2 из 4):*\n\n2. Введите **Описание** акции (подробности и условия):", parse_mode='Markdown')
+    msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 2 из 5):*\n\n2. Введите **Описание** акции (подробности и условия):", parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_promo_description)
 
 def process_promo_description(message):
@@ -397,7 +399,7 @@ def process_promo_description(message):
     TEMP_DATA[chat_id]['description'] = message.text.strip()
     USER_STATE[chat_id] = 'awaiting_promo_discount'
     
-    msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 3 из 4):*\n\n3. Введите **Размер скидки/Бонуса** (например: '20%' или 'x2 бонуса'):", parse_mode='Markdown')
+    msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 3 из 5):*\n\n3. Введите **Размер скидки/Бонуса** (например: '20%' или 'x2 бонуса'):", parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_promo_discount)
 
 def process_promo_discount(message):
@@ -405,7 +407,7 @@ def process_promo_discount(message):
     TEMP_DATA[chat_id]['discount_value'] = message.text.strip()
     USER_STATE[chat_id] = 'awaiting_promo_end_date'
     
-    msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 4 из 4):*\n\n4. Введите **Дату окончания** акции в формате *ДД.ММ.ГГГГ* (например: 31.12.2025):", parse_mode='Markdown')
+    msg = bot.send_message(chat_id, "✍️ *Создание Акции (Шаг 4 из 5):*\n\n4. Введите **Дату окончания** акции в формате *ДД.ММ.ГГГГ* (например: 31.12.2025):", parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_promo_end_date)
 
 def process_promo_end_date(message):
@@ -429,25 +431,148 @@ def process_promo_end_date(message):
         bot.register_next_step_handler(msg, process_promo_end_date)
         return
 
-    # Завершаем сбор данных и сохраняем в БД
+    # Переходим к загрузке фото (Шаг 5)
+    USER_STATE[chat_id] = 'awaiting_promo_photo'
+    
+    # Создаём кнопку для пропуска загрузки фото
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add(types.KeyboardButton("⏩ Пропустить загрузку фото"))
+    
+    bot.send_message(
+        chat_id, 
+        "📸 *Создание Акции (Шаг 5 из 5):*\n\n"
+        "5. Загрузите **Изображение** для акции (фото товара, баннер и т.д.)\n\n"
+        "Или нажмите кнопку *'Пропустить'* для создания акции без изображения.",
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
+    
+    bot.register_next_step_handler_by_chat_id(chat_id, process_promo_photo)
+
+def process_promo_photo(message):
+    """Обработка загрузки фото для акции (новый шаг 5)"""
+    chat_id = message.chat.id
+    
+    # Убираем кастомную клавиатуру
+    markup_remove = types.ReplyKeyboardRemove()
+    
+    # Проверяем - пропустил ли пользователь загрузку
+    if message.text and message.text == "⏩ Пропустить загрузку фото":
+        # Сохраняем без фото
+        bot.send_message(chat_id, "⏳ Сохранение акции без изображения...", reply_markup=markup_remove)
+        save_promotion(chat_id)
+        return
+    
+    # Проверяем, что это фото
+    if not message.photo:
+        msg = bot.send_message(
+            chat_id, 
+            "❌ Пожалуйста, отправьте изображение или нажмите *'Пропустить'*.",
+            parse_mode='Markdown',
+            reply_markup=markup_remove
+        )
+        
+        # Возвращаем кнопку пропуска
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        markup.add(types.KeyboardButton("⏩ Пропустить загрузку фото"))
+        bot.send_message(chat_id, "Выберите действие:", reply_markup=markup)
+        
+        bot.register_next_step_handler_by_chat_id(chat_id, process_promo_photo)
+        return
+    
+    # Получаем file_id самого большого размера фото
+    file_id = message.photo[-1].file_id
+    
+    # Отправляем сообщение о начале обработки
+    processing_msg = bot.send_message(
+        chat_id, 
+        "📸 Обрабатываю изображение...\n⏳ Пожалуйста, подождите.", 
+        reply_markup=markup_remove
+    )
+    
+    try:
+        # Обрабатываем и загружаем фото
+        success, result = process_photo_for_promotion(file_id, PARTNER_TOKEN)
+        
+        if success:
+            # result - это URL загруженного изображения
+            TEMP_DATA[chat_id]['image_url'] = result
+            try:
+                bot.edit_message_text(
+                    "✅ Изображение успешно загружено!",
+                    chat_id,
+                    processing_msg.message_id
+                )
+            except:
+                # Если не можем редактировать, отправляем новое сообщение
+                bot.send_message(chat_id, "✅ Изображение успешно загружено!")
+        else:
+            # result - это сообщение об ошибке
+            try:
+                bot.edit_message_text(
+                    f"❌ Ошибка загрузки изображения:\n{result}\n\nАкция будет создана без изображения.",
+                    chat_id,
+                    processing_msg.message_id
+                )
+            except:
+                # Если не можем редактировать, отправляем новое сообщение
+                bot.send_message(
+                    chat_id,
+                    f"❌ Ошибка загрузки изображения:\n{result}\n\nАкция будет создана без изображения."
+                )
+    
+    except Exception as e:
+        logger.error(f"Error processing photo: {e}")
+        try:
+            bot.edit_message_text(
+                f"❌ Ошибка при обработке изображения.\nАкция будет создана без изображения.",
+                chat_id,
+                processing_msg.message_id
+            )
+        except:
+            # Если не можем редактировать, отправляем новое сообщение
+            bot.send_message(
+                chat_id,
+                f"❌ Ошибка при обработке изображения.\nАкция будет создана без изображения."
+            )
+    
+    # Сохраняем акцию (с фото или без)
+    bot.send_message(chat_id, "⏳ Сохранение акции...")
+    save_promotion(chat_id)
+
+def save_promotion(chat_id):
+    """Сохранение акции в БД"""
     promo_data = TEMP_DATA.pop(chat_id, None)
     USER_STATE.pop(chat_id, None)
 
     if not promo_data:
-        bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать снова: /start")
+        bot.send_message(chat_id, "❌ Ошибка сессии. Попробуйте начать снова: /start")
         return
         
     try:
         success = sm.add_promotion(promo_data)
         
         if success:
-            bot.send_message(chat_id, "🎉 **Акция успешно создана!** Она будет немедленно отображена в Клиентском Web App.", parse_mode='Markdown')
+            if promo_data.get('image_url'):
+                bot.send_message(
+                    chat_id, 
+                    "🎉 **Акция с изображением успешно создана!**\n\n"
+                    "Она будет отображена в приложении с вашим фото.",
+                    parse_mode='Markdown'
+                )
+            else:
+                bot.send_message(
+                    chat_id, 
+                    "🎉 **Акция успешно создана!**\n\n"
+                    "Она будет отображена с placeholder изображением.",
+                    parse_mode='Markdown'
+                )
         else:
             bot.send_message(chat_id, "❌ Ошибка при сохранении акции. Проверьте логи.")
 
     except Exception as e:
-        print(f"Error saving promotion: {e}")
-        bot.send_message(chat_id, "Произошла системная ошибка при проведении транзакции.")
+        logger.error(f"Error saving promotion: {e}")
+        bot.send_message(chat_id, "❌ Произошла системная ошибка при сохранении акции.")
 
     partner_main_menu(chat_id)
 

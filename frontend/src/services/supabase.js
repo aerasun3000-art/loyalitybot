@@ -81,6 +81,7 @@ export const getActivePromotions = async () => {
       *,
       partner:partners!promotions_partner_chat_id_fkey(name, company_name)
     `)
+    .eq('is_active', true)
     .gte('end_date', today)
     .order('created_at', { ascending: false })
   
