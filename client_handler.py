@@ -5,6 +5,7 @@ from telebot import types
 import os
 import sys
 import re # <-- НОВЫЙ ИМПОРТ
+import asyncio
 from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
 
@@ -12,6 +13,7 @@ load_dotenv()
 
 sys.path.append(os.path.dirname(__file__))
 from supabase_manager import SupabaseManager
+from ai_helper import get_ai_support_answer
 
 # Инициализация логгера
 logger = get_bot_logger('client_bot')
@@ -218,11 +220,105 @@ def handle_new_user_start(message):
         parse_mode='Markdown'
     )
 
+# ------------------------------------
+# AI ПОДДЕРЖКА
+# ------------------------------------
+
+@client_bot.message_handler(commands=['ask', 'спросить'])
+def handle_ask_command(message):
+    """Обработчик команды /ask - запрос к AI помощнику"""
+    chat_id = str(message.chat.id)
+    logger.info(f"Клиент {chat_id} использовал команду /ask")
+    
+    client_bot.send_message(
+        chat_id,
+        "🤖 **AI Помощник**\n\n"
+        "Задайте свой вопрос о программе лояльности, и я постараюсь помочь!\n\n"
+        "Например:\n"
+        "• Как накопить баллы?\n"
+        "• Где найти партнеров?\n"
+        "• Как обменять баллы?\n\n"
+        "Или начните вопрос с символа **?**",
+        parse_mode='Markdown'
+    )
+
+
+@client_bot.message_handler(func=lambda message: message.text and message.text.startswith('?'))
+def handle_ai_question(message):
+    """Обработчик вопросов, начинающихся с ?"""
+    chat_id = str(message.chat.id)
+    question = message.text[1:].strip()  # Убираем "?" из начала
+    
+    if not question:
+        client_bot.send_message(chat_id, "Пожалуйста, укажите ваш вопрос после символа ?")
+        return
+    
+    logger.info(f"AI вопрос от клиента {chat_id}: {question}")
+    
+    # Показываем, что бот "думает"
+    thinking_msg = client_bot.send_message(chat_id, "🤔 Думаю...")
+    
+    try:
+        # Получаем ответ от AI (синхронная обертка для async функции)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        answer = loop.run_until_complete(get_ai_support_answer(question))
+        loop.close()
+        
+        # Удаляем сообщение "Думаю..."
+        try:
+            client_bot.delete_message(chat_id, thinking_msg.message_id)
+        except:
+            pass
+        
+        # Отправляем ответ
+        client_bot.send_message(
+            chat_id,
+            f"🤖 **AI Помощник:**\n\n{answer}\n\n"
+            f"_Если нужна дополнительная помощь, напишите 'поддержка'_",
+            parse_mode='Markdown'
+        )
+        
+        logger.info(f"AI ответ отправлен клиенту {chat_id}")
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка получения AI ответа для клиента {chat_id}")
+        
+        try:
+            client_bot.delete_message(chat_id, thinking_msg.message_id)
+        except:
+            pass
+        
+        client_bot.send_message(
+            chat_id,
+            "😔 Извините, сейчас я не могу ответить на ваш вопрос.\n\n"
+            "Попробуйте позже или напишите 'поддержка' для связи с оператором."
+        )
+
+
+@client_bot.message_handler(func=lambda message: message.text and message.text.lower() == 'поддержка')
+def handle_support_request(message):
+    """Обработчик запроса связи с поддержкой"""
+    chat_id = str(message.chat.id)
+    logger.info(f"Клиент {chat_id} запросил поддержку")
+    
+    client_bot.send_message(
+        chat_id,
+        "📞 **Связь с поддержкой**\n\n"
+        "Напишите ваш вопрос или проблему, и наш оператор свяжется с вами в ближайшее время.\n\n"
+        "⏰ Время ответа: обычно до 1 часа\n"
+        "📧 Email: support@loyalitybot.com",
+        parse_mode='Markdown'
+    )
+
+
 @client_bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
     # Предотвращаем потерю сообщений, направляя клиента на /start
     client_bot.send_message(message.chat.id,
-                             "Пожалуйста, начните с команды /start.")
+                             "Пожалуйста, начните с команды /start.\n\n"
+                             "💡 Подсказка: Для вопросов используйте команду /ask или начните сообщение с **?**",
+                             parse_mode='Markdown')
 
 if __name__ == '__main__':
     logger.info("=== Клиентский бот запущен ===")

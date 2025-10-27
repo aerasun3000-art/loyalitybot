@@ -3,3 +3,4 @@ pandas
 streamlit
 supabase
 python-dotenv
+gigachat>=0.1.20
