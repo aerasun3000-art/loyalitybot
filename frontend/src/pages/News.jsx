@@ -118,14 +118,13 @@ const News = () => {
                   className="bg-white rounded-2xl overflow-hidden card-shadow hover:card-shadow-hover transition-all duration-300 cursor-pointer active:scale-98"
                 >
                   {/* Изображение */}
-                  {item.image_url ? (
-                    <div className="h-48 relative overflow-hidden">
-                      <img
-                        src={item.image_url}
-                        alt={item.title}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                    {item.image_url ? (
+                      <div className="h-48 relative overflow-hidden">
+                        <img
+                          src={item.image_url}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                        />
                       
                       {/* Дата поверх изображения */}
                       <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full">

@@ -132,7 +132,6 @@ const NewsDetail = () => {
             alt={news.title}
             className="w-full h-64 object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         </div>
       )}
 

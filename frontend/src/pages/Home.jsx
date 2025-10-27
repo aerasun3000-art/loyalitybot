@@ -221,7 +221,6 @@ const Home = () => {
                         alt={item.title}
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                       <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
                         <span className="text-xs font-semibold text-gray-700">
                           {formatDate(item.created_at)}
