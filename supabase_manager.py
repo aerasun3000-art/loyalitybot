@@ -688,3 +688,188 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error updating service status: {e}")
             return False
+
+    # -----------------------------------------------------------------
+    # VI. МЕТОДЫ ДЛЯ РАБОТЫ С НОВОСТЯМИ
+    # -----------------------------------------------------------------
+
+    def create_news(self, news_data: dict) -> tuple[bool, int | None]:
+        """
+        Создает новую новость.
+        
+        Args:
+            news_data: Словарь с данными новости
+                - title (str): Заголовок новости
+                - content (str): Полный текст новости
+                - preview_text (str, optional): Краткое описание
+                - image_url (str, optional): URL изображения
+                - author_chat_id (str): ID администратора
+                - is_published (bool, optional): Опубликована ли новость (по умолчанию True)
+        
+        Returns:
+            tuple[bool, int | None]: (успех операции, ID созданной новости)
+        """
+        if not self.client:
+            return False, None
+        
+        try:
+            # Валидация обязательных полей
+            if not news_data.get('title') or not news_data.get('content'):
+                logging.error("create_news: missing required fields (title or content)")
+                return False, None
+            
+            # Подготовка данных для вставки
+            record = {
+                'title': news_data['title'],
+                'content': news_data['content'],
+                'preview_text': news_data.get('preview_text', news_data['content'][:200]),
+                'author_chat_id': str(news_data.get('author_chat_id', '')),
+                'is_published': news_data.get('is_published', True),
+                'created_at': datetime.datetime.now().isoformat(),
+                'updated_at': datetime.datetime.now().isoformat()
+            }
+            
+            # Добавляем image_url если есть
+            if news_data.get('image_url'):
+                record['image_url'] = news_data['image_url']
+            
+            result = self.client.from_('news').insert(record).execute()
+            
+            if result.data and len(result.data) > 0:
+                news_id = result.data[0]['id']
+                logging.info(f"News created successfully with ID: {news_id}")
+                return True, news_id
+            
+            return False, None
+            
+        except Exception as e:
+            logging.error(f"Error creating news: {e}")
+            return False, None
+
+    def get_all_news(self, published_only: bool = True) -> pd.DataFrame:
+        """
+        Получает все новости.
+        
+        Args:
+            published_only: Если True, возвращает только опубликованные новости
+        
+        Returns:
+            DataFrame с новостями
+        """
+        if not self.client:
+            return pd.DataFrame()
+        
+        try:
+            query = self.client.from_('news').select('*')
+            
+            if published_only:
+                query = query.eq('is_published', True)
+            
+            response = query.order('created_at', desc=True).execute()
+            return pd.DataFrame(response.data) if response.data else pd.DataFrame()
+            
+        except Exception as e:
+            logging.error(f"Error getting news: {e}")
+            return pd.DataFrame()
+
+    def get_news_by_id(self, news_id: int) -> dict | None:
+        """
+        Получает новость по ID.
+        
+        Args:
+            news_id: ID новости
+        
+        Returns:
+            Словарь с данными новости или None
+        """
+        if not self.client:
+            return None
+        
+        try:
+            response = self.client.from_('news').select('*').eq('id', news_id).limit(1).execute()
+            
+            if response.data and len(response.data) > 0:
+                return response.data[0]
+            
+            return None
+            
+        except Exception as e:
+            logging.error(f"Error getting news by id {news_id}: {e}")
+            return None
+
+    def update_news(self, news_id: int, updates: dict) -> bool:
+        """
+        Обновляет существующую новость.
+        
+        Args:
+            news_id: ID новости для обновления
+            updates: Словарь с полями для обновления
+        
+        Returns:
+            True если успешно, False иначе
+        """
+        if not self.client:
+            return False
+        
+        try:
+            # Добавляем время обновления
+            updates['updated_at'] = datetime.datetime.now().isoformat()
+            
+            self.client.from_('news').update(updates).eq('id', news_id).execute()
+            logging.info(f"News {news_id} updated successfully")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error updating news {news_id}: {e}")
+            return False
+
+    def delete_news(self, news_id: int) -> bool:
+        """
+        Удаляет новость.
+        
+        Args:
+            news_id: ID новости для удаления
+        
+        Returns:
+            True если успешно, False иначе
+        """
+        if not self.client:
+            return False
+        
+        try:
+            self.client.from_('news').delete().eq('id', news_id).execute()
+            logging.info(f"News {news_id} deleted successfully")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error deleting news {news_id}: {e}")
+            return False
+
+    def increment_news_views(self, news_id: int) -> bool:
+        """
+        Увеличивает счетчик просмотров новости.
+        
+        Args:
+            news_id: ID новости
+        
+        Returns:
+            True если успешно, False иначе
+        """
+        if not self.client:
+            return False
+        
+        try:
+            # Получаем текущее количество просмотров
+            news = self.get_news_by_id(news_id)
+            if not news:
+                return False
+            
+            current_views = news.get('views_count', 0)
+            new_views = current_views + 1
+            
+            self.client.from_('news').update({'views_count': new_views}).eq('id', news_id).execute()
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error incrementing views for news {news_id}: {e}")
+            return False

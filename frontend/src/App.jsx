@@ -9,6 +9,8 @@ import Promotions from './pages/Promotions'
 import Services from './pages/Services'
 import History from './pages/History'
 import Profile from './pages/Profile'
+import News from './pages/News'
+import NewsDetail from './pages/NewsDetail'
 
 // Components
 import Navigation from './components/Navigation'
@@ -57,6 +59,8 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/promotions" element={<Promotions />} />
                 <Route path="/services" element={<Services />} />
+                <Route path="/news" element={<News />} />
+                <Route path="/news/:id" element={<NewsDetail />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

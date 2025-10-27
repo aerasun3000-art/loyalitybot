@@ -212,3 +212,74 @@ export const getClientAnalytics = async (chatId) => {
   }
 }
 
+/**
+ * Получить все опубликованные новости
+ */
+export const getPublishedNews = async () => {
+  const { data, error } = await supabase
+    .from('news')
+    .select('*')
+    .eq('is_published', true)
+    .order('created_at', { ascending: false })
+  
+  if (error) {
+    console.error('Error fetching news:', error)
+    return []
+  }
+  
+  return data || []
+}
+
+/**
+ * Получить новость по ID
+ */
+export const getNewsById = async (newsId) => {
+  const { data, error } = await supabase
+    .from('news')
+    .select('*')
+    .eq('id', newsId)
+    .eq('is_published', true)
+    .single()
+  
+  if (error) {
+    console.error('Error fetching news by id:', error)
+    return null
+  }
+  
+  return data
+}
+
+/**
+ * Увеличить счетчик просмотров новости
+ */
+export const incrementNewsViews = async (newsId) => {
+  try {
+    // Получаем текущее количество просмотров
+    const { data: currentNews } = await supabase
+      .from('news')
+      .select('views_count')
+      .eq('id', newsId)
+      .single()
+    
+    if (!currentNews) return false
+    
+    const newViewsCount = (currentNews.views_count || 0) + 1
+    
+    // Обновляем счетчик
+    const { error } = await supabase
+      .from('news')
+      .update({ views_count: newViewsCount })
+      .eq('id', newsId)
+    
+    if (error) {
+      console.error('Error incrementing views:', error)
+      return false
+    }
+    
+    return true
+  } catch (error) {
+    console.error('Error in incrementNewsViews:', error)
+    return false
+  }
+}
+

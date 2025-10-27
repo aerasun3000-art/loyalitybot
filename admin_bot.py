@@ -5,6 +5,9 @@ import requests
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
 import logging
 
 # Предполагается, что SupabaseManager находится в отдельном файле (например, supabase_manager.py)
@@ -35,8 +38,9 @@ if not BOT_TOKEN or not ADMIN_CHAT_ID:
 logger.info("Инициализация админ-бота...")
 
 # Инициализация
+storage = MemoryStorage()
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(storage=storage)
 
 try:
     db_manager = SupabaseManager()
@@ -48,6 +52,18 @@ except Exception as e:
 _notified_pending_partner_ids: set[str] = set()
 # Множество для трекинга уже уведомлённых услуг
 _notified_pending_service_ids: set[int] = set()
+
+# --- FSM States для создания и редактирования новостей ---
+class NewsCreation(StatesGroup):
+    waiting_for_title = State()
+    waiting_for_content = State()
+    waiting_for_preview = State()
+    waiting_for_image = State()
+
+class NewsEditing(StatesGroup):
+    selecting_news = State()
+    selecting_field = State()
+    waiting_for_new_value = State()
 
 # Хелпер: список ID администраторов
 def _get_admin_ids() -> list[int]:
@@ -86,6 +102,7 @@ async def handle_start_admin(message: types.Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
         [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
+        [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
         [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")]
     ])
     
@@ -324,6 +341,388 @@ async def handle_service_approval(callback_query: types.CallbackQuery):
         await callback_query.answer("Ошибка при обновлении статуса услуги в БД.")
         
     await callback_query.answer()
+
+
+# --- Управление Новостями ---
+
+@dp.callback_query(F.data == "admin_news")
+async def show_news_management(callback_query: types.CallbackQuery):
+    """Показывает меню управления новостями."""
+    await callback_query.answer("Загрузка меню новостей...")
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Создать новость", callback_data="news_create")],
+        [InlineKeyboardButton(text="📋 Список всех новостей", callback_data="news_list")],
+        [InlineKeyboardButton(text="✏️ Редактировать новость", callback_data="news_edit")],
+        [InlineKeyboardButton(text="🗑 Удалить новость", callback_data="news_delete")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    
+    await callback_query.message.edit_text(
+        "📰 **Управление Новостями**\n\nВыберите действие:",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data == "back_to_main")
+async def back_to_main_menu(callback_query: types.CallbackQuery):
+    """Возврат в главное меню."""
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
+        [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
+        [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
+        [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")]
+    ])
+    
+    await callback_query.message.edit_text(
+        "👋 **Админ-панель**\n\nВыберите раздел для управления системой лояльности:",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data == "news_create")
+async def start_news_creation(callback_query: types.CallbackQuery, state: FSMContext):
+    """Начинает процесс создания новости."""
+    await callback_query.answer()
+    await state.set_state(NewsCreation.waiting_for_title)
+    await callback_query.message.answer(
+        "📝 **Создание новости**\n\n"
+        "Шаг 1/4: Введите заголовок новости:\n\n"
+        "Отправьте /cancel для отмены."
+    )
+
+
+@dp.message(NewsCreation.waiting_for_title)
+async def process_news_title(message: types.Message, state: FSMContext):
+    """Обрабатывает заголовок новости."""
+    if message.text == '/cancel':
+        await state.clear()
+        await message.answer("❌ Создание новости отменено.")
+        return
+    
+    await state.update_data(title=message.text)
+    await state.set_state(NewsCreation.waiting_for_content)
+    await message.answer(
+        f"✅ Заголовок сохранен: **{message.text}**\n\n"
+        "Шаг 2/4: Введите полный текст новости:\n\n"
+        "Отправьте /cancel для отмены."
+    )
+
+
+@dp.message(NewsCreation.waiting_for_content)
+async def process_news_content(message: types.Message, state: FSMContext):
+    """Обрабатывает содержание новости."""
+    if message.text == '/cancel':
+        await state.clear()
+        await message.answer("❌ Создание новости отменено.")
+        return
+    
+    await state.update_data(content=message.text)
+    await state.set_state(NewsCreation.waiting_for_preview)
+    
+    preview = message.text[:200] + "..." if len(message.text) > 200 else message.text
+    await message.answer(
+        f"✅ Текст новости сохранен!\n\n"
+        f"Шаг 3/4: Введите краткое описание (превью) для списка новостей.\n\n"
+        f"Автоматическое превью: _{preview}_\n\n"
+        f"Отправьте /skip чтобы использовать автоматическое превью, или /cancel для отмены."
+    )
+
+
+@dp.message(NewsCreation.waiting_for_preview)
+async def process_news_preview(message: types.Message, state: FSMContext):
+    """Обрабатывает превью новости."""
+    if message.text == '/cancel':
+        await state.clear()
+        await message.answer("❌ Создание новости отменено.")
+        return
+    
+    if message.text != '/skip':
+        await state.update_data(preview_text=message.text)
+    
+    await state.set_state(NewsCreation.waiting_for_image)
+    await message.answer(
+        "✅ Превью сохранено!\n\n"
+        "Шаг 4/4: Отправьте URL изображения для новости.\n\n"
+        "Отправьте /skip чтобы создать новость без изображения, или /cancel для отмены."
+    )
+
+
+@dp.message(NewsCreation.waiting_for_image)
+async def process_news_image(message: types.Message, state: FSMContext):
+    """Обрабатывает изображение новости и создает ее."""
+    if message.text == '/cancel':
+        await state.clear()
+        await message.answer("❌ Создание новости отменено.")
+        return
+    
+    data = await state.get_data()
+    
+    if message.text != '/skip':
+        data['image_url'] = message.text
+    
+    # Добавляем ID автора
+    data['author_chat_id'] = str(message.chat.id)
+    
+    # Создаем новость в БД
+    success, news_id = db_manager.create_news(data)
+    
+    if success:
+        await message.answer(
+            f"✅ **Новость успешно создана!**\n\n"
+            f"🆔 ID новости: {news_id}\n"
+            f"📰 Заголовок: {data['title']}\n\n"
+            f"Новость опубликована и видна пользователям в приложении."
+        )
+    else:
+        await message.answer(
+            "❌ Ошибка при создании новости. Проверьте логи или попробуйте снова."
+        )
+    
+    await state.clear()
+
+
+@dp.callback_query(F.data == "news_list")
+async def show_news_list(callback_query: types.CallbackQuery):
+    """Показывает список всех новостей."""
+    await callback_query.answer("Загрузка новостей...")
+    
+    news_df = db_manager.get_all_news(published_only=False)
+    
+    if news_df.empty:
+        await callback_query.message.edit_text(
+            "📭 Новостей пока нет.\n\n"
+            "Используйте кнопку 'Создать новость' для добавления первой новости.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_news")]
+            ])
+        )
+        return
+    
+    message_text = "📋 **Список всех новостей:**\n\n"
+    
+    for index, news in news_df.iterrows():
+        status_icon = "✅" if news['is_published'] else "📝"
+        views = news.get('views_count', 0)
+        created = news['created_at'][:10] if 'created_at' in news else 'N/A'
+        
+        message_text += (
+            f"{status_icon} **ID {news['id']}**: {news['title']}\n"
+            f"   👁 Просмотров: {views} | 📅 {created}\n\n"
+        )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_news")]
+    ])
+    
+    await callback_query.message.edit_text(message_text, reply_markup=keyboard)
+
+
+@dp.callback_query(F.data == "news_edit")
+async def start_news_editing(callback_query: types.CallbackQuery, state: FSMContext):
+    """Начинает процесс редактирования новости."""
+    await callback_query.answer()
+    
+    news_df = db_manager.get_all_news(published_only=False)
+    
+    if news_df.empty:
+        await callback_query.message.answer(
+            "📭 Новостей для редактирования нет."
+        )
+        return
+    
+    message_text = "✏️ **Редактирование новости**\n\nВведите ID новости для редактирования:\n\n"
+    
+    for index, news in news_df.iterrows():
+        message_text += f"**{news['id']}**: {news['title']}\n"
+    
+    await state.set_state(NewsEditing.selecting_news)
+    await callback_query.message.answer(message_text)
+
+
+@dp.message(NewsEditing.selecting_news)
+async def select_news_for_editing(message: types.Message, state: FSMContext):
+    """Выбирает новость для редактирования."""
+    try:
+        news_id = int(message.text)
+    except ValueError:
+        await message.answer("❌ Неверный формат ID. Введите число.")
+        return
+    
+    news = db_manager.get_news_by_id(news_id)
+    
+    if not news:
+        await message.answer("❌ Новость с таким ID не найдена.")
+        return
+    
+    await state.update_data(news_id=news_id, news=news)
+    await state.set_state(NewsEditing.selecting_field)
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📝 Заголовок", callback_data="edit_title")],
+        [InlineKeyboardButton(text="📄 Текст", callback_data="edit_content")],
+        [InlineKeyboardButton(text="📋 Превью", callback_data="edit_preview")],
+        [InlineKeyboardButton(text="🖼 Изображение", callback_data="edit_image")],
+        [InlineKeyboardButton(text="👁 Опубликовано", callback_data="edit_published")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_edit")]
+    ])
+    
+    status = "✅ Опубликована" if news['is_published'] else "📝 Черновик"
+    
+    await message.answer(
+        f"📰 **Редактирование новости ID {news_id}**\n\n"
+        f"**Заголовок:** {news['title']}\n"
+        f"**Статус:** {status}\n"
+        f"**Просмотров:** {news.get('views_count', 0)}\n\n"
+        f"Выберите поле для редактирования:",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data.startswith("edit_"), NewsEditing.selecting_field)
+async def process_field_selection(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обрабатывает выбор поля для редактирования."""
+    field = callback_query.data.replace("edit_", "")
+    
+    if field == "published":
+        data = await state.get_data()
+        news_id = data['news_id']
+        current_status = data['news']['is_published']
+        new_status = not current_status
+        
+        success = db_manager.update_news(news_id, {'is_published': new_status})
+        
+        if success:
+            status_text = "опубликована" if new_status else "снята с публикации"
+            await callback_query.answer(f"✅ Новость {status_text}")
+            await callback_query.message.edit_text(
+                f"✅ Новость ID {news_id} успешно {status_text}!"
+            )
+        else:
+            await callback_query.answer("❌ Ошибка обновления")
+        
+        await state.clear()
+        return
+    
+    await state.update_data(editing_field=field)
+    await state.set_state(NewsEditing.waiting_for_new_value)
+    
+    field_names = {
+        'title': 'заголовок',
+        'content': 'текст новости',
+        'preview': 'превью',
+        'image': 'URL изображения'
+    }
+    
+    await callback_query.message.answer(
+        f"✏️ Введите новое значение для поля **{field_names.get(field, field)}**:"
+    )
+
+
+@dp.message(NewsEditing.waiting_for_new_value)
+async def save_edited_field(message: types.Message, state: FSMContext):
+    """Сохраняет отредактированное поле."""
+    data = await state.get_data()
+    news_id = data['news_id']
+    field = data['editing_field']
+    new_value = message.text
+    
+    field_mapping = {
+        'title': 'title',
+        'content': 'content',
+        'preview': 'preview_text',
+        'image': 'image_url'
+    }
+    
+    db_field = field_mapping.get(field)
+    success = db_manager.update_news(news_id, {db_field: new_value})
+    
+    if success:
+        await message.answer(
+            f"✅ Новость ID {news_id} успешно обновлена!\n\n"
+            f"Поле '{field}' изменено."
+        )
+    else:
+        await message.answer("❌ Ошибка при обновлении новости.")
+    
+    await state.clear()
+
+
+@dp.callback_query(F.data == "cancel_edit")
+async def cancel_editing(callback_query: types.CallbackQuery, state: FSMContext):
+    """Отменяет редактирование."""
+    await state.clear()
+    await callback_query.message.edit_text("❌ Редактирование отменено.")
+
+
+@dp.callback_query(F.data == "news_delete")
+async def start_news_deletion(callback_query: types.CallbackQuery):
+    """Начинает процесс удаления новости."""
+    await callback_query.answer()
+    
+    news_df = db_manager.get_all_news(published_only=False)
+    
+    if news_df.empty:
+        await callback_query.message.answer("📭 Новостей для удаления нет.")
+        return
+    
+    # Создаем кнопки для каждой новости
+    buttons = []
+    for index, news in news_df.iterrows():
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"🗑 {news['id']}: {news['title'][:40]}...",
+                callback_data=f"delete_news_{news['id']}"
+            )
+        ])
+    
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_news")])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    await callback_query.message.edit_text(
+        "🗑 **Удаление новости**\n\nВыберите новость для удаления:",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data.startswith("delete_news_"))
+async def confirm_news_deletion(callback_query: types.CallbackQuery):
+    """Подтверждает удаление новости."""
+    news_id = int(callback_query.data.replace("delete_news_", ""))
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"confirm_delete_{news_id}"),
+            InlineKeyboardButton(text="❌ Отмена", callback_data="admin_news")
+        ]
+    ])
+    
+    await callback_query.message.edit_text(
+        f"⚠️ **Подтверждение удаления**\n\n"
+        f"Вы уверены, что хотите удалить новость ID {news_id}?\n"
+        f"Это действие нельзя отменить!",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data.startswith("confirm_delete_"))
+async def delete_news_confirmed(callback_query: types.CallbackQuery):
+    """Удаляет новость после подтверждения."""
+    news_id = int(callback_query.data.replace("confirm_delete_", ""))
+    
+    success = db_manager.delete_news(news_id)
+    
+    if success:
+        await callback_query.answer("✅ Новость удалена")
+        await callback_query.message.edit_text(
+            f"✅ Новость ID {news_id} успешно удалена из базы данных."
+        )
+    else:
+        await callback_query.answer("❌ Ошибка удаления")
+        await callback_query.message.edit_text(
+            f"❌ Ошибка при удалении новости ID {news_id}. Проверьте логи."
+        )
 
 
 # --- Запуск Бота ---

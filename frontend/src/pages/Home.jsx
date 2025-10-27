@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Title, Text, Button, Avatar } from '@telegram-apps/telegram-ui'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
-import { getClientBalance, getActivePromotions, getApprovedServices } from '../services/supabase'
+import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews } from '../services/supabase'
 import { getServiceIcon, defaultServiceIcons } from '../utils/serviceIcons'
 import Loader from '../components/Loader'
 import LoyaltyProgress from '../components/LoyaltyProgress'
@@ -23,6 +23,7 @@ const Home = () => {
   const [userName, setUserName] = useState('')
   const [promotions, setPromotions] = useState([])
   const [services, setServices] = useState([])
+  const [news, setNews] = useState([])
   const [language, setLanguage] = useState('ru')
 
   useEffect(() => {
@@ -34,16 +35,18 @@ const Home = () => {
       setLoading(true)
       
       // Загружаем данные параллельно
-      const [balanceData, promotionsData, servicesData] = await Promise.all([
+      const [balanceData, promotionsData, servicesData, newsData] = await Promise.all([
         getClientBalance(chatId),
         getActivePromotions(),
-        getApprovedServices()
+        getApprovedServices(),
+        getPublishedNews()
       ])
       
       setBalance(balanceData?.balance || 0)
       setUserName(balanceData?.name || user?.first_name || 'Гость')
       setPromotions(promotionsData.slice(0, 5)) // Первые 5 акций
       setServices(servicesData.slice(0, 8)) // Первые 8 услуг
+      setNews(newsData.slice(0, 5)) // Первые 5 новостей
     } catch (error) {
       console.error('Error loading home data:', error)
     } finally {
@@ -59,6 +62,17 @@ const Home = () => {
   const handlePromotionClick = (promoId) => {
     hapticFeedback('light')
     navigate(`/promotions?id=${promoId}`)
+  }
+
+  const handleNewsClick = (newsId) => {
+    hapticFeedback('light')
+    navigate(`/news/${newsId}`)
+  }
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    const options = { day: 'numeric', month: 'short' }
+    return date.toLocaleDateString('ru-RU', options)
   }
 
   const toggleLanguage = () => {
@@ -162,63 +176,134 @@ const Home = () => {
         </div>
       </div>
 
-      {/* Секция промо и новостей сообщества */}
+      {/* Секция новостей */}
       <div className="bg-white rounded-t-[2rem] px-4 pt-6 pb-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-800">
-            {language === 'ru' ? '🌟 Новости' : '🌟 News'}
+            {language === 'ru' ? '📰 Новости' : '📰 News'}
           </h2>
+          {news.length > 0 && (
+            <button
+              onClick={() => navigate('/news')}
+              className="text-pink-500 font-semibold text-sm"
+            >
+              {language === 'ru' ? 'Все →' : 'All →'}
+            </button>
+          )}
         </div>
         
         {/* Карусель новостей */}
         <div className="overflow-x-auto flex gap-3 pb-4 scrollbar-hide mb-6">
-          {/* Карточка 1: Добро пожаловать */}
-          <div className="flex-shrink-0 w-64 bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl overflow-hidden border border-pink-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer">
-            <div className="h-24 bg-gradient-to-br from-pink-400 to-pink-500 flex items-center justify-center relative">
-              <div className="absolute inset-0 bg-white/10" />
-              <span className="text-6xl relative z-10 drop-shadow-lg">📢</span>
-            </div>
-            <div className="p-4">
-              <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
-                Добро пожаловать!
-              </h3>
-              <p className="text-sm text-gray-600">
-                Накапливайте баллы за каждую покупку у наших партнёров и обменивайте на услуги!
-              </p>
-            </div>
-          </div>
-          
-          {/* Карточка 2: Акции месяца */}
-          <div className="flex-shrink-0 w-64 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl overflow-hidden border border-purple-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer">
-            <div className="h-24 bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center relative">
-              <div className="absolute inset-0 bg-white/10" />
-              <span className="text-6xl relative z-10 drop-shadow-lg">🎉</span>
-            </div>
-            <div className="p-4">
-              <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
-                Акции месяца
-              </h3>
-              <p className="text-sm text-gray-600">
-                Специальные предложения от партнёров - скидки до 50%!
-              </p>
-            </div>
-          </div>
-          
-          {/* Карточка 3: Реферальная программа */}
-          <div className="flex-shrink-0 w-64 bg-gradient-to-br from-rose-50 to-rose-100 rounded-2xl overflow-hidden border border-rose-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer">
-            <div className="h-24 bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center relative">
-              <div className="absolute inset-0 bg-white/10" />
-              <span className="text-6xl relative z-10 drop-shadow-lg">🎁</span>
-            </div>
-            <div className="p-4">
-              <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
-                Реферальная программа
-              </h3>
-              <p className="text-sm text-gray-600">
-                Приглашайте друзей и получайте бонусные баллы за каждого!
-              </p>
-            </div>
-          </div>
+          {news.length > 0 ? (
+            news.map((item, index) => {
+              const gradients = [
+                'from-pink-400 to-pink-500',
+                'from-purple-400 to-pink-400',
+                'from-rose-400 to-pink-500',
+                'from-pink-300 to-purple-400',
+                'from-fuchsia-400 to-pink-400'
+              ]
+              const gradient = gradients[index % gradients.length]
+              
+              const newsIcons = ['📢', '✨', '🎉', '🎁', '🌟']
+              const newsIcon = newsIcons[index % newsIcons.length]
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => handleNewsClick(item.id)}
+                  className="flex-shrink-0 w-64 bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl overflow-hidden border border-pink-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                >
+                  {item.image_url ? (
+                    <div className="h-24 relative overflow-hidden">
+                      <img
+                        src={item.image_url}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
+                        <span className="text-xs font-semibold text-gray-700">
+                          {formatDate(item.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`h-24 bg-gradient-to-br ${gradient} flex items-center justify-center relative`}>
+                      <div className="absolute inset-0 bg-white/10" />
+                      <span className="text-6xl relative z-10 drop-shadow-lg">{newsIcon}</span>
+                      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
+                        <span className="text-xs font-semibold text-gray-700">
+                          {formatDate(item.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="p-4">
+                    <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2 line-clamp-2 min-h-[3rem]">
+                      {item.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {item.preview_text || item.content.substring(0, 80) + '...'}
+                    </p>
+                  </div>
+                </div>
+              )
+            })
+          ) : (
+            <>
+              {/* Карточка 1: Добро пожаловать */}
+              <div className="flex-shrink-0 w-64 bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl overflow-hidden border border-pink-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                onClick={() => navigate('/news')}>
+                <div className="h-24 bg-gradient-to-br from-pink-400 to-pink-500 flex items-center justify-center relative">
+                  <div className="absolute inset-0 bg-white/10" />
+                  <span className="text-6xl relative z-10 drop-shadow-lg">📢</span>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                    Добро пожаловать!
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Накапливайте баллы за каждую покупку у наших партнёров и обменивайте на услуги!
+                  </p>
+                </div>
+              </div>
+              
+              {/* Карточка 2: Акции месяца */}
+              <div className="flex-shrink-0 w-64 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl overflow-hidden border border-purple-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                onClick={() => navigate('/promotions')}>
+                <div className="h-24 bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center relative">
+                  <div className="absolute inset-0 bg-white/10" />
+                  <span className="text-6xl relative z-10 drop-shadow-lg">🎉</span>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                    Акции месяца
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Специальные предложения от партнёров - скидки до 50%!
+                  </p>
+                </div>
+              </div>
+              
+              {/* Карточка 3: Реферальная программа */}
+              <div className="flex-shrink-0 w-64 bg-gradient-to-br from-rose-50 to-rose-100 rounded-2xl overflow-hidden border border-rose-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                onClick={() => navigate('/profile')}>
+                <div className="h-24 bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center relative">
+                  <div className="absolute inset-0 bg-white/10" />
+                  <span className="text-6xl relative z-10 drop-shadow-lg">🎁</span>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                    Реферальная программа
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Приглашайте друзей и получайте бонусные баллы за каждого!
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Секция Services */}
@@ -380,6 +465,12 @@ const Home = () => {
         .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
+        }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
       `}</style>
     </div>
