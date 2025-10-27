@@ -137,6 +137,17 @@ const translations = {
     partner_footer_text: 'После одобрения заявки вы получите доступ к партнерской панели',
     partner_error: 'Произошла ошибка при отправке заявки. Попробуйте еще раз.',
     
+    // Loyalty Progress
+    loyalty_level_newbie: 'Новичок',
+    loyalty_level_friend: 'Друг',
+    loyalty_level_vip: 'VIP',
+    loyalty_level_platinum: 'Платина',
+    loyalty_to: 'До',
+    loyalty_progress: 'Прогресс',
+    loyalty_points_to_next: 'баллов до следующего уровня',
+    loyalty_max_level: 'Максимальный уровень!',
+    loyalty_max_reached: 'Вы достигли максимального уровня!',
+    
     // Common
     loading: 'Загрузка',
     loading_data: 'Загрузка данных...',
@@ -286,6 +297,17 @@ const translations = {
     partner_redirecting: 'Redirecting to partner bot...',
     partner_footer_text: 'After approval, you will get access to the partner panel',
     partner_error: 'An error occurred while submitting the application. Please try again.',
+    
+    // Loyalty Progress
+    loyalty_level_newbie: 'Newbie',
+    loyalty_level_friend: 'Friend',
+    loyalty_level_vip: 'VIP',
+    loyalty_level_platinum: 'Platinum',
+    loyalty_to: 'To',
+    loyalty_progress: 'Progress',
+    loyalty_points_to_next: 'points to next level',
+    loyalty_max_level: 'Maximum level!',
+    loyalty_max_reached: 'You have reached the maximum level!',
     
     // Common
     loading: 'Loading',
