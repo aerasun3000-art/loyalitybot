@@ -4,9 +4,12 @@ import { Card, Title, Text, Button, Avatar } from '@telegram-apps/telegram-ui'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
 import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews } from '../services/supabase'
 import { getServiceIcon, defaultServiceIcons } from '../utils/serviceIcons'
+import { useTranslation } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 import LoyaltyProgress from '../components/LoyaltyProgress'
 import LocationSelector from '../components/LocationSelector'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 import { 
   BalanceSkeleton, 
   CarouselCardSkeleton, 
@@ -18,6 +21,8 @@ const Home = () => {
   const navigate = useNavigate()
   const user = getTelegramUser()
   const chatId = getChatId()
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
   
   const [loading, setLoading] = useState(true)
   const [balance, setBalance] = useState(0)
@@ -25,7 +30,6 @@ const Home = () => {
   const [promotions, setPromotions] = useState([])
   const [services, setServices] = useState([])
   const [news, setNews] = useState([])
-  const [language, setLanguage] = useState('ru')
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
   const [selectedServiceCategory, setSelectedServiceCategory] = useState(null)
 
@@ -46,10 +50,10 @@ const Home = () => {
       ])
       
       setBalance(balanceData?.balance || 0)
-      setUserName(balanceData?.name || user?.first_name || 'Гость')
-      setPromotions(promotionsData.slice(0, 5)) // Первые 5 акций
-      setServices(servicesData.slice(0, 8)) // Первые 8 услуг
-      setNews(newsData.slice(0, 5)) // Первые 5 новостей
+      setUserName(balanceData?.name || user?.first_name || t('profile_guest'))
+      setPromotions(promotionsData.slice(0, 5))
+      setServices(servicesData.slice(0, 8))
+      setNews(newsData.slice(0, 5))
     } catch (error) {
       console.error('Error loading home data:', error)
     } finally {
@@ -92,12 +96,8 @@ const Home = () => {
   const formatDate = (dateString) => {
     const date = new Date(dateString)
     const options = { day: 'numeric', month: 'short' }
-    return date.toLocaleDateString('ru-RU', options)
-  }
-
-  const toggleLanguage = () => {
-    hapticFeedback('light')
-    setLanguage(prev => prev === 'ru' ? 'en' : 'ru')
+    const locale = language === 'ru' ? 'ru-RU' : 'en-US'
+    return date.toLocaleDateString(locale, options)
   }
 
   // Skeleton вместо Loader
@@ -141,36 +141,15 @@ const Home = () => {
       <div className="px-4 pt-6 pb-4">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-white">
-            Hi {userName}
+            {t('home_greeting')} {userName}
           </h1>
-          <button
-            onClick={toggleLanguage}
-            className="flex items-center gap-2 bg-white rounded-full px-3 py-2 shadow-sm"
-          >
-            <span className="text-lg">{language === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              className="text-gray-600"
-            >
-              <path
-                d="M4 6L8 10L12 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+          <LanguageSwitcher />
         </div>
 
         {/* Карточка с балансом и прогрессом */}
         <div className="bg-white rounded-3xl p-4 card-shadow hover:card-shadow-hover transition-all duration-300">
           <p className="text-pink-500 font-semibold text-base mb-3">
-            {language === 'ru' 
-              ? 'Используйте баллы для получения услуг и скидок!'
-              : 'Use points to get services and discounts!'}
+            {t('home_balance_text')}
           </p>
           
           {/* Баланс */}
@@ -179,7 +158,7 @@ const Home = () => {
               <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center">
                 <span className="text-pink-500 text-lg">💰</span>
               </div>
-              <span className="font-bold text-gray-800">{balance} баллов</span>
+              <span className="font-bold text-gray-800">{balance} {t('home_points')}</span>
             </div>
             <button
               onClick={() => navigate('/history')}
@@ -200,14 +179,14 @@ const Home = () => {
       <div className="bg-white rounded-t-[2rem] px-4 pt-6 pb-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-800">
-            {language === 'ru' ? '📰 Новости' : '📰 News'}
+            📰 {t('news_latest')}
           </h2>
           {news.length > 0 && (
             <button
               onClick={() => navigate('/news')}
               className="text-pink-500 font-semibold text-sm"
             >
-              {language === 'ru' ? 'Все →' : 'All →'}
+              {t('home_see_all')} →
             </button>
           )}
         </div>
@@ -328,14 +307,14 @@ const Home = () => {
         {/* Секция Services */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-800">
-            {language === 'ru' ? 'Услуги' : 'Services'}
+            {t('home_services')}
           </h2>
           <button
             onClick={() => navigate('/services')}
             className="flex items-center gap-1"
           >
             <span className="text-pink-500 font-semibold">
-              {language === 'ru' ? 'Все' : 'See all'}
+              {t('home_see_all')}
             </span>
             {services.length > 8 && (
               <span className="bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full ml-1">
@@ -383,13 +362,13 @@ const Home = () => {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold text-gray-800">
-              {language === 'ru' ? '🎁 Акции партнёров' : '🎁 Partner Deals'}
+              🎁 {t('promo_title')}
             </h2>
             <button
               onClick={() => navigate('/promotions')}
               className="text-pink-500 font-semibold"
             >
-              {language === 'ru' ? 'Все акции →' : 'All deals →'}
+              {t('home_see_all')} →
             </button>
           </div>
 
@@ -464,7 +443,7 @@ const Home = () => {
                           </span>
                         </div>
                         <button className="text-pink-500 text-sm font-semibold">
-                          Подробнее →
+                          {t('promo_details')} →
                         </button>
                       </div>
                     </div>
@@ -481,7 +460,6 @@ const Home = () => {
         isOpen={isLocationSelectorOpen}
         onClose={() => setIsLocationSelectorOpen(false)}
         onSelect={handleLocationSelect}
-        title="Выберите местоположение"
       />
 
       {/* Скрыть скроллбар */}

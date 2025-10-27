@@ -2,14 +2,17 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getNewsById, incrementNewsViews } from '../services/supabase'
 import { hapticFeedback } from '../utils/telegram'
+import { useTranslation } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 
 const NewsDetail = () => {
   const navigate = useNavigate()
   const { id } = useParams()
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
   const [news, setNews] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [language, setLanguage] = useState('ru')
 
   useEffect(() => {
     loadNewsDetail()
@@ -41,7 +44,8 @@ const NewsDetail = () => {
   const formatDate = (dateString) => {
     const date = new Date(dateString)
     const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }
-    return date.toLocaleDateString('ru-RU', options)
+    const locale = language === 'ru' ? 'ru-RU' : 'en-US'
+    return date.toLocaleDateString(locale, options)
   }
 
   const handleBack = () => {
@@ -53,7 +57,10 @@ const NewsDetail = () => {
     hapticFeedback('medium')
     // Можно добавить функцию шаринга через Telegram
     if (window.Telegram?.WebApp) {
-      window.Telegram.WebApp.showAlert('Функция "Поделиться" скоро будет доступна!')
+      const message = language === 'ru' 
+        ? 'Функция "Поделиться" скоро будет доступна!' 
+        : 'Share feature coming soon!'
+      window.Telegram.WebApp.showAlert(message)
     }
   }
 
@@ -67,13 +74,13 @@ const NewsDetail = () => {
         <div className="text-center">
           <div className="text-6xl mb-4">❌</div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">
-            Новость не найдена
+            {language === 'ru' ? 'Новость не найдена' : 'News not found'}
           </h2>
           <button
             onClick={handleBack}
             className="text-pink-500 font-semibold"
           >
-            ← Вернуться к списку
+            ← {t('news_back_to_news')}
           </button>
         </div>
       </div>
@@ -101,7 +108,7 @@ const NewsDetail = () => {
         </button>
         
         <span className="font-semibold text-gray-800">
-          {language === 'ru' ? 'Новость' : 'News'}
+          {t('news_title')}
         </span>
         
         <button
@@ -172,7 +179,7 @@ const NewsDetail = () => {
                 <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" />
                 <circle cx="8" cy="8" r="2" />
               </svg>
-              <span>{news.views_count} {language === 'ru' ? 'просмотров' : 'views'}</span>
+              <span>{news.views_count} {t('news_views')}</span>
             </div>
           )}
         </div>
@@ -195,21 +202,21 @@ const NewsDetail = () => {
           </h3>
           <div className="space-y-2 text-sm text-gray-600">
             <div className="flex justify-between">
-              <span>{language === 'ru' ? 'Опубликовано:' : 'Published:'}</span>
+              <span>{t('news_published')}:</span>
               <span className="font-semibold text-gray-800">
                 {formatDate(news.created_at)}
               </span>
             </div>
             {news.updated_at && news.updated_at !== news.created_at && (
               <div className="flex justify-between">
-                <span>{language === 'ru' ? 'Обновлено:' : 'Updated:'}</span>
+                <span>{language === 'ru' ? 'Обновлено' : 'Updated'}:</span>
                 <span className="font-semibold text-gray-800">
                   {formatDate(news.updated_at)}
                 </span>
               </div>
             )}
             <div className="flex justify-between">
-              <span>{language === 'ru' ? 'Просмотров:' : 'Views:'}</span>
+              <span>{t('news_views')}:</span>
               <span className="font-semibold text-gray-800">
                 {news.views_count || 0}
               </span>
@@ -232,7 +239,7 @@ const NewsDetail = () => {
           >
             <path d="M15 10H5M10 15l-5-5 5-5" />
           </svg>
-          {language === 'ru' ? 'Назад к новостям' : 'Back to news'}
+          {t('news_back_to_news')}
         </button>
       </div>
 

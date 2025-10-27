@@ -2,14 +2,17 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getPublishedNews } from '../services/supabase'
 import { hapticFeedback } from '../utils/telegram'
+import { useTranslation } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 
 const News = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
   const [news, setNews] = useState([])
   const [loading, setLoading] = useState(true)
-  const [language, setLanguage] = useState('ru')
 
   useEffect(() => {
     loadNews()
@@ -41,7 +44,8 @@ const News = () => {
   const formatDate = (dateString) => {
     const date = new Date(dateString)
     const options = { year: 'numeric', month: 'long', day: 'numeric' }
-    return date.toLocaleDateString('ru-RU', options)
+    const locale = language === 'ru' ? 'ru-RU' : 'en-US'
+    return date.toLocaleDateString(locale, options)
   }
 
   if (loading) {
@@ -69,14 +73,12 @@ const News = () => {
             </svg>
           </button>
           <h1 className="text-2xl font-bold text-white flex-1 text-center">
-            {language === 'ru' ? '📰 Новости' : '📰 News'}
+            📰 {t('news_title')}
           </h1>
           <div className="w-8"></div>
         </div>
         <p className="text-white/90 text-center text-sm">
-          {language === 'ru' 
-            ? 'Последние новости и обновления' 
-            : 'Latest news and updates'}
+          {t('news_latest')}
         </p>
       </div>
 
@@ -86,7 +88,7 @@ const News = () => {
           <div className="bg-white rounded-2xl p-8 text-center card-shadow">
             <div className="text-6xl mb-4">📭</div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">
-              {language === 'ru' ? 'Пока нет новостей' : 'No news yet'}
+              {t('news_no_items')}
             </h3>
             <p className="text-gray-600">
               {language === 'ru'
@@ -183,7 +185,7 @@ const News = () => {
                         {formatDate(item.created_at)}
                       </span>
                       <button className="text-pink-500 font-semibold text-sm flex items-center gap-1">
-                        {language === 'ru' ? 'Читать далее' : 'Read more'}
+                        {t('news_read_more')}
                         <svg
                           width="16"
                           height="16"

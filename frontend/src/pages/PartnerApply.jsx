@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createPartnerApplication } from '../services/supabase'
 import { getChatId, hapticFeedback, getTelegramUser } from '../utils/telegram'
 import { getCitiesList, getDistrictsByCity, isOnlineService } from '../utils/locations'
+import { useTranslation } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 
 const PartnerApply = () => {
@@ -10,6 +12,8 @@ const PartnerApply = () => {
   const [searchParams] = useSearchParams()
   const chatId = getChatId()
   const user = getTelegramUser()
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
   
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -64,25 +68,25 @@ const PartnerApply = () => {
     const newErrors = {}
     
     if (!formData.name.trim()) {
-      newErrors.name = 'Укажите ваше имя'
+      newErrors.name = t('partner_name_required')
     }
     
     if (!formData.phone.trim()) {
-      newErrors.phone = 'Укажите номер телефона'
+      newErrors.phone = t('partner_phone_required')
     } else if (!/^\+?[0-9\s\-()]{10,}$/.test(formData.phone)) {
-      newErrors.phone = 'Неверный формат телефона'
+      newErrors.phone = t('partner_phone_invalid')
     }
     
     if (!formData.companyName.trim()) {
-      newErrors.companyName = 'Укажите название компании'
+      newErrors.companyName = t('partner_company_required')
     }
     
     if (!formData.city) {
-      newErrors.city = 'Выберите город'
+      newErrors.city = t('partner_city_required')
     }
     
     if (!formData.district) {
-      newErrors.district = 'Выберите район'
+      newErrors.district = t('partner_district_required')
     }
     
     setErrors(newErrors)
@@ -124,7 +128,7 @@ const PartnerApply = () => {
     } catch (error) {
       console.error('Error submitting application:', error)
       hapticFeedback('error')
-      setErrors({ submit: 'Произошла ошибка при отправке заявки. Попробуйте еще раз.' })
+      setErrors({ submit: t('partner_error') })
     } finally {
       setLoading(false)
     }
@@ -141,20 +145,19 @@ const PartnerApply = () => {
           </div>
           
           <h1 className="text-2xl font-bold text-gray-800 mb-3">
-            Заявка отправлена! 🎉
+            {t('partner_success_title')} 🎉
           </h1>
           
           <p className="text-gray-600 mb-6">
-            Ваша заявка на партнерство принята и ожидает одобрения администратора.
-            Мы уведомим вас о результате в ближайшее время.
+            {t('partner_success_text')}
           </p>
           
           <div className="bg-pink-50 rounded-xl p-4 mb-6">
             <p className="text-sm text-gray-700">
-              <strong>Ваша локация:</strong><br/>
+              <strong>{t('partner_your_location')}:</strong><br/>
               {isOnlineService(formData.city, formData.district) ? (
                 <span className="text-pink-600 font-semibold">
-                  🌍 {formData.city === 'Все' ? 'Работаю везде (онлайн)' : `${formData.city} (все районы)`}
+                  🌍 {formData.city === 'Все' ? t('partner_work_everywhere') : `${formData.city} (${t('partner_all_districts')})`}
                 </span>
               ) : (
                 <span className="text-pink-600 font-semibold">
@@ -165,7 +168,7 @@ const PartnerApply = () => {
           </div>
           
           <p className="text-xs text-gray-500">
-            Перенаправление в партнерский бот...
+            {t('partner_redirecting')}
           </p>
         </div>
       </div>
@@ -178,10 +181,10 @@ const PartnerApply = () => {
         {/* Заголовок */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
-            Стать партнером 🤝
+            {t('partner_apply_title')} 🤝
           </h1>
           <p className="text-white/90">
-            Заполните форму для подачи заявки
+            {t('partner_apply_subtitle')}
           </p>
         </div>
 
@@ -190,7 +193,7 @@ const PartnerApply = () => {
           {/* Имя */}
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">
-              Ваше имя *
+              {t('partner_name')} {t('required_field')}
             </label>
             <input
               type="text"
@@ -200,7 +203,7 @@ const PartnerApply = () => {
               className={`w-full px-4 py-3 rounded-xl border-2 ${
                 errors.name ? 'border-red-500' : 'border-gray-200'
               } focus:border-pink-500 focus:outline-none transition-colors`}
-              placeholder="Иван Иванов"
+              placeholder={language === 'ru' ? 'Иван Иванов' : 'John Doe'}
             />
             {errors.name && (
               <p className="text-red-500 text-sm mt-1">{errors.name}</p>
@@ -210,7 +213,7 @@ const PartnerApply = () => {
           {/* Телефон */}
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">
-              Номер телефона *
+              {t('partner_phone')} {t('required_field')}
             </label>
             <input
               type="tel"
@@ -220,7 +223,7 @@ const PartnerApply = () => {
               className={`w-full px-4 py-3 rounded-xl border-2 ${
                 errors.phone ? 'border-red-500' : 'border-gray-200'
               } focus:border-pink-500 focus:outline-none transition-colors`}
-              placeholder="+7 (900) 123-45-67"
+              placeholder={t('partner_phone_placeholder')}
             />
             {errors.phone && (
               <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
@@ -230,7 +233,7 @@ const PartnerApply = () => {
           {/* Название компании */}
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">
-              Название компании *
+              {t('partner_company')} {t('required_field')}
             </label>
             <input
               type="text"
@@ -240,7 +243,7 @@ const PartnerApply = () => {
               className={`w-full px-4 py-3 rounded-xl border-2 ${
                 errors.companyName ? 'border-red-500' : 'border-gray-200'
               } focus:border-pink-500 focus:outline-none transition-colors`}
-              placeholder="Салон красоты 'Аврора'"
+              placeholder={t('partner_company_placeholder')}
             />
             {errors.companyName && (
               <p className="text-red-500 text-sm mt-1">{errors.companyName}</p>
@@ -250,7 +253,7 @@ const PartnerApply = () => {
           {/* Город */}
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">
-              Город работы *
+              {t('partner_city')} {t('required_field')}
             </label>
             <select
               name="city"
@@ -260,7 +263,7 @@ const PartnerApply = () => {
                 errors.city ? 'border-red-500' : 'border-gray-200'
               } focus:border-pink-500 focus:outline-none transition-colors bg-white`}
             >
-              <option value="">Выберите город</option>
+              <option value="">{t('partner_city_placeholder')}</option>
               {cities.map((city) => (
                 <option key={city.value} value={city.value}>
                   {city.label}
@@ -273,7 +276,7 @@ const PartnerApply = () => {
             {formData.city === 'Все' && (
               <p className="text-pink-600 text-sm mt-2 flex items-center gap-1">
                 <span>💡</span>
-                <span>Отлично для онлайн-консультаций и дистанционных услуг!</span>
+                <span>{t('partner_online_hint')}</span>
               </p>
             )}
           </div>
@@ -282,7 +285,7 @@ const PartnerApply = () => {
           {formData.city && formData.city !== 'Все' && (
             <div className="mb-6">
               <label className="block text-gray-700 font-semibold mb-2">
-                Район работы *
+                {t('partner_district')} {t('required_field')}
               </label>
               <select
                 name="district"
@@ -292,7 +295,7 @@ const PartnerApply = () => {
                   errors.district ? 'border-red-500' : 'border-gray-200'
                 } focus:border-pink-500 focus:outline-none transition-colors bg-white`}
               >
-                <option value="">Выберите район</option>
+                <option value="">{t('partner_district_placeholder')}</option>
                 {districts.map((district) => (
                   <option key={district.value} value={district.value}>
                     {district.label}
@@ -305,7 +308,7 @@ const PartnerApply = () => {
               {formData.district === 'Все' && (
                 <p className="text-pink-600 text-sm mt-2 flex items-center gap-1">
                   <span>💡</span>
-                  <span>Ваши услуги будут видны во всех районах города!</span>
+                  <span>{t('partner_all_districts_hint')}</span>
                 </p>
               )}
             </div>
@@ -314,8 +317,8 @@ const PartnerApply = () => {
           {/* Инфо */}
           <div className="bg-blue-50 rounded-xl p-4 mb-6">
             <p className="text-sm text-blue-800">
-              <strong>ℹ️ Обратите внимание:</strong><br/>
-              Выбранная локация определит, где будут видны ваши услуги в приложении.
+              <strong>ℹ️ {language === 'ru' ? 'Обратите внимание' : 'Note'}:</strong><br/>
+              {t('partner_location_info')}
             </p>
           </div>
 
@@ -339,10 +342,10 @@ const PartnerApply = () => {
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Отправка...
+                {t('partner_submitting')}
               </span>
             ) : (
-              'Отправить заявку'
+              t('partner_submit')
             )}
           </button>
         </form>
@@ -350,7 +353,7 @@ const PartnerApply = () => {
         {/* Дополнительная информация */}
         <div className="mt-6 text-center">
           <p className="text-white/80 text-sm">
-            После одобрения заявки вы получите доступ<br/>к партнерской панели
+            {t('partner_footer_text')}
           </p>
         </div>
       </div>

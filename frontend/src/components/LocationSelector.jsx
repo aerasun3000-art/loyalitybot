@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
 import { getCities, getDistrictsByCity } from '../services/supabase'
 import { hapticFeedback } from '../utils/telegram'
+import { useTranslation } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 
-const LocationSelector = ({ isOpen, onClose, onSelect, title = 'Выберите местоположение' }) => {
+const LocationSelector = ({ isOpen, onClose, onSelect }) => {
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
   const [cities, setCities] = useState([])
   const [districts, setDistricts] = useState([])
   const [selectedCity, setSelectedCity] = useState('')
@@ -114,7 +118,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect, title = 'Выберите
               </button>
             )}
             <h2 className="text-xl font-bold text-gray-800 flex-1 text-center">
-              {step === 'city' ? 'Выберите город' : 'Выберите район'}
+              {step === 'city' ? t('location_select_city') : t('location_select_district')}
             </h2>
             <button
               onClick={handleClose}
@@ -149,7 +153,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect, title = 'Выберите
                     onClick={() => handleConfirm('', '')}
                     className="w-full p-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl font-semibold active:scale-95 transition-transform duration-200"
                   >
-                    🌍 Все города
+                    {t('location_all_cities')}
                   </button>
                   
                   {cities.filter(city => city !== 'Все').map((city, index) => (
@@ -169,7 +173,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect, title = 'Выберите
                   {cities.length === 0 && (
                     <div className="text-center text-gray-500 py-8">
                       <div className="text-4xl mb-2">🏙️</div>
-                      <p>Города не найдены</p>
+                      <p>{language === 'ru' ? 'Города не найдены' : 'No cities found'}</p>
                     </div>
                   )}
                 </div>
@@ -182,7 +186,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect, title = 'Выберите
                     onClick={() => handleConfirm(selectedCity, '')}
                     className="w-full p-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl font-semibold active:scale-95 transition-transform duration-200"
                   >
-                    🌆 Все районы города
+                    {t('location_all_districts')}
                   </button>
                   
                   {districts.filter(district => district !== 'Все').map((district, index) => (
@@ -205,12 +209,12 @@ const LocationSelector = ({ isOpen, onClose, onSelect, title = 'Выберите
                   {districts.length === 0 && (
                     <div className="text-center text-gray-500 py-8">
                       <div className="text-4xl mb-2">🏘️</div>
-                      <p>Районы не найдены</p>
+                      <p>{language === 'ru' ? 'Районы не найдены' : 'No districts found'}</p>
                       <button
                         onClick={() => handleConfirm(selectedCity, '')}
                         className="mt-4 px-6 py-2 bg-pink-500 text-white rounded-full font-semibold"
                       >
-                        Продолжить без района
+                        {language === 'ru' ? 'Продолжить без района' : 'Continue without district'}
                       </button>
                     </div>
                   )}
@@ -227,7 +231,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect, title = 'Выберите
               onClick={handleClearFilters}
               className="w-full py-3 text-gray-600 font-semibold rounded-2xl border-2 border-gray-300 active:scale-95 transition-transform duration-200"
             >
-              🗑️ Сбросить фильтры
+              🗑️ {language === 'ru' ? 'Сбросить фильтры' : 'Clear filters'}
             </button>
           </div>
         )}

@@ -1,9 +1,13 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { hapticFeedback } from '../utils/telegram'
+import { useTranslation } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 
 const Navigation = () => {
   const location = useLocation()
   const navigate = useNavigate()
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
 
   const handleNavigation = (path) => {
     hapticFeedback('light')
@@ -15,7 +19,7 @@ const Navigation = () => {
   const navItems = [
     {
       path: '/',
-      label: 'Главная',
+      labelKey: 'nav_home',
       icon: (active) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <path
@@ -31,7 +35,7 @@ const Navigation = () => {
     },
     {
       path: '/promotions',
-      label: 'Акции',
+      labelKey: 'nav_promotions',
       icon: (active) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <path
@@ -47,7 +51,7 @@ const Navigation = () => {
     },
     {
       path: '/news',
-      label: 'Новости',
+      labelKey: 'nav_news',
       icon: (active) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <path
@@ -63,7 +67,7 @@ const Navigation = () => {
     },
     {
       path: '/history',
-      label: 'История',
+      labelKey: 'nav_history',
       icon: (active) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <path
@@ -79,7 +83,7 @@ const Navigation = () => {
     },
     {
       path: '/profile',
-      label: 'Профиль',
+      labelKey: 'nav_profile',
       icon: (active) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <path
@@ -112,7 +116,7 @@ const Navigation = () => {
                 {item.icon(active)}
               </div>
               <span className={`text-[10px] mt-1 font-medium ${active ? 'font-semibold' : ''}`}>
-                {item.label}
+                {t(item.labelKey)}
               </span>
               {active && (
                 <div className="absolute bottom-0 h-0.5 w-12 bg-pink-500 rounded-t-full" />
