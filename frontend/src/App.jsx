@@ -11,6 +11,7 @@ import History from './pages/History'
 import Profile from './pages/Profile'
 import News from './pages/News'
 import NewsDetail from './pages/NewsDetail'
+import PartnerApply from './pages/PartnerApply'
 
 // Components
 import Navigation from './components/Navigation'
@@ -63,6 +64,7 @@ function App() {
                 <Route path="/news/:id" element={<NewsDetail />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/partner/apply" element={<PartnerApply />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
