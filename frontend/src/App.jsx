@@ -12,6 +12,7 @@ import Profile from './pages/Profile'
 import News from './pages/News'
 import NewsDetail from './pages/NewsDetail'
 import PartnerApply from './pages/PartnerApply'
+import About from './pages/About'
 
 // Components
 import Navigation from './components/Navigation'
@@ -64,6 +65,7 @@ function App() {
                 <Route path="/news/:id" element={<NewsDetail />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/about" element={<About />} />
                 <Route path="/partner/apply" element={<PartnerApply />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

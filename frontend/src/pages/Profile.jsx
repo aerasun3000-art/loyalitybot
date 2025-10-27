@@ -2,16 +2,19 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getClientAnalytics } from '../services/supabase'
 import { getTelegramUser, getChatId, hapticFeedback, closeApp } from '../utils/telegram'
+import { useTranslation } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 
 const Profile = () => {
   const navigate = useNavigate()
   const tgUser = getTelegramUser()
   const chatId = getChatId()
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
   
   const [loading, setLoading] = useState(true)
   const [clientData, setClientData] = useState(null)
-  const [language, setLanguage] = useState('ru')
 
   useEffect(() => {
     loadProfile()
@@ -29,27 +32,26 @@ const Profile = () => {
     }
   }
 
-  const toggleLanguage = () => {
-    hapticFeedback('light')
-    setLanguage(prev => prev === 'ru' ? 'en' : 'ru')
-    // TODO: Применить изменение языка ко всему приложению
-  }
-
   const handleLogout = () => {
     hapticFeedback('medium')
     closeApp()
   }
 
+  const handleBecomePartner = () => {
+    hapticFeedback('medium')
+    navigate('/partner/apply')
+  }
+
   if (loading) {
-    return <Loader text="Загрузка профиля..." />
+    return <Loader text={t('loading_profile')} />
   }
 
   const memberSince = clientData?.reg_date 
-    ? new Date(clientData.reg_date).toLocaleDateString('ru', {
+    ? new Date(clientData.reg_date).toLocaleDateString(language === 'ru' ? 'ru' : 'en', {
         month: 'long',
         year: 'numeric'
       })
-    : 'Неизвестно'
+    : t('profile_unknown')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -69,7 +71,7 @@ const Profile = () => {
               />
             </svg>
           </button>
-          <h1 className="text-xl font-bold text-white">Профиль</h1>
+          <h1 className="text-xl font-bold text-white">{t('profile_title')}</h1>
           <div className="w-6" /> {/* Spacer */}
         </div>
 
@@ -87,14 +89,14 @@ const Profile = () => {
             )}
           </div>
           <h2 className="text-2xl font-bold text-white mb-1">
-            {clientData?.name || tgUser?.first_name || 'Гость'}
+            {clientData?.name || tgUser?.first_name || t('profile_guest')}
           </h2>
           <p className="text-white/80 text-sm">
-            {clientData?.phone || 'Телефон не указан'}
+            {clientData?.phone || t('profile_no_phone')}
           </p>
           <div className="mt-2 bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full">
             <span className="text-white text-sm">
-              С {memberSince}
+              {t('profile_member_since')} {memberSince}
             </span>
           </div>
         </div>
@@ -102,9 +104,34 @@ const Profile = () => {
 
       {/* Основной контент */}
       <div className="px-4 -mt-8 pb-20">
+        {/* Кнопка стать партнером */}
+        <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl p-6 shadow-lg mb-4 relative overflow-hidden">
+          {/* Декоративные элементы */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-4xl">🤝</span>
+              <h3 className="font-bold text-white text-lg">
+                {t('profile_become_partner')}
+              </h3>
+            </div>
+            <p className="text-white/90 text-sm mb-4">
+              {t('profile_partner_description')}
+            </p>
+            <button
+              onClick={handleBecomePartner}
+              className="w-full bg-white text-purple-600 py-3 rounded-xl font-semibold hover:bg-purple-50 transition-all transform hover:scale-105 shadow-lg"
+            >
+              {t('profile_partner_button')} →
+            </button>
+          </div>
+        </div>
+
         {/* Статистика */}
         <div className="bg-white rounded-2xl p-4 shadow-lg mb-4">
-          <h3 className="font-bold text-gray-800 mb-4">Моя статистика</h3>
+          <h3 className="font-bold text-gray-800 mb-4">{t('profile_my_stats')}</h3>
           
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center">
@@ -112,7 +139,7 @@ const Profile = () => {
               <div className="text-2xl font-bold text-pink-500">
                 {clientData?.balance || 0}
               </div>
-              <div className="text-xs text-gray-500">Баллов на счёте</div>
+              <div className="text-xs text-gray-500">{t('profile_balance')}</div>
             </div>
             
             <div className="text-center">
@@ -120,7 +147,7 @@ const Profile = () => {
               <div className="text-2xl font-bold text-green-500">
                 {clientData?.analytics?.totalEarned || 0}
               </div>
-              <div className="text-xs text-gray-500">Всего получено</div>
+              <div className="text-xs text-gray-500">{t('profile_earned')}</div>
             </div>
             
             <div className="text-center">
@@ -128,7 +155,7 @@ const Profile = () => {
               <div className="text-2xl font-bold text-blue-500">
                 {clientData?.analytics?.totalSpent || 0}
               </div>
-              <div className="text-xs text-gray-500">Потрачено</div>
+              <div className="text-xs text-gray-500">{t('profile_spent')}</div>
             </div>
             
             <div className="text-center">
@@ -136,36 +163,13 @@ const Profile = () => {
               <div className="text-2xl font-bold text-purple-500">
                 {clientData?.analytics?.transactionCount || 0}
               </div>
-              <div className="text-xs text-gray-500">Транзакций</div>
+              <div className="text-xs text-gray-500">{t('profile_transactions')}</div>
             </div>
           </div>
         </div>
 
         {/* Настройки */}
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm mb-4">
-          <button
-            onClick={toggleLanguage}
-            className="w-full flex items-center justify-between p-4 border-b border-gray-100"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🌐</span>
-              <span className="font-semibold text-gray-800">Язык</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-gray-600">
-                {language === 'ru' ? 'Русский' : 'English'}
-              </span>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path
-                  d="M7 8L10 11L13 8"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-          </button>
-
           <button
             onClick={() => {
               hapticFeedback('light')
@@ -175,7 +179,7 @@ const Profile = () => {
           >
             <div className="flex items-center gap-3">
               <span className="text-2xl">📊</span>
-              <span className="font-semibold text-gray-800">История транзакций</span>
+              <span className="font-semibold text-gray-800">{t('profile_history')}</span>
             </div>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
@@ -190,13 +194,16 @@ const Profile = () => {
           <button
             onClick={() => {
               hapticFeedback('light')
-              // TODO: Открыть раздел помощи
+              // Возвращаем в Telegram бот для получения поддержки
+              if (window.Telegram?.WebApp) {
+                window.Telegram.WebApp.close()
+              }
             }}
             className="w-full flex items-center justify-between p-4 border-b border-gray-100"
           >
             <div className="flex items-center gap-3">
               <span className="text-2xl">💬</span>
-              <span className="font-semibold text-gray-800">Помощь и поддержка</span>
+              <span className="font-semibold text-gray-800">{t('profile_support')}</span>
             </div>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
@@ -211,13 +218,13 @@ const Profile = () => {
           <button
             onClick={() => {
               hapticFeedback('light')
-              // TODO: Открыть раздел "О приложении"
+              navigate('/about')
             }}
             className="w-full flex items-center justify-between p-4"
           >
             <div className="flex items-center gap-3">
               <span className="text-2xl">ℹ️</span>
-              <span className="font-semibold text-gray-800">О приложении</span>
+              <span className="font-semibold text-gray-800">{t('profile_about')}</span>
             </div>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
@@ -234,9 +241,9 @@ const Profile = () => {
         <div className="bg-gradient-to-br from-pink-100 to-pink-200 rounded-2xl p-4 mb-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-gray-800 mb-1">Статус</h3>
+              <h3 className="font-bold text-gray-800 mb-1">{t('profile_status')}</h3>
               <p className="text-pink-600 font-semibold">
-                {clientData?.status === 'active' ? '✓ Активный' : 'Неактивный'}
+                {clientData?.status === 'active' ? `✓ ${t('profile_active')}` : t('profile_inactive')}
               </p>
             </div>
             <div className="text-5xl">
@@ -250,10 +257,10 @@ const Profile = () => {
           <div className="bg-purple-50 rounded-2xl p-4 mb-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">🤝</span>
-              <h3 className="font-bold text-gray-800">Реферальная программа</h3>
+              <h3 className="font-bold text-gray-800">{t('profile_referral')}</h3>
             </div>
             <p className="text-sm text-gray-600">
-              Вы были приглашены другом! Приглашайте своих друзей и получайте бонусы.
+              {t('profile_referral_text')}
             </p>
           </div>
         )}
@@ -263,7 +270,7 @@ const Profile = () => {
           onClick={handleLogout}
           className="w-full bg-white border-2 border-red-200 text-red-500 py-4 rounded-xl font-semibold hover:bg-red-50 transition-colors"
         >
-          Выйти из приложения
+          {t('profile_logout')}
         </button>
       </div>
     </div>
