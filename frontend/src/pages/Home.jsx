@@ -6,6 +6,7 @@ import { getClientBalance, getActivePromotions, getApprovedServices, getPublishe
 import { getServiceIcon, defaultServiceIcons } from '../utils/serviceIcons'
 import Loader from '../components/Loader'
 import LoyaltyProgress from '../components/LoyaltyProgress'
+import LocationSelector from '../components/LocationSelector'
 import { 
   BalanceSkeleton, 
   CarouselCardSkeleton, 
@@ -25,6 +26,8 @@ const Home = () => {
   const [services, setServices] = useState([])
   const [news, setNews] = useState([])
   const [language, setLanguage] = useState('ru')
+  const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
+  const [selectedServiceCategory, setSelectedServiceCategory] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -54,9 +57,26 @@ const Home = () => {
     }
   }
 
-  const handleServiceClick = (serviceId) => {
+  const handleServiceClick = (service) => {
     hapticFeedback('light')
-    navigate(`/services?id=${serviceId}`)
+    if (service && service.id) {
+      // Если это реальная услуга с ID, открываем селектор локации
+      setSelectedServiceCategory(service)
+      setIsLocationSelectorOpen(true)
+    } else {
+      // Если это иконка по умолчанию, переходим на страницу всех услуг
+      navigate('/services')
+    }
+  }
+
+  const handleLocationSelect = (location) => {
+    // Переходим на страницу услуг с фильтром по локации
+    const params = new URLSearchParams()
+    if (location.city) params.set('city', location.city)
+    if (location.district) params.set('district', location.district)
+    if (selectedServiceCategory?.id) params.set('id', selectedServiceCategory.id)
+    
+    navigate(`/services?${params.toString()}`)
   }
 
   const handlePromotionClick = (promoId) => {
@@ -336,8 +356,8 @@ const Home = () => {
             return (
               <div
                 key={serviceId || index}
-                onClick={() => isService && handleServiceClick(serviceId)}
-                className={`flex flex-col items-center ${isService ? 'cursor-pointer' : ''}`}
+                onClick={() => handleServiceClick(isService ? item : null)}
+                className="flex flex-col items-center cursor-pointer"
               >
                 <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center mb-2 relative hover:bg-pink-200 hover:scale-110 active:scale-95 transition-all duration-200">
                   <span className="text-3xl">
@@ -455,6 +475,14 @@ const Home = () => {
           </div>
         </div>
       </div>
+
+      {/* Модальное окно выбора локации */}
+      <LocationSelector
+        isOpen={isLocationSelectorOpen}
+        onClose={() => setIsLocationSelectorOpen(false)}
+        onSelect={handleLocationSelect}
+        title="Выберите местоположение"
+      />
 
       {/* Скрыть скроллбар */}
       <style>{`

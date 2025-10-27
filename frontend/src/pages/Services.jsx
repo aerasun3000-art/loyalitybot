@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getApprovedServices, getClientBalance } from '../services/supabase'
+import { getFilteredServices, getClientBalance } from '../services/supabase'
 import { getChatId, hapticFeedback, showConfirm } from '../utils/telegram'
 import Loader from '../components/Loader'
+import LocationSelector from '../components/LocationSelector'
 
 const Services = () => {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const highlightId = searchParams.get('id')
+  const cityParam = searchParams.get('city')
+  const districtParam = searchParams.get('district')
   const chatId = getChatId()
   
   const [loading, setLoading] = useState(true)
@@ -15,25 +18,50 @@ const Services = () => {
   const [balance, setBalance] = useState(0)
   const [filter, setFilter] = useState('all') // all, affordable, expensive
   const [selectedService, setSelectedService] = useState(null)
+  const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
+  const [selectedCity, setSelectedCity] = useState(cityParam || '')
+  const [selectedDistrict, setSelectedDistrict] = useState(districtParam || '')
 
   useEffect(() => {
     loadData()
-  }, [chatId])
+  }, [chatId, cityParam, districtParam])
 
   const loadData = async () => {
     try {
       setLoading(true)
       const [servicesData, balanceData] = await Promise.all([
-        getApprovedServices(),
+        getFilteredServices(cityParam || null, districtParam || null),
         getClientBalance(chatId)
       ])
       setServices(servicesData)
       setBalance(balanceData?.balance || 0)
+      setSelectedCity(cityParam || '')
+      setSelectedDistrict(districtParam || '')
     } catch (error) {
       console.error('Error loading services:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleLocationSelect = (location) => {
+    // Обновляем URL параметры
+    const params = new URLSearchParams()
+    if (location.city) params.set('city', location.city)
+    if (location.district) params.set('district', location.district)
+    if (highlightId) params.set('id', highlightId)
+    
+    setSearchParams(params)
+    setSelectedCity(location.city || '')
+    setSelectedDistrict(location.district || '')
+    
+    // Перезагружаем данные
+    loadData()
+  }
+
+  const handleOpenLocationSelector = () => {
+    hapticFeedback('light')
+    setIsLocationSelectorOpen(true)
   }
 
   const getFilteredServices = () => {
@@ -114,7 +142,7 @@ const Services = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Шапка */}
       <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 pt-6 pb-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
             <button
               onClick={() => navigate('/')}
@@ -136,8 +164,33 @@ const Services = () => {
           </div>
         </div>
 
+        {/* Выбранная локация */}
+        {(selectedCity || selectedDistrict) && (
+          <div className="mb-4 flex items-center justify-between bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
+            <span className="text-white text-sm">
+              📍 {selectedCity}{selectedDistrict ? `, ${selectedDistrict}` : ''}
+            </span>
+            <button
+              onClick={handleOpenLocationSelector}
+              className="text-white text-xs underline ml-2"
+            >
+              Изменить
+            </button>
+          </div>
+        )}
+
         {/* Фильтры */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+          {/* Кнопка выбора локации */}
+          {!selectedCity && !selectedDistrict && (
+            <button
+              onClick={handleOpenLocationSelector}
+              className="px-4 py-2 rounded-full font-semibold whitespace-nowrap bg-white text-pink-500 flex items-center gap-2"
+            >
+              📍 Выбрать город
+            </button>
+          )}
+          
           <button
             onClick={() => handleFilterChange('all')}
             className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap ${
@@ -217,6 +270,16 @@ const Services = () => {
                     <p className="text-xs text-gray-600 mb-2 line-clamp-2">
                       {service.partner?.company_name || service.partner?.name}
                     </p>
+                    
+                    {/* Отображаем город/район */}
+                    {service.partner?.city && (
+                      <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                        <span>📍</span>
+                        <span className="truncate">
+                          {service.partner.city}{service.partner.district ? `, ${service.partner.district}` : ''}
+                        </span>
+                      </p>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
@@ -305,6 +368,14 @@ const Services = () => {
           </div>
         </div>
       )}
+
+      {/* Модальное окно выбора локации */}
+      <LocationSelector
+        isOpen={isLocationSelectorOpen}
+        onClose={() => setIsLocationSelectorOpen(false)}
+        onSelect={handleLocationSelect}
+        title="Выберите местоположение"
+      />
 
       <style>{`
         .scrollbar-hide::-webkit-scrollbar {

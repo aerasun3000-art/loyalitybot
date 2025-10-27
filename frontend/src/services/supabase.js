@@ -105,7 +105,7 @@ export const getApprovedServices = async () => {
     .from('services')
     .select(`
       *,
-      partner:partners!services_partner_chat_id_fkey(name, company_name)
+      partner:partners!services_partner_chat_id_fkey(name, company_name, city, district)
     `)
     .eq('approval_status', 'Approved')
     .eq('is_active', true)
@@ -117,6 +117,90 @@ export const getApprovedServices = async () => {
   }
   
   return data
+}
+
+/**
+ * Получить услуги с фильтрацией по городу и району
+ */
+export const getFilteredServices = async (city = null, district = null) => {
+  let query = supabase
+    .from('services')
+    .select(`
+      *,
+      partner:partners!services_partner_chat_id_fkey(name, company_name, city, district)
+    `)
+    .eq('approval_status', 'Approved')
+    .eq('is_active', true)
+  
+  // Фильтрация выполняется на стороне клиента после получения данных
+  // так как city и district находятся в связанной таблице partners
+  
+  const { data, error } = await query.order('price_points', { ascending: true })
+  
+  if (error) {
+    console.error('Error fetching filtered services:', error)
+    return []
+  }
+  
+  // Применяем фильтры на клиентской стороне
+  let filteredData = data || []
+  
+  if (city) {
+    filteredData = filteredData.filter(service => 
+      service.partner?.city === city
+    )
+  }
+  
+  if (district) {
+    filteredData = filteredData.filter(service => 
+      service.partner?.district === district
+    )
+  }
+  
+  return filteredData
+}
+
+/**
+ * Получить список уникальных городов из партнеров
+ */
+export const getCities = async () => {
+  const { data, error } = await supabase
+    .from('partners')
+    .select('city')
+    .not('city', 'is', null)
+    .order('city')
+  
+  if (error) {
+    console.error('Error fetching cities:', error)
+    return []
+  }
+  
+  // Получаем уникальные города
+  const uniqueCities = [...new Set(data.map(item => item.city).filter(Boolean))]
+  return uniqueCities
+}
+
+/**
+ * Получить список районов для конкретного города
+ */
+export const getDistrictsByCity = async (city) => {
+  if (!city) return []
+  
+  const { data, error } = await supabase
+    .from('partners')
+    .select('district')
+    .eq('city', city)
+    .not('district', 'is', null)
+    .order('district')
+  
+  if (error) {
+    console.error('Error fetching districts:', error)
+    return []
+  }
+  
+  // Получаем уникальные районы
+  const uniqueDistricts = [...new Set(data.map(item => item.district).filter(Boolean))]
+  return uniqueDistricts
 }
 
 /**
