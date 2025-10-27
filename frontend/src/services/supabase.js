@@ -146,15 +146,27 @@ export const getFilteredServices = async (city = null, district = null) => {
   let filteredData = data || []
   
   if (city) {
-    filteredData = filteredData.filter(service => 
-      service.partner?.city === city
-    )
+    filteredData = filteredData.filter(service => {
+      // Показываем услугу если:
+      // 1. Город партнера совпадает с выбранным
+      // 2. У партнера город = "Все" (работает везде, например онлайн)
+      // 3. У партнера нет указанного города (NULL) - работает везде
+      return service.partner?.city === city || 
+             service.partner?.city === 'Все' || 
+             !service.partner?.city
+    })
   }
   
   if (district) {
-    filteredData = filteredData.filter(service => 
-      service.partner?.district === district
-    )
+    filteredData = filteredData.filter(service => {
+      // Показываем услугу если:
+      // 1. Район партнера совпадает с выбранным
+      // 2. У партнера район = "Все" (работает во всех районах)
+      // 3. У партнера нет указанного района (NULL) - работает везде
+      return service.partner?.district === district || 
+             service.partner?.district === 'Все' || 
+             !service.partner?.district
+    })
   }
   
   return filteredData

@@ -152,7 +152,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect, title = 'Выберите
                     🌍 Все города
                   </button>
                   
-                  {cities.map((city, index) => (
+                  {cities.filter(city => city !== 'Все').map((city, index) => (
                     <button
                       key={index}
                       onClick={() => handleCitySelect(city)}
@@ -185,7 +185,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect, title = 'Выберите
                     🌆 Все районы города
                   </button>
                   
-                  {districts.map((district, index) => (
+                  {districts.filter(district => district !== 'Все').map((district, index) => (
                     <button
                       key={index}
                       onClick={() => {

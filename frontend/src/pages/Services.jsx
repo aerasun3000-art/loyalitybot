@@ -276,7 +276,8 @@ const Services = () => {
                       <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
                         <span>📍</span>
                         <span className="truncate">
-                          {service.partner.city}{service.partner.district ? `, ${service.partner.district}` : ''}
+                          {service.partner.city === 'Все' ? '🌍 Везде (онлайн)' : service.partner.city}
+                          {service.partner.district && service.partner.district !== 'Все' ? `, ${service.partner.district}` : ''}
                         </span>
                       </p>
                     )}
