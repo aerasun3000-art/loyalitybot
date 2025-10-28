@@ -1444,3 +1444,250 @@ class SupabaseManager:
             deletion_results['success'] = False
             deletion_results['error'] = str(e)
             return deletion_results
+
+    # -----------------------------------------------------------------
+    # PARTNER ANALYTICS METHODS
+    # -----------------------------------------------------------------
+    
+    def get_advanced_partner_stats(self, partner_chat_id: str, period_days: int = 30) -> dict:
+        """
+        Получает расширенную статистику партнера за указанный период.
+        
+        Args:
+            partner_chat_id: Chat ID партнера
+            period_days: Количество дней для анализа
+        
+        Returns:
+            Словарь с детальной статистикой
+        """
+        if not self.client:
+            logging.error("Supabase client not initialized")
+            return None
+        
+        try:
+            # Определяем период
+            now = datetime.datetime.now(datetime.timezone.utc)
+            period_start = now - datetime.timedelta(days=period_days)
+            
+            # 1. Получаем всех клиентов партнера
+            all_clients_response = self.client.from_('clients').select('chat_id, reg_date').eq('referrer_chat_id', partner_chat_id).execute()
+            all_clients = all_clients_response.data if all_clients_response.data else []
+            
+            total_clients = len(all_clients)
+            new_clients = sum(1 for c in all_clients if c.get('reg_date') and parser.parse(c['reg_date']) >= period_start)
+            
+            # 2. Получаем транзакции за период
+            transactions_response = self.client.from_('transactions').select('*').eq('partner_chat_id', partner_chat_id).gte('date_time', period_start.isoformat()).execute()
+            transactions = transactions_response.data if transactions_response.data else []
+            
+            # 3. Анализируем транзакции
+            total_transactions = len(transactions)
+            accrual_transactions = [t for t in transactions if t.get('operation_type') == 'accrual']
+            redemption_transactions = [t for t in transactions if t.get('operation_type') == 'spend']
+            
+            total_revenue = sum(float(t.get('total_amount', 0)) for t in accrual_transactions)
+            avg_check = total_revenue / len(accrual_transactions) if accrual_transactions else 0
+            
+            total_points_accrued = sum(int(t.get('points_change', 0)) for t in accrual_transactions)
+            total_points_redeemed = sum(abs(int(t.get('points_change', 0))) for t in redemption_transactions)
+            
+            # 4. Уникальные активные клиенты
+            active_client_ids = set(t.get('client_chat_id') for t in transactions if t.get('client_chat_id'))
+            active_clients = len(active_client_ids)
+            
+            # 5. Повторные покупки
+            client_txn_count = {}
+            for t in accrual_transactions:
+                client_id = t.get('client_chat_id')
+                if client_id:
+                    client_txn_count[client_id] = client_txn_count.get(client_id, 0) + 1
+            
+            returning_clients = sum(1 for count in client_txn_count.values() if count > 1)
+            retention_rate = (returning_clients / active_clients * 100) if active_clients > 0 else 0
+            
+            # 6. LTV расчет
+            avg_ltv = total_revenue / total_clients if total_clients > 0 else 0
+            
+            # 7. NPS (если есть данные)
+            nps_response = self.client.from_('nps_ratings').select('rating').eq('partner_chat_id', partner_chat_id).gte('created_at', period_start.isoformat()).execute()
+            nps_ratings = nps_response.data if nps_response.data else []
+            
+            promoters = sum(1 for r in nps_ratings if r.get('rating', 0) >= 9)
+            detractors = sum(1 for r in nps_ratings if r.get('rating', 0) <= 6)
+            total_nps = len(nps_ratings)
+            
+            nps_score = ((promoters - detractors) / total_nps * 100) if total_nps > 0 else 0
+            avg_nps = sum(r.get('rating', 0) for r in nps_ratings) / total_nps if total_nps > 0 else 0
+            
+            # 8. Топ клиенты по выручке
+            client_revenue = {}
+            for t in accrual_transactions:
+                client_id = t.get('client_chat_id')
+                if client_id:
+                    client_revenue[client_id] = client_revenue.get(client_id, 0) + float(t.get('total_amount', 0))
+            
+            top_clients = sorted(client_revenue.items(), key=lambda x: x[1], reverse=True)[:5]
+            
+            # Формируем результат
+            stats = {
+                'period_days': period_days,
+                'total_clients': total_clients,
+                'new_clients': new_clients,
+                'active_clients': active_clients,
+                'returning_clients': returning_clients,
+                'retention_rate': round(retention_rate, 2),
+                'total_revenue': round(total_revenue, 2),
+                'avg_check': round(avg_check, 2),
+                'avg_ltv': round(avg_ltv, 2),
+                'total_transactions': total_transactions,
+                'accrual_transactions': len(accrual_transactions),
+                'redemption_transactions': len(redemption_transactions),
+                'total_points_accrued': total_points_accrued,
+                'total_points_redeemed': total_points_redeemed,
+                'nps_score': round(nps_score, 1),
+                'avg_nps': round(avg_nps, 2),
+                'total_nps_responses': total_nps,
+                'top_clients': [{'client_id': cid, 'revenue': round(rev, 2)} for cid, rev in top_clients]
+            }
+            
+            logging.info(f"Advanced stats generated for partner {partner_chat_id} ({period_days} days)")
+            return stats
+            
+        except Exception as e:
+            logging.error(f"Error getting advanced partner stats for {partner_chat_id}: {e}")
+            return None
+    
+    def export_partner_data_to_csv(self, partner_chat_id: str, period_days: int = 90) -> tuple:
+        """
+        Экспортирует данные партнера в CSV файл.
+        
+        Args:
+            partner_chat_id: Chat ID партнера
+            period_days: Количество дней для экспорта
+        
+        Returns:
+            Tuple[bool, str]: (success, filepath_or_error_message)
+        """
+        if not self.client:
+            logging.error("Supabase client not initialized")
+            return False, "Database not available"
+        
+        try:
+            import csv
+            import tempfile
+            
+            # Определяем период
+            now = datetime.datetime.now(datetime.timezone.utc)
+            period_start = now - datetime.timedelta(days=period_days)
+            
+            # Получаем транзакции
+            transactions_response = self.client.from_('transactions').select('*').eq('partner_chat_id', partner_chat_id).gte('date_time', period_start.isoformat()).order('date_time', desc=True).execute()
+            transactions = transactions_response.data if transactions_response.data else []
+            
+            if not transactions:
+                return False, "Нет данных за указанный период"
+            
+            # Создаем временный CSV файл
+            temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', encoding='utf-8-sig', newline='')
+            
+            # Заголовки
+            fieldnames = [
+                'Дата и время',
+                'Тип операции',
+                'Клиент ID',
+                'Сумма чека (₽)',
+                'Изменение баллов',
+                'Баланс после',
+                'Описание'
+            ]
+            
+            writer = csv.DictWriter(temp_file, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            # Записываем данные
+            for txn in transactions:
+                writer.writerow({
+                    'Дата и время': txn.get('date_time', ''),
+                    'Тип операции': 'Начисление' if txn.get('operation_type') == 'accrual' else 'Списание',
+                    'Клиент ID': txn.get('client_chat_id', ''),
+                    'Сумма чека (₽)': txn.get('total_amount', 0),
+                    'Изменение баллов': txn.get('points_change', 0),
+                    'Баланс после': txn.get('balance_after', 0),
+                    'Описание': txn.get('description', '')
+                })
+            
+            temp_file.close()
+            
+            logging.info(f"CSV export created for partner {partner_chat_id}: {len(transactions)} transactions")
+            return True, temp_file.name
+            
+        except Exception as e:
+            logging.error(f"Error exporting partner data to CSV for {partner_chat_id}: {e}")
+            return False, str(e)
+    
+    def get_partner_cohort_analysis(self, partner_chat_id: str) -> dict:
+        """
+        Проводит когортный анализ клиентов партнера.
+        Группирует клиентов по месяцам регистрации и анализирует их поведение.
+        
+        Args:
+            partner_chat_id: Chat ID партнера
+        
+        Returns:
+            Словарь с когортными данными
+        """
+        if not self.client:
+            logging.error("Supabase client not initialized")
+            return {'cohorts': []}
+        
+        try:
+            # Получаем всех клиентов партнера
+            clients_response = self.client.from_('clients').select('chat_id, reg_date').eq('referrer_chat_id', partner_chat_id).execute()
+            clients = clients_response.data if clients_response.data else []
+            
+            if not clients:
+                return {'cohorts': []}
+            
+            # Группируем клиентов по месяцам регистрации
+            cohort_groups = {}
+            
+            for client in clients:
+                if not client.get('reg_date'):
+                    continue
+                
+                reg_date = parser.parse(client['reg_date'])
+                cohort_month = f"{reg_date.year}-{str(reg_date.month).zfill(2)}"
+                
+                if cohort_month not in cohort_groups:
+                    cohort_groups[cohort_month] = []
+                
+                cohort_groups[cohort_month].append(client['chat_id'])
+            
+            # Анализируем каждую когорту
+            cohorts = []
+            
+            for cohort_month, client_ids in sorted(cohort_groups.items()):
+                # Получаем транзакции для клиентов этой когорты
+                transactions_response = self.client.from_('transactions').select('*').eq('partner_chat_id', partner_chat_id).in_('client_chat_id', client_ids).execute()
+                transactions = transactions_response.data if transactions_response.data else []
+                
+                accrual_transactions = [t for t in transactions if t.get('operation_type') == 'accrual']
+                
+                total_revenue = sum(float(t.get('total_amount', 0)) for t in accrual_transactions)
+                total_transactions = len(accrual_transactions)
+                
+                cohorts.append({
+                    'month': cohort_month,
+                    'clients_count': len(client_ids),
+                    'total_revenue': round(total_revenue, 2),
+                    'total_transactions': total_transactions,
+                    'avg_revenue_per_client': round(total_revenue / len(client_ids), 2) if client_ids else 0,
+                    'avg_transactions_per_client': round(total_transactions / len(client_ids), 2) if client_ids else 0
+                })
+            
+            logging.info(f"Cohort analysis completed for partner {partner_chat_id}: {len(cohorts)} cohorts")
+            return {'cohorts': cohorts}
+            
+        except Exception as e:
+            logging.error(f"Error in cohort analysis for {partner_chat_id}: {e}")
+            return {'cohorts': []}
