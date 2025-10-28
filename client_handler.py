@@ -17,6 +17,7 @@ load_dotenv()
 sys.path.append(os.path.dirname(__file__))
 from supabase_manager import SupabaseManager
 from ai_helper import get_ai_support_answer
+from rate_limiter import rate_limiter, check_rate_limit
 
 # Инициализация логгера
 logger = get_bot_logger('client_bot')
@@ -123,6 +124,13 @@ def callback_nps_rating(call):
 def handle_new_user_start(message):
     chat_id = str(message.chat.id)
     text = message.text
+    
+    # Rate limiting: 5 команд в минуту
+    allowed, error = check_rate_limit(chat_id, 'command')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        logger.warning(f"Rate limit exceeded for {chat_id}: start command")
+        return
     
     logger.info(f"Клиент {chat_id} запустил бота с текстом: {text}")
 
@@ -231,6 +239,14 @@ def handle_new_user_start(message):
 def handle_ask_command(message):
     """Обработчик команды /ask - запрос к AI помощнику"""
     chat_id = str(message.chat.id)
+    
+    # Rate limiting: 5 команд в минуту
+    allowed, error = check_rate_limit(chat_id, 'command')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        logger.warning(f"Rate limit exceeded for {chat_id}: ask command")
+        return
+    
     logger.info(f"Клиент {chat_id} использовал команду /ask")
     
     client_bot.send_message(
@@ -250,6 +266,14 @@ def handle_ask_command(message):
 def handle_ai_question(message):
     """Обработчик вопросов, начинающихся с ?"""
     chat_id = str(message.chat.id)
+    
+    # Rate limiting: 10 сообщений в минуту
+    allowed, error = check_rate_limit(chat_id, 'message')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        logger.warning(f"Rate limit exceeded for {chat_id}: AI question")
+        return
+    
     question = message.text[1:].strip()  # Убираем "?" из начала
     
     if not question:
@@ -323,6 +347,14 @@ def handle_support_request(message):
 def handle_export_data(message):
     """Обработчик команды экспорта данных (GDPR Right to Data Portability)"""
     chat_id = str(message.chat.id)
+    
+    # Rate limiting: 1 экспорт в час
+    allowed, error = check_rate_limit(chat_id, 'export_data')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        logger.warning(f"Rate limit exceeded for {chat_id}: export_data")
+        return
+    
     logger.info(f"Клиент {chat_id} запросил экспорт своих данных (GDPR)")
     
     client_bot.send_message(
@@ -387,6 +419,14 @@ def handle_export_data(message):
 def handle_delete_account_request(message):
     """Обработчик запроса на удаление аккаунта (GDPR Right to be Forgotten)"""
     chat_id = str(message.chat.id)
+    
+    # Rate limiting: 1 попытка удаления в день
+    allowed, error = check_rate_limit(chat_id, 'delete_account')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        logger.warning(f"Rate limit exceeded for {chat_id}: delete_account")
+        return
+    
     logger.info(f"Клиент {chat_id} запросил удаление аккаунта (GDPR)")
     
     # Создаем клавиатуру для подтверждения
@@ -484,6 +524,15 @@ def handle_gdpr_delete_callback(call):
 
 @client_bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
+    chat_id = str(message.chat.id)
+    
+    # Rate limiting: 10 сообщений в минуту
+    allowed, error = check_rate_limit(chat_id, 'message')
+    if not allowed:
+        # Не отправляем сообщение об ошибке, чтобы не создавать flood
+        logger.warning(f"Rate limit exceeded for {chat_id}: general message")
+        return
+    
     # Предотвращаем потерю сообщений, направляя клиента на /start
     client_bot.send_message(message.chat.id,
                              "Пожалуйста, начните с команды /start.\n\n"
