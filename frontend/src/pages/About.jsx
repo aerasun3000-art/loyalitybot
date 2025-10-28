@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import { hapticFeedback } from '../utils/telegram'
+import Footer from '../components/Footer'
 
 const About = () => {
   const navigate = useNavigate()
@@ -176,6 +177,9 @@ const About = () => {
           </div>
         </div>
       </div>
+
+      {/* Footer with legal links */}
+      <Footer />
     </div>
   )
 }

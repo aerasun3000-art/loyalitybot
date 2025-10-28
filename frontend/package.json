@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.39.0",
     "@telegram-apps/telegram-ui": "^2.1.5",
     "@twa-dev/sdk": "^7.0.1",

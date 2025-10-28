@@ -11,7 +11,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 import logging
 
 # Предполагается, что SupabaseManager находится в отдельном файле (например, supabase_manager.py)
-from supabase_manager import SupabaseManager 
+from supabase_manager import SupabaseManager
+from dashboard_urls import get_admin_dashboard_url, get_onepager_url 
 
 load_dotenv()
 
@@ -103,7 +104,9 @@ async def handle_start_admin(message: types.Message):
         [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
         [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
         [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
-        [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")]
+        [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
+        [InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers")]
     ])
     
     await message.answer(
@@ -371,7 +374,9 @@ async def back_to_main_menu(callback_query: types.CallbackQuery):
         [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
         [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
         [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
-        [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")]
+        [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
+        [InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers")]
     ])
     
     await callback_query.message.edit_text(
@@ -722,6 +727,146 @@ async def delete_news_confirmed(callback_query: types.CallbackQuery):
         await callback_query.answer("❌ Ошибка удаления")
         await callback_query.message.edit_text(
             f"❌ Ошибка при удалении новости ID {news_id}. Проверьте логи."
+        )
+
+
+# --- Дашборд Админа ---
+
+@dp.callback_query(F.data == "admin_dashboard")
+async def show_admin_dashboard(callback_query: types.CallbackQuery):
+    """Показывает ссылку на расширенный дашборд администратора."""
+    await callback_query.answer("Загрузка дашборда...")
+    
+    try:
+        dashboard_url = get_admin_dashboard_url()
+        
+        message_text = (
+            "📈 **Дашборд Администратора**\n\n"
+            "Расширенный дашборд с метриками по всей системе:\n\n"
+            f"🔗 {dashboard_url}\n\n"
+            "📊 **Доступные метрики:**\n\n"
+            "🌐 **Общие метрики системы:**\n"
+            "• Общий оборот по всем партнёрам\n"
+            "• Количество активных партнёров\n"
+            "• Общее количество клиентов\n"
+            "• Транзакции по системе\n"
+            "• Средний NPS по платформе\n\n"
+            "👥 **Метрики по партнёрам:**\n"
+            "• Детальная статистика каждого партнёра\n"
+            "• Сравнительный анализ партнёров\n"
+            "• Топ партнёров по обороту\n"
+            "• Рейтинг по удержанию клиентов\n\n"
+            "📈 **Аналитика:**\n"
+            "• Тренды роста системы\n"
+            "• Прогнозы развития\n"
+            "• Когортный анализ\n"
+            "• Графики и визуализация"
+        )
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+        ])
+        
+        await callback_query.message.edit_text(message_text, reply_markup=keyboard)
+        logger.info(f"Админ {callback_query.message.chat.id} открыл дашборд")
+        
+    except Exception as e:
+        logger.error(f"Ошибка показа дашборда админу: {e}")
+        await callback_query.message.edit_text(
+            "❌ Ошибка при загрузке дашборда. Проверьте логи.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+            ])
+        )
+
+
+# --- Одностраничники ---
+
+@dp.callback_query(F.data == "admin_onepagers")
+async def show_onepagers_menu(callback_query: types.CallbackQuery):
+    """Показывает меню одностраничников для разных аудиторий."""
+    await callback_query.answer("Загрузка меню...")
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🤝 Для Партнёров", callback_data="onepager_partner")],
+        [InlineKeyboardButton(text="👤 Для Клиентов", callback_data="onepager_client")],
+        [InlineKeyboardButton(text="💼 Для Инвесторов", callback_data="onepager_investor")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    
+    await callback_query.message.edit_text(
+        "📄 **Одностраничники**\n\n"
+        "Выберите аудиторию для просмотра одностраничника:\n\n"
+        "🤝 **Партнёры** - презентация для бизнеса\n"
+        "👤 **Клиенты** - информация для пользователей\n"
+        "💼 **Инвесторы** - питч для инвесторов",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data.startswith("onepager_"))
+async def show_onepager(callback_query: types.CallbackQuery):
+    """Показывает конкретный одностраничник."""
+    onepager_type = callback_query.data.replace("onepager_", "")
+    
+    await callback_query.answer("Загрузка...")
+    
+    try:
+        onepager_url = get_onepager_url(onepager_type)
+        
+        type_names = {
+            'partner': '🤝 Партнёров',
+            'client': '👤 Клиентов',
+            'investor': '💼 Инвесторов'
+        }
+        
+        type_descriptions = {
+            'partner': (
+                "**Содержание:**\n"
+                "• Преимущества программы лояльности\n"
+                "• Как это работает для бизнеса\n"
+                "• Статистика и кейсы\n"
+                "• Условия партнёрства\n"
+                "• Как начать работу"
+            ),
+            'client': (
+                "**Содержание:**\n"
+                "• Что такое программа лояльности\n"
+                "• Как накапливать баллы\n"
+                "• Что можно получить за баллы\n"
+                "• FAQ для пользователей\n"
+                "• Партнёры программы"
+            ),
+            'investor': (
+                "**Содержание:**\n"
+                "• Описание проекта и модели\n"
+                "• Рыночный потенциал\n"
+                "• Текущие метрики и рост\n"
+                "• Финансовые показатели\n"
+                "• Оценка и инвестиционное предложение"
+            )
+        }
+        
+        message_text = (
+            f"📄 **Одностраничник для {type_names.get(onepager_type, 'аудитории')}**\n\n"
+            f"🔗 {onepager_url}\n\n"
+            f"{type_descriptions.get(onepager_type, '')}"
+        )
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад к списку", callback_data="admin_onepagers")]
+        ])
+        
+        await callback_query.message.edit_text(message_text, reply_markup=keyboard)
+        logger.info(f"Админ {callback_query.message.chat.id} открыл одностраничник {onepager_type}")
+        
+    except Exception as e:
+        logger.error(f"Ошибка показа одностраничника {onepager_type}: {e}")
+        await callback_query.message.edit_text(
+            "❌ Ошибка при загрузке одностраничника.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_onepagers")]
+            ])
         )
 
 

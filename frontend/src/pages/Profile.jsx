@@ -5,6 +5,7 @@ import { getTelegramUser, getChatId, hapticFeedback, closeApp } from '../utils/t
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
+import Footer from '../components/Footer'
 
 const Profile = () => {
   const navigate = useNavigate()
@@ -273,6 +274,9 @@ const Profile = () => {
           {t('profile_logout')}
         </button>
       </div>
+
+      {/* Footer with legal links */}
+      <Footer />
     </div>
   )
 }

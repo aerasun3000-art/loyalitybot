@@ -7,6 +7,7 @@ import datetime
 from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
 from image_handler import process_photo_for_promotion
+from dashboard_urls import get_partner_dashboard_url
 
 load_dotenv()
 
@@ -67,13 +68,15 @@ def get_partner_keyboard():
     btn_service = types.KeyboardButton("🛠️ Услуги") 
     btn_invite = types.KeyboardButton("👥 Пригласить клиента")
     btn_stats = types.KeyboardButton("📊 Моя статистика")
+    btn_dashboard = types.KeyboardButton("📈 Дашборд")
     btn_find = types.KeyboardButton("👤 Найти клиента")
     btn_settings = types.KeyboardButton("⚙️ Настройки")
 
     markup.add(btn_add, btn_subtract)
     markup.add(btn_promo, btn_service)
     markup.add(btn_invite, btn_stats)
-    markup.add(btn_find, btn_settings)
+    markup.add(btn_dashboard, btn_find)
+    markup.add(btn_settings)
     return markup
 
 def partner_main_menu(chat_id, message_text="Выберите следующее действие:"):
@@ -127,7 +130,7 @@ def handle_partner_start(message):
 # ------------------------------------
 # ФУНКЦИОНАЛ: ОБЩИЕ КНОПКИ МЕНЮ
 # ------------------------------------
-@bot.message_handler(func=lambda message: message.text in ["➕ Начислить баллы", "➖ Списать баллы", "📊 Моя статистика", "👤 Найти клиента", "⚙️ Настройки"])
+@bot.message_handler(func=lambda message: message.text in ["➕ Начислить баллы", "➖ Списать баллы", "📊 Моя статистика", "📈 Дашборд", "👤 Найти клиента", "⚙️ Настройки"])
 def handle_partner_menu_buttons(message):
     chat_id = message.chat.id
 
@@ -147,6 +150,10 @@ def handle_partner_menu_buttons(message):
 
     if message.text == "📊 Моя статистика":
         handle_partner_stats(message)
+        return
+
+    if message.text == "📈 Дашборд":
+        handle_partner_dashboard(message)
         return
 
     if message.text == "👤 Найти клиента":
@@ -291,42 +298,268 @@ def process_amount(message):
 
 
 # ------------------------------------
+# ФУНКЦИОНАЛ: ДАШБОРД ПАРТНЕРА
+# ------------------------------------
+
+def handle_partner_dashboard(message):
+    """Отправляет ссылку на дашборд партнера с визуализацией метрик."""
+    chat_id = message.chat.id
+    
+    try:
+        # Генерируем персональную ссылку на дашборд партнера
+        dashboard_url = get_partner_dashboard_url(str(chat_id))
+        
+        # Используем HTML вместо Markdown для корректной работы с URL
+        message_text = (
+            "📈 <b>Дашборд партнера</b>\n\n"
+            "Ваш персональный дашборд с визуализацией всех метрик:\n\n"
+            f"🔗 <a href='{dashboard_url}'>Открыть дашборд</a>\n\n"
+            "На дашборде вы найдете:\n"
+            "• 📊 График оборота и транзакций\n"
+            "• 👥 Динамика клиентской базы\n"
+            "• ⭐ NPS метрики и отзывы\n"
+            "• 💰 Финансовые показатели\n"
+            "• 📈 Тренды и аналитика"
+        )
+        bot.send_message(chat_id, message_text, parse_mode='HTML', disable_web_page_preview=False)
+        logger.info(f"Партнёр {chat_id} запросил дашборд")
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка отправки дашборда партнёру {chat_id}")
+        bot.send_message(chat_id, "Произошла ошибка при генерации дашборда.")
+    
+    partner_main_menu(chat_id)
+
+
+# ------------------------------------
 # ФУНКЦИОНАЛ: СТАТИСТИКА ПАРТНЕРА (ОСТАВЛЕНО)
 # ------------------------------------
 
 def handle_partner_stats(message):
-    """Выводит ключевую статистику Партнера."""
-    chat_id = str(message.chat.id)
-    bot.send_message(chat_id, "⏳ Собираю данные по вашему партнерству...")
+    """Выводит расширенную статистику Партнера с выбором периода."""
+    chat_id = message.chat.id
+    
+    # Создаем inline меню для выбора периода и типа статистики
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    
+    btn_7d = types.InlineKeyboardButton("📊 7 дней", callback_data="stats_7")
+    btn_30d = types.InlineKeyboardButton("📊 30 дней", callback_data="stats_30")
+    btn_90d = types.InlineKeyboardButton("📊 90 дней", callback_data="stats_90")
+    btn_all = types.InlineKeyboardButton("📊 Всё время", callback_data="stats_all")
+    btn_export = types.InlineKeyboardButton("📥 Экспорт данных", callback_data="stats_export")
+    btn_cohort = types.InlineKeyboardButton("👥 Когортный анализ", callback_data="stats_cohort")
+    btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="partner_main_menu")
+    
+    markup.add(btn_7d, btn_30d)
+    markup.add(btn_90d, btn_all)
+    markup.add(btn_export, btn_cohort)
+    markup.add(btn_back)
+    
+    bot.send_message(
+        chat_id,
+        "📊 **АНАЛИТИКА И СТАТИСТИКА**\n\n"
+        "Выберите период для детального отчета:",
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
 
-    stats = sm.get_partner_stats(chat_id)
+@bot.callback_query_handler(func=lambda call: call.data.startswith('stats_'))
+def handle_stats_callbacks(call):
+    """Обработка выбора типа статистики"""
+    chat_id = call.message.chat.id
+    
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    
+    if call.data == 'partner_main_menu':
+        partner_main_menu(chat_id)
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'stats_export':
+        handle_export_data(chat_id)
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'stats_cohort':
+        handle_cohort_analysis(chat_id)
+        bot.answer_callback_query(call.id)
+        return
+    
+    # Определяем период
+    period_map = {
+        'stats_7': 7,
+        'stats_30': 30,
+        'stats_90': 90,
+        'stats_all': 365  # год для "всё время"
+    }
+    
+    period_days = period_map.get(call.data, 30)
+    
+    bot.send_message(chat_id, "⏳ Собираю расширенную аналитику...")
+    
+    try:
+        # Получаем расширенную статистику
+        stats = sm.get_advanced_partner_stats(str(chat_id), period_days)
+        
+        if not stats:
+            bot.send_message(chat_id, "❌ Ошибка получения статистики")
+            partner_main_menu(chat_id)
+            bot.answer_callback_query(call.id)
+            return
+        
+        # Формируем красивый отчет
+        period_label = "7 дней" if period_days == 7 else f"{period_days} дней" if period_days < 365 else "Всё время"
 
-    total_ratings = stats['promoters'] + stats['detractors'] + (stats['total_transactions'] - stats['promoters'] - stats['detractors']) if stats['total_transactions'] > 0 else 0
+        response_text = f"""
+📊 **ДЕТАЛЬНАЯ СТАТИСТИКА** (за {period_label})
+{'=' * 35}
 
-    nps_score = 0
-    if total_ratings > 0:
-        nps_score = round(((stats['promoters'] - stats['detractors']) / total_ratings) * 100, 0)
+👥 **КЛИЕНТЫ:**
+├─ Всего клиентов: **{stats['total_clients']}** чел.
+├─ Активных за период: **{stats['active_clients']}** чел.
+├─ Новых за период: **{stats['new_clients']}** чел.
+└─ Повторные покупки: **{stats['returning_clients']}** чел.
 
+💰 **ФИНАНСЫ:**
+├─ Общий оборот: **{stats['total_revenue']:,.2f}** ₽
+├─ Средний чек: **{stats['avg_check']:,.2f}** ₽
+└─ Средний LTV: **{stats['avg_ltv']:,.2f}** ₽/клиент
 
-    response_text = f"""
-**📊 Ваша Статистика**
----
-**Привлечение:**
-👥 Привлечено клиентов (referral): **{stats['total_referrals']}** чел.
----
-**Финансы:**
-💰 Общий оборот (по чекам, рубли): **{stats['total_spent_rub']:,.0f}** руб.
-🎁 Всего начислено баллов: **{stats['total_accrued_points']:,.0f}**
-🧾 Общее количество транзакций: **{stats['total_transactions']}**
----
-**Качество (NPS):**
-⭐ Средняя оценка (A. Rating): **{stats['avg_nps_rating']:.2f}**
-📈 Чистый NPS: **{nps_score:,.0f}**
-🟢 Промоутеры (9-10): **{stats['promoters']}**
-🔴 Детракторы (0-6): **{stats['detractors']}**
+🧾 **ТРАНЗАКЦИИ:**
+├─ Всего операций: **{stats['total_transactions']}**
+├─ Начислений: **{stats['accrual_transactions']}**
+├─ Списаний: **{stats['redemption_transactions']}**
+├─ Начислено баллов: **{stats['total_points_accrued']:,}**
+└─ Списано баллов: **{stats['total_points_redeemed']:,}**
+
+📈 **ВОВЛЕЧЕННОСТЬ:**
+├─ Средняя частота покупок: **{stats['avg_frequency']}** транз/клиент
+└─ Churn Rate (отток): **{stats['churn_rate']}%**
+
+⭐ **NPS ИНДЕКС:**
+├─ Средний NPS: **{stats['avg_nps']:.2f}**
+├─ Чистый NPS: **{stats['nps_score']}**
+├─ 🟢 Промоутеры (9-10): **{stats['promoters']}**
+├─ 🟡 Нейтральные (7-8): **{stats['passives']}**
+└─ 🔴 Детракторы (0-6): **{stats['detractors']}**
+
+🎯 **КОНВЕРСИИ:**
+├─ Регистрация → Покупка: **{stats['registration_to_first_purchase']}%**
+└─ Повторные покупки: **{stats['repeat_purchase_rate']}%**
 """
+        
+        # Добавляем интерпретацию метрик
+        insights = []
+        
+        if stats['churn_rate'] > 50:
+            insights.append("⚠️ Высокий отток клиентов - рекомендуем активировать программу удержания")
+        elif stats['churn_rate'] < 20:
+            insights.append("✅ Отличное удержание клиентов!")
+        
+        if stats['repeat_purchase_rate'] > 60:
+            insights.append("✅ Высокая лояльность - клиенты возвращаются!")
+        elif stats['repeat_purchase_rate'] < 30:
+            insights.append("💡 Низкий процент повторных покупок - создайте акции для возврата клиентов")
+        
+        if stats['nps_score'] > 50:
+            insights.append("🌟 Отличный NPS! Клиенты рекомендуют вас")
+        elif stats['nps_score'] < 0:
+            insights.append("⚠️ Низкий NPS - обратите внимание на качество обслуживания")
+        
+        if insights:
+            response_text += "\n💡 **РЕКОМЕНДАЦИИ:**\n"
+            for insight in insights:
+                response_text += f"• {insight}\n"
 
-    bot.send_message(chat_id, response_text, parse_mode='Markdown')
+        bot.send_message(chat_id, response_text, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error showing advanced stats: {e}")
+        bot.send_message(chat_id, "❌ Ошибка при формировании статистики")
+    
+    partner_main_menu(chat_id)
+    bot.answer_callback_query(call.id)
+
+
+def handle_export_data(chat_id):
+    """Экспортирует данные партнера в CSV"""
+    bot.send_message(chat_id, "📥 Подготовка данных для экспорта...", parse_mode='Markdown')
+    
+    try:
+        # Экспортируем данные за последние 90 дней
+        success, result = sm.export_partner_data_to_csv(str(chat_id), period_days=90)
+        
+        if success:
+            # result содержит путь к файлу
+            with open(result, 'rb') as file:
+                bot.send_document(
+                    chat_id,
+                    file,
+                    caption="📊 **Экспорт данных за последние 90 дней**\n\n"
+                           "Файл содержит все транзакции с деталями.\n"
+                           "Откройте в Excel или Google Sheets для анализа.",
+                    parse_mode='Markdown'
+                )
+            
+            logger.info(f"Данные экспортированы для партнёра {chat_id}")
+            
+            # Удаляем временный файл
+            try:
+                os.remove(result)
+            except:
+                pass
+        else:
+            bot.send_message(
+                chat_id,
+                f"❌ Ошибка экспорта: {result}\n\n"
+                "Возможно, у вас пока нет данных за этот период.",
+                parse_mode='Markdown'
+            )
+    
+    except Exception as e:
+        logger.error(f"Error exporting data: {e}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при экспорте данных")
+    
+    partner_main_menu(chat_id)
+
+
+def handle_cohort_analysis(chat_id):
+    """Показывает когортный анализ клиентов"""
+    bot.send_message(chat_id, "📊 Формирую когортный анализ...", parse_mode='Markdown')
+    
+    try:
+        cohort_data = sm.get_partner_cohort_analysis(str(chat_id))
+        
+        if not cohort_data.get('cohorts'):
+            bot.send_message(
+                chat_id,
+                "📊 У вас пока недостаточно данных для когортного анализа.\n\n"
+                "Когортный анализ показывает, как ведут себя клиенты, "
+                "зарегистрированные в разные месяцы.",
+                parse_mode='Markdown'
+            )
+            partner_main_menu(chat_id)
+            return
+        
+        response_text = "👥 **КОГОРТНЫЙ АНАЛИЗ**\n"
+        response_text += "(клиенты по месяцам регистрации)\n\n"
+        
+        for cohort in cohort_data['cohorts']:
+            response_text += f"📅 **{cohort['month']}**\n"
+            response_text += f"├─ Клиентов: {cohort['clients_count']}\n"
+            response_text += f"├─ Оборот: {cohort['total_revenue']:,.2f} ₽\n"
+            response_text += f"├─ Транзакций: {cohort['total_transactions']}\n"
+            response_text += f"└─ Средний чек/клиент: {cohort['avg_revenue_per_client']:,.2f} ₽\n\n"
+        
+        bot.send_message(chat_id, response_text, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error in cohort analysis: {e}")
+        bot.send_message(chat_id, "❌ Ошибка при формировании когортного анализа")
+    
     partner_main_menu(chat_id)
 
 

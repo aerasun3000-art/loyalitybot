@@ -195,6 +195,13 @@ const translations = {
     about_support: 'Поддержка',
     about_follow_us: 'Следите за нами',
     
+    // Legal Pages
+    privacy_policy_title: 'Политика конфиденциальности',
+    terms_of_service_title: 'Условия использования',
+    legal_back: 'Назад',
+    legal_updated: 'Обновлено',
+    legal_effective_date: 'Дата вступления в силу',
+    
     // Common
     loading: 'Загрузка',
     loading_data: 'Загрузка данных...',
@@ -402,6 +409,13 @@ const translations = {
     about_platform: 'Platform',
     about_support: 'Support',
     about_follow_us: 'Follow Us',
+    
+    // Legal Pages
+    privacy_policy_title: 'Privacy Policy',
+    terms_of_service_title: 'Terms of Service',
+    legal_back: 'Back',
+    legal_updated: 'Updated',
+    legal_effective_date: 'Effective Date',
     
     // Common
     loading: 'Loading',

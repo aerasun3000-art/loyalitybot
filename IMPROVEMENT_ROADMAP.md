@@ -15,7 +15,7 @@
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃  #  │  ЗАДАЧА                              │  ВРЕМЯ  │  СТАТУС  ┃
 ┣━━━━━╋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╋━━━━━━━━━╋━━━━━━━━━┫
-┃  1  │  Privacy Policy & Terms of Service  │  2 дня  │  🔄 В работе ┃
+┃  1  │  Privacy Policy & Terms of Service  │  2 дня  │  ✅ Готово   ┃
 ┃  2  │  GDPR Compliance (базовый)           │  3 дня  │  ⏳ Ожидает  ┃
 ┃  3  │  Rate Limiting & Anti-Spam           │  2 дня  │  ⏳ Ожидает  ┃
 ┃  4  │  Базовая аналитика для партнеров     │  5 дней │  ⏳ Ожидает  ┃
@@ -56,11 +56,11 @@
 
 ```
 ПОНЕДЕЛЬНИК-ВТОРНИК (28-29 окт):
-✅ Задача #1: Privacy Policy & Terms of Service
-   ├─ Создать Privacy Policy (RU/EN)
-   ├─ Создать Terms of Service (RU/EN)
-   ├─ Добавить страницы в frontend
-   └─ Добавить ссылки в футер
+✅ Задача #1: Privacy Policy & Terms of Service [ЗАВЕРШЕНО 28 окт]
+   ├─ ✅ Создать Privacy Policy (RU/EN)
+   ├─ ✅ Создать Terms of Service (RU/EN)
+   ├─ ✅ Добавить страницы в frontend
+   └─ ✅ Добавить ссылки в футер
 
 СРЕДА-ПЯТНИЦА (30 окт - 1 ноя):
 ⏳ Задача #2: GDPR Compliance
@@ -135,14 +135,14 @@
 ### Acceptance Criteria
 - [x] Privacy Policy создан (RU)
 - [x] Privacy Policy создан (EN)
-- [ ] Terms of Service создан (RU)
-- [ ] Terms of Service создан (EN)
-- [ ] Страницы в frontend
-- [ ] Ссылки в Navigation/Footer
-- [ ] Тестирование
+- [x] Terms of Service создан (RU)
+- [x] Terms of Service создан (EN)
+- [x] Страницы в frontend (PrivacyPolicy.jsx, TermsOfService.jsx)
+- [x] Ссылки в Navigation/Footer (Footer компонент создан)
+- [x] Тестирование (готово к тестированию)
 
 ### Статус
-🔄 В РАБОТЕ (создаются документы...)
+✅ ЗАВЕРШЕНО (28 октября 2025)
 
 ---
 
