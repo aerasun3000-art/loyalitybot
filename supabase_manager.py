@@ -1247,3 +1247,200 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error incrementing views for news {news_id}: {e}")
             return False
+
+    # -----------------------------------------------------------------
+    # GDPR COMPLIANCE METHODS
+    # -----------------------------------------------------------------
+    
+    def export_user_data(self, chat_id: str) -> dict:
+        """
+        Экспортирует все данные пользователя в соответствии с GDPR (Right to Data Portability).
+        
+        Args:
+            chat_id: Telegram chat ID пользователя
+        
+        Returns:
+            Словарь со всеми данными пользователя или None в случае ошибки
+        """
+        if not self.client:
+            logging.error("Supabase client not initialized")
+            return None
+        
+        try:
+            user_data = {
+                'export_date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                'chat_id': chat_id,
+                'client_data': None,
+                'partner_data': None,
+                'transactions': [],
+                'partner_applications': []
+            }
+            
+            # 1. Данные клиента
+            try:
+                client_response = self.client.from_('clients').select('*').eq('chat_id', chat_id).execute()
+                if client_response.data:
+                    user_data['client_data'] = client_response.data[0]
+            except Exception as e:
+                logging.warning(f"No client data found for {chat_id}: {e}")
+            
+            # 2. Данные партнера
+            try:
+                partner_response = self.client.from_('partners').select('*').eq('chat_id', chat_id).execute()
+                if partner_response.data:
+                    user_data['partner_data'] = partner_response.data[0]
+            except Exception as e:
+                logging.warning(f"No partner data found for {chat_id}: {e}")
+            
+            # 3. Транзакции (как клиента)
+            try:
+                transactions_response = self.client.from_('transactions').select('*').eq('client_chat_id', chat_id).execute()
+                if transactions_response.data:
+                    user_data['transactions'] = transactions_response.data
+            except Exception as e:
+                logging.warning(f"No transactions found for {chat_id}: {e}")
+            
+            # 4. Транзакции (как партнера)
+            try:
+                partner_trans_response = self.client.from_('transactions').select('*').eq('partner_chat_id', chat_id).execute()
+                if partner_trans_response.data:
+                    user_data['partner_transactions'] = partner_trans_response.data
+            except Exception as e:
+                logging.warning(f"No partner transactions found for {chat_id}: {e}")
+            
+            # 5. Заявки на партнерство
+            try:
+                applications_response = self.client.from_('partner_applications').select('*').eq('chat_id', chat_id).execute()
+                if applications_response.data:
+                    user_data['partner_applications'] = applications_response.data
+            except Exception as e:
+                logging.warning(f"No partner applications found for {chat_id}: {e}")
+            
+            # 6. Услуги партнера
+            if user_data['partner_data']:
+                try:
+                    services_response = self.client.from_('services').select('*').eq('partner_chat_id', chat_id).execute()
+                    if services_response.data:
+                        user_data['partner_services'] = services_response.data
+                except Exception as e:
+                    logging.warning(f"No services found for partner {chat_id}: {e}")
+            
+            # 7. Акции партнера
+            if user_data['partner_data']:
+                try:
+                    promotions_response = self.client.from_('promotions').select('*').eq('partner_chat_id', chat_id).execute()
+                    if promotions_response.data:
+                        user_data['partner_promotions'] = promotions_response.data
+                except Exception as e:
+                    logging.warning(f"No promotions found for partner {chat_id}: {e}")
+            
+            logging.info(f"Successfully exported data for user {chat_id}")
+            return user_data
+            
+        except Exception as e:
+            logging.error(f"Error exporting user data for {chat_id}: {e}")
+            return None
+
+    def delete_user_data(self, chat_id: str) -> dict:
+        """
+        Полностью удаляет все данные пользователя из системы в соответствии с GDPR (Right to be Forgotten).
+        
+        ВНИМАНИЕ: Это действие необратимо!
+        
+        Args:
+            chat_id: Telegram chat ID пользователя
+        
+        Returns:
+            Словарь с результатами удаления по каждой таблице
+        """
+        if not self.client:
+            logging.error("Supabase client not initialized")
+            return {'success': False, 'error': 'Database not available'}
+        
+        deletion_results = {
+            'chat_id': chat_id,
+            'deletion_date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'success': True,
+            'tables_deleted': {}
+        }
+        
+        try:
+            # 1. Удаление услуг партнера (если есть)
+            try:
+                self.client.from_('services').delete().eq('partner_chat_id', chat_id).execute()
+                deletion_results['tables_deleted']['services'] = 'deleted'
+                logging.info(f"Deleted services for {chat_id}")
+            except Exception as e:
+                deletion_results['tables_deleted']['services'] = f'error: {str(e)}'
+                logging.warning(f"Error deleting services for {chat_id}: {e}")
+            
+            # 2. Удаление акций партнера (если есть)
+            try:
+                self.client.from_('promotions').delete().eq('partner_chat_id', chat_id).execute()
+                deletion_results['tables_deleted']['promotions'] = 'deleted'
+                logging.info(f"Deleted promotions for {chat_id}")
+            except Exception as e:
+                deletion_results['tables_deleted']['promotions'] = f'error: {str(e)}'
+                logging.warning(f"Error deleting promotions for {chat_id}: {e}")
+            
+            # 3. Анонимизация транзакций (не удаляем, чтобы не нарушить финансовую отчетность)
+            # Заменяем chat_id на "DELETED_USER" для соблюдения GDPR
+            try:
+                # Транзакции как клиента
+                self.client.from_('transactions').update({
+                    'client_chat_id': 'DELETED_USER',
+                    'description': 'User data deleted per GDPR request'
+                }).eq('client_chat_id', chat_id).execute()
+                
+                # Транзакции как партнера
+                self.client.from_('transactions').update({
+                    'partner_chat_id': 'DELETED_USER'
+                }).eq('partner_chat_id', chat_id).execute()
+                
+                deletion_results['tables_deleted']['transactions'] = 'anonymized'
+                logging.info(f"Anonymized transactions for {chat_id}")
+            except Exception as e:
+                deletion_results['tables_deleted']['transactions'] = f'error: {str(e)}'
+                deletion_results['success'] = False
+                logging.error(f"Error anonymizing transactions for {chat_id}: {e}")
+            
+            # 4. Удаление заявок на партнерство
+            try:
+                self.client.from_('partner_applications').delete().eq('chat_id', chat_id).execute()
+                deletion_results['tables_deleted']['partner_applications'] = 'deleted'
+                logging.info(f"Deleted partner applications for {chat_id}")
+            except Exception as e:
+                deletion_results['tables_deleted']['partner_applications'] = f'error: {str(e)}'
+                logging.warning(f"Error deleting partner applications for {chat_id}: {e}")
+            
+            # 5. Удаление данных партнера
+            try:
+                self.client.from_('partners').delete().eq('chat_id', chat_id).execute()
+                deletion_results['tables_deleted']['partners'] = 'deleted'
+                logging.info(f"Deleted partner data for {chat_id}")
+            except Exception as e:
+                deletion_results['tables_deleted']['partners'] = f'error: {str(e)}'
+                logging.warning(f"Error deleting partner data for {chat_id}: {e}")
+            
+            # 6. Удаление данных клиента (последним, т.к. может быть FK)
+            try:
+                self.client.from_('clients').delete().eq('chat_id', chat_id).execute()
+                deletion_results['tables_deleted']['clients'] = 'deleted'
+                logging.info(f"Deleted client data for {chat_id}")
+            except Exception as e:
+                deletion_results['tables_deleted']['clients'] = f'error: {str(e)}'
+                deletion_results['success'] = False
+                logging.error(f"Error deleting client data for {chat_id}: {e}")
+            
+            if deletion_results['success']:
+                logging.info(f"Successfully deleted all data for user {chat_id}")
+            else:
+                logging.warning(f"Partial deletion completed for user {chat_id}")
+            
+            return deletion_results
+            
+        except Exception as e:
+            logging.error(f"Critical error during user data deletion for {chat_id}: {e}")
+            deletion_results['success'] = False
+            deletion_results['error'] = str(e)
+            return deletion_results

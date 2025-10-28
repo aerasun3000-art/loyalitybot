@@ -6,6 +6,9 @@ import os
 import sys
 import re # <-- НОВЫЙ ИМПОРТ
 import asyncio
+import json
+import datetime
+import io
 from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
 
@@ -310,6 +313,173 @@ def handle_support_request(message):
         "📧 Email: support@loyalitybot.com",
         parse_mode='Markdown'
     )
+
+
+# ------------------------------------
+# GDPR COMPLIANCE
+# ------------------------------------
+
+@client_bot.message_handler(commands=['export_data', 'экспорт_данных'])
+def handle_export_data(message):
+    """Обработчик команды экспорта данных (GDPR Right to Data Portability)"""
+    chat_id = str(message.chat.id)
+    logger.info(f"Клиент {chat_id} запросил экспорт своих данных (GDPR)")
+    
+    client_bot.send_message(
+        chat_id,
+        "📦 **Экспорт ваших данных**\n\n"
+        "Готовлю полный экспорт всех ваших данных...\n\n"
+        "⏳ Это может занять несколько секунд.",
+        parse_mode='Markdown'
+    )
+    
+    try:
+        # Экспортируем данные пользователя
+        user_data = db.export_user_data(chat_id)
+        
+        if not user_data:
+            client_bot.send_message(
+                chat_id,
+                "❌ **Ошибка экспорта**\n\n"
+                "Не удалось экспортировать ваши данные. Пожалуйста, попробуйте позже или свяжитесь с поддержкой.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Конвертируем в JSON и отправляем как файл
+        import json
+        import io
+        
+        json_data = json.dumps(user_data, indent=2, ensure_ascii=False, default=str)
+        json_file = io.BytesIO(json_data.encode('utf-8'))
+        json_file.name = f'user_data_{chat_id}_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+        
+        client_bot.send_document(
+            chat_id,
+            json_file,
+            caption=(
+                "✅ **Экспорт завершен**\n\n"
+                "Ваши данные экспортированы в соответствии с GDPR.\n\n"
+                "📄 Файл содержит:\n"
+                "• Профиль клиента\n"
+                "• Данные партнера (если применимо)\n"
+                "• История транзакций\n"
+                "• Заявки на партнерство\n"
+                "• Услуги и акции (для партнеров)\n\n"
+                "🔒 Храните файл в безопасном месте."
+            ),
+            parse_mode='Markdown'
+        )
+        
+        logger.info(f"Successfully sent data export to {chat_id}")
+        
+    except Exception as e:
+        log_exception(logger, e, f"Error exporting data for {chat_id}")
+        client_bot.send_message(
+            chat_id,
+            "❌ **Ошибка**\n\n"
+            "Произошла ошибка при экспорте данных. Пожалуйста, попробуйте позже.",
+            parse_mode='Markdown'
+        )
+
+
+@client_bot.message_handler(commands=['delete_account', 'удалить_аккаунт'])
+def handle_delete_account_request(message):
+    """Обработчик запроса на удаление аккаунта (GDPR Right to be Forgotten)"""
+    chat_id = str(message.chat.id)
+    logger.info(f"Клиент {chat_id} запросил удаление аккаунта (GDPR)")
+    
+    # Создаем клавиатуру для подтверждения
+    markup = types.InlineKeyboardMarkup()
+    markup.row(
+        types.InlineKeyboardButton("✅ Да, удалить все", callback_data=f"gdpr_delete_confirm_{chat_id}"),
+        types.InlineKeyboardButton("❌ Отмена", callback_data="gdpr_delete_cancel")
+    )
+    
+    client_bot.send_message(
+        chat_id,
+        "⚠️ **УДАЛЕНИЕ АККАУНТА**\n\n"
+        "Вы уверены, что хотите удалить все свои данные?\n\n"
+        "**Будет удалено:**\n"
+        "❌ Ваш профиль и баланс баллов\n"
+        "❌ Все услуги и акции (если вы партнер)\n"
+        "❌ Заявки на партнерство\n"
+        "⚠️ История транзакций будет анонимизирована\n\n"
+        "**⚠️ ЭТО ДЕЙСТВИЕ НЕОБРАТИМО!**\n\n"
+        "Вы действительно хотите продолжить?",
+        parse_mode='Markdown',
+        reply_markup=markup
+    )
+
+
+@client_bot.callback_query_handler(func=lambda call: call.data.startswith('gdpr_delete_'))
+def handle_gdpr_delete_callback(call):
+    """Обработчик подтверждения удаления аккаунта"""
+    chat_id = str(call.message.chat.id)
+    
+    if call.data == "gdpr_delete_cancel":
+        client_bot.edit_message_text(
+            "❎ **Отменено**\n\n"
+            "Удаление аккаунта отменено. Ваши данные сохранены.",
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            parse_mode='Markdown'
+        )
+        logger.info(f"Client {chat_id} cancelled account deletion")
+        return
+    
+    if call.data.startswith("gdpr_delete_confirm_"):
+        client_bot.edit_message_text(
+            "🗑️ **Удаление данных**\n\n"
+            "Удаляю все ваши данные из системы...\n\n"
+            "⏳ Пожалуйста, подождите.",
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            parse_mode='Markdown'
+        )
+        
+        try:
+            # Удаляем данные пользователя
+            deletion_results = db.delete_user_data(chat_id)
+            
+            if deletion_results.get('success'):
+                client_bot.edit_message_text(
+                    "✅ **Данные удалены**\n\n"
+                    "Все ваши данные успешно удалены из системы в соответствии с GDPR.\n\n"
+                    "**Удалено:**\n"
+                    f"• Профиль клиента: {deletion_results['tables_deleted'].get('clients', 'N/A')}\n"
+                    f"• Профиль партнера: {deletion_results['tables_deleted'].get('partners', 'N/A')}\n"
+                    f"• Услуги: {deletion_results['tables_deleted'].get('services', 'N/A')}\n"
+                    f"• Акции: {deletion_results['tables_deleted'].get('promotions', 'N/A')}\n"
+                    f"• Транзакции: {deletion_results['tables_deleted'].get('transactions', 'N/A')}\n\n"
+                    "Вы можете в любой момент зарегистрироваться заново, используя команду /start.\n\n"
+                    "Спасибо, что пользовались LoyaltyBot! 👋",
+                    chat_id=chat_id,
+                    message_id=call.message.message_id,
+                    parse_mode='Markdown'
+                )
+                logger.info(f"Successfully deleted account for {chat_id}")
+            else:
+                client_bot.edit_message_text(
+                    "⚠️ **Частичное удаление**\n\n"
+                    "Некоторые данные были удалены, но произошли ошибки:\n\n"
+                    f"{json.dumps(deletion_results['tables_deleted'], indent=2, ensure_ascii=False)}\n\n"
+                    "Пожалуйста, свяжитесь с поддержкой для завершения удаления.",
+                    chat_id=chat_id,
+                    message_id=call.message.message_id,
+                    parse_mode='Markdown'
+                )
+                logger.warning(f"Partial deletion for {chat_id}: {deletion_results}")
+                
+        except Exception as e:
+            log_exception(logger, e, f"Error deleting account for {chat_id}")
+            client_bot.edit_message_text(
+                "❌ **Ошибка**\n\n"
+                "Произошла ошибка при удалении данных. Пожалуйста, свяжитесь с поддержкой.",
+                chat_id=chat_id,
+                message_id=call.message.message_id,
+                parse_mode='Markdown'
+            )
 
 
 @client_bot.message_handler(func=lambda message: True)
