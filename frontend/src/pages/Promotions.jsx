@@ -60,7 +60,7 @@ const Promotions = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 pt-6 pb-8">
+        <div className="bg-gradient-to-r from-luxury-charcoal to-luxury-navy px-4 pt-6 pb-8">
           <div className="flex items-center mb-6">
             <div className="w-6 h-6 bg-white/50 rounded animate-pulse mr-3" />
             <div className="h-8 bg-white/50 rounded w-40 animate-pulse" />
@@ -86,7 +86,7 @@ const Promotions = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Шапка */}
-      <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 pt-6 pb-8">
+      <div className="bg-gradient-to-r from-luxury-charcoal to-luxury-navy px-4 pt-6 pb-8">
         <div className="flex items-center mb-6">
           <button
             onClick={() => navigate('/')}
@@ -108,9 +108,9 @@ const Promotions = () => {
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
               <button
                 onClick={() => handleFilterChange('all')}
-                className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 ${
+                className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 ${
                   filter === 'all'
-                    ? 'bg-white text-pink-500 shadow-lg'
+                    ? 'bg-white text-luxury-gold shadow-md'
                     : 'bg-white/20 text-white hover:bg-white/30'
                 }`}
               >
@@ -118,9 +118,9 @@ const Promotions = () => {
           </button>
               <button
                 onClick={() => handleFilterChange('active')}
-                className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 ${
+                className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 ${
                   filter === 'active'
-                    ? 'bg-white text-pink-500 shadow-lg'
+                    ? 'bg-white text-luxury-gold shadow-md'
                     : 'bg-white/20 text-white hover:bg-white/30'
                 }`}
               >
@@ -128,9 +128,9 @@ const Promotions = () => {
           </button>
               <button
                 onClick={() => handleFilterChange('ending')}
-                className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 ${
+                className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 ${
                   filter === 'ending'
-                    ? 'bg-white text-pink-500 shadow-lg'
+                    ? 'bg-white text-luxury-gold shadow-md'
                     : 'bg-white/20 text-white hover:bg-white/30'
                 }`}
               >
@@ -142,8 +142,10 @@ const Promotions = () => {
       {/* Список акций */}
       <div className="px-4 -mt-4 pb-20">
         {filteredPromotions.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-            <span className="text-6xl mb-4 block">📭</span>
+          <div className="bg-white rounded-xl p-8 text-center shadow-sm border border-gray-200">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-gray-400">
+              <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="currentColor"/>
+            </svg>
             <p className="text-gray-600">Нет активных акций</p>
           </div>
         ) : (

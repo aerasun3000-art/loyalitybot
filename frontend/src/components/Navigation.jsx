@@ -100,7 +100,7 @@ const Navigation = () => {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-sm z-50 backdrop-blur-sm bg-white/95">
       <div className="flex items-center justify-around h-16 max-w-screen-xl mx-auto px-2">
         {navItems.map((item) => {
           const active = isActive(item.path)
@@ -108,18 +108,18 @@ const Navigation = () => {
             <button
               key={item.path}
               onClick={() => handleNavigation(item.path)}
-              className={`flex flex-col items-center justify-center min-w-[60px] h-full transition-all ${
-                active ? 'text-pink-500' : 'text-gray-500'
+              className={`flex flex-col items-center justify-center min-w-[60px] h-full transition-colors ${
+                active ? 'text-luxury-gold' : 'text-gray-400'
               }`}
             >
-              <div className={`transition-transform ${active ? 'scale-110' : 'scale-100'}`}>
+              <div className="transition-opacity">
                 {item.icon(active)}
               </div>
               <span className={`text-[10px] mt-1 font-medium ${active ? 'font-semibold' : ''}`}>
                 {t(item.labelKey)}
               </span>
               {active && (
-                <div className="absolute bottom-0 h-0.5 w-12 bg-pink-500 rounded-t-full" />
+                <div className="absolute bottom-0 h-0.5 w-12 bg-luxury-gold" />
               )}
             </button>
           )

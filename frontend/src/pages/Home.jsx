@@ -103,7 +103,7 @@ const Home = () => {
   // Skeleton вместо Loader
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-pink-400 via-pink-300 to-white">
+      <div className="min-h-screen bg-gradient-to-b from-luxury-charcoal via-luxury-navy to-gray-50">
         <div className="px-4 pt-6 pb-4">
           <div className="flex items-center justify-between mb-4">
             <div className="h-8 bg-white/50 rounded w-32 animate-pulse" />
@@ -136,7 +136,7 @@ const Home = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-400 via-pink-300 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-luxury-charcoal via-luxury-navy to-gray-50">
       {/* Шапка с приветствием */}
       <div className="px-4 pt-6 pb-4">
         <div className="flex items-center justify-between mb-4">
@@ -147,16 +147,18 @@ const Home = () => {
         </div>
 
         {/* Карточка с балансом и прогрессом */}
-        <div className="bg-white rounded-3xl p-4 card-shadow hover:card-shadow-hover transition-all duration-300">
-          <p className="text-pink-500 font-semibold text-base mb-3">
+        <div className="bg-white rounded-xl p-4 shadow-lg border border-gray-100 transition-shadow hover:shadow-xl">
+          <p className="text-luxury-gold font-semibold text-base mb-3">
             {t('home_balance_text')}
           </p>
           
           {/* Баланс */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center">
-                <span className="text-pink-500 text-lg">💰</span>
+              <div className="w-8 h-8 bg-luxury-gold-light rounded-lg flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-luxury-gold">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z" fill="currentColor"/>
+                </svg>
               </div>
               <span className="font-bold text-gray-800">{balance} {t('home_points')}</span>
             </div>
@@ -178,13 +180,16 @@ const Home = () => {
       {/* Секция новостей */}
       <div className="bg-white rounded-t-[2rem] px-4 pt-6 pb-4">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">
-            📰 {t('news_latest')}
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-luxury-gold">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" fill="currentColor"/>
+            </svg>
+            {t('news_latest')}
           </h2>
           {news.length > 0 && (
             <button
               onClick={() => navigate('/news')}
-              className="text-pink-500 font-semibold text-sm"
+              className="text-luxury-gold font-semibold text-sm hover:text-luxury-gold-dark transition-colors"
             >
               {t('home_see_all')} →
             </button>
@@ -196,22 +201,19 @@ const Home = () => {
           {news.length > 0 ? (
             news.map((item, index) => {
               const gradients = [
-                'from-pink-400 to-pink-500',
-                'from-purple-400 to-pink-400',
-                'from-rose-400 to-pink-500',
-                'from-pink-300 to-purple-400',
-                'from-fuchsia-400 to-pink-400'
+                'from-luxury-charcoal to-luxury-navy',
+                'from-luxury-navy to-luxury-slate',
+                'from-luxury-slate to-luxury-charcoal',
+                'from-luxury-deep to-luxury-navy',
+                'from-luxury-charcoal to-luxury-slate'
               ]
               const gradient = gradients[index % gradients.length]
-              
-              const newsIcons = ['📢', '✨', '🎉', '🎁', '🌟']
-              const newsIcon = newsIcons[index % newsIcons.length]
 
               return (
                 <div
                   key={item.id}
                   onClick={() => handleNewsClick(item.id)}
-                  className="flex-shrink-0 w-64 bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl overflow-hidden border border-pink-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                  className="flex-shrink-0 w-64 bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
                 >
                   {item.image_url ? (
                     <div className="h-24 relative overflow-hidden">
@@ -220,7 +222,7 @@ const Home = () => {
                         alt={item.title}
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
+                      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg">
                         <span className="text-xs font-semibold text-gray-700">
                           {formatDate(item.created_at)}
                         </span>
@@ -228,9 +230,11 @@ const Home = () => {
                     </div>
                   ) : (
                     <div className={`h-24 bg-gradient-to-br ${gradient} flex items-center justify-center relative`}>
-                      <div className="absolute inset-0 bg-white/10" />
-                      <span className="text-6xl relative z-10 drop-shadow-lg">{newsIcon}</span>
-                      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
+                      <div className="absolute inset-0 bg-luxury-gold/5" />
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="relative z-10 text-luxury-gold-light">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" fill="currentColor"/>
+                      </svg>
+                      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg">
                         <span className="text-xs font-semibold text-gray-700">
                           {formatDate(item.created_at)}
                         </span>
@@ -251,11 +255,13 @@ const Home = () => {
           ) : (
             <>
               {/* Карточка 1: Добро пожаловать */}
-              <div className="flex-shrink-0 w-64 bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl overflow-hidden border border-pink-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+              <div className="flex-shrink-0 w-64 bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
                 onClick={() => navigate('/news')}>
-                <div className="h-24 bg-gradient-to-br from-pink-400 to-pink-500 flex items-center justify-center relative">
-                  <div className="absolute inset-0 bg-white/10" />
-                  <span className="text-6xl relative z-10 drop-shadow-lg">📢</span>
+                <div className="h-24 bg-gradient-to-br from-luxury-charcoal to-luxury-navy flex items-center justify-center relative">
+                  <div className="absolute inset-0 bg-luxury-gold/5" />
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="relative z-10 text-luxury-gold-light">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" fill="currentColor"/>
+                  </svg>
                 </div>
                 <div className="p-4">
                   <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
@@ -268,11 +274,13 @@ const Home = () => {
               </div>
               
               {/* Карточка 2: Акции месяца */}
-              <div className="flex-shrink-0 w-64 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl overflow-hidden border border-purple-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+              <div className="flex-shrink-0 w-64 bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
                 onClick={() => navigate('/promotions')}>
-                <div className="h-24 bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center relative">
-                  <div className="absolute inset-0 bg-white/10" />
-                  <span className="text-6xl relative z-10 drop-shadow-lg">🎉</span>
+                <div className="h-24 bg-gradient-to-br from-luxury-navy to-luxury-slate flex items-center justify-center relative">
+                  <div className="absolute inset-0 bg-luxury-gold/5" />
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="relative z-10 text-luxury-gold-light">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/>
+                  </svg>
                 </div>
                 <div className="p-4">
                   <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
@@ -285,11 +293,13 @@ const Home = () => {
               </div>
               
               {/* Карточка 3: Реферальная программа */}
-              <div className="flex-shrink-0 w-64 bg-gradient-to-br from-rose-50 to-rose-100 rounded-2xl overflow-hidden border border-rose-200 shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+              <div className="flex-shrink-0 w-64 bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
                 onClick={() => navigate('/profile')}>
-                <div className="h-24 bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center relative">
-                  <div className="absolute inset-0 bg-white/10" />
-                  <span className="text-6xl relative z-10 drop-shadow-lg">🎁</span>
+                <div className="h-24 bg-gradient-to-br from-luxury-slate to-luxury-charcoal flex items-center justify-center relative">
+                  <div className="absolute inset-0 bg-luxury-gold/5" />
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="relative z-10 text-luxury-gold-light">
+                    <path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.996 2.996 0 0 0-5.5-1.65l-.5.67-.5-.68C10.96 2.54 10 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z" fill="currentColor"/>
+                  </svg>
                 </div>
                 <div className="p-4">
                   <h3 className="font-bold text-gray-800 mb-2 flex items-center gap-2">
@@ -313,11 +323,11 @@ const Home = () => {
             onClick={() => navigate('/services')}
             className="flex items-center gap-1"
           >
-            <span className="text-pink-500 font-semibold">
+            <span className="text-luxury-gold font-semibold hover:text-luxury-gold-dark transition-colors">
               {t('home_see_all')}
             </span>
             {services.length > 8 && (
-              <span className="bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full ml-1">
+              <span className="bg-luxury-gold text-luxury-charcoal text-xs px-2 py-0.5 rounded-lg ml-1 font-semibold">
                 NEW
               </span>
             )}
@@ -338,12 +348,12 @@ const Home = () => {
                 onClick={() => handleServiceClick(isService ? item : null)}
                 className="flex flex-col items-center cursor-pointer"
               >
-                <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center mb-2 relative hover:bg-pink-200 hover:scale-110 active:scale-95 transition-all duration-200">
+                <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mb-2 relative hover:bg-gray-200 transition-colors border border-gray-200">
                   <span className="text-3xl">
                     {serviceIcon}
                   </span>
                   {isService && index < 2 && (
-                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                    <span className="absolute -top-1 -right-1 bg-luxury-gold text-luxury-charcoal text-[10px] px-1.5 py-0.5 rounded-lg font-semibold">
                       NEW
                     </span>
                   )}
@@ -361,12 +371,15 @@ const Home = () => {
         {/* Секция Акции */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">
-              🎁 {t('promo_title')}
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-luxury-gold">
+                <path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.996 2.996 0 0 0-5.5-1.65l-.5.67-.5-.68C10.96 2.54 10 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z" fill="currentColor"/>
+              </svg>
+              {t('promo_title')}
             </h2>
             <button
               onClick={() => navigate('/promotions')}
-              className="text-pink-500 font-semibold"
+              className="text-luxury-gold font-semibold hover:text-luxury-gold-dark transition-colors"
             >
               {t('home_see_all')} →
             </button>
@@ -376,15 +389,11 @@ const Home = () => {
             {promotions.slice(0, 3).map((promo, index) => {
               // Градиенты для разнообразия
               const imageGradients = [
-                'from-pink-300 via-pink-400 to-rose-400',
-                'from-purple-300 via-pink-300 to-pink-400',
-                'from-rose-300 via-pink-400 to-purple-300'
+                'from-luxury-charcoal via-luxury-navy to-luxury-slate',
+                'from-luxury-navy via-luxury-slate to-luxury-charcoal',
+                'from-luxury-slate via-luxury-charcoal to-luxury-navy'
               ]
               const imageGradient = imageGradients[index % imageGradients.length]
-              
-              // Иконки
-              const dealIcons = ['🎁', '✨', '💝', '🌟', '💖']
-              const dealIcon = dealIcons[index % dealIcons.length]
               
               return (
                 <div
@@ -392,7 +401,7 @@ const Home = () => {
                   onClick={() => handlePromotionClick(promo.id)}
                   className="flex-shrink-0 w-72 cursor-pointer group"
                 >
-                  <div className="bg-white rounded-2xl overflow-hidden card-shadow group-hover:card-shadow-hover transition-all duration-300 active:scale-98">
+                  <div className="bg-white rounded-xl overflow-hidden shadow-md group-hover:shadow-lg transition-all duration-300 border border-gray-200">
                     {/* Изображение */}
                     {promo.image_url ? (
                       // Реальное фото
@@ -406,7 +415,7 @@ const Home = () => {
                         
                         {/* Бэдж скидки (если есть) */}
                         {promo.required_points === 0 && (
-                          <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                          <div className="absolute top-3 right-3 bg-luxury-gold text-luxury-charcoal px-3 py-1 rounded-lg text-xs font-bold shadow-lg">
                             FREE
                           </div>
                         )}
@@ -414,13 +423,14 @@ const Home = () => {
                     ) : (
                       // Placeholder с градиентом
                       <div className={`h-40 bg-gradient-to-br ${imageGradient} flex items-center justify-center relative overflow-hidden`}>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                        <span className="text-8xl opacity-20 absolute">{dealIcon}</span>
-                        <span className="text-6xl relative z-10 drop-shadow-lg">{dealIcon}</span>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" className="relative z-10 text-luxury-gold-light opacity-80">
+                          <path d="M20 6h-2.18c.11-.31.18-.65.18-1a2.996 2.996 0 0 0-5.5-1.65l-.5.67-.5-.68C10.96 2.54 10 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z" fill="currentColor"/>
+                        </svg>
                         
                         {/* Бэдж скидки (если есть) */}
                         {promo.required_points === 0 && (
-                          <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                          <div className="absolute top-3 right-3 bg-luxury-gold text-luxury-charcoal px-3 py-1 rounded-lg text-xs font-bold shadow-lg">
                             FREE
                           </div>
                         )}
@@ -436,13 +446,15 @@ const Home = () => {
                         {promo.partner?.company_name || promo.partner?.name}
                       </p>
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1 text-pink-500">
-                          <span className="text-2xl font-bold">🪙</span>
+                        <div className="flex items-center gap-1 text-luxury-gold">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-luxury-gold">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z" fill="currentColor"/>
+                          </svg>
                           <span className="text-xl font-bold">
                             {promo.required_points || 'Free'}
                           </span>
                         </div>
-                        <button className="text-pink-500 text-sm font-semibold">
+                        <button className="text-luxury-gold text-sm font-semibold hover:text-luxury-gold-dark transition-colors">
                           {t('promo_details')} →
                         </button>
                       </div>

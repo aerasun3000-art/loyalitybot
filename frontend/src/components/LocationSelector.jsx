@@ -103,7 +103,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-t-3xl w-full max-h-[80vh] flex flex-col animate-slide-up">
+      <div className="bg-white rounded-t-xl w-full max-h-[80vh] flex flex-col animate-slide-up">
         {/* Заголовок */}
         <div className="px-4 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
@@ -142,7 +142,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
         <div className="flex-1 overflow-y-auto px-4 py-2">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-8 h-8 border-4 border-luxury-gold border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : (
             <>
@@ -151,7 +151,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
                   {/* Кнопка "Все города" */}
                   <button
                     onClick={() => handleConfirm('', '')}
-                    className="w-full p-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl font-semibold active:scale-95 transition-transform duration-200"
+                    className="w-full p-4 bg-gradient-to-r from-luxury-charcoal to-luxury-navy text-white rounded-xl font-semibold transition-colors duration-200 hover:opacity-90"
                   >
                     {t('location_all_cities')}
                   </button>
@@ -160,9 +160,9 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
                     <button
                       key={index}
                       onClick={() => handleCitySelect(city)}
-                      className={`w-full p-4 rounded-2xl font-semibold text-left transition-all duration-200 active:scale-95 ${
+                      className={`w-full p-4 rounded-xl font-semibold text-left transition-colors duration-200 ${
                         selectedCity === city
-                          ? 'bg-pink-500 text-white'
+                          ? 'bg-luxury-gold text-luxury-charcoal'
                           : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                       }`}
                     >
@@ -184,7 +184,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
                   {/* Кнопка "Все районы города" */}
                   <button
                     onClick={() => handleConfirm(selectedCity, '')}
-                    className="w-full p-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl font-semibold active:scale-95 transition-transform duration-200"
+                    className="w-full p-4 bg-gradient-to-r from-luxury-charcoal to-luxury-navy text-white rounded-xl font-semibold transition-colors duration-200 hover:opacity-90"
                   >
                     {t('location_all_districts')}
                   </button>
@@ -196,9 +196,9 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
                         handleDistrictSelect(district)
                         handleConfirm(selectedCity, district)
                       }}
-                      className={`w-full p-4 rounded-2xl font-semibold text-left transition-all duration-200 active:scale-95 ${
+                      className={`w-full p-4 rounded-xl font-semibold text-left transition-colors duration-200 ${
                         selectedDistrict === district
-                          ? 'bg-pink-500 text-white'
+                          ? 'bg-luxury-gold text-luxury-charcoal'
                           : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                       }`}
                     >
@@ -212,7 +212,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
                       <p>{language === 'ru' ? 'Районы не найдены' : 'No districts found'}</p>
                       <button
                         onClick={() => handleConfirm(selectedCity, '')}
-                        className="mt-4 px-6 py-2 bg-pink-500 text-white rounded-full font-semibold"
+                        className="mt-4 px-6 py-2 bg-luxury-gold text-luxury-charcoal rounded-lg font-semibold hover:bg-luxury-gold-dark transition-colors"
                       >
                         {language === 'ru' ? 'Продолжить без района' : 'Continue without district'}
                       </button>
@@ -229,7 +229,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
           <div className="px-4 py-3 border-t border-gray-200">
             <button
               onClick={handleClearFilters}
-              className="w-full py-3 text-gray-600 font-semibold rounded-2xl border-2 border-gray-300 active:scale-95 transition-transform duration-200"
+              className="w-full py-3 text-gray-600 font-semibold rounded-xl border-2 border-gray-300 hover:bg-gray-50 transition-colors duration-200"
             >
               🗑️ {language === 'ru' ? 'Сбросить фильтры' : 'Clear filters'}
             </button>

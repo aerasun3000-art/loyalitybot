@@ -20,14 +20,14 @@ const Footer = () => {
         <div className="flex flex-wrap justify-center gap-4 mb-4 text-sm">
           <button
             onClick={() => handleNavigation('/privacy')}
-            className="text-gray-600 dark:text-gray-400 hover:text-pink-500 dark:hover:text-pink-400 transition-colors"
+            className="text-gray-600 dark:text-gray-400 hover:text-luxury-gold dark:hover:text-luxury-gold transition-colors"
           >
             {t('privacy_policy_title')}
           </button>
           <span className="text-gray-400">•</span>
           <button
             onClick={() => handleNavigation('/terms')}
-            className="text-gray-600 dark:text-gray-400 hover:text-pink-500 dark:hover:text-pink-400 transition-colors"
+            className="text-gray-600 dark:text-gray-400 hover:text-luxury-gold dark:hover:text-luxury-gold transition-colors"
           >
             {t('terms_of_service_title')}
           </button>

@@ -9,10 +9,10 @@ const LoyaltyProgress = ({ balance }) => {
 
   // Определение уровней лояльности
   const loyaltyLevels = [
-    { nameKey: 'loyalty_level_newbie', emoji: '💎', min: 0, max: 99, color: 'from-pink-400 to-pink-500' },
-    { nameKey: 'loyalty_level_friend', emoji: '🌸', min: 100, max: 499, color: 'from-pink-500 to-purple-400' },
-    { nameKey: 'loyalty_level_vip', emoji: '💖', min: 500, max: 999, color: 'from-purple-400 to-purple-500' },
-    { nameKey: 'loyalty_level_platinum', emoji: '⭐', min: 1000, max: Infinity, color: 'from-amber-400 to-pink-400' }
+    { nameKey: 'loyalty_level_newbie', emoji: '💎', min: 0, max: 99, color: 'from-gray-400 to-gray-500' },
+    { nameKey: 'loyalty_level_friend', emoji: '🌸', min: 100, max: 499, color: 'from-luxury-bronze to-luxury-gold' },
+    { nameKey: 'loyalty_level_vip', emoji: '💖', min: 500, max: 999, color: 'from-luxury-gold to-luxury-gold-dark' },
+    { nameKey: 'loyalty_level_platinum', emoji: '⭐', min: 1000, max: Infinity, color: 'from-luxury-gold-dark to-luxury-charcoal' }
   ]
 
   // Определение текущего статуса
@@ -66,10 +66,10 @@ const LoyaltyProgress = ({ balance }) => {
         onClick={() => setShowTooltip(!showTooltip)}
       >
         {/* Фон прогресс-бара */}
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className="h-2 bg-gray-200 rounded-lg overflow-hidden">
           {/* Заполненная часть */}
           <div
-            className={`h-full bg-gradient-to-r ${currentLevel.color} rounded-full transition-all duration-500 ease-out`}
+            className={`h-full bg-gradient-to-r ${currentLevel.color} rounded-lg transition-all duration-500 ease-out`}
             style={{ width: `${progress}%` }}
             role="progressbar"
             aria-valuenow={progress}
@@ -131,7 +131,7 @@ const LoyaltyProgress = ({ balance }) => {
 
       {/* Мобильная подсказка (для тач-устройств) */}
       {!nextLevel && (
-        <p className="text-center text-xs text-pink-500 font-semibold mt-1">
+        <p className="text-center text-xs text-luxury-gold font-semibold mt-1">
           ⭐ {t('loyalty_max_reached')}
         </p>
       )}
