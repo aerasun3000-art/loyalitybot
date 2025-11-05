@@ -9,6 +9,7 @@ import asyncio
 import json
 import datetime
 import io
+import qrcode
 from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
 
@@ -117,6 +118,78 @@ def callback_nps_rating(call):
 
 
 # ------------------------------------
+# QR-КОД ДЛЯ КЛИЕНТА
+# ------------------------------------
+
+def generate_qr_code(data: str) -> io.BytesIO:
+    """Генерирует QR-код с данными и возвращает BytesIO объект."""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    return img_byte_arr
+
+
+@client_bot.callback_query_handler(func=lambda call: call.data == 'show_qr_code')
+def handle_show_qr_code(call):
+    """Обработчик для показа QR-кода клиента."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        # Проверяем, зарегистрирован ли клиент
+        client_exists = sm.client_exists(chat_id)
+        
+        if not client_exists:
+            client_bot.answer_callback_query(
+                call.id, 
+                "Сначала зарегистрируйтесь через приложение",
+                show_alert=True
+            )
+            client_bot.send_message(
+                chat_id,
+                "📱 **Для получения QR-кода нужно зарегистрироваться**\n\n"
+                "Нажмите кнопку '🚀 Открыть приложение' для регистрации в программе лояльности.\n\n"
+                "После регистрации вы сможете получить свой QR-код для быстрого начисления баллов.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Генерируем QR-код с chat_id клиента
+        # Формат: CLIENT_ID:<chat_id>
+        qr_data = f"CLIENT_ID:{chat_id}"
+        qr_image = generate_qr_code(qr_data)
+        
+        client_bot.send_photo(
+            chat_id,
+            qr_image,
+            caption="📱 **Ваш QR-код**\n\n"
+                    "Покажите этот QR-код партнеру для быстрого начисления или списания баллов.\n\n"
+                    f"Ваш ID: `{chat_id}`",
+            parse_mode='Markdown'
+        )
+        
+        logger.info(f"Клиент {chat_id} запросил QR-код")
+        client_bot.answer_callback_query(call.id, "QR-код отправлен")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка генерации QR-кода для клиента {chat_id}")
+        try:
+            client_bot.answer_callback_query(call.id, "Ошибка при генерации QR-кода")
+            client_bot.send_message(chat_id, "❌ Произошла ошибка при генерации QR-кода. Попробуйте позже.")
+        except:
+            pass
+
+
+# ------------------------------------
 # ГЛАВНЫЙ ОБРАБОТЧИК /START (ОБНОВЛЕНО)
 # ------------------------------------
 
@@ -191,12 +264,16 @@ def handle_new_user_start(message):
 
         # ---------------------------------------------
 
-        markup = types.InlineKeyboardMarkup()
+        markup = types.InlineKeyboardMarkup(row_width=1)
         webapp_btn = types.InlineKeyboardButton(
             "🚀 Открыть приложение",
             web_app=types.WebAppInfo(url=BASE_DOMAIN)
         )
-        markup.add(webapp_btn)
+        qr_btn = types.InlineKeyboardButton(
+            "📱 Показать QR-код",
+            callback_data="show_qr_code"
+        )
+        markup.add(webapp_btn, qr_btn)
 
         client_bot.send_message(
             chat_id,
@@ -212,12 +289,16 @@ def handle_new_user_start(message):
 
     # --- 4. ЛОГИКА: НЕЗАРЕГИСТРИРОВАННЫЙ КЛИЕНТ (БЕЗ РЕФЕРАЛА) ---
     # Предлагаем открыть приложение для регистрации
-    markup = types.InlineKeyboardMarkup()
+    markup = types.InlineKeyboardMarkup(row_width=1)
     webapp_btn = types.InlineKeyboardButton(
         "🚀 Открыть приложение",
         web_app=types.WebAppInfo(url=BASE_DOMAIN)
     )
-    markup.add(webapp_btn)
+    qr_btn = types.InlineKeyboardButton(
+        "📱 Показать QR-код",
+        callback_data="show_qr_code"
+    )
+    markup.add(webapp_btn, qr_btn)
 
     client_bot.send_message(
         chat_id,

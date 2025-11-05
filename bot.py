@@ -4,6 +4,10 @@ import os
 import sys
 import time
 import datetime
+import requests
+from io import BytesIO
+from PIL import Image
+from pyzbar.pyzbar import decode as decode_qr
 from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
 from image_handler import process_photo_for_promotion
@@ -140,12 +144,20 @@ def handle_partner_menu_buttons(message):
 
     if message.text == "➕ Начислить баллы":
         USER_STATE[chat_id] = 'awaiting_client_id_issue'
-        bot.send_message(chat_id, "Введите *Chat ID клиента* или *ID телефона клиента*.", parse_mode="Markdown")
+        bot.send_message(chat_id, 
+            "Введите *Chat ID клиента* или *ID телефона клиента*.\n\n"
+            "📱 Или отправьте фото с QR-кодом клиента для быстрого сканирования.",
+            parse_mode="Markdown"
+        )
         return
 
     if message.text == "➖ Списать баллы":
         USER_STATE[chat_id] = 'awaiting_client_id_spend'
-        bot.send_message(chat_id, "Введите *Chat ID клиента* или *ID телефона клиента* для списания баллов.", parse_mode="Markdown")
+        bot.send_message(chat_id, 
+            "Введите *Chat ID клиента* или *ID телефона клиента* для списания баллов.\n\n"
+            "📱 Или отправьте фото с QR-кодом клиента для быстрого сканирования.",
+            parse_mode="Markdown"
+        )
         return
 
     if message.text == "📊 Моя статистика":
@@ -212,6 +224,97 @@ def handle_invite_callbacks(call):
 # ------------------------------------
 # ЛОГИКА ТРАНЗАКЦИЙ ПАРТНЕРА (ОСТАВЛЕНО)
 # ------------------------------------
+def decode_qr_from_photo(file_id: str) -> str | None:
+    """Декодирует QR-код из фото и возвращает данные или None."""
+    try:
+        # Получаем информацию о файле
+        file_info = bot.get_file(file_id)
+        file_url = f"https://api.telegram.org/file/bot{PARTNER_TOKEN}/{file_info.file_path}"
+        
+        # Скачиваем фото
+        response = requests.get(file_url, timeout=30)
+        if response.status_code != 200:
+            return None
+        
+        # Открываем изображение
+        img = Image.open(BytesIO(response.content))
+        
+        # Декодируем QR-код
+        decoded_objects = decode_qr(img)
+        if decoded_objects:
+            # Извлекаем данные из первого найденного QR-кода
+            qr_data = decoded_objects[0].data.decode('utf-8')
+            logger.info(f"QR-код успешно декодирован: {qr_data}")
+            return qr_data
+        
+        return None
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка декодирования QR-кода")
+        return None
+
+
+@bot.message_handler(content_types=['photo'], func=lambda message: USER_STATE.get(message.chat.id) in ['awaiting_client_id_issue', 'awaiting_client_id_spend'])
+def process_qr_photo(message):
+    """Обрабатывает фото с QR-кодом для сканирования ID клиента."""
+    chat_id = message.chat.id
+    
+    if not message.photo:
+        bot.send_message(chat_id, "❌ Не удалось получить фото. Попробуйте отправить фото еще раз.")
+        return
+    
+    # Получаем самое большое фото
+    file_id = message.photo[-1].file_id
+    
+    bot.send_message(chat_id, "🔍 Сканирую QR-код...")
+    
+    # Декодируем QR-код
+    qr_data = decode_qr_from_photo(file_id)
+    
+    if not qr_data:
+        bot.send_message(chat_id, 
+            "❌ Не удалось распознать QR-код на фото.\n\n"
+            "Пожалуйста, убедитесь, что:\n"
+            "• QR-код четко виден на фото\n"
+            "• Фото хорошо освещено\n"
+            "• QR-код не поврежден\n\n"
+            "Или введите Chat ID клиента вручную."
+        )
+        return
+    
+    # Парсим данные из QR-кода (формат: CLIENT_ID:<chat_id>)
+    if qr_data.startswith('CLIENT_ID:'):
+        client_id = qr_data.replace('CLIENT_ID:', '').strip()
+    else:
+        # Если формат другой, пытаемся использовать как есть
+        client_id = qr_data.strip()
+    
+    # Проверяем существование клиента
+    if not sm.client_exists(client_id):
+        bot.send_message(chat_id, 
+            f"❌ Клиент с ID `{client_id}` не найден в системе.\n\n"
+            "Попробуйте отсканировать QR-код еще раз или введите ID вручную.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Успешно получили ID клиента
+    TEMP_DATA[chat_id] = {
+        'client_id': client_id,
+        'txn_type': 'accrual' if USER_STATE[chat_id] == 'awaiting_client_id_issue' else 'spend'
+    }
+    USER_STATE[chat_id] = 'awaiting_amount'
+    
+    prompt = ""
+    current_balance = sm.get_client_balance(client_id)
+    if TEMP_DATA[chat_id]['txn_type'] == 'accrual':
+        prompt = f"✅ QR-код успешно распознан!\n\nКлиент ID: `{client_id}`\nТекущий баланс: **{current_balance}** баллов.\n\nВведите *сумму чека (в рублях)* для начисления баллов:"
+    else:
+        prompt = f"✅ QR-код успешно распознан!\n\nКлиент ID: `{client_id}`\nТекущий баланс: **{current_balance}** баллов.\n\nВведите *количество баллов* для списания:"
+    
+    bot.send_message(chat_id, prompt, parse_mode="Markdown")
+    logger.info(f"Партнёр {chat_id} отсканировал QR-код клиента {client_id}")
+
+
 @bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) in ['awaiting_client_id_issue', 'awaiting_client_id_spend'])
 def process_client_id(message):
     chat_id = message.chat.id
@@ -828,9 +931,10 @@ def handle_services_menu(message):
 
     markup = types.InlineKeyboardMarkup(row_width=1)
     btn_add = types.InlineKeyboardButton("➕ Добавить новую услугу", callback_data="service_add")
-    btn_manage = types.InlineKeyboardButton("🔍 Мои услуги (статус)", callback_data="service_status")
+    btn_manage = types.InlineKeyboardButton("🔍 Мои услуги", callback_data="service_status")
+    btn_edit = types.InlineKeyboardButton("✏️ Редактировать услугу", callback_data="service_edit_list")
     btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
-    markup.add(btn_add, btn_manage, btn_back)
+    markup.add(btn_add, btn_manage, btn_edit, btn_back)
 
     bot.send_message(chat_id, "*Управление Услугами:*\nСоздайте услугу, которая будет доступна для обмена баллов клиентами (требуется одобрение Администратора).", reply_markup=markup, parse_mode='Markdown')
 
@@ -855,6 +959,37 @@ def handle_service_callbacks(call):
     
     elif call.data == 'service_status':
         handle_service_status_list(chat_id)
+    
+    elif call.data == 'service_edit_list':
+        handle_service_edit_list(chat_id)
+    
+    elif call.data.startswith('edit_service_'):
+        # Формат: edit_service_<service_id>
+        service_id = int(call.data.replace('edit_service_', ''))
+        handle_service_edit_menu(chat_id, service_id)
+    
+    elif call.data.startswith('edit_field_'):
+        # Формат: edit_field_<service_id>_<field>
+        parts = call.data.replace('edit_field_', '').split('_')
+        service_id = int(parts[0])
+        field = '_'.join(parts[1:])  # На случай, если field содержит _
+        handle_service_field_edit(chat_id, service_id, field)
+    
+    elif call.data == 'service_back':
+        # Возвращаемся в меню услуг
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_add = types.InlineKeyboardButton("➕ Добавить новую услугу", callback_data="service_add")
+        btn_manage = types.InlineKeyboardButton("🔍 Мои услуги", callback_data="service_status")
+        btn_edit = types.InlineKeyboardButton("✏️ Редактировать услугу", callback_data="service_edit_list")
+        btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
+        markup.add(btn_add, btn_manage, btn_edit, btn_back)
+        
+        bot.edit_message_text(
+            "*Управление Услугами:*\nСоздайте услугу, которая будет доступна для обмена баллов клиентами (требуется одобрение Администратора).",
+            chat_id, call.message.message_id,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
 
     elif call.data == 'partner_main_menu':
         partner_main_menu(chat_id)
@@ -970,8 +1105,9 @@ def handle_partner_settings(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
     btn_bonus = types.InlineKeyboardButton("🎁 Изменить приветственный бонус", callback_data="settings_bonus")
     btn_info = types.InlineKeyboardButton("ℹ️ Моя информация", callback_data="settings_info")
+    btn_edit = types.InlineKeyboardButton("✏️ Редактировать данные", callback_data="settings_edit")
     btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
-    markup.add(btn_bonus, btn_info, btn_back)
+    markup.add(btn_bonus, btn_info, btn_edit, btn_back)
     
     bot.send_message(chat_id, "*⚙️ Настройки партнёра:*\nВыберите действие:", reply_markup=markup, parse_mode='Markdown')
 
@@ -1017,7 +1153,151 @@ def handle_settings_callbacks(call):
         )
         partner_main_menu(chat_id)
     
+    elif call.data == 'settings_edit':
+        # Показываем меню выбора поля для редактирования
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_name = types.InlineKeyboardButton("👤 Редактировать имя", callback_data="edit_name")
+        btn_company = types.InlineKeyboardButton("🏢 Редактировать компанию", callback_data="edit_company")
+        btn_phone = types.InlineKeyboardButton("📱 Редактировать телефон", callback_data="edit_phone")
+        btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="settings_back")
+        markup.add(btn_name, btn_company, btn_phone, btn_back)
+        
+        bot.send_message(chat_id, "✏️ *Редактирование данных:*\n\nВыберите поле, которое хотите изменить:", reply_markup=markup, parse_mode='Markdown')
+    
+    elif call.data == 'settings_back':
+        # Возвращаемся в меню настроек
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_bonus = types.InlineKeyboardButton("🎁 Изменить приветственный бонус", callback_data="settings_bonus")
+        btn_info = types.InlineKeyboardButton("ℹ️ Моя информация", callback_data="settings_info")
+        btn_edit = types.InlineKeyboardButton("✏️ Редактировать данные", callback_data="settings_edit")
+        btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
+        markup.add(btn_bonus, btn_info, btn_edit, btn_back)
+        
+        bot.edit_message_text(
+            "*⚙️ Настройки партнёра:*\nВыберите действие:",
+            chat_id, call.message.message_id,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+    
     bot.answer_callback_query(call.id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('edit_'))
+def handle_edit_callbacks(call):
+    """Обработчик callback'ов для редактирования данных партнера."""
+    chat_id = call.message.chat.id
+    
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    
+    if call.data == 'edit_name':
+        USER_STATE[chat_id] = 'awaiting_edit_name'
+        msg = bot.send_message(chat_id, "✏️ *Редактирование имени*\n\nВведите новое имя:", parse_mode='Markdown')
+        bot.register_next_step_handler(msg, process_edit_name)
+    
+    elif call.data == 'edit_company':
+        USER_STATE[chat_id] = 'awaiting_edit_company'
+        msg = bot.send_message(chat_id, "✏️ *Редактирование названия компании*\n\nВведите новое название компании:", parse_mode='Markdown')
+        bot.register_next_step_handler(msg, process_edit_company)
+    
+    elif call.data == 'edit_phone':
+        USER_STATE[chat_id] = 'awaiting_edit_phone'
+        msg = bot.send_message(chat_id, "✏️ *Редактирование телефона*\n\nВведите новый номер телефона:", parse_mode='Markdown')
+        bot.register_next_step_handler(msg, process_edit_phone)
+    
+    bot.answer_callback_query(call.id)
+
+
+def process_edit_name(message):
+    """Обрабатывает ввод нового имени партнера."""
+    chat_id = message.chat.id
+    
+    if chat_id not in USER_STATE or USER_STATE[chat_id] != 'awaiting_edit_name':
+        return
+    
+    new_name = message.text.strip()
+    
+    if len(new_name) < 2:
+        msg = bot.send_message(chat_id, "❌ Имя слишком короткое. Введите имя еще раз:")
+        bot.register_next_step_handler(msg, process_edit_name)
+        return
+    
+    try:
+        success = sm.update_partner_data(str(chat_id), name=new_name)
+        if success:
+            bot.send_message(chat_id, f"✅ Имя успешно обновлено на: **{new_name}**", parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} обновил имя на: {new_name}")
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при обновлении имени. Попробуйте позже.")
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обновления имени партнёра {chat_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при обновлении имени.")
+    
+    USER_STATE.pop(chat_id, None)
+    partner_main_menu(chat_id)
+
+
+def process_edit_company(message):
+    """Обрабатывает ввод нового названия компании партнера."""
+    chat_id = message.chat.id
+    
+    if chat_id not in USER_STATE or USER_STATE[chat_id] != 'awaiting_edit_company':
+        return
+    
+    new_company = message.text.strip()
+    
+    if len(new_company) < 2:
+        msg = bot.send_message(chat_id, "❌ Название компании слишком короткое. Введите название еще раз:")
+        bot.register_next_step_handler(msg, process_edit_company)
+        return
+    
+    try:
+        success = sm.update_partner_data(str(chat_id), company_name=new_company)
+        if success:
+            bot.send_message(chat_id, f"✅ Название компании успешно обновлено на: **{new_company}**", parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} обновил название компании на: {new_company}")
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при обновлении названия компании. Попробуйте позже.")
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обновления названия компании партнёра {chat_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при обновлении названия компании.")
+    
+    USER_STATE.pop(chat_id, None)
+    partner_main_menu(chat_id)
+
+
+def process_edit_phone(message):
+    """Обрабатывает ввод нового телефона партнера."""
+    chat_id = message.chat.id
+    
+    if chat_id not in USER_STATE or USER_STATE[chat_id] != 'awaiting_edit_phone':
+        return
+    
+    new_phone = message.text.strip()
+    
+    # Простая валидация телефона (должен содержать хотя бы 10 цифр)
+    digits = ''.join(filter(str.isdigit, new_phone))
+    if len(digits) < 10:
+        msg = bot.send_message(chat_id, "❌ Номер телефона слишком короткий. Введите корректный номер телефона:")
+        bot.register_next_step_handler(msg, process_edit_phone)
+        return
+    
+    try:
+        success = sm.update_partner_data(str(chat_id), phone=new_phone)
+        if success:
+            bot.send_message(chat_id, f"✅ Номер телефона успешно обновлен на: **{new_phone}**", parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} обновил телефон на: {new_phone}")
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при обновлении номера телефона. Попробуйте позже.")
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обновления телефона партнёра {chat_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при обновлении номера телефона.")
+    
+    USER_STATE.pop(chat_id, None)
+    partner_main_menu(chat_id)
 
 
 # ------------------------------------
@@ -1128,6 +1408,217 @@ def handle_service_status_list(chat_id):
         log_exception(logger, e, f"Ошибка получения статуса услуг партнёра {chat_id}")
         bot.send_message(chat_id, "Ошибка при получении статуса услуг.")
     
+    partner_main_menu(chat_id)
+
+
+def handle_service_edit_list(chat_id):
+    """Показывает список услуг для редактирования."""
+    try:
+        all_services = sm.client.from_('services').select('*').eq('partner_chat_id', str(chat_id)).execute()
+        
+        if not all_services.data:
+            bot.send_message(chat_id, "У вас пока нет созданных услуг для редактирования.")
+            partner_main_menu(chat_id)
+            return
+        
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        
+        for service in all_services.data:
+            service_id = service.get('id')
+            title = service.get('title', 'Без названия')
+            price = service.get('price_points', 0)
+            
+            btn = types.InlineKeyboardButton(
+                f"✏️ {title} ({price} баллов)",
+                callback_data=f"edit_service_{service_id}"
+            )
+            markup.add(btn)
+        
+        btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="service_back")
+        markup.add(btn_back)
+        
+        bot.send_message(chat_id, "✏️ **Выберите услугу для редактирования:**", reply_markup=markup, parse_mode='Markdown')
+        logger.info(f"Партнёр {chat_id} открыл список услуг для редактирования")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка получения списка услуг для редактирования {chat_id}")
+        bot.send_message(chat_id, "Ошибка при получении списка услуг.")
+
+
+def handle_service_edit_menu(chat_id, service_id):
+    """Показывает меню выбора поля для редактирования услуги."""
+    try:
+        service = sm.get_service_by_id(service_id, str(chat_id))
+        
+        if not service:
+            bot.send_message(chat_id, "❌ Услуга не найдена или у вас нет прав для её редактирования.")
+            partner_main_menu(chat_id)
+            return
+        
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_title = types.InlineKeyboardButton("👤 Редактировать название", callback_data=f"edit_field_{service_id}_title")
+        btn_desc = types.InlineKeyboardButton("📝 Редактировать описание", callback_data=f"edit_field_{service_id}_description")
+        btn_price = types.InlineKeyboardButton("💎 Редактировать стоимость", callback_data=f"edit_field_{service_id}_price_points")
+        btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="service_edit_list")
+        markup.add(btn_title, btn_desc, btn_price, btn_back)
+        
+        info_text = f"**Редактирование услуги:**\n\n"
+        info_text += f"👤 Название: {service.get('title', 'Не указано')}\n"
+        info_text += f"📝 Описание: {service.get('description', 'Не указано')[:50]}...\n"
+        info_text += f"💎 Стоимость: {service.get('price_points', 0)} баллов\n\n"
+        info_text += "Выберите поле для редактирования:"
+        
+        bot.send_message(chat_id, info_text, reply_markup=markup, parse_mode='Markdown')
+        logger.info(f"Партнёр {chat_id} открыл меню редактирования услуги {service_id}")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка открытия меню редактирования услуги {service_id}")
+        bot.send_message(chat_id, "Ошибка при открытии меню редактирования.")
+
+
+def handle_service_field_edit(chat_id, service_id, field):
+    """Инициирует процесс редактирования поля услуги."""
+    try:
+        service = sm.get_service_by_id(service_id, str(chat_id))
+        
+        if not service:
+            bot.send_message(chat_id, "❌ Услуга не найдена.")
+            return
+        
+        # Сохраняем информацию о редактировании
+        TEMP_DATA[chat_id] = {
+            'editing_service_id': service_id,
+            'editing_field': field
+        }
+        
+        field_names = {
+            'title': 'название',
+            'description': 'описание',
+            'price_points': 'стоимость'
+        }
+        
+        field_prompts = {
+            'title': f"Введите новое **название** услуги (текущее: {service.get('title', 'Не указано')}):",
+            'description': f"Введите новое **описание** услуги (текущее: {service.get('description', 'Не указано')[:100]}...):",
+            'price_points': f"Введите новую **стоимость** в баллах (текущая: {service.get('price_points', 0)}):"
+        }
+        
+        prompt = field_prompts.get(field, f"Введите новое значение для {field_names.get(field, field)}:")
+        
+        USER_STATE[chat_id] = f'awaiting_service_edit_{field}'
+        
+        msg = bot.send_message(chat_id, f"✏️ *Редактирование {field_names.get(field, field)}:*\n\n{prompt}", parse_mode='Markdown')
+        
+        if field == 'price_points':
+            bot.register_next_step_handler(msg, process_service_edit_price)
+        elif field == 'title':
+            bot.register_next_step_handler(msg, process_service_edit_title)
+        elif field == 'description':
+            bot.register_next_step_handler(msg, process_service_edit_description)
+        
+        logger.info(f"Партнёр {chat_id} начал редактирование поля {field} услуги {service_id}")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка инициализации редактирования поля {field} услуги {service_id}")
+        bot.send_message(chat_id, "Ошибка при начале редактирования.")
+
+
+def process_service_edit_title(message):
+    """Обрабатывает ввод нового названия услуги."""
+    chat_id = message.chat.id
+    
+    if chat_id not in TEMP_DATA or 'editing_service_id' not in TEMP_DATA[chat_id]:
+        bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать редактирование снова.")
+        return
+    
+    service_id = TEMP_DATA[chat_id]['editing_service_id']
+    new_title = message.text.strip()
+    
+    if len(new_title) < 2:
+        msg = bot.send_message(chat_id, "❌ Название слишком короткое. Введите название еще раз:")
+        bot.register_next_step_handler(msg, process_service_edit_title)
+        return
+    
+    try:
+        success = sm.update_service(service_id, str(chat_id), title=new_title)
+        if success:
+            bot.send_message(chat_id, f"✅ Название услуги успешно обновлено на: **{new_title}**", parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} обновил название услуги {service_id}")
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при обновлении названия. Попробуйте позже.")
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обновления названия услуги {service_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при обновлении названия.")
+    
+    TEMP_DATA.pop(chat_id, None)
+    USER_STATE.pop(chat_id, None)
+    partner_main_menu(chat_id)
+
+
+def process_service_edit_description(message):
+    """Обрабатывает ввод нового описания услуги."""
+    chat_id = message.chat.id
+    
+    if chat_id not in TEMP_DATA or 'editing_service_id' not in TEMP_DATA[chat_id]:
+        bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать редактирование снова.")
+        return
+    
+    service_id = TEMP_DATA[chat_id]['editing_service_id']
+    new_description = message.text.strip()
+    
+    if len(new_description) < 5:
+        msg = bot.send_message(chat_id, "❌ Описание слишком короткое. Введите описание еще раз:")
+        bot.register_next_step_handler(msg, process_service_edit_description)
+        return
+    
+    try:
+        success = sm.update_service(service_id, str(chat_id), description=new_description)
+        if success:
+            bot.send_message(chat_id, f"✅ Описание услуги успешно обновлено!", parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} обновил описание услуги {service_id}")
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при обновлении описания. Попробуйте позже.")
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обновления описания услуги {service_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при обновлении описания.")
+    
+    TEMP_DATA.pop(chat_id, None)
+    USER_STATE.pop(chat_id, None)
+    partner_main_menu(chat_id)
+
+
+def process_service_edit_price(message):
+    """Обрабатывает ввод новой стоимости услуги."""
+    chat_id = message.chat.id
+    
+    if chat_id not in TEMP_DATA or 'editing_service_id' not in TEMP_DATA[chat_id]:
+        bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать редактирование снова.")
+        return
+    
+    service_id = TEMP_DATA[chat_id]['editing_service_id']
+    
+    try:
+        new_price = int(message.text.strip())
+        if new_price <= 0:
+            raise ValueError
+    except ValueError:
+        msg = bot.send_message(chat_id, "❌ Неверный формат. Введите *целое число* баллов больше нуля:")
+        bot.register_next_step_handler(msg, process_service_edit_price)
+        return
+    
+    try:
+        success = sm.update_service(service_id, str(chat_id), price_points=new_price)
+        if success:
+            bot.send_message(chat_id, f"✅ Стоимость услуги успешно обновлена на: **{new_price}** баллов", parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} обновил стоимость услуги {service_id}")
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при обновлении стоимости. Попробуйте позже.")
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обновления стоимости услуги {service_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при обновлении стоимости.")
+    
+    TEMP_DATA.pop(chat_id, None)
+    USER_STATE.pop(chat_id, None)
     partner_main_menu(chat_id)
 
 

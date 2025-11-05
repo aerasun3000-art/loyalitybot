@@ -4,3 +4,5 @@ streamlit
 supabase
 python-dotenv
 gigachat>=0.1.20
+qrcode[pil]
+pyzbar

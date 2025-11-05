@@ -32,7 +32,13 @@ class SupabaseManager:
         else:
             self.client: Client = create_client(supabase_url, supabase_key)
 
-        self.CASHBACK_PERCENT = 0.05
+        # Процент кэшбэка теперь конфигурируется через переменную окружения CASHBACK_PERCENT
+        # Пример: CASHBACK_PERCENT=0.05 (5%)
+        try:
+            self.CASHBACK_PERCENT = float(os.getenv("CASHBACK_PERCENT", "0.05"))
+        except ValueError:
+            logging.error("Некорректное значение CASHBACK_PERCENT. Использую значение по умолчанию 0.05")
+            self.CASHBACK_PERCENT = 0.05
         
         bonus_from_env = os.getenv("WELCOME_BONUS_AMOUNT", "100") 
         try:
@@ -841,6 +847,28 @@ class SupabaseManager:
         except Exception:
             return False
 
+    def update_partner_data(self, partner_id: str, name: str = None, company_name: str = None, phone: str = None) -> bool:
+        """Обновляет данные партнера (имя, название компании, телефон)."""
+        if not self.client: return False
+        try:
+            update_data = {}
+            if name is not None:
+                update_data['name'] = name
+            if company_name is not None:
+                update_data['company_name'] = company_name
+            if phone is not None:
+                # Очищаем номер телефона от форматирования
+                clean_phone = phone.replace('+', '').replace(' ', '').replace('-', '').strip()
+                update_data['phone'] = clean_phone
+            
+            if update_data:
+                self.client.from_('partner_applications').update(update_data).eq('chat_id', str(partner_id)).execute()
+                return True
+            return False
+        except Exception as e:
+            logging.error(f"Error updating partner data: {e}")
+            return False
+
     def record_nps_rating(self, client_chat_id: str, partner_chat_id: str, rating: int, master_name: str | None = None) -> bool:
         """Записывает оценку NPS клиента."""
         if not self.client: return False
@@ -1062,6 +1090,43 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error updating service status: {e}")
             return False
+
+    def update_service(self, service_id: int, partner_chat_id: str, title: str = None, description: str = None, price_points: int = None) -> bool:
+        """Обновляет данные услуги (название, описание, стоимость)."""
+        if not self.client: return False
+        try:
+            update_data = {}
+            if title is not None:
+                update_data['title'] = title
+            if description is not None:
+                update_data['description'] = description
+            if price_points is not None:
+                update_data['price_points'] = price_points
+            
+            if update_data:
+                # Проверяем, что услуга принадлежит партнеру
+                response = self.client.from_('services').select('id').eq('id', service_id).eq('partner_chat_id', str(partner_chat_id)).execute()
+                if not response.data:
+                    logging.error(f"Service {service_id} not found or doesn't belong to partner {partner_chat_id}")
+                    return False
+                
+                self.client.from_('services').update(update_data).eq('id', service_id).execute()
+                logging.info(f"Service {service_id} updated successfully")
+                return True
+            return False
+        except Exception as e:
+            logging.error(f"Error updating service: {e}")
+            return False
+
+    def get_service_by_id(self, service_id: int, partner_chat_id: str) -> dict | None:
+        """Получает услугу по ID с проверкой принадлежности партнеру."""
+        if not self.client: return None
+        try:
+            response = self.client.from_('services').select('*').eq('id', service_id).eq('partner_chat_id', str(partner_chat_id)).execute()
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logging.error(f"Error getting service by id: {e}")
+            return None
 
     # -----------------------------------------------------------------
     # VI. МЕТОДЫ ДЛЯ РАБОТЫ С НОВОСТЯМИ
