@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getClientTransactions } from '../services/supabase'
 import { getChatId, hapticFeedback } from '../utils/telegram'
+// import LuxuryIcon from '../components/LuxuryIcons'
 import Loader from '../components/Loader'
 
 const History = () => {
@@ -203,7 +204,7 @@ const History = () => {
       <div className="px-4 -mt-4 pb-20">
         {filteredTransactions.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-            <span className="text-6xl mb-4 block">📭</span>
+            <span className="text-6xl leading-none mx-auto mb-4 block text-jewelry-gray-elegant">🚫</span>
             <p className="text-gray-600">История транзакций пуста</p>
           </div>
         ) : (

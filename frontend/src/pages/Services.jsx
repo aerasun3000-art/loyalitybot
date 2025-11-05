@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getFilteredServices, getClientBalance } from '../services/supabase'
 import { getChatId, hapticFeedback, showConfirm } from '../utils/telegram'
+import { getServiceIcon, serviceCategories } from '../utils/serviceIcons'
 import Loader from '../components/Loader'
 import LocationSelector from '../components/LocationSelector'
 
@@ -17,6 +19,9 @@ const Services = () => {
   const [services, setServices] = useState([])
   const [balance, setBalance] = useState(0)
   const [filter, setFilter] = useState('all') // all, affordable, expensive
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [sortBy, setSortBy] = useState('relevance') // relevance, price_asc, price_desc, newest
   const [selectedService, setSelectedService] = useState(null)
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
   const [selectedCity, setSelectedCity] = useState(cityParam || '')
@@ -25,6 +30,12 @@ const Services = () => {
   useEffect(() => {
     loadData()
   }, [chatId, cityParam, districtParam])
+
+  // debounce поискового запроса
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(searchQuery), 300)
+    return () => clearTimeout(id)
+  }, [searchQuery])
 
   const loadData = async () => {
     try {
@@ -65,19 +76,48 @@ const Services = () => {
   }
 
   const getFilteredServices = () => {
-    switch (filter) {
-      case 'affordable':
-        return services.filter(s => s.price_points <= balance)
-      case 'expensive':
-        return services.filter(s => s.price_points > balance)
-      default:
-        return services
+    // 1) базовая выборка по фильтру доступности
+    let result = (() => {
+      switch (filter) {
+        case 'affordable':
+          return services.filter(s => s.price_points <= balance)
+        case 'expensive':
+          return services.filter(s => s.price_points > balance)
+        default:
+          return services
+      }
+    })()
+
+    // 2) поиск по названию услуги и имени партнёра
+    const q = debouncedQuery.trim().toLowerCase()
+    if (q) {
+      result = result.filter(s => {
+        const title = (s.title || '').toLowerCase()
+        const partnerName = (s.partner?.company_name || s.partner?.name || '').toLowerCase()
+        return title.includes(q) || partnerName.includes(q)
+      })
     }
+
+    // 3) сортировка
+    if (sortBy === 'price_asc') {
+      result = [...result].sort((a, b) => (a.price_points || 0) - (b.price_points || 0))
+    } else if (sortBy === 'price_desc') {
+      result = [...result].sort((a, b) => (b.price_points || 0) - (a.price_points || 0))
+    } else if (sortBy === 'newest') {
+      result = [...result].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+    }
+
+    return result
   }
 
   const handleFilterChange = (newFilter) => {
     hapticFeedback('light')
     setFilter(newFilter)
+  }
+
+  const handleSortChange = (newSort) => {
+    hapticFeedback('light')
+    setSortBy(newSort)
   }
 
   const handleServiceClick = (service) => {
@@ -108,12 +148,10 @@ const Services = () => {
     )
   }
 
-  const serviceIcons = ['🧹', '🔧', '🏠', '💼', '🚗', '📦', '🎨', '💆', '🍕', '☕', '🎁', '🎮']
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 pb-20">
-        <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 pt-6 pb-8">
+        <div className="bg-gradient-to-r from-jewelry-brown-dark to-jewelry-burgundy px-4 pt-6 pb-8">
           <div className="flex items-center mb-6">
             <div className="w-6 h-6 bg-white/50 rounded animate-pulse mr-3" />
             <div className="h-8 bg-white/50 rounded w-32 animate-pulse" />
@@ -125,9 +163,9 @@ const Services = () => {
           <div className="grid grid-cols-2 gap-4">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="bg-white rounded-2xl p-4 animate-pulse">
-                <div className="w-16 h-16 bg-pink-100 rounded-2xl mx-auto mb-3" />
-                <div className="h-4 bg-pink-100 rounded w-3/4 mx-auto mb-2" />
-                <div className="h-3 bg-pink-50 rounded w-1/2 mx-auto" />
+                <div className="w-16 h-16 bg-jewelry-cream rounded-xl mx-auto mb-3 border border-jewelry-gold/20" />
+                <div className="h-4 bg-jewelry-cream rounded w-3/4 mx-auto mb-2 border border-jewelry-gold/20" />
+                <div className="h-3 bg-jewelry-cream/50 rounded w-1/2 mx-auto border border-jewelry-gold/10" />
               </div>
             ))}
           </div>
@@ -141,7 +179,7 @@ const Services = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Шапка */}
-      <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 pt-6 pb-8">
+      <div className="bg-gradient-to-r from-jewelry-brown-dark to-jewelry-burgundy px-4 pt-6 pb-8">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center">
             <button
@@ -180,12 +218,33 @@ const Services = () => {
         )}
 
         {/* Фильтры */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+        <div className="flex flex-col gap-3">
+          {/* Строка поиска + сортировка */}
+          <div className="flex items-center gap-2">
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Поиск услуг..."
+              className="flex-1 px-3 py-2 rounded-lg bg-white/20 text-white placeholder-white/80 outline-none border border-white/20"
+            />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-white/20 text-white outline-none border border-white/20"
+            >
+              <option value="relevance">По релевантности</option>
+              <option value="newest">Сначала новые</option>
+              <option value="price_asc">Цена: по возрастанию</option>
+              <option value="price_desc">Цена: по убыванию</option>
+            </select>
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {/* Кнопка выбора локации */}
           {!selectedCity && !selectedDistrict && (
             <button
               onClick={handleOpenLocationSelector}
-              className="px-4 py-2 rounded-full font-semibold whitespace-nowrap bg-white text-pink-500 flex items-center gap-2"
+              className="px-4 py-2 rounded-lg font-semibold whitespace-nowrap bg-jewelry-cream text-jewelry-gold flex items-center gap-2 border border-jewelry-gold/20 transition-transform active:scale-95"
             >
               📍 Выбрать город
             </button>
@@ -193,9 +252,9 @@ const Services = () => {
           
           <button
             onClick={() => handleFilterChange('all')}
-            className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap ${
+            className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition-transform active:scale-95 ${
               filter === 'all'
-                ? 'bg-white text-pink-500'
+                ? 'bg-jewelry-cream text-jewelry-gold'
                 : 'bg-white/20 text-white'
             }`}
           >
@@ -203,9 +262,9 @@ const Services = () => {
           </button>
           <button
             onClick={() => handleFilterChange('affordable')}
-            className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap ${
+            className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition-transform active:scale-95 ${
               filter === 'affordable'
-                ? 'bg-white text-pink-500'
+                ? 'bg-jewelry-cream text-jewelry-gold'
                 : 'bg-white/20 text-white'
             }`}
           >
@@ -213,14 +272,15 @@ const Services = () => {
           </button>
           <button
             onClick={() => handleFilterChange('expensive')}
-            className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap ${
+            className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition-transform active:scale-95 ${
               filter === 'expensive'
-                ? 'bg-white text-pink-500'
+                ? 'bg-jewelry-cream text-jewelry-gold'
                 : 'bg-white/20 text-white'
             }`}
           >
             Копим
           </button>
+          </div>
         </div>
       </div>
 
@@ -229,11 +289,31 @@ const Services = () => {
         {filteredServices.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
             <span className="text-6xl mb-4 block">🔍</span>
-            <p className="text-gray-600">
-              {filter === 'affordable' 
-                ? 'Нет доступных услуг. Копите баллы!'
-                : 'Услуги не найдены'}
+            <p className="text-gray-600 mb-3">
+              {searchQuery
+                ? 'Ничего не найдено по вашему запросу.'
+                : filter === 'affordable'
+                  ? 'Нет доступных услуг. Копите баллы!'
+                  : 'Услуги не найдены'}
             </p>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              {(selectedCity || selectedDistrict) && (
+                <button
+                  onClick={() => handleOpenLocationSelector()}
+                  className="px-4 py-2 rounded-lg font-semibold bg-jewelry-gold text-jewelry-cream hover:bg-jewelry-gold-dark transition-colors"
+                >
+                  📍 Изменить локацию
+                </button>
+              )}
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="px-4 py-2 rounded-lg font-semibold bg-gray-100 text-gray-800 hover:bg-gray-200 transition-colors"
+                >
+                  Очистить поиск
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
@@ -245,17 +325,17 @@ const Services = () => {
                 <div
                   key={service.id}
                   onClick={() => handleServiceClick(service)}
-                  className={`bg-white rounded-2xl overflow-hidden shadow-sm cursor-pointer transition-all ${
-                    isHighlighted ? 'ring-2 ring-pink-500' : ''
+                  className={`bg-jewelry-cream rounded-xl overflow-hidden shadow-lg border border-jewelry-gold/20 cursor-pointer transition-all active:scale-98 hover:shadow-xl ${
+                    isHighlighted ? 'ring-2 ring-jewelry-gold' : ''
                   } ${!isAffordable ? 'opacity-60' : ''}`}
                 >
                   {/* Иконка */}
-                  <div className="h-32 bg-gradient-to-br from-pink-100 to-pink-200 flex items-center justify-center relative">
-                    <span className="text-6xl">
-                      {serviceIcons[index % serviceIcons.length]}
+                  <div className="h-32 bg-gradient-to-br from-jewelry-cream to-jewelry-gold-light flex items-center justify-center relative">
+                    <span className="text-5xl leading-none">
+                      {serviceCategories[getServiceIcon(service.title)]?.emoji || '⭐'}
                     </span>
                     {!isAffordable && (
-                      <div className="absolute top-2 right-2 bg-gray-500 text-white px-2 py-1 rounded-full text-xs">
+                      <div className="absolute top-2 right-2 bg-jewelry-gray-elegant text-jewelry-cream px-2 py-1 rounded-lg text-xs font-semibold">
                         🔒
                       </div>
                     )}
@@ -267,16 +347,18 @@ const Services = () => {
                       {service.title}
                     </h3>
                     
-                    <p className="text-xs text-gray-600 mb-2 line-clamp-2">
-                      {service.partner?.company_name || service.partner?.name}
-                    </p>
+                    {(service.partner?.company_name || service.partner?.name) && (
+                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                        {service.partner?.company_name || service.partner?.name}
+                      </p>
+                    )}
                     
                     {/* Отображаем город/район */}
                     {service.partner?.city && (
-                      <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                        <span>📍</span>
+                      <p className="text-xs text-jewelry-gray-elegant mb-2 flex items-center gap-1">
+                        <span className="text-lg leading-none">📍</span>
                         <span className="truncate">
-                          {service.partner.city === 'Все' ? '🌍 Везде (онлайн)' : service.partner.city}
+                          {service.partner.city === 'Все' ? 'Везде (онлайн)' : service.partner.city}
                           {service.partner.district && service.partner.district !== 'Все' ? `, ${service.partner.district}` : ''}
                         </span>
                       </p>
@@ -284,11 +366,9 @@ const Services = () => {
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
-                        <span className="text-pink-500 font-bold text-lg">
-                          🪙
-                        </span>
+                        <span className="text-lg leading-none 💰">💰</span>
                         <span className={`font-bold ${
-                          isAffordable ? 'text-pink-500' : 'text-gray-400'
+                          isAffordable ? 'text-jewelry-gold' : 'text-gray-400'
                         }`}>
                           {service.price_points}
                         </span>
@@ -312,58 +392,67 @@ const Services = () => {
           onClick={() => setSelectedService(null)}
         >
           <div
-            className="bg-white rounded-t-3xl w-full p-6 animate-slide-up"
+            className="bg-white rounded-t-3xl w-full p-6 shadow-lg transform transition-all duration-300 ease-out"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6" />
-            
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center">
-                <span className="text-4xl">
-                  {serviceIcons[services.indexOf(selectedService) % serviceIcons.length]}
-                </span>
-              </div>
-              <div className="flex-1">
-                <h2 className="text-xl font-bold text-gray-800 mb-1">
-                  {selectedService.title}
-                </h2>
-                <p className="text-sm text-gray-600">
-                  {selectedService.partner?.company_name || selectedService.partner?.name}
-                </p>
-              </div>
+            {/* Закрыть кнопку */}
+            <button
+              onClick={() => setSelectedService(null)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            {/* Изображение услуги */}
+            <div className="flex items-center justify-center mb-6">
+              {selectedService.image_url ? (
+                <img 
+                  src={selectedService.image_url} 
+                  alt={selectedService.title}
+                  className="w-32 h-32 object-cover rounded-full shadow-md"
+                />
+              ) : (
+                <div className="w-32 h-32 bg-gradient-to-br from-jewelry-cream to-jewelry-gold-light rounded-full flex items-center justify-center shadow-md border border-jewelry-gold/20">
+                  <span className="text-6xl leading-none">
+                    {serviceCategories[getServiceIcon(selectedService.title)]?.emoji || '⭐'}
+                  </span>
+                </div>
+              )}
             </div>
 
-            <p className="text-gray-700 mb-6">
-              {selectedService.description || 'Подробности уточняйте у партнёра'}
+            <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">
+              {selectedService.title}
+            </h2>
+            <p className="text-center text-gray-600 text-sm mb-4">
+              {selectedService.partner?.company_name || selectedService.partner?.name}
             </p>
 
-            <div className="flex items-center justify-between mb-6">
-              <span className="text-gray-600">Стоимость:</span>
-              <div className="flex items-center gap-2">
-                <span className="text-3xl">🪙</span>
-                <span className="text-2xl font-bold text-pink-500">
+            {/* Описание */}
+            <p className="text-gray-700 text-sm leading-relaxed mb-4">
+              {selectedService.description}
+            </p>
+
+            {/* Цена и кнопка обмена */}
+            <div className="flex items-center justify-between mt-6">
+              <div className="flex items-center gap-2 text-jewelry-gold">
+                <span className="text-3xl leading-none">💰</span>
+                <span className="text-3xl font-bold">
                   {selectedService.price_points}
                 </span>
+                <span className="text-lg font-semibold text-gray-500">баллов</span>
               </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setSelectedService(null)}
-                className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-xl font-semibold"
-              >
-                Отмена
-              </button>
               <button
                 onClick={handleExchange}
-                disabled={balance < selectedService.price_points}
-                className={`flex-1 py-4 rounded-xl font-semibold ${
+                className={`px-6 py-3 rounded-full text-white font-bold transition-colors shadow-lg active:scale-95 ${
                   balance >= selectedService.price_points
-                    ? 'bg-pink-500 text-white'
-                    : 'bg-gray-200 text-gray-400'
+                    ? 'bg-jewelry-gold hover:bg-jewelry-gold-dark'
+                    : 'bg-gray-400 cursor-not-allowed'
                 }`}
+                disabled={balance < selectedService.price_points}
               >
-                {balance >= selectedService.price_points ? 'Обменять' : 'Недостаточно баллов'}
+                Обменять
               </button>
             </div>
           </div>
@@ -375,9 +464,9 @@ const Services = () => {
         isOpen={isLocationSelectorOpen}
         onClose={() => setIsLocationSelectorOpen(false)}
         onSelect={handleLocationSelect}
-        title="Выберите местоположение"
       />
 
+      {/* Скрыть скроллбар */}
       <style>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -386,16 +475,11 @@ const Services = () => {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
-        @keyframes slide-up {
-          from {
-            transform: translateY(100%);
-          }
-          to {
-            transform: translateY(0);
-          }
-        }
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
       `}</style>
     </div>
@@ -403,4 +487,3 @@ const Services = () => {
 }
 
 export default Services
-

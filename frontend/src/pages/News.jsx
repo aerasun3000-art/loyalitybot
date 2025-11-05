@@ -26,9 +26,22 @@ const News = () => {
 
   const loadNews = async () => {
     try {
-      setLoading(true)
+      // 1) сначала берём кеш, если есть
+      const cached = sessionStorage.getItem('news_cache')
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) {
+            setNews(parsed)
+            setLoading(false)
+          }
+        } catch {}
+      }
+
+      // 2) фоновая загрузка актуальных данных
       const newsData = await getPublishedNews()
       setNews(newsData)
+      sessionStorage.setItem('news_cache', JSON.stringify(newsData))
     } catch (error) {
       console.error('Error loading news:', error)
     } finally {
@@ -86,7 +99,7 @@ const News = () => {
       <div className="px-4 -mt-4">
         {news.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center card-shadow">
-            <div className="text-6xl mb-4">📭</div>
+            <span className="text-6xl leading-none mx-auto mb-4 text-jewelry-gray-elegant">🚫</span>
             <h3 className="text-xl font-bold text-gray-800 mb-2">
               {t('news_no_items')}
             </h3>

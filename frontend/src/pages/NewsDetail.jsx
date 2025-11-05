@@ -4,6 +4,7 @@ import { getNewsById, incrementNewsViews } from '../services/supabase'
 import { hapticFeedback } from '../utils/telegram'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
+// import LuxuryIcon from '../components/LuxuryIcons'
 import Loader from '../components/Loader'
 
 const NewsDetail = () => {
@@ -72,7 +73,7 @@ const NewsDetail = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">❌</div>
+          <span className="text-6xl leading-none mx-auto mb-4 text-jewelry-gray-elegant">⚠️</span>
           <h2 className="text-xl font-bold text-gray-800 mb-2">
             {language === 'ru' ? 'Новость не найдена' : 'News not found'}
           </h2>
@@ -197,7 +198,7 @@ const NewsDetail = () => {
         {/* Дополнительная информация */}
         <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-6 border border-pink-100">
           <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <span className="text-xl">ℹ️</span>
+            <span className="text-lg leading-none">ℹ️</span>
             {language === 'ru' ? 'Информация' : 'Information'}
           </h3>
           <div className="space-y-2 text-sm text-gray-600">

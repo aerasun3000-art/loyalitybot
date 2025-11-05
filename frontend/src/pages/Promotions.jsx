@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Title, Card, Button, Chip } from '@telegram-apps/telegram-ui'
 import { getActivePromotions } from '../services/supabase'
 import { hapticFeedback } from '../utils/telegram'
+// import LuxuryIcon from '../components/LuxuryIcons'
 import Loader from '../components/Loader'
 import { PromotionSkeleton } from '../components/SkeletonCard'
 
@@ -21,9 +22,22 @@ const Promotions = () => {
 
   const loadPromotions = async () => {
     try {
-      setLoading(true)
+      // 1) сначала берём кеш
+      const cached = sessionStorage.getItem('promotions_cache')
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) {
+            setPromotions(parsed)
+            setLoading(false)
+          }
+        } catch {}
+      }
+
+      // 2) фоновая загрузка
       const data = await getActivePromotions()
       setPromotions(data)
+      sessionStorage.setItem('promotions_cache', JSON.stringify(data))
     } catch (error) {
       console.error('Error loading promotions:', error)
     } finally {
@@ -60,7 +74,7 @@ const Promotions = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="bg-gradient-to-r from-luxury-charcoal to-luxury-navy px-4 pt-6 pb-8">
+        <div className="bg-gradient-to-r from-jewelry-brown-dark to-jewelry-burgundy px-4 pt-6 pb-8">
           <div className="flex items-center mb-6">
             <div className="w-6 h-6 bg-white/50 rounded animate-pulse mr-3" />
             <div className="h-8 bg-white/50 rounded w-40 animate-pulse" />
@@ -86,7 +100,7 @@ const Promotions = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Шапка */}
-      <div className="bg-gradient-to-r from-luxury-charcoal to-luxury-navy px-4 pt-6 pb-8">
+      <div className="bg-gradient-to-r from-jewelry-brown-dark to-jewelry-burgundy px-4 pt-6 pb-8">
         <div className="flex items-center mb-6">
           <button
             onClick={() => navigate('/')}
@@ -110,8 +124,8 @@ const Promotions = () => {
                 onClick={() => handleFilterChange('all')}
                 className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 ${
                   filter === 'all'
-                    ? 'bg-white text-luxury-gold shadow-md'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                    ? 'bg-jewelry-cream text-jewelry-gold shadow-lg'
+                    : 'bg-jewelry-cream/20 text-jewelry-cream hover:bg-jewelry-cream/30'
                 }`}
               >
             Все ({promotions.length})
@@ -120,8 +134,8 @@ const Promotions = () => {
                 onClick={() => handleFilterChange('active')}
                 className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 ${
                   filter === 'active'
-                    ? 'bg-white text-luxury-gold shadow-md'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                    ? 'bg-jewelry-cream text-jewelry-gold shadow-lg'
+                    : 'bg-jewelry-cream/20 text-jewelry-cream hover:bg-jewelry-cream/30'
                 }`}
               >
             Активные
@@ -130,8 +144,8 @@ const Promotions = () => {
                 onClick={() => handleFilterChange('ending')}
                 className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 ${
                   filter === 'ending'
-                    ? 'bg-white text-luxury-gold shadow-md'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                    ? 'bg-jewelry-cream text-jewelry-gold shadow-lg'
+                    : 'bg-jewelry-cream/20 text-jewelry-cream hover:bg-jewelry-cream/30'
                 }`}
               >
             Скоро закончатся
@@ -142,11 +156,11 @@ const Promotions = () => {
       {/* Список акций */}
       <div className="px-4 -mt-4 pb-20">
         {filteredPromotions.length === 0 ? (
-          <div className="bg-white rounded-xl p-8 text-center shadow-sm border border-gray-200">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-gray-400">
+          <div className="bg-jewelry-cream rounded-xl p-8 text-center shadow-lg border border-jewelry-gold/20">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-jewelry-gray-elegant">
               <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="currentColor"/>
             </svg>
-            <p className="text-gray-600">Нет активных акций</p>
+            <p className="text-jewelry-brown-dark">Нет активных акций</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -156,24 +170,24 @@ const Promotions = () => {
               
               // Разнообразные градиенты для каждой карточки
               const gradients = [
-                'from-pink-400 via-rose-400 to-pink-500',
-                'from-purple-400 via-pink-400 to-rose-400',
-                'from-rose-400 via-pink-500 to-purple-400',
-                'from-pink-500 via-purple-400 to-pink-400',
-                'from-pink-300 via-pink-400 to-rose-400',
-                'from-purple-300 via-pink-300 to-pink-400'
+                'from-jewelry-brown-dark via-jewelry-burgundy to-jewelry-gold',
+                'from-jewelry-burgundy via-jewelry-gold to-jewelry-brown-dark',
+                'from-jewelry-gold via-jewelry-brown-dark to-jewelry-burgundy',
+                'from-jewelry-brown-light via-jewelry-burgundy to-jewelry-gold',
+                'from-jewelry-burgundy via-jewelry-gold to-jewelry-brown-light',
+                'from-jewelry-gold via-jewelry-brown-light to-jewelry-burgundy'
               ]
               const gradient = gradients[index % gradients.length]
               
               // Разнообразные иконки
-              const icons = ['🎉', '🎁', '✨', '💖', '🌸', '💝', '🌟', '💎', '⭐']
-              const icon = icons[index % icons.length]
+              const iconNames = ['celebration', 'celebration', 'default', 'heart', 'flower', 'celebration', 'star', 'diamond', 'star']
+              const iconName = iconNames[index % iconNames.length]
               
               return (
                   <div
                     key={promo.id}
-                    className={`bg-white rounded-2xl overflow-hidden card-shadow hover:card-shadow-hover active:scale-98 transition-all duration-300 ${
-                      isHighlighted ? 'ring-2 ring-pink-500' : ''
+                    className={`bg-jewelry-cream rounded-xl overflow-hidden shadow-lg border border-jewelry-gold/20 hover:shadow-xl transition-all duration-300 ${
+                      isHighlighted ? 'ring-2 ring-jewelry-gold' : ''
                     }`}
                   >
                   {/* Баннер с изображением */}
@@ -191,15 +205,26 @@ const Promotions = () => {
                       <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-10">
                         {/* Бэдж "Заканчивается" */}
                         {daysLeft <= 3 && (
-                          <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
-                            {daysLeft === 0 ? '🔥 Последний день!' : `⏰ ${daysLeft} дн.`}
+                          <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
+                            {daysLeft === 0 ? (
+                              <>
+                                <span>⚠️</span>
+                                <span>Последний день!</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>ℹ️</span>
+                                <span>{daysLeft} дн.</span>
+                              </>
+                            )}
                           </div>
                         )}
                         
                         {/* Бэдж "Бесплатно" */}
                         {promo.required_points === 0 && (
-                          <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto">
-                            🎁 FREE
+                          <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto flex items-center gap-1">
+                            <span>🎉</span>
+                            <span>FREE</span>
                           </div>
                         )}
                       </div>
@@ -212,26 +237,39 @@ const Promotions = () => {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                       
                       {/* Фоновая иконка */}
-                      <span className="text-9xl opacity-20 absolute">{icon}</span>
+                      <div className="absolute opacity-20 text-9xl leading-none">
+                        ⭐
+                      </div>
                       
                       {/* Основная иконка */}
-                      <div className="relative z-10 text-center">
-                        <span className="text-8xl drop-shadow-2xl">{icon}</span>
+                      <div className="relative z-10 text-center text-6xl leading-none">
+                        ⭐
                       </div>
                       
                       {/* Бэджи */}
                       <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
                         {/* Бэдж "Заканчивается" */}
                         {daysLeft <= 3 && (
-                          <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
-                            {daysLeft === 0 ? '🔥 Последний день!' : `⏰ ${daysLeft} дн.`}
+                          <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
+                            {daysLeft === 0 ? (
+                              <>
+                                <span>⚠️</span>
+                                <span>Последний день!</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>ℹ️</span>
+                                <span>{daysLeft} дн.</span>
+                              </>
+                            )}
                           </div>
                         )}
                         
                         {/* Бэдж "Бесплатно" */}
                         {promo.required_points === 0 && (
-                          <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto">
-                            🎁 FREE
+                          <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto flex items-center gap-1">
+                            <span>🎉</span>
+                            <span>FREE</span>
                           </div>
                         )}
                       </div>
@@ -240,22 +278,25 @@ const Promotions = () => {
 
                   {/* Контент */}
                   <div className="p-4">
-                    <h3 className="text-xl font-bold text-gray-800 mb-2 line-clamp-2">
+                    <h3 className="text-xl font-bold text-jewelry-brown-dark mb-2 line-clamp-2">
                       {promo.title}
                     </h3>
                     
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-pink-500 font-semibold text-sm">
-                        {promo.partner?.company_name || promo.partner?.name}
-                      </span>
+                      {(promo.partner?.company_name || promo.partner?.name) && (
+                        <span className="text-jewelry-gold font-semibold text-sm">
+                          {promo.partner?.company_name || promo.partner?.name}
+                        </span>
+                      )}
                       {promo.required_points > 0 && (
-                        <span className="bg-pink-100 text-pink-600 px-2 py-1 rounded-full text-xs font-bold">
-                          🪙 {promo.required_points}
+                        <span className="bg-jewelry-gold/20 text-jewelry-gold px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+                          <span>💰</span>
+                          <span>{promo.required_points}</span>
                         </span>
                       )}
                     </div>
 
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                    <p className="text-jewelry-gray-elegant text-sm mb-4 line-clamp-3">
                       {promo.description || 'Подробности уточняйте у партнёра'}
                     </p>
 
@@ -277,11 +318,11 @@ const Promotions = () => {
                           hapticFeedback('medium')
                           // TODO: Открыть детали акции
                         }}
-                        className="text-pink-500 font-semibold flex items-center gap-1 hover:gap-2 transition-all"
+                        className="text-jewelry-gold font-semibold flex items-center gap-1 hover:gap-2 transition-all active:scale-95"
                       >
                         Подробнее
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                          <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
                         </svg>
                       </button>
                     </div>

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import { hapticFeedback } from '../utils/telegram'
+// import LuxuryIcon from '../components/LuxuryIcons'
 import Footer from '../components/Footer'
 
 const About = () => {
@@ -40,7 +41,7 @@ const About = () => {
         </div>
 
         <div className="text-center">
-          <div className="text-6xl mb-4">💖</div>
+          <span className="text-6xl leading-none mx-auto mb-4 text-white">❤️</span>
           <h2 className="text-2xl font-bold text-white mb-2">LoyaltyBot</h2>
           <p className="text-white/90 text-sm">{t('about_subtitle')}</p>
         </div>
@@ -51,7 +52,7 @@ const About = () => {
         {/* О программе */}
         <div className="bg-white rounded-2xl p-6 shadow-lg mb-4">
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-3xl">ℹ️</span>
+            <span className="text-lg leading-none text-jewelry-gold">ℹ️</span>
             <h3 className="font-bold text-gray-800 text-lg">{t('about_what_is')}</h3>
           </div>
           <p className="text-gray-600 leading-relaxed mb-4">
@@ -59,19 +60,19 @@ const About = () => {
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-pink-50 rounded-xl p-3 text-center">
-              <div className="text-2xl mb-1">💰</div>
+              <span className="text-lg leading-none mx-auto mb-1 text-jewelry-gold">💰</span>
               <div className="text-xs text-gray-700 font-medium">{t('about_earn_points')}</div>
             </div>
             <div className="bg-purple-50 rounded-xl p-3 text-center">
-              <div className="text-2xl mb-1">🎁</div>
+              <span className="text-lg leading-none mx-auto mb-1 text-jewelry-gold">🎉</span>
               <div className="text-xs text-gray-700 font-medium">{t('about_get_rewards')}</div>
             </div>
             <div className="bg-blue-50 rounded-xl p-3 text-center">
-              <div className="text-2xl mb-1">⭐</div>
+              <span className="text-lg leading-none mx-auto mb-1 text-jewelry-gold">⭐</span>
               <div className="text-xs text-gray-700 font-medium">{t('about_vip_status')}</div>
             </div>
             <div className="bg-green-50 rounded-xl p-3 text-center">
-              <div className="text-2xl mb-1">🤝</div>
+              <span className="text-lg leading-none mx-auto mb-1 text-jewelry-gold">🧠</span>
               <div className="text-xs text-gray-700 font-medium">{t('about_partners')}</div>
             </div>
           </div>
@@ -125,7 +126,7 @@ const About = () => {
           
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-4xl">🤝</span>
+              <span className="text-3xl leading-none text-white">🧠</span>
               <h3 className="font-bold text-white text-lg">
                 {t('profile_become_partner')}
               </h3>

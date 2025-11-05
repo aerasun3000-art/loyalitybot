@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
+// import LuxuryIcon from './LuxuryIcons'
 
 const LoyaltyProgress = ({ balance }) => {
   const [showTooltip, setShowTooltip] = useState(false)
@@ -9,10 +10,10 @@ const LoyaltyProgress = ({ balance }) => {
 
   // Определение уровней лояльности
   const loyaltyLevels = [
-    { nameKey: 'loyalty_level_newbie', emoji: '💎', min: 0, max: 99, color: 'from-gray-400 to-gray-500' },
-    { nameKey: 'loyalty_level_friend', emoji: '🌸', min: 100, max: 499, color: 'from-luxury-bronze to-luxury-gold' },
-    { nameKey: 'loyalty_level_vip', emoji: '💖', min: 500, max: 999, color: 'from-luxury-gold to-luxury-gold-dark' },
-    { nameKey: 'loyalty_level_platinum', emoji: '⭐', min: 1000, max: Infinity, color: 'from-luxury-gold-dark to-luxury-charcoal' }
+    { nameKey: 'loyalty_level_newbie', icon: 'diamond', emoji: '💎', min: 0, max: 99, color: 'from-gray-400 to-gray-500' },
+    { nameKey: 'loyalty_level_friend', icon: 'flower', emoji: '🌸', min: 100, max: 499, color: 'from-jewelry-brown-light to-jewelry-gold' },
+    { nameKey: 'loyalty_level_vip', icon: 'heart', emoji: '❤️', min: 500, max: 999, color: 'from-jewelry-gold to-jewelry-gold-dark' },
+    { nameKey: 'loyalty_level_platinum', icon: 'star', emoji: '⭐', min: 1000, max: Infinity, color: 'from-jewelry-gold-dark to-jewelry-brown-dark' }
   ]
 
   // Определение текущего статуса
@@ -46,14 +47,14 @@ const LoyaltyProgress = ({ balance }) => {
       {/* Заголовок статуса */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-xl">{currentLevel.emoji}</span>
-          <span className="text-sm font-semibold text-gray-700">
+          <span className="text-xl leading-none text-jewelry-gold">{currentLevel.emoji}</span>
+          <span className="text-sm font-semibold text-jewelry-brown-dark">
             {t(currentLevel.nameKey)}
           </span>
         </div>
         {nextLevel && (
-          <span className="text-xs text-gray-500">
-            {t('loyalty_to')} {nextLevel.emoji} {t(nextLevel.nameKey)}: {pointsToNext}
+          <span className="text-xs text-jewelry-gray-elegant flex items-center gap-1">
+            {t('loyalty_to')} <span className="text-sm leading-none">{nextLevel.emoji}</span> {t(nextLevel.nameKey)}: {pointsToNext}
           </span>
         )}
       </div>
@@ -91,13 +92,13 @@ const LoyaltyProgress = ({ balance }) => {
                   isCurrent ? 'scale-110' : 'scale-90'
                 }`}
               >
-                <span
-                  className={`text-xs transition-all ${
-                    isActive ? 'opacity-100 scale-110' : 'opacity-40 scale-90'
+                <div
+                  className={`transition-all ${
+                    isActive ? 'opacity-100 scale-110 text-jewelry-gold' : 'opacity-30 scale-90 text-jewelry-gray-elegant'
                   }`}
                 >
-                  {level.emoji}
-                </span>
+                  <span className="text-lg leading-none">{level.emoji}</span>
+                </div>
               </div>
             )
           })}
@@ -109,16 +110,16 @@ const LoyaltyProgress = ({ balance }) => {
             <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg whitespace-nowrap">
               {nextLevel ? (
                 <>
-                  <p className="font-semibold mb-1">
-                    {currentLevel.emoji} {t(currentLevel.nameKey)} → {nextLevel.emoji} {t(nextLevel.nameKey)}
+                  <p className="font-semibold mb-1 flex items-center gap-1">
+                    <span className="text-sm leading-none">{currentLevel.emoji}</span> {t(currentLevel.nameKey)} → <span className="text-sm leading-none">{nextLevel.emoji}</span> {t(nextLevel.nameKey)}
                   </p>
                   <p>
                     {t('loyalty_progress')}: {progress}% ({pointsToNext} {t('loyalty_points_to_next')})
                   </p>
                 </>
               ) : (
-                <p className="font-semibold">
-                  🎉 {t('loyalty_max_level')} {currentLevel.emoji} {t(currentLevel.nameKey)}
+                <p className="font-semibold flex items-center gap-1">
+                  <span className="text-sm leading-none">🎉</span> {t('loyalty_max_level')} <span className="text-sm leading-none">{currentLevel.emoji}</span> {t(currentLevel.nameKey)}
                 </p>
               )}
               <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
@@ -131,8 +132,8 @@ const LoyaltyProgress = ({ balance }) => {
 
       {/* Мобильная подсказка (для тач-устройств) */}
       {!nextLevel && (
-        <p className="text-center text-xs text-luxury-gold font-semibold mt-1">
-          ⭐ {t('loyalty_max_reached')}
+        <p className="text-center text-xs text-jewelry-gold font-semibold mt-1 flex items-center justify-center gap-1">
+          <span className="text-sm leading-none">⭐</span> {t('loyalty_max_reached')}
         </p>
       )}
     </div>
