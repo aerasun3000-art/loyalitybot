@@ -15,11 +15,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
  * Получить информацию о клиенте
  */
 export const getClientInfo = async (chatId) => {
+  // Если chatId null или undefined, возвращаем null
+  if (!chatId) {
+    return null
+  }
+  
   const { data, error } = await supabase
     .from('users')
     .select('*')
     .eq('chat_id', chatId)
-    .single()
+    .maybeSingle() // Используем maybeSingle вместо single - не падает если нет строк
   
   if (error) {
     console.error('Error fetching client:', error)
@@ -397,7 +402,7 @@ export const getNewsById = async (newsId) => {
     .select('*')
     .eq('id', newsId)
     .eq('is_published', true)
-    .single()
+    .maybeSingle() // Используем maybeSingle вместо single - не падает если нет строк
   
   if (error) {
     console.error('Error fetching news by id:', error)
@@ -413,13 +418,13 @@ export const getNewsById = async (newsId) => {
 export const incrementNewsViews = async (newsId) => {
   try {
     // Получаем текущее количество просмотров
-    const { data: currentNews } = await supabase
+    const { data: currentNews, error: fetchError } = await supabase
       .from('news')
       .select('views_count')
       .eq('id', newsId)
-      .single()
+      .maybeSingle() // Используем maybeSingle вместо single - не падает если нет строк
     
-    if (!currentNews) return false
+    if (fetchError || !currentNews) return false
     
     const newViewsCount = (currentNews.views_count || 0) + 1
     
