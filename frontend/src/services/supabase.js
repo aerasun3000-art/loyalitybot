@@ -994,6 +994,12 @@ export const getGlobalPopularCategories = async () => {
  */
 export const getAppSetting = async (settingKey, defaultValue = null) => {
   try {
+    // Проверяем, что supabase клиент инициализирован
+    if (!supabase) {
+      console.warn('Supabase client not initialized')
+      return defaultValue
+    }
+    
     const { data, error } = await supabase
       .from('app_settings')
       .select('setting_value')
@@ -1002,13 +1008,19 @@ export const getAppSetting = async (settingKey, defaultValue = null) => {
       .maybeSingle()
     
     if (error) {
-      console.error(`Error fetching app setting ${settingKey}:`, error)
+      // Не логируем ошибку, если это просто отсутствие записи (PGRST116)
+      if (error.code !== 'PGRST116') {
+        console.error(`Error fetching app setting ${settingKey}:`, error)
+      }
       return defaultValue
     }
     
     return data?.setting_value || defaultValue
   } catch (error) {
-    console.error(`Error in getAppSetting for ${settingKey}:`, error)
+    // Только логируем критические ошибки
+    if (error.message && !error.message.includes('PGRST116')) {
+      console.error(`Error in getAppSetting for ${settingKey}:`, error)
+    }
     return defaultValue
   }
 }

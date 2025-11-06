@@ -54,7 +54,8 @@ const Home = () => {
         setBgImage(bg)
       }
     } catch (error) {
-      console.error('Error loading background image:', error)
+      // Тихо обрабатываем ошибку, используем дефолтный фон
+      console.warn('Background image not loaded from DB, using default:', error?.message || error)
     }
   }
 
