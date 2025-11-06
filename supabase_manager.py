@@ -1048,8 +1048,12 @@ class SupabaseManager:
         if not self.client: return False
         
         # Гарантируем наличие статуса
-        if 'status' not in service_data:
-            service_data['status'] = 'Pending'
+        if 'approval_status' not in service_data:
+            service_data['approval_status'] = 'Pending'
+        
+        # Устанавливаем is_active по умолчанию
+        if 'is_active' not in service_data:
+            service_data['is_active'] = True
         
         # Проверяем существование партнёра в таблице partners (для FK)
         partner_chat_id = service_data.get('partner_chat_id')
@@ -1063,12 +1067,18 @@ class SupabaseManager:
             except Exception as e:
                 logging.error(f"add_service: partners check failed: {e}")
         
+        # Логируем данные перед вставкой
+        logging.info(f"Attempting to add service with data: {service_data}")
+        
         try:
-            self.client.from_('services').insert(service_data).execute()
+            response = self.client.from_('services').insert(service_data).execute()
             logging.info(f"Service '{service_data.get('title')}' added successfully for partner {partner_chat_id}")
             return True
         except Exception as e:
+            import traceback
             logging.error(f"Error adding service: {e}")
+            logging.error(f"Service data: {service_data}")
+            logging.error(f"Traceback: {traceback.format_exc()}")
             return False
 
     def get_pending_services_for_admin(self) -> pd.DataFrame:
@@ -1081,14 +1091,21 @@ class SupabaseManager:
             logging.error(f"Error getting pending services: {e}")
             return pd.DataFrame()
 
-    def update_service_approval_status(self, service_id: int, new_status: str) -> bool:
-        """Обновляет статус одобрения услуги."""
+    def update_service_approval_status(self, service_id: str, new_status: str) -> bool:
+        """Обновляет статус одобрения услуги. service_id может быть UUID (строка) или числом."""
         if not self.client: return False
         try:
-            self.client.from_('services').update({'approval_status': new_status}).eq('id', service_id).execute()
-            return True
+            response = self.client.from_('services').update({'approval_status': new_status}).eq('id', service_id).execute()
+            if response.data and len(response.data) > 0:
+                logging.info(f"Service {service_id} approval status updated to {new_status}")
+                return True
+            else:
+                logging.warning(f"Service {service_id} not found or no rows updated")
+                return False
         except Exception as e:
-            logging.error(f"Error updating service status: {e}")
+            logging.error(f"Error updating service status {service_id}: {e}")
+            import traceback
+            logging.error(f"Traceback: {traceback.format_exc()}")
             return False
 
     def update_service(self, service_id: int, partner_chat_id: str, title: str = None, description: str = None, price_points: int = None) -> bool:
@@ -1756,3 +1773,53 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error in cohort analysis for {partner_chat_id}: {e}")
             return {'cohorts': []}
+
+    # ============================================
+    # НАСТРОЙКИ ПРИЛОЖЕНИЯ
+    # ============================================
+
+    def get_app_setting(self, setting_key: str, default_value: str = None) -> str | None:
+        """Получить значение настройки приложения."""
+        if not self.client:
+            return default_value
+        try:
+            response = self.client.from_('app_settings').select('setting_value').eq('setting_key', setting_key).limit(1).execute()
+            if response.data and len(response.data) > 0:
+                return response.data[0]['setting_value']
+            return default_value
+        except Exception as e:
+            logging.error(f"Error getting app setting {setting_key}: {e}")
+            return default_value
+
+    def set_app_setting(self, setting_key: str, setting_value: str, updated_by: str = 'admin') -> bool:
+        """Установить значение настройки приложения."""
+        if not self.client:
+            return False
+        try:
+            # Проверяем, существует ли настройка
+            existing = self.client.from_('app_settings').select('id').eq('setting_key', setting_key).limit(1).execute()
+            
+            if existing.data and len(existing.data) > 0:
+                # Обновляем существующую настройку
+                response = self.client.from_('app_settings').update({
+                    'setting_value': setting_value,
+                    'updated_at': 'now()',
+                    'updated_by': updated_by
+                }).eq('setting_key', setting_key).execute()
+            else:
+                # Создаем новую настройку
+                response = self.client.from_('app_settings').insert({
+                    'setting_key': setting_key,
+                    'setting_value': setting_value,
+                    'updated_by': updated_by
+                }).execute()
+            
+            logging.info(f"App setting {setting_key} updated to {setting_value}")
+            return True
+        except Exception as e:
+            logging.error(f"Error setting app setting {setting_key}: {e}")
+            return False
+
+    def get_background_image(self) -> str:
+        """Получить путь к фоновому изображению."""
+        return self.get_app_setting('background_image', '/bg/sakura.jpg')

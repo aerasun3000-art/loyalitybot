@@ -104,6 +104,7 @@ async def handle_start_admin(message: types.Message):
         [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
         [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
         [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
+        [InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background")],
         [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
         [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
         [InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers")]
@@ -778,6 +779,67 @@ async def show_admin_dashboard(callback_query: types.CallbackQuery):
                 [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
             ])
         )
+
+
+# --- Смена фона ---
+
+@dp.callback_query(F.data == "admin_background")
+async def show_background_menu(callback_query: types.CallbackQuery):
+    """Показывает меню выбора фона."""
+    await callback_query.answer("Загрузка меню...")
+    
+    # Получаем текущий фон
+    current_bg = db_manager.get_background_image()
+    
+    # Доступные фоны
+    backgrounds = [
+        ("🌸 Сакура (по умолчанию)", "/bg/sakura.jpg"),
+        ("🎨 Фон 2", "/bg/fon2_files/02e59953309fdb690b5421c190a7524f.jpg"),
+        ("🎨 Фон 3", "/bg/fon3_files/e6e8a21b0775730d94fac0aeeeb0b03f.jpg"),
+        ("🎨 Фон 6", "/bg/fon6_files/2c793e92fdcc7213bbd46848a72f59aa.jpg"),
+    ]
+    
+    keyboard_buttons = []
+    for name, path in backgrounds:
+        is_current = "✅ " if path == current_bg else ""
+        # Кодируем путь для callback_data (заменяем / на | чтобы избежать проблем)
+        encoded_path = path.replace('/', '|')
+        keyboard_buttons.append([InlineKeyboardButton(
+            text=f"{is_current}{name}",
+            callback_data=f"bg_set_{encoded_path}"
+        )])
+    
+    keyboard_buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+    
+    await callback_query.message.edit_text(
+        f"🎨 **Смена Фона**\n\n"
+        f"Текущий фон: `{current_bg}`\n\n"
+        f"Выберите новый фон для главной страницы:",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data.startswith("bg_set_"))
+async def set_background(callback_query: types.CallbackQuery):
+    """Устанавливает выбранный фон."""
+    # Восстанавливаем путь из callback_data
+    encoded_path = callback_query.data.replace("bg_set_", "")
+    bg_path = encoded_path.replace("|", "/")
+    
+    success = db_manager.set_app_setting(
+        'background_image',
+        bg_path,
+        updated_by=str(callback_query.from_user.id)
+    )
+    
+    if success:
+        await callback_query.answer(f"✅ Фон изменен на: {bg_path}", show_alert=True)
+        # Возвращаемся в меню выбора фона
+        await show_background_menu(callback_query)
+    else:
+        await callback_query.answer("❌ Ошибка при сохранении фона", show_alert=True)
 
 
 # --- Одностраничники ---

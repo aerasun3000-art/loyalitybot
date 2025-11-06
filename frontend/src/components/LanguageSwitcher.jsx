@@ -12,7 +12,7 @@ const LanguageSwitcher = ({ className = '' }) => {
   return (
     <button
       onClick={handleToggle}
-      className={`flex items-center gap-2 bg-white rounded-full px-3 py-2 shadow-sm ${className}`}
+      className={`flex items-center gap-2 bg-sakura-surface/15 rounded-full px-3 py-2 shadow-sm border border-sakura-border/50 hover:border-sakura-accent transition-colors backdrop-blur-sm ${className}`}
     >
       <span className="text-lg">{language === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
       <svg
@@ -20,7 +20,7 @@ const LanguageSwitcher = ({ className = '' }) => {
         height="16"
         viewBox="0 0 16 16"
         fill="none"
-        className="text-gray-600"
+        className="text-sakura-mid"
       >
         <path
           d="M4 6L8 10L12 6"

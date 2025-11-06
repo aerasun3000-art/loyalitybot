@@ -33,18 +33,24 @@ export const getClientInfo = async (chatId) => {
  * Получить баланс клиента
  */
 export const getClientBalance = async (chatId) => {
+  // Если chatId null или undefined, возвращаем дефолтные значения
+  if (!chatId) {
+    return { balance: 0, name: '', status: 'inactive' }
+  }
+  
   const { data, error } = await supabase
     .from('users')
     .select('balance, name, status')
     .eq('chat_id', chatId)
-    .single()
+    .maybeSingle() // Используем maybeSingle вместо single - не падает если нет строк
   
   if (error) {
     console.error('Error fetching balance:', error)
     return { balance: 0, name: '', status: 'inactive' }
   }
   
-  return data
+  // Если данных нет, возвращаем дефолтные значения
+  return data || { balance: 0, name: '', status: 'inactive' }
 }
 
 /**
@@ -101,50 +107,106 @@ export const getActivePromotions = async () => {
  * Получить все одобренные услуги
  */
 export const getApprovedServices = async () => {
-  const { data, error } = await supabase
+  // Сначала получаем услуги без join (чтобы избежать ошибки FK)
+  const { data: services, error: servicesError } = await supabase
     .from('services')
-    .select(`
-      *,
-      partner:partners!services_partner_chat_id_fkey(name, company_name, city, district)
-    `)
+    .select('*')
     .eq('approval_status', 'Approved')
     .eq('is_active', true)
     .order('price_points', { ascending: true })
   
-  if (error) {
-    console.error('Error fetching services:', error)
+  if (servicesError) {
+    console.error('Error fetching services:', servicesError)
     return []
   }
   
-  return data
+  if (!services || services.length === 0) {
+    return []
+  }
+  
+  // Получаем уникальные partner_chat_id
+  const partnerIds = [...new Set(services.map(s => s.partner_chat_id).filter(Boolean))]
+  
+  if (partnerIds.length === 0) {
+    return services.map(s => ({ ...s, partner: null }))
+  }
+  
+  // Получаем данные партнёров отдельным запросом
+  const { data: partners, error: partnersError } = await supabase
+    .from('partners')
+    .select('chat_id, name, company_name, city, district')
+    .in('chat_id', partnerIds)
+  
+  if (partnersError) {
+    console.error('Error fetching partners:', partnersError)
+    // Возвращаем услуги без данных партнёров
+    return services.map(s => ({ ...s, partner: null }))
+  }
+  
+  // Создаём мапу партнёров для быстрого поиска
+  const partnersMap = {}
+  partners?.forEach(p => {
+    partnersMap[p.chat_id] = p
+  })
+  
+  // Объединяем услуги с данными партнёров
+  return services.map(service => ({
+    ...service,
+    partner: partnersMap[service.partner_chat_id] || null
+  }))
 }
 
 /**
  * Получить услуги с фильтрацией по городу и району
  */
-export const getFilteredServices = async (city = null, district = null) => {
+export const getFilteredServices = async (city = null, district = null, category = null) => {
+  // Получаем услуги без join
   let query = supabase
     .from('services')
-    .select(`
-      *,
-      partner:partners!services_partner_chat_id_fkey(name, company_name, city, district)
-    `)
+    .select('*')
     .eq('approval_status', 'Approved')
     .eq('is_active', true)
   
-  // Фильтрация выполняется на стороне клиента после получения данных
-  // так как city и district находятся в связанной таблице partners
+  // Фильтрация по категории выполняется на уровне запроса
+  if (category) {
+    query = query.eq('category', category)
+  }
   
-  const { data, error } = await query.order('price_points', { ascending: true })
+  const { data: services, error: servicesError } = await query.order('price_points', { ascending: true })
   
-  if (error) {
-    console.error('Error fetching filtered services:', error)
+  if (servicesError) {
+    console.error('Error fetching filtered services:', servicesError)
     return []
   }
   
-  // Применяем фильтры на клиентской стороне
-  let filteredData = data || []
+  if (!services || services.length === 0) {
+    return []
+  }
   
+  // Получаем данные партнёров отдельным запросом
+  const partnerIds = [...new Set(services.map(s => s.partner_chat_id).filter(Boolean))]
+  
+  let partnersMap = {}
+  if (partnerIds.length > 0) {
+    const { data: partners, error: partnersError } = await supabase
+      .from('partners')
+      .select('chat_id, name, company_name, city, district')
+      .in('chat_id', partnerIds)
+    
+    if (!partnersError && partners) {
+      partners.forEach(p => {
+        partnersMap[p.chat_id] = p
+      })
+    }
+  }
+  
+  // Объединяем услуги с данными партнёров
+  let filteredData = services.map(service => ({
+    ...service,
+    partner: partnersMap[service.partner_chat_id] || null
+  }))
+  
+  // Применяем фильтры на клиентской стороне
   if (city) {
     filteredData = filteredData.filter(service => {
       // Показываем услугу если:
@@ -756,5 +818,205 @@ export const getTopClientsByLTV = async (partnerChatId, limit = 10) => {
     console.error('Error fetching top clients:', error)
     return []
   }
+}
+
+/**
+ * Получить персональные популярные категории услуг клиента
+ * Анализирует транзакции клиента и возвращает категории, которые он чаще всего использует
+ */
+export const getClientPopularCategories = async (chatId) => {
+  try {
+    // Получаем все транзакции обмена (redemption) клиента
+    const { data: redemptionTransactions, error: redemptionError } = await supabase
+      .from('transactions')
+      .select('partner_chat_id, date_time')
+      .eq('client_chat_id', chatId)
+      .eq('operation_type', 'redemption')
+      .order('date_time', { ascending: false })
+      .limit(100) // Берём последние 100 транзакций
+    
+    if (redemptionError) throw redemptionError
+    
+    // Если у клиента нет транзакций, возвращаем null (будем использовать глобальную статистику)
+    if (!redemptionTransactions || redemptionTransactions.length === 0) {
+      return null
+    }
+    
+    // Получаем уникальные ID партнёров из транзакций
+    const partnerIds = [...new Set(redemptionTransactions.map(t => t.partner_chat_id))]
+    
+    // Подсчитываем частоту посещения каждого партнёра
+    const partnerFrequency = {}
+    redemptionTransactions.forEach(t => {
+      partnerFrequency[t.partner_chat_id] = (partnerFrequency[t.partner_chat_id] || 0) + 1
+    })
+    
+    // Получаем услуги партнёров и их категории
+    const { data: services, error: servicesError } = await supabase
+      .from('services')
+      .select('category, partner_chat_id')
+      .in('partner_chat_id', partnerIds)
+      .eq('approval_status', 'Approved')
+      .eq('is_active', true)
+    
+    if (servicesError) throw servicesError
+    
+    // Подсчитываем популярность категорий на основе частоты посещения партнёров
+    const categoryFrequency = {}
+    
+    services.forEach(service => {
+      if (service.category) {
+        const frequency = partnerFrequency[service.partner_chat_id] || 1
+        categoryFrequency[service.category] = (categoryFrequency[service.category] || 0) + frequency
+      }
+    })
+    
+    // Также учитываем начисления (accrual) - если клиент часто получает баллы от партнёра,
+    // значит он часто использует услуги этого типа
+    const { data: accrualTransactions, error: accrualError } = await supabase
+      .from('transactions')
+      .select('partner_chat_id')
+      .eq('client_chat_id', chatId)
+      .eq('operation_type', 'accrual')
+      .order('date_time', { ascending: false })
+      .limit(50) // Берём последние 50 начислений
+    
+    if (!accrualError && accrualTransactions) {
+      const accrualPartnerIds = [...new Set(accrualTransactions.map(t => t.partner_chat_id))]
+      
+      // Подсчитываем частоту начислений от каждого партнёра
+      const accrualFrequency = {}
+      accrualTransactions.forEach(t => {
+        accrualFrequency[t.partner_chat_id] = (accrualFrequency[t.partner_chat_id] || 0) + 1
+      })
+      
+      // Добавляем категории из партнёров начислений (с меньшим весом)
+      const { data: accrualServices, error: accrualServicesError } = await supabase
+        .from('services')
+        .select('category, partner_chat_id')
+        .in('partner_chat_id', accrualPartnerIds)
+        .eq('approval_status', 'Approved')
+        .eq('is_active', true)
+      
+      if (!accrualServicesError && accrualServices) {
+        accrualServices.forEach(service => {
+          if (service.category) {
+            const frequency = (accrualFrequency[service.partner_chat_id] || 1) * 0.5 // Меньший вес для начислений
+            categoryFrequency[service.category] = (categoryFrequency[service.category] || 0) + frequency
+          }
+        })
+      }
+    }
+    
+    // Сортируем категории по популярности
+    const sortedCategories = Object.entries(categoryFrequency)
+      .sort((a, b) => b[1] - a[1])
+      .map(([category]) => category)
+    
+    return sortedCategories
+  } catch (error) {
+    console.error('Error getting client popular categories:', error)
+    return null
+  }
+}
+
+/**
+ * Получить глобальную статистику популярных категорий услуг
+ * Используется как fallback если у клиента нет истории транзакций
+ */
+export const getGlobalPopularCategories = async () => {
+  try {
+    // Получаем все транзакции обмена за последние 90 дней
+    const ninetyDaysAgo = new Date()
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+    
+    const { data: transactions, error: transactionsError } = await supabase
+      .from('transactions')
+      .select('partner_chat_id')
+      .eq('operation_type', 'redemption')
+      .gte('date_time', ninetyDaysAgo.toISOString())
+    
+    if (transactionsError) throw transactionsError
+    
+    if (!transactions || transactions.length === 0) {
+      // Если нет транзакций, возвращаем дефолтный список популярных категорий
+      return ['manicure', 'hairstyle', 'massage', 'cosmetologist', 'eyebrows', 'eyelashes', 'makeup', 'skincare']
+    }
+    
+    // Получаем уникальные ID партнёров
+    const partnerIds = [...new Set(transactions.map(t => t.partner_chat_id))]
+    
+    // Подсчитываем частоту посещения каждого партнёра
+    const partnerFrequency = {}
+    transactions.forEach(t => {
+      partnerFrequency[t.partner_chat_id] = (partnerFrequency[t.partner_chat_id] || 0) + 1
+    })
+    
+    // Получаем услуги партнёров
+    const { data: services, error: servicesError } = await supabase
+      .from('services')
+      .select('category, partner_chat_id')
+      .in('partner_chat_id', partnerIds)
+      .eq('approval_status', 'Approved')
+      .eq('is_active', true)
+    
+    if (servicesError) throw servicesError
+    
+    // Подсчитываем популярность категорий
+    const categoryFrequency = {}
+    
+    services.forEach(service => {
+      if (service.category) {
+        const frequency = partnerFrequency[service.partner_chat_id] || 1
+        categoryFrequency[service.category] = (categoryFrequency[service.category] || 0) + frequency
+      }
+    })
+    
+    // Сортируем категории по популярности
+    const sortedCategories = Object.entries(categoryFrequency)
+      .sort((a, b) => b[1] - a[1])
+      .map(([category]) => category)
+    
+    // Если категорий меньше 8, добавляем популярные по умолчанию
+    const defaultCategories = ['manicure', 'hairstyle', 'massage', 'cosmetologist', 'eyebrows', 'eyelashes', 'makeup', 'skincare']
+    const combined = [...new Set([...sortedCategories, ...defaultCategories])]
+    
+    return combined.slice(0, 8)
+  } catch (error) {
+    console.error('Error getting global popular categories:', error)
+    // Возвращаем дефолтный список при ошибке
+    return ['manicure', 'hairstyle', 'massage', 'cosmetologist', 'eyebrows', 'eyelashes', 'makeup', 'skincare']
+  }
+}
+
+/**
+ * Получить настройку приложения
+ */
+export const getAppSetting = async (settingKey, defaultValue = null) => {
+  try {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('setting_value')
+      .eq('setting_key', settingKey)
+      .limit(1)
+      .maybeSingle()
+    
+    if (error) {
+      console.error(`Error fetching app setting ${settingKey}:`, error)
+      return defaultValue
+    }
+    
+    return data?.setting_value || defaultValue
+  } catch (error) {
+    console.error(`Error in getAppSetting for ${settingKey}:`, error)
+    return defaultValue
+  }
+}
+
+/**
+ * Получить путь к фоновому изображению
+ */
+export const getBackgroundImage = async () => {
+  return await getAppSetting('background_image', '/bg/sakura.jpg')
 }
 
