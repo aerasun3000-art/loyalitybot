@@ -8,6 +8,7 @@ import re # <-- НОВЫЙ ИМПОРТ
 import asyncio
 import json
 import datetime
+import time
 import io
 import qrcode
 from dotenv import load_dotenv
@@ -39,7 +40,9 @@ except Exception as e:
     log_exception(logger, e, "Ошибка инициализации SupabaseManager")
     raise
 
-BASE_DOMAIN = "https://loyalitybot.vercel.app"
+# Используем переменную окружения или актуальный URL последнего деплоя
+# Новый URL создан для обхода кэша Telegram WebView
+BASE_DOMAIN = os.environ.get('FRONTEND_URL', 'https://frontend-2nmw8tish-alekseis-projects-3b6bffb8.vercel.app')
 
 # Регулярное выражение для парсинга реферальной ссылки
 # Ожидаемый формат: /start partner_<ID>
@@ -196,7 +199,7 @@ def handle_show_qr_code(call):
 @client_bot.message_handler(commands=['start', 'help'])
 def handle_new_user_start(message):
     chat_id = str(message.chat.id)
-    text = message.text
+    text = message.text or ''
     
     # Rate limiting: 5 команд в минуту
     allowed, error = check_rate_limit(chat_id, 'command')
@@ -219,7 +222,25 @@ def handle_new_user_start(message):
         client_exists = sm.client_exists(chat_id)
     except Exception as e:
         log_exception(logger, e, f"Ошибка проверки существования клиента {chat_id}")
-        client_bot.send_message(chat_id, "Произошла ошибка при доступе к системе. Попробуйте позже.")
+        # Даже при ошибке показываем меню, чтобы пользователь мог попробовать
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        webapp_btn = types.InlineKeyboardButton(
+            "🚀 Открыть приложение",
+            # Добавляем версию и nocache, чтобы обойти кэш Telegram WebView/CDN
+            web_app=types.WebAppInfo(url=f"{BASE_DOMAIN}?v={int(time.time())}&nocache=1&_t={int(time.time())}&_r={int(time.time()*1000)}&_cache_bust={int(time.time()*1000)}&_refresh={int(time.time())}")
+        )
+        qr_btn = types.InlineKeyboardButton(
+            "📱 Показать QR-код",
+            callback_data="show_qr_code"
+        )
+        markup.add(webapp_btn, qr_btn)
+        client_bot.send_message(
+            chat_id,
+            "👋 **Добро пожаловать в LoyalityBot!**\n\n"
+            "Произошла временная ошибка при доступе к системе. Попробуйте открыть приложение:",
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
         return
 
     # --- 2. ЛОГИКА: РЕГИСТРАЦИЯ ПО РЕФЕРАЛУ (АТОМАРНАЯ) ---
@@ -244,30 +265,33 @@ def handle_new_user_start(message):
                 # Обработка ошибки
                 error_msg = result[1] if result else "Неизвестная ошибка"
                 logger.error(f"Ошибка регистрации клиента {chat_id} по ссылке партнёра {partner_id}: {error_msg}")
-                client_bot.send_message(chat_id, f"Извините, произошла ошибка регистрации: {error_msg}. Пожалуйста, попробуйте команду /start еще раз.")
+                # Показываем меню даже при ошибке регистрации
+                client_exists = False
         except Exception as e:
             log_exception(logger, e, f"Критическая ошибка при регистрации клиента {chat_id} через ссылку")
-            client_bot.send_message(chat_id, "Произошла системная ошибка. Обратитесь в поддержку.")
-    
+            # Показываем меню даже при критической ошибке
+            client_exists = False
+
     # --- 3. ЛОГИКА: СУЩЕСТВУЮЩИЙ КЛИЕНТ (включая только что зарегистрированных) ---
     if client_exists:
-
         # --- ЛОГИКА: ОБНОВЛЕНИЕ ВРЕМЕННОГО ID (СУЩЕСТВУЮЩАЯ ЛОГИКА) ---
-        client_data = sm.get_client_details_for_partner(chat_id)
+        try:
+            client_data = sm.get_client_details_for_partner(chat_id)
+            # Если chat_id начинается с VIA_PARTNER_, значит, клиент впервые нажал /start
+            if client_data and client_data.get('chat_id', '').startswith('VIA_PARTNER_'):
+                temp_id = client_data['chat_id']
+                # Обновляем chat_id в таблицах. Поиск идет по temp_id.
+                if sm.update_client_chat_id(old_id=temp_id, new_id=chat_id):
+                    logger.info(f"CLIENT_HANDLER: Обновлен chat_id клиента с {temp_id} на {chat_id}")
+        except Exception as e:
+            log_exception(logger, e, f"Ошибка при обновлении chat_id для {chat_id}")
 
-        # Если chat_id начинается с VIA_PARTNER_, значит, клиент впервые нажал /start
-        if client_data and client_data.get('chat_id', '').startswith('VIA_PARTNER_'):
-            temp_id = client_data['chat_id']
-            # Обновляем chat_id в таблицах. Поиск идет по temp_id.
-            if sm.update_client_chat_id(old_id=temp_id, new_id=chat_id):
-                print(f"CLIENT_HANDLER: Обновлен chat_id клиента с {temp_id} на {chat_id}")
-
-        # ---------------------------------------------
-
+        # Всегда показываем меню для существующего клиента
         markup = types.InlineKeyboardMarkup(row_width=1)
         webapp_btn = types.InlineKeyboardButton(
             "🚀 Открыть приложение",
-            web_app=types.WebAppInfo(url=BASE_DOMAIN)
+            # Добавляем версию и nocache, чтобы обойти кэш Telegram WebView/CDN
+            web_app=types.WebAppInfo(url=f"{BASE_DOMAIN}?v={int(time.time())}&nocache=1&_t={int(time.time())}&_r={int(time.time()*1000)}&_cache_bust={int(time.time()*1000)}&_refresh={int(time.time())}")
         )
         qr_btn = types.InlineKeyboardButton(
             "📱 Показать QR-код",
@@ -292,7 +316,8 @@ def handle_new_user_start(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
     webapp_btn = types.InlineKeyboardButton(
         "🚀 Открыть приложение",
-        web_app=types.WebAppInfo(url=BASE_DOMAIN)
+        # Добавляем версию и nocache, чтобы обойти кэш Telegram WebView/CDN
+        web_app=types.WebAppInfo(url=f"{BASE_DOMAIN}?v={int(time.time())}&nocache=1&_t={int(time.time())}&_r={int(time.time()*1000)}")
     )
     qr_btn = types.InlineKeyboardButton(
         "📱 Показать QR-код",
