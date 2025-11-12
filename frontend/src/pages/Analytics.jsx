@@ -83,12 +83,12 @@ export default function Analytics() {
     return change
   }
 
-  const MetricCard = ({ title, value, icon: Icon, color, change, suffix = '' }) => (
+  const MetricCard = ({ title, value, icon, color, change, suffix = '' }) => (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
         <div className={`p-2 rounded-lg ${color}`}>
-          <Icon className="w-5 h-5 text-white" />
+          <span className="text-lg leading-none">{icon}</span>
         </div>
       </div>
       <div className="flex items-end justify-between">
@@ -98,11 +98,7 @@ export default function Analytics() {
           </p>
           {change !== null && change !== undefined && (
             <div className={`flex items-center mt-1 text-sm ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {change >= 0 ? (
-                <ArrowUpIcon className="w-4 h-4 mr-1" />
-              ) : (
-                <ArrowDownIcon className="w-4 h-4 mr-1" />
-              )}
+              <span className="mr-1">{change >= 0 ? '▲' : '▼'}</span>
               <span>{Math.abs(change).toFixed(1)}%</span>
             </div>
           )}
@@ -227,25 +223,25 @@ export default function Analytics() {
               <MetricCard
                 title="Оборот"
                 value={formatCurrency(stats.total_revenue)}
-                icon={CurrencyDollarIcon}
+                icon="💰"
                 color="bg-green-500"
               />
               <MetricCard
                 title="Средний чек"
                 value={formatCurrency(stats.avg_check)}
-                icon={ChartBarIcon}
+                icon="📊"
                 color="bg-blue-500"
               />
               <MetricCard
                 title="Активные клиенты"
                 value={stats.active_clients}
-                icon={UsersIcon}
+                icon="👥"
                 color="bg-purple-500"
               />
               <MetricCard
                 title="NPS Score"
                 value={stats.nps_score}
-                icon={TrendingUpIcon}
+                icon="⭐"
                 color="bg-yellow-500"
               />
             </div>

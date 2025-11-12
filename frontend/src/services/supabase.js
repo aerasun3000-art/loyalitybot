@@ -139,7 +139,7 @@ export const getApprovedServices = async () => {
   // Получаем данные партнёров отдельным запросом
   const { data: partners, error: partnersError } = await supabase
     .from('partners')
-    .select('chat_id, name, company_name, city, district')
+    .select('chat_id, name, company_name, city, district, business_type')
     .in('chat_id', partnerIds)
   
   if (partnersError) {
@@ -195,7 +195,7 @@ export const getFilteredServices = async (city = null, district = null, category
   if (partnerIds.length > 0) {
     const { data: partners, error: partnersError } = await supabase
       .from('partners')
-      .select('chat_id, name, company_name, city, district')
+      .select('chat_id, name, company_name, city, district, business_type')
       .in('chat_id', partnerIds)
     
     if (!partnersError && partners) {
@@ -237,6 +237,32 @@ export const getFilteredServices = async (city = null, district = null, category
   }
   
   return filteredData
+}
+
+/**
+ * Получить список партнёров, которых клиент уже оценил (NPS)
+ */
+export const getClientRatedPartners = async (clientChatId) => {
+  if (!clientChatId) return []
+
+  try {
+    const { data, error } = await supabase
+      .from('nps_ratings')
+      .select('partner_chat_id')
+      .eq('client_chat_id', clientChatId)
+      .not('partner_chat_id', 'is', null)
+
+    if (error) {
+      console.error('Error fetching client rated partners:', error)
+      return []
+    }
+
+    const uniquePartners = [...new Set((data || []).map(item => item.partner_chat_id).filter(Boolean))]
+    return uniquePartners
+  } catch (err) {
+    console.error('Unexpected error fetching client rated partners:', err)
+    return []
+  }
 }
 
 /**
@@ -314,29 +340,65 @@ export const registerClient = async (clientData) => {
  * Создать заявку на партнёрство
  */
 export const createPartnerApplication = async (applicationData) => {
-  const { data, error } = await supabase
-    .from('partner_applications')
-    .insert([
-      {
-        chat_id: applicationData.chatId,
-        name: applicationData.name,
-        phone: applicationData.phone,
-        company_name: applicationData.companyName,
-        city: applicationData.city || '',
-        district: applicationData.district || '',
-        status: 'Pending',
-        created_at: new Date().toISOString()
+  try {
+    // Сначала проверяем, существует ли уже заявка с таким chat_id
+    const { data: existing, error: checkError } = await supabase
+      .from('partner_applications')
+      .select('id')
+      .eq('chat_id', applicationData.chatId)
+      .maybeSingle()
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking existing application:', checkError)
+      // Продолжаем выполнение, даже если проверка не удалась
+    }
+    
+    const applicationDataToSave = {
+      chat_id: applicationData.chatId,
+      name: applicationData.name,
+      phone: applicationData.phone,
+      company_name: applicationData.companyName,
+      business_type: applicationData.businessType || null,
+      city: applicationData.city || '',
+      district: applicationData.district || '',
+      status: 'Pending',
+      created_at: new Date().toISOString()
+    }
+    
+    // Если заявка уже существует - обновляем её
+    if (existing && existing.id) {
+      const { data, error } = await supabase
+        .from('partner_applications')
+        .update(applicationDataToSave)
+        .eq('id', existing.id)
+        .select()
+        .single()
+      
+      if (error) {
+        console.error('Error updating partner application:', error)
+        throw error
       }
-    ])
-    .select()
-    .single()
-  
-  if (error) {
-    console.error('Error creating partner application:', error)
+      
+      return data
+    }
+    
+    // Если заявки нет - создаём новую
+    const { data, error } = await supabase
+      .from('partner_applications')
+      .insert([applicationDataToSave])
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Error creating partner application:', error)
+      throw error
+    }
+    
+    return data
+  } catch (error) {
+    console.error('Error in createPartnerApplication:', error)
     throw error
   }
-  
-  return data
 }
 
 /**

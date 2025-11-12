@@ -56,20 +56,20 @@ const PartnerAnalytics = () => {
 
       // Вычисляем метрики
       const totalRevenue = transactions
-        ?.filter(t => t.transaction_type === 'accrual')
-        .reduce((sum, t) => sum + (t.check_amount || 0), 0) || 0;
+        ?.filter(t => t.operation_type === 'accrual')
+        .reduce((sum, t) => sum + (Number(t.total_amount) || 0), 0) || 0;
 
       const totalTransactions = transactions?.length || 0;
-      const accrualTransactions = transactions?.filter(t => t.transaction_type === 'accrual').length || 0;
-      const redemptionTransactions = transactions?.filter(t => t.transaction_type === 'spend').length || 0;
+      const accrualTransactions = transactions?.filter(t => t.operation_type === 'accrual').length || 0;
+      const redemptionTransactions = transactions?.filter(t => t.operation_type === 'redemption').length || 0;
 
       const totalPointsAccrued = transactions
-        ?.filter(t => t.transaction_type === 'accrual')
-        .reduce((sum, t) => sum + (t.points_change || 0), 0) || 0;
+        ?.filter(t => t.operation_type === 'accrual' || t.operation_type === 'enrollment_bonus')
+        .reduce((sum, t) => sum + (Number(t.earned_points) || 0), 0) || 0;
 
       const totalPointsRedeemed = transactions
-        ?.filter(t => t.transaction_type === 'spend')
-        .reduce((sum, t) => sum + Math.abs(t.points_change || 0), 0) || 0;
+        ?.filter(t => t.operation_type === 'redemption')
+        .reduce((sum, t) => sum + (Number(t.spent_points) || 0), 0) || 0;
 
       const avgCheck = accrualTransactions > 0 ? totalRevenue / accrualTransactions : 0;
 
@@ -88,7 +88,7 @@ const PartnerAnalytics = () => {
         : 0;
 
       // Активные клиенты за период
-      const uniqueClients = new Set(transactions?.map(t => t.user_chat_id));
+      const uniqueClients = new Set(transactions?.map(t => t.client_chat_id));
       const activeClients = uniqueClients.size;
 
       const newClients = clients?.filter(c => {

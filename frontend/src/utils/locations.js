@@ -112,6 +112,50 @@ export const CITIES = [
   }
 ]
 
+// Список городов для партнерства (топ-7 регионов США + онлайн)
+export const PARTNER_CITIES = [
+  {
+    name: 'Online',
+    label: '🌍 Online',
+    districts: ['All']
+  },
+  {
+    name: 'New York',
+    label: 'New York',
+    districts: ['All']
+  },
+  {
+    name: 'Los Angeles',
+    label: 'Los Angeles',
+    districts: ['All']
+  },
+  {
+    name: 'Bay Area',
+    label: 'Bay Area',
+    districts: ['All']
+  },
+  {
+    name: 'Chicago',
+    label: 'Chicago',
+    districts: ['All']
+  },
+  {
+    name: 'Miami',
+    label: 'Miami',
+    districts: ['All']
+  },
+  {
+    name: 'Boston',
+    label: 'Boston',
+    districts: ['All']
+  },
+  {
+    name: 'Seattle',
+    label: 'Seattle',
+    districts: ['All']
+  }
+]
+
 // Получить список всех городов
 export const getCitiesList = () => {
   return CITIES.map(city => ({
@@ -120,8 +164,26 @@ export const getCitiesList = () => {
   }))
 }
 
+// Получить список городов для партнерства
+export const getPartnerCitiesList = () => {
+  return PARTNER_CITIES.map(city => ({
+    value: city.name,
+    label: city.label
+  }))
+}
+
 // Получить список районов для города
 export const getDistrictsByCity = (cityName) => {
+  // Сначала проверяем города для партнерства
+  const partnerCity = PARTNER_CITIES.find(c => c.name === cityName)
+  if (partnerCity) {
+    return partnerCity.districts.map(district => ({
+      value: district,
+      label: district === 'All' ? '🌆 All districts' : district
+    }))
+  }
+  
+  // Затем проверяем обычные города
   const city = CITIES.find(c => c.name === cityName)
   if (!city) return []
   
@@ -133,6 +195,7 @@ export const getDistrictsByCity = (cityName) => {
 
 // Проверить, является ли это онлайн-услугой
 export const isOnlineService = (city, district) => {
-  return city === 'Все' || (city !== 'Все' && district === 'Все')
+  return city === 'Все' || city === 'Online' || (city !== 'Все' && district === 'Все') || 
+         (PARTNER_CITIES.some(c => c.name === city) && district === 'All')
 }
 

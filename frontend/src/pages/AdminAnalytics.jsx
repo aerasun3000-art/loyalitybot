@@ -54,13 +54,13 @@ const AdminAnalytics = () => {
 
       // Вычисляем общие метрики системы
       const totalRevenue = transactions
-        ?.filter(t => t.transaction_type === 'accrual')
-        .reduce((sum, t) => sum + (t.check_amount || 0), 0) || 0;
+        ?.filter(t => t.operation_type === 'accrual')
+        .reduce((sum, t) => sum + (Number(t.total_amount) || 0), 0) || 0;
 
       const totalTransactions = transactions?.length || 0;
       const totalPointsAccrued = transactions
-        ?.filter(t => t.transaction_type === 'accrual')
-        .reduce((sum, t) => sum + (t.points_change || 0), 0) || 0;
+        ?.filter(t => t.operation_type === 'accrual' || t.operation_type === 'enrollment_bonus')
+        .reduce((sum, t) => sum + (Number(t.earned_points) || 0), 0) || 0;
 
       // NPS расчёт по системе
       const promoters = npsRatings?.filter(r => r.rating >= 9).length || 0;
@@ -100,8 +100,8 @@ const AdminAnalytics = () => {
         ) || [];
 
         const revenue = partnerTransactions
-          .filter(t => t.transaction_type === 'accrual')
-          .reduce((sum, t) => sum + (t.check_amount || 0), 0);
+          .filter(t => t.operation_type === 'accrual')
+          .reduce((sum, t) => sum + (Number(t.total_amount) || 0), 0);
 
         const npsPromoters = partnerNPS.filter(r => r.rating >= 9).length;
         const npsDetractors = partnerNPS.filter(r => r.rating <= 6).length;

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createPartnerApplication } from '../services/supabase'
 import { getChatId, hapticFeedback, getTelegramUser } from '../utils/telegram'
-import { getCitiesList, getDistrictsByCity, isOnlineService } from '../utils/locations'
+import { getPartnerCitiesList, getDistrictsByCity, isOnlineService } from '../utils/locations'
+import { getAllServiceCategories } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
@@ -20,13 +21,15 @@ const PartnerApply = () => {
     name: user?.first_name || '',
     phone: '',
     companyName: '',
+    businessType: '',
     city: '',
     district: ''
   })
   const [errors, setErrors] = useState({})
-  const [cities] = useState(getCitiesList())
+  const [cities] = useState(getPartnerCitiesList())
   const [districts, setDistricts] = useState([])
   const [showSuccess, setShowSuccess] = useState(false)
+  const [serviceCategories] = useState(getAllServiceCategories())
 
   useEffect(() => {
     // Загружаем районы при выборе города
@@ -34,12 +37,16 @@ const PartnerApply = () => {
       const districtsForCity = getDistrictsByCity(formData.city)
       setDistricts(districtsForCity)
       
-      // Если выбран город "Все", автоматически ставим район "Все"
-      if (formData.city === 'Все') {
-        setFormData(prev => ({ ...prev, district: 'Все' }))
+      // Если выбран город с районом "All", автоматически ставим район "All"
+      if (districtsForCity.length > 0 && districtsForCity[0].value === 'All') {
+        setFormData(prev => ({ ...prev, district: 'All' }))
+      } else if (districtsForCity.length === 0) {
+        // Если районов нет, сбрасываем district
+        setFormData(prev => ({ ...prev, district: '' }))
       }
     } else {
       setDistricts([])
+      setFormData(prev => ({ ...prev, district: '' }))
     }
   }, [formData.city])
 
@@ -81,11 +88,24 @@ const PartnerApply = () => {
       newErrors.companyName = t('partner_company_required')
     }
     
+    if (!formData.businessType) {
+      newErrors.businessType = language === 'ru' ? 'Выберите категорию услуг' : 'Select service category'
+    }
+    
     if (!formData.city) {
       newErrors.city = t('partner_city_required')
     }
     
-    if (!formData.district) {
+    // Для всех партнерских городов district должен быть 'All'
+    // Если district не установлен, устанавливаем его автоматически
+    if (formData.city && !formData.district) {
+      const districtsForCity = getDistrictsByCity(formData.city)
+      if (districtsForCity.length > 0 && districtsForCity[0].value === 'All') {
+        setFormData(prev => ({ ...prev, district: 'All' }))
+      } else {
+        newErrors.district = t('partner_district_required')
+      }
+    } else if (!formData.district) {
       newErrors.district = t('partner_district_required')
     }
     
@@ -95,6 +115,13 @@ const PartnerApply = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Проверка chatId
+    if (!chatId) {
+      hapticFeedback('error')
+      setErrors({ submit: 'Chat ID не найден. Пожалуйста, откройте форму через Telegram бота.' })
+      return
+    }
     
     if (!validateForm()) {
       hapticFeedback('error')
@@ -107,12 +134,15 @@ const PartnerApply = () => {
     try {
       const applicationData = {
         chatId: chatId.toString(),
-        name: formData.name,
-        phone: formData.phone,
-        companyName: formData.companyName,
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        companyName: formData.companyName.trim(),
+        businessType: formData.businessType,
         city: formData.city,
-        district: formData.district
+        district: formData.district || 'All'
       }
+      
+      console.log('Submitting application:', applicationData)
       
       await createPartnerApplication(applicationData)
       
@@ -128,7 +158,8 @@ const PartnerApply = () => {
     } catch (error) {
       console.error('Error submitting application:', error)
       hapticFeedback('error')
-      setErrors({ submit: t('partner_error') })
+      const errorMessage = error?.message || error?.error?.message || t('partner_error')
+      setErrors({ submit: `Ошибка: ${errorMessage}` })
     } finally {
       setLoading(false)
     }
@@ -157,7 +188,7 @@ const PartnerApply = () => {
               <strong>{t('partner_your_location')}:</strong><br/>
               {isOnlineService(formData.city, formData.district) ? (
                 <span className="text-pink-600 font-semibold">
-                  🌍 {formData.city === 'Все' ? t('partner_work_everywhere') : `${formData.city} (${t('partner_all_districts')})`}
+                  🌍 {formData.city === 'Все' || formData.city === 'Online' ? (formData.city === 'Online' ? 'Online' : t('partner_work_everywhere')) : `${formData.city} (${formData.district === 'All' ? 'All districts' : t('partner_all_districts')})`}
                 </span>
               ) : (
                 <span className="text-pink-600 font-semibold">
@@ -200,9 +231,10 @@ const PartnerApply = () => {
               name="name"
               value={formData.name}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 ${
+              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
                 errors.name ? 'border-red-500' : 'border-gray-200'
               } focus:border-pink-500 focus:outline-none transition-colors`}
+              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
               placeholder={language === 'ru' ? 'Иван Иванов' : 'John Doe'}
             />
             {errors.name && (
@@ -220,9 +252,10 @@ const PartnerApply = () => {
               name="phone"
               value={formData.phone}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 ${
+              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
                 errors.phone ? 'border-red-500' : 'border-gray-200'
               } focus:border-pink-500 focus:outline-none transition-colors`}
+              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
               placeholder={t('partner_phone_placeholder')}
             />
             {errors.phone && (
@@ -240,13 +273,40 @@ const PartnerApply = () => {
               name="companyName"
               value={formData.companyName}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 ${
+              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
                 errors.companyName ? 'border-red-500' : 'border-gray-200'
               } focus:border-pink-500 focus:outline-none transition-colors`}
+              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
               placeholder={t('partner_company_placeholder')}
             />
             {errors.companyName && (
               <p className="text-red-500 text-sm mt-1">{errors.companyName}</p>
+            )}
+          </div>
+
+          {/* Категория услуг */}
+          <div className="mb-4">
+            <label className="block text-gray-700 font-semibold mb-2">
+              {language === 'ru' ? 'Категория услуг' : 'Service Category'} {t('required_field')}
+            </label>
+            <select
+              name="businessType"
+              value={formData.businessType}
+              onChange={handleInputChange}
+              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
+                errors.businessType ? 'border-red-500' : 'border-gray-200'
+              } focus:border-pink-500 focus:outline-none transition-colors bg-white`}
+              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+            >
+              <option value="">{language === 'ru' ? 'Выберите категорию услуг' : 'Select service category'}</option>
+              {serviceCategories.map((category) => (
+                <option key={category.code} value={category.code}>
+                  {category.emoji} {language === 'ru' ? category.name : category.nameEn}
+                </option>
+              ))}
+            </select>
+            {errors.businessType && (
+              <p className="text-red-500 text-sm mt-1">{errors.businessType}</p>
             )}
           </div>
 
@@ -259,9 +319,10 @@ const PartnerApply = () => {
               name="city"
               value={formData.city}
               onChange={handleCityChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 ${
+              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
                 errors.city ? 'border-red-500' : 'border-gray-200'
               } focus:border-pink-500 focus:outline-none transition-colors bg-white`}
+              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
             >
               <option value="">{t('partner_city_placeholder')}</option>
               {cities.map((city) => (
@@ -273,16 +334,10 @@ const PartnerApply = () => {
             {errors.city && (
               <p className="text-red-500 text-sm mt-1">{errors.city}</p>
             )}
-            {formData.city === 'Все' && (
-              <p className="text-pink-600 text-sm mt-2 flex items-center gap-1">
-                <span>💡</span>
-                <span>{t('partner_online_hint')}</span>
-              </p>
-            )}
           </div>
 
           {/* Район */}
-          {formData.city && formData.city !== 'Все' && (
+          {formData.city && (
             <div className="mb-6">
               <label className="block text-gray-700 font-semibold mb-2">
                 {t('partner_district')} {t('required_field')}
@@ -291,9 +346,10 @@ const PartnerApply = () => {
                 name="district"
                 value={formData.district}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 rounded-xl border-2 ${
+                className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
                   errors.district ? 'border-red-500' : 'border-gray-200'
                 } focus:border-pink-500 focus:outline-none transition-colors bg-white`}
+                style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
               >
                 <option value="">{t('partner_district_placeholder')}</option>
                 {districts.map((district) => (
@@ -305,7 +361,7 @@ const PartnerApply = () => {
               {errors.district && (
                 <p className="text-red-500 text-sm mt-1">{errors.district}</p>
               )}
-              {formData.district === 'Все' && (
+              {formData.district === 'All' && (
                 <p className="text-pink-600 text-sm mt-2 flex items-center gap-1">
                   <span>💡</span>
                   <span>{t('partner_all_districts_hint')}</span>

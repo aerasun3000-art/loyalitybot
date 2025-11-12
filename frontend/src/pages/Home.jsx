@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Title, Text, Button, Avatar } from '@telegram-apps/telegram-ui'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
 import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage } from '../services/supabase'
-import { getServiceIcon, defaultServiceIcons, serviceCategories } from '../utils/serviceIcons'
-// // import LuxuryIcon from '../components/LuxuryIcons'
+import { getServiceIcon, getMainPageCategories, getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
@@ -41,6 +39,7 @@ const Home = () => {
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
   const [selectedServiceCategory, setSelectedServiceCategory] = useState(null)
   const [popularCategories, setPopularCategories] = useState([])
+  const [pointsToNextReward, setPointsToNextReward] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -87,6 +86,10 @@ const Home = () => {
       // Сортируем услуги по популярности категорий
       const sortedServices = sortServicesByPopularity(servicesData, categories)
       setServices(sortedServices.slice(0, 8))
+
+      setPointsToNextReward(
+        calculatePointsToNextReward(servicesData, balanceData?.balance || 0)
+      )
     } catch (error) {
       console.error('Error loading home data:', error)
     } finally {
@@ -125,12 +128,40 @@ const Home = () => {
     })
   }
 
-  const handleServiceClick = (service) => {
+  const calculatePointsToNextReward = (servicesList, currentBalance) => {
+    if (!Array.isArray(servicesList) || servicesList.length === 0) {
+      return null
+    }
+
+    const prices = servicesList
+      .map(service => service?.price_points)
+      .filter(price => typeof price === 'number' && price > 0)
+
+    if (prices.length === 0) {
+      return null
+    }
+
+    const nextPrice = prices
+      .filter(price => price > currentBalance)
+      .sort((a, b) => a - b)[0]
+
+    if (nextPrice === undefined) {
+      return 0
+    }
+
+    return Math.max(nextPrice - currentBalance, 0)
+  }
+
+  const handleServiceClick = (service, categoryCode = null) => {
     hapticFeedback('light')
     
     if (service && service.id) {
       setSelectedServiceCategory(service)
       setIsLocationSelectorOpen(true)
+    } else if (categoryCode) {
+      const params = new URLSearchParams()
+      params.set('category', categoryCode)
+      navigate(`/services?${params.toString()}`)
     } else {
       navigate('/services')
     }
@@ -148,54 +179,87 @@ const Home = () => {
 
   // Функция для получения дефолтных услуг, отсортированных по популярности
   const getDefaultServicesByPopularity = () => {
+    const mainCategories = getMainPageCategories()
+    
     if (popularCategories.length > 0) {
-      // Сортируем defaultServiceIcons по популярности категорий
+      // Сортируем категории по популярности
       const categoryIndex = {}
       popularCategories.forEach((cat, index) => {
         categoryIndex[cat] = index
       })
       
-      return [...defaultServiceIcons]
+      return [...mainCategories]
         .sort((a, b) => {
-          const aIndex = categoryIndex[a.icon] ?? 999
-          const bIndex = categoryIndex[b.icon] ?? 999
+          const aIndex = categoryIndex[a.code] ?? 999
+          const bIndex = categoryIndex[b.code] ?? 999
           return aIndex - bIndex
         })
         .slice(0, 8)
     }
     
-    // Если нет данных о популярности, используем стандартный порядок
-    return defaultServiceIcons.slice(0, 8)
+    // Если нет данных о популярности, используем стандартный порядок (первые 8)
+    return mainCategories.slice(0, 8)
   }
 
   // Возвращает ровно 8 плиток услуг: сначала реальные услуги (уже отсортированы по популярности),
   // затем – дефолтные иконки по глобальной популярности, чтобы добить до 8 без повторов
   const getServiceTiles = () => {
     const tiles = []
-
-    // Добавляем реальные услуги в текущем порядке
+    const addedCodes = new Set()
+    const normalizeCode = (code) => {
+      if (!code) return null
+      return String(code).trim().toLowerCase()
+    }
+    const getShortLabel = (categoryData) => {
+      const code = normalizeCode(categoryData.code)
+      const shortMap = language === 'ru'
+        ? {
+            brow_design: 'Брови',
+            hair_salon: 'Прически',
+            lash_services: 'Реснички',
+            makeup_pmu: 'Макияж'
+          }
+        : {
+            brow_design: 'Brows',
+            hair_salon: 'Hairstyles',
+            lash_services: 'Lashes',
+            makeup_pmu: 'Makeup'
+          }
+      return shortMap[code] || (language === 'ru' ? categoryData.name : categoryData.nameEn || categoryData.name)
+    }
+    const addCategory = (code) => {
+      const normalized = normalizeCode(code)
+      if (!normalized) return
+      const categoryData = getCategoryByCode(normalized) || serviceCategories[normalized]
+      if (!categoryData) return
+      const canonicalCode = normalizeCode(categoryData.code || normalized)
+      if (!canonicalCode || addedCodes.has(canonicalCode)) return
+      tiles.push({ type: 'category', code: canonicalCode, data: { ...categoryData, shortLabel: getShortLabel(categoryData) } })
+      addedCodes.add(canonicalCode)
+    }
+ 
     if (services && services.length > 0) {
-      services.forEach(svc => tiles.push({ type: 'service', data: svc }))
+      services.forEach(service => {
+        let categoryCode = service.partner?.business_type || service.category || null
+        if (!categoryCode) {
+          const inferredCode = getServiceIcon(service.title)
+          if (inferredCode) {
+            categoryCode = inferredCode
+          }
+        }
+
+        addCategory(categoryCode)
+      })
     }
 
-    // Если не хватает до 8, добиваем дефолтными по популярности, избегая дублей по названию/категории
     if (tiles.length < 8) {
       const defaults = getDefaultServicesByPopularity()
-
-      const existingNames = new Set(
-        tiles.map(t => (t.type === 'service' ? (t.data.title || '') : (t.data.name || ''))?.toLowerCase())
-      )
-
       for (const def of defaults) {
-        const defName = (def.name || def.nameEn || def.icon || '').toLowerCase()
-        if (!existingNames.has(defName)) {
-          tiles.push({ type: 'default', data: def })
-        }
+        addCategory(def.code || def.icon)
         if (tiles.length >= 8) break
       }
     }
 
-    // Гарантируем ровно 8 элементов
     return tiles.slice(0, 8)
   }
 
@@ -288,7 +352,16 @@ const Home = () => {
               <div className="w-8 h-8 rounded-xl flex items-center justify-center border border-sakura-border/50 bg-sakura-surface/15 backdrop-blur-sm shadow">
                 <span className="text-sakura-deep text-base leading-none">💸</span>
               </div>
-              <span className="font-bold text-sakura-dark">{balance} {t('home_points')}</span>
+              <div className="flex flex-col">
+                <span className="font-bold text-sakura-dark">{balance} {t('home_points')}</span>
+                {pointsToNextReward !== null && (
+                  <span className="text-xs text-sakura-dark/60">
+                    {pointsToNextReward > 0
+                      ? t('home_points_to_next_reward', { points: pointsToNextReward })
+                      : t('home_points_ready')}
+                  </span>
+                )}
+              </div>
             </div>
             <button
               onClick={() => navigate('/history')}
@@ -319,7 +392,7 @@ const Home = () => {
           {news.length > 0 && (
             <button
               onClick={() => navigate('/news')}
-              className="text-sakura-accent font-semibold text-sm hover:opacity-80 transition-colors"
+              className="bg-sakura-accent/15 text-sakura-accent font-semibold text-sm px-3 py-1 rounded-lg border border-sakura-accent/30 hover:bg-sakura-accent/25 transition-colors"
             >
               {t('home_see_all')} →
             </button>
@@ -344,16 +417,18 @@ const Home = () => {
                 <div
                   key={item.id}
                   onClick={() => handleNewsClick(item.id)}
-                  className="flex-shrink-0 w-64 bg-sakura-surface/5 backdrop-blur-sm rounded-xl overflow-hidden border border-sakura-border/40 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer snap-start active:scale-[0.985]"
+                  className="group flex-shrink-0 w-64 bg-sakura-surface/5 backdrop-blur-sm rounded-xl overflow-hidden border border-sakura-border/40 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer snap-start active:scale-[0.985]"
                 >
                   {item.image_url ? (
                     <div className="h-24 relative overflow-hidden">
                       <img
                         src={item.image_url}
                         alt={item.title}
-                        className="w-full h-full object-cover opacity-15"
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover opacity-20 transition-transform duration-500 group-hover:scale-105"
                       />
-                      <div className="absolute top-2 right-2 bg-sakura-surface/85 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
+                      <div className="absolute top-2 right-2 bg-sakura-surface/15 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
                         <span className="text-xs font-semibold text-jewelry-brown-dark">
                           {formatDate(item.created_at)}
                         </span>
@@ -366,7 +441,7 @@ const Home = () => {
                         <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         <path d="M8 10H16M8 14H16M8 6H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                       </svg>
-                      <div className="absolute top-2 right-2 bg-sakura-surface/85 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
+                      <div className="absolute top-2 right-2 bg-sakura-surface/15 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
                         <span className="text-xs font-semibold text-jewelry-brown-dark">
                           {formatDate(item.created_at)}
                         </span>
@@ -380,6 +455,10 @@ const Home = () => {
                     <p className="text-sm text-sakura-mid line-clamp-2">
                       {item.preview_text || item.content.substring(0, 80) + '...'}
                     </p>
+                    <div className="mt-3 inline-flex items-center gap-1 text-sakura-accent font-semibold text-sm transition-transform duration-300 group-hover:translate-x-0.5">
+                      <span>Подробнее</span>
+                      <span aria-hidden="true">→</span>
+                    </div>
                   </div>
                 </div>
               )
@@ -403,6 +482,10 @@ const Home = () => {
                   <p className="text-sm text-jewelry-gray-elegant">
                     Накапливайте баллы за каждую покупку у наших партнёров и обменивайте на услуги!
                   </p>
+                  <div className="mt-3 inline-flex items-center gap-1 text-sakura-accent font-semibold text-sm">
+                    <span>Перейти к новостям</span>
+                    <span aria-hidden="true">→</span>
+                  </div>
                 </div>
               </div>
               
@@ -422,6 +505,10 @@ const Home = () => {
                   <p className="text-sm text-jewelry-gray-elegant">
                     Специальные предложения от партнёров - скидки до 50%!
                   </p>
+                  <div className="mt-3 inline-flex items-center gap-1 text-sakura-accent font-semibold text-sm">
+                    <span>Открыть акции</span>
+                    <span aria-hidden="true">→</span>
+                  </div>
                 </div>
               </div>
               
@@ -443,6 +530,10 @@ const Home = () => {
                   <p className="text-sm text-jewelry-gray-elegant">
                     Приглашайте друзей и получайте бонусные баллы за каждого!
                   </p>
+                  <div className="mt-3 inline-flex items-center gap-1 text-sakura-accent font-semibold text-sm">
+                    <span>Открыть рефералы</span>
+                    <span aria-hidden="true">→</span>
+                  </div>
                 </div>
               </div>
             </>
@@ -472,63 +563,25 @@ const Home = () => {
         {/* Сетка услуг 4x2 */}
         <div className="grid grid-cols-4 gap-4 mb-8">
           {getServiceTiles().map((itemWrapper, index) => {
-            const isService = itemWrapper.type === 'service'
-            const item = itemWrapper.data
-            
-            // В оригинальном дизайне просто отображаем эмодзи для всех услуг
-            let emojiToDisplay = '⭐' // по умолчанию
+            const categoryData = itemWrapper.data
+            const categoryCode = itemWrapper.code
+            const emojiToDisplay = categoryData.emoji || '⭐'
+            const displayName = categoryData.shortLabel || (language === 'ru' ? categoryData.name : categoryData.nameEn || categoryData.name)
 
-            if (isService) {
-              // Услуга из базы данных - определяем эмодзи по названию или категории
-              if (item.category && serviceCategories[item.category]) {
-                emojiToDisplay = serviceCategories[item.category].emoji
-              } else {
-                const serviceTitle = item.title || ''
-                const iconName = getServiceIcon(serviceTitle)
-                if (iconName && serviceCategories[iconName]) {
-                  emojiToDisplay = serviceCategories[iconName].emoji
-                }
-              }
-            } else {
-              // defaultServiceIcons - используем emoji из объекта
-              emojiToDisplay = item.emoji || '⭐'
-            }
-            
-            // ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА: убеждаемся что finalIcon - это валидная строка без эмодзи
-            // const isValidIcon = typeof finalIcon === 'string' && 
-            //                       finalIcon.length < 20 && 
-            //                       finalIcon.length > 0 &&
-            //                       !/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(finalIcon) &&
-            //                       /^[a-z_]+$/i.test(finalIcon) // Только буквы и подчеркивания
-            
-            // const safeIcon = isValidIcon ? finalIcon : 'default'
-            
-            // Для отображения используем title для услуг, или name для defaultServiceIcons
-            const displayName = isService ? item.title : (language === 'ru' ? item.name : item.nameEn)
-            const serviceId = isService ? item.id : null
-            
             return (
               <div
-                key={serviceId || index}
-                onClick={() => handleServiceClick(isService ? item : null)} // Revert to old onClick
+                key={categoryCode || index}
+                onClick={() => handleServiceClick(null, categoryCode)}
                 className="flex flex-col items-center cursor-pointer active:scale-[0.98] transition-transform"
               >
                 <div className="w-16 h-16 bg-sakura-surface/15 backdrop-blur-sm rounded-xl flex items-center justify-center mb-2 relative hover:bg-sakura-accent/10 transition-colors border border-sakura-border/50 shadow-sm active:shadow-md">
-                  {/* В оригинальном дизайне просто отображаем эмодзи */}
-                  <div 
-                    className="flex items-center justify-center w-full h-full text-3xl" 
-                  >
+                  <div className="flex items-center justify-center w-full h-full text-3xl">
                     {emojiToDisplay}
                   </div>
-                  {isService && index < 2 && (
-                    <span className="absolute -top-1 -right-1 bg-sakura-accent text-white text-[10px] px-1.5 py-0.5 rounded-lg font-semibold border border-sakura-border/40">
-                      NEW
-                    </span>
-                  )}
                 </div>
                 <span className="text-[11px] text-center text-sakura-deep leading-tight">
-                  {displayName?.length > 15 
-                    ? displayName.substring(0, 15) + '...' 
+                  {displayName?.length > 15
+                    ? displayName.substring(0, 15) + '...'
                     : displayName}
                 </span>
               </div>
@@ -549,7 +602,7 @@ const Home = () => {
             </h2>
             <button
               onClick={() => navigate('/promotions')}
-              className="text-sakura-accent font-semibold hover:opacity-80 transition-colors"
+            className="bg-sakura-accent/15 text-sakura-accent font-semibold text-sm px-3 py-1 rounded-lg border border-sakura-accent/30 hover:bg-sakura-accent/25 transition-colors"
             >
               {t('home_see_all')} →
             </button>
@@ -564,6 +617,11 @@ const Home = () => {
                 'from-jewelry-pink-medium via-jewelry-pink-dark to-jewelry-rose'
               ]
               const imageGradient = imageGradients[index % imageGradients.length]
+              const partnerCategory =
+                promo.partner?.category ||
+                promo.partner?.business_type ||
+                promo.partner?.industry ||
+                promo.category_label
               
               return (
                 <div
@@ -579,7 +637,9 @@ const Home = () => {
                         <img 
                           src={promo.image_url} 
                           alt={promo.title}
-                          className="w-full h-full object-cover opacity-15"
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover opacity-20 transition-transform duration-500 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                         
@@ -614,10 +674,18 @@ const Home = () => {
                       <h3 className="font-bold text-sakura-deep mb-1 line-clamp-2 min-h-[2.5rem]">
                         {promo.title}
                       </h3>
+                      {partnerCategory && (
+                        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-sakura-mid/80 mb-2">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-sakura-accent">
+                            <path d="M12 3L4 9V21H9V14H15V21H20V9L12 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          <span className="line-clamp-1">{partnerCategory}</span>
+                        </div>
+                      )}
                       <p className="text-sm text-sakura-mid mb-3">
                         {promo.partner?.company_name || promo.partner?.name}
                       </p>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center gap-1 text-sakura-accent">
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-sakura-accent">
                             <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -628,8 +696,9 @@ const Home = () => {
                             {promo.required_points || 'Free'}
                           </span>
                         </div>
-                        <button className="text-jewelry-rose text-sm font-semibold hover:opacity-80 transition-colors">
-                          {t('promo_details')} →
+                        <button className="bg-sakura-accent/15 text-sakura-accent text-sm font-semibold px-3 py-1 rounded-lg border border-sakura-accent/20 hover:bg-sakura-accent/25 transition-colors">
+                          {t('promo_details')}
+                          <span className="ml-1" aria-hidden="true">→</span>
                         </button>
                       </div>
                     </div>

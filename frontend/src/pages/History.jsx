@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getClientTransactions } from '../services/supabase'
+import { getClientTransactions, getClientBalance } from '../services/supabase'
 import { getChatId, hapticFeedback } from '../utils/telegram'
 // import LuxuryIcon from '../components/LuxuryIcons'
 import Loader from '../components/Loader'
@@ -11,17 +11,47 @@ const History = () => {
   
   const [loading, setLoading] = useState(true)
   const [transactions, setTransactions] = useState([])
+  const [currentBalance, setCurrentBalance] = useState(0)
   const [filter, setFilter] = useState('all') // all, accrual, redemption
 
   useEffect(() => {
     loadTransactions()
   }, [chatId])
 
+  const annotateTransactions = (txs, balanceValue) => {
+    if (!Array.isArray(txs)) {
+      return []
+    }
+
+    let runningBalance = typeof balanceValue === 'number' ? balanceValue : 0
+
+    return txs.map(txn => {
+      const balanceAfter = runningBalance
+
+      if (txn.operation_type === 'accrual' || txn.operation_type === 'enrollment_bonus') {
+        runningBalance -= txn.earned_points || 0
+      } else if (txn.operation_type === 'redemption') {
+        runningBalance += txn.spent_points || 0
+      }
+
+      return {
+        ...txn,
+        balance_after: balanceAfter
+      }
+    })
+  }
+
   const loadTransactions = async () => {
     try {
       setLoading(true)
-      const data = await getClientTransactions(chatId, 100)
-      setTransactions(data)
+      const [balanceData, data] = await Promise.all([
+        getClientBalance(chatId),
+        getClientTransactions(chatId, 100)
+      ])
+
+      const balanceValue = balanceData?.balance ?? 0
+      setCurrentBalance(balanceValue)
+      setTransactions(annotateTransactions(data, balanceValue))
     } catch (error) {
       console.error('Error loading transactions:', error)
     } finally {
@@ -165,6 +195,11 @@ const History = () => {
           </div>
         </div>
 
+      <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4 mb-4">
+        <span className="text-white/80 text-sm block">Текущий баланс</span>
+        <span className="text-white font-bold text-2xl">{currentBalance} баллов</span>
+      </div>
+
         {/* Фильтры */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           <button
@@ -243,6 +278,11 @@ const History = () => {
                           <p className="text-xs text-gray-500">
                             {formatDate(transaction.date_time)}
                           </p>
+                          {typeof transaction.balance_after === 'number' && (
+                            <p className="text-xs text-gray-400 mt-1">
+                              Баланс после операции: {transaction.balance_after} баллов
+                            </p>
+                          )}
                         </div>
 
                         {/* Баллы */}

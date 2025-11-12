@@ -57,7 +57,7 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Шапка с градиентом */}
-      <div className="bg-gradient-to-br from-luxury-charcoal via-luxury-navy to-luxury-slate px-4 pt-6 pb-16">
+      <div className="bg-gradient-to-br from-jewelry-brown-dark via-jewelry-burgundy to-jewelry-gold px-4 pt-6 pb-16">
         <div className="flex items-center justify-between mb-8">
           <button
             onClick={() => navigate('/')}
@@ -78,7 +78,7 @@ const Profile = () => {
 
         {/* Аватар и имя */}
         <div className="flex flex-col items-center">
-          <div className="w-24 h-24 bg-white rounded-xl flex items-center justify-center mb-4 shadow-lg ring-2 ring-luxury-gold-light">
+          <div className="w-24 h-24 bg-jewelry-cream rounded-xl flex items-center justify-center mb-4 shadow-xl ring-2 ring-jewelry-gold/30">
             {tgUser?.photo_url ? (
               <img 
                 src={tgUser.photo_url} 
@@ -86,8 +86,9 @@ const Profile = () => {
                 className="w-full h-full rounded-xl object-cover"
               />
             ) : (
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="text-luxury-gold">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"/>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+                <circle cx="12" cy="8" r="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M6 21C6 17 8.5 14 12 14C15.5 14 18 17 18 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
           </div>
@@ -108,15 +109,15 @@ const Profile = () => {
       {/* Основной контент */}
       <div className="px-4 -mt-8 pb-20">
         {/* Кнопка стать партнером */}
-        <div className="bg-gradient-to-br from-luxury-charcoal to-luxury-navy rounded-xl p-6 shadow-lg mb-4 relative overflow-hidden border border-luxury-gold/20">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-luxury-gold/5 rounded-full -mr-16 -mt-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-luxury-gold/5 rounded-full -ml-12 -mb-12"></div>
+        <div className="bg-gradient-to-br from-jewelry-brown-dark to-jewelry-burgundy rounded-xl p-6 shadow-xl mb-4 relative overflow-hidden border border-jewelry-gold/30">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-jewelry-gold/10 rounded-full -mr-16 -mt-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-jewelry-gold/10 rounded-full -ml-12 -mb-12"></div>
           
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-3">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-luxury-gold">
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke="currentColor" strokeWidth="2"/>
-                <path d="M15 2v4M9 2v4M3 10h18" stroke="currentColor" strokeWidth="2"/>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+                <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M8 8H16M8 12H16M8 16H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
               <h3 className="font-bold text-white text-lg">
                 {t('profile_become_partner')}
@@ -127,7 +128,7 @@ const Profile = () => {
             </p>
             <button
               onClick={handleBecomePartner}
-              className="w-full bg-luxury-gold text-luxury-charcoal py-3 rounded-lg font-semibold hover:bg-luxury-gold-dark transition-colors shadow-md"
+              className="w-full bg-jewelry-gold text-jewelry-cream py-3 rounded-lg font-semibold hover:bg-jewelry-gold-dark transition-colors shadow-lg border border-jewelry-gold-dark/30"
             >
               {t('profile_partner_button')} →
             </button>
@@ -135,54 +136,60 @@ const Profile = () => {
         </div>
 
         {/* Статистика */}
-        <div className="bg-white rounded-xl p-4 shadow-sm mb-4 border border-gray-100">
-          <h3 className="font-bold text-gray-800 mb-4">{t('profile_my_stats')}</h3>
+        <div className="bg-jewelry-cream rounded-xl p-4 shadow-lg mb-4 border border-jewelry-gold/20">
+          <h3 className="font-bold text-jewelry-brown-dark mb-4">{t('profile_my_stats')}</h3>
           
           <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-2 text-luxury-gold">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z" fill="currentColor"/>
+            <div className="text-center p-3 bg-jewelry-cream rounded-lg border border-jewelry-gold/20">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-2 text-jewelry-gold">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M12 8V12L15 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M8 12H16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-              <div className="text-2xl font-bold text-luxury-gold">
+              <div className="text-2xl font-bold text-jewelry-gold">
                 {clientData?.balance || 0}
               </div>
-              <div className="text-xs text-gray-500 mt-1">{t('profile_balance')}</div>
+              <div className="text-xs text-jewelry-gray-elegant mt-1">{t('profile_balance')}</div>
             </div>
             
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
+            <div className="text-center p-3 bg-jewelry-cream rounded-lg border border-jewelry-gold/20">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-2 text-green-600">
-                <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" fill="currentColor"/>
+                <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                <path d="M20 6H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <div className="text-2xl font-bold text-green-600">
                 {clientData?.analytics?.totalEarned || 0}
               </div>
-              <div className="text-xs text-gray-500 mt-1">{t('profile_earned')}</div>
+              <div className="text-xs text-jewelry-gray-elegant mt-1">{t('profile_earned')}</div>
             </div>
             
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-2 text-blue-600">
-                <path d="M7 10l5 5 5-5z" fill="currentColor"/>
+            <div className="text-center p-3 bg-jewelry-cream rounded-lg border border-jewelry-gold/20">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-2 text-jewelry-burgundy">
+                <path d="M7 13L12 18L17 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M7 6L12 11L17 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <div className="text-2xl font-bold text-blue-600">
+              <div className="text-2xl font-bold text-jewelry-burgundy">
                 {clientData?.analytics?.totalSpent || 0}
               </div>
-              <div className="text-xs text-gray-500 mt-1">{t('profile_spent')}</div>
+              <div className="text-xs text-jewelry-gray-elegant mt-1">{t('profile_spent')}</div>
             </div>
             
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-2 text-luxury-bronze">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/>
+            <div className="text-center p-3 bg-jewelry-cream rounded-lg border border-jewelry-gold/20">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mx-auto mb-2 text-jewelry-brown-light">
+                <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="20" cy="6" r="1.5" fill="currentColor" />
+                <circle cx="4" cy="12" r="1.5" fill="currentColor" />
               </svg>
-              <div className="text-2xl font-bold text-luxury-bronze">
+              <div className="text-2xl font-bold text-jewelry-brown-light">
                 {clientData?.analytics?.transactionCount || 0}
               </div>
-              <div className="text-xs text-gray-500 mt-1">{t('profile_transactions')}</div>
+              <div className="text-xs text-jewelry-gray-elegant mt-1">{t('profile_transactions')}</div>
             </div>
           </div>
         </div>
 
         {/* Настройки */}
-        <div className="bg-white rounded-xl overflow-hidden shadow-sm mb-4 border border-gray-100">
+        <div className="bg-jewelry-cream rounded-xl overflow-hidden shadow-lg mb-4 border border-jewelry-gold/20">
           <button
             onClick={() => {
               hapticFeedback('light')
@@ -191,10 +198,11 @@ const Profile = () => {
             className="w-full flex items-center justify-between p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-gray-600">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" fill="currentColor"/>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-jewelry-brown-dark">
+                <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M8 10H16M8 14H16M8 6H16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-              <span className="font-semibold text-gray-800">{t('profile_history')}</span>
+              <span className="font-semibold text-jewelry-brown-dark">{t('profile_history')}</span>
             </div>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
@@ -214,13 +222,14 @@ const Profile = () => {
                 window.Telegram.WebApp.close()
               }
             }}
-            className="w-full flex items-center justify-between p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center justify-between p-4 border-b border-jewelry-gold/20 hover:bg-jewelry-gold/5 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-gray-600">
-                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="currentColor"/>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-jewelry-brown-dark">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M8 10H16M8 14H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-              <span className="font-semibold text-gray-800">{t('profile_support')}</span>
+              <span className="font-semibold text-jewelry-brown-dark">{t('profile_support')}</span>
             </div>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
@@ -237,13 +246,14 @@ const Profile = () => {
               hapticFeedback('light')
               navigate('/about')
             }}
-            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center justify-between p-4 hover:bg-jewelry-gold/5 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-gray-600">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor"/>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-jewelry-brown-dark">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M12 8V12M12 16H12.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-              <span className="font-semibold text-gray-800">{t('profile_about')}</span>
+              <span className="font-semibold text-jewelry-brown-dark">{t('profile_about')}</span>
             </div>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path
@@ -257,18 +267,18 @@ const Profile = () => {
         </div>
 
         {/* Статус клиента */}
-        <div className="bg-gradient-to-br from-luxury-gold-light to-luxury-gold/20 rounded-xl p-4 mb-4 border border-luxury-gold/30">
+        <div className="bg-gradient-to-br from-jewelry-gold-light to-jewelry-gold/20 rounded-xl p-4 mb-4 border border-jewelry-gold/40">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-bold text-gray-800 mb-1">{t('profile_status')}</h3>
-              <p className="text-luxury-gold-dark font-semibold">
+              <h3 className="font-bold text-jewelry-brown-dark mb-1">{t('profile_status')}</h3>
+              <p className="text-jewelry-gold-dark font-semibold">
                 {clientData?.status === 'active' ? `✓ ${t('profile_active')}` : t('profile_inactive')}
               </p>
             </div>
             <div>
               {clientData?.status === 'active' ? (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-luxury-gold">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21L12 17.77L5.82 21L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="currentColor" fillOpacity="0.3" />
                 </svg>
               ) : (
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-gray-400">
@@ -281,14 +291,16 @@ const Profile = () => {
 
         {/* Информация о реферальной программе */}
         {clientData?.referrer_chat_id && (
-          <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200">
+          <div className="bg-jewelry-cream rounded-xl p-4 mb-4 border border-jewelry-gold/20">
             <div className="flex items-center gap-2 mb-2">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-luxury-gold">
-                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" fill="currentColor"/>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+                <circle cx="9" cy="7" r="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="15" cy="7" r="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M6 21C6 17 8.5 14 12 14C15.5 14 18 17 18 21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <h3 className="font-bold text-gray-800">{t('profile_referral')}</h3>
+              <h3 className="font-bold text-jewelry-brown-dark">{t('profile_referral')}</h3>
             </div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-jewelry-gray-elegant">
               {t('profile_referral_text')}
             </p>
           </div>
@@ -297,7 +309,7 @@ const Profile = () => {
         {/* Кнопка выхода */}
         <button
           onClick={handleLogout}
-          className="w-full bg-white border border-gray-300 text-gray-700 py-4 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+          className="w-full bg-jewelry-cream border border-jewelry-gold/30 text-jewelry-brown-dark py-4 rounded-lg font-semibold hover:bg-jewelry-gold/5 transition-colors"
         >
           {t('profile_logout')}
         </button>

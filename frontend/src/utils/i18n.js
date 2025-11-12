@@ -6,6 +6,9 @@ const translations = {
   ru: {
     // Navigation
     nav_home: 'Главная',
+    nav_activity: 'Активность',
+    nav_community: 'Сообщество',
+    nav_message: 'Сообщения',
     nav_promotions: 'Акции',
     nav_services: 'Услуги',
     nav_history: 'История',
@@ -15,6 +18,8 @@ const translations = {
     home_greeting: 'Привет',
     home_balance_text: 'Используйте баллы для получения услуг и скидок!',
     home_points: 'баллов',
+    home_points_to_next_reward: 'До следующего вознаграждения осталось {points} баллов',
+    home_points_ready: 'Баллов достаточно для обмена — выберите услугу!',
     home_services: 'Услуги',
     home_see_all: 'Все',
     home_rewards: 'Награды',
@@ -221,6 +226,9 @@ const translations = {
   en: {
     // Navigation
     nav_home: 'Home',
+    nav_activity: 'Activity',
+    nav_community: 'Community',
+    nav_message: 'Message',
     nav_promotions: 'Promotions',
     nav_services: 'Services',
     nav_history: 'History',
@@ -230,6 +238,8 @@ const translations = {
     home_greeting: 'Hi',
     home_balance_text: 'Use points to get services and discounts!',
     home_points: 'points',
+    home_points_to_next_reward: '{points} points to the next reward',
+    home_points_ready: 'Enough points for a reward — pick a service!',
     home_services: 'Services',
     home_see_all: 'See all',
     home_rewards: 'Rewards',

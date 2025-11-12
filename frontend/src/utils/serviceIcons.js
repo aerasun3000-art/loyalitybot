@@ -1,144 +1,254 @@
 /**
  * Иконки и данные для различных типов услуг
+ * Используются профессиональные линейные иконки в luxury стиле
  */
 
 export const serviceCategories = {
-  // Косметология и красота
-  manicure: {
-    icon: '💅',
-    name: 'Маникюр',
-    nameEn: 'Manicure',
-    color: 'from-pink-400 to-pink-600'
+  // Основные 12 категорий услуг (первые 8 отображаются на главной)
+  nail_care: {
+    code: 'nail_care',
+    icon: 'nail_care',
+    name: 'Ногтевой сервис',
+    nameEn: 'Nail Care',
+    color: 'from-jewelry-burgundy to-jewelry-gold',
+    emoji: '💅',
+    displayOrder: 1,
+    isMainPage: true
   },
-  hairstyle: {
-    icon: '💇‍♀️',
-    name: 'Прически',
-    nameEn: 'Hairstyle',
-    color: 'from-purple-400 to-purple-600'
+  brow_design: {
+    code: 'brow_design',
+    icon: 'brow_design',
+    name: 'Коррекция и окрашивание бровей',
+    nameEn: 'Brow Design',
+    color: 'from-jewelry-gold to-jewelry-brown-light',
+    emoji: '👁️',
+    displayOrder: 2,
+    isMainPage: true
   },
-  massage: {
-    icon: '💆‍♀️',
+  hair_salon: {
+    code: 'hair_salon',
+    icon: 'hair_salon',
+    name: 'Парикмахерские услуги',
+    nameEn: 'Hair Salon Services',
+    color: 'from-jewelry-brown-light to-jewelry-gold',
+    emoji: '💇‍♀️',
+    displayOrder: 3,
+    isMainPage: true
+  },
+  hair_removal: {
+    code: 'hair_removal',
+    icon: 'hair_removal',
+    name: 'Депиляция',
+    nameEn: 'Hair Removal',
+    color: 'from-jewelry-gold to-jewelry-burgundy',
+    emoji: '⚡',
+    displayOrder: 4,
+    isMainPage: true
+  },
+  facial_aesthetics: {
+    code: 'facial_aesthetics',
+    icon: 'facial_aesthetics',
+    name: 'Косметология',
+    nameEn: 'Facial Aesthetics',
+    color: 'from-jewelry-burgundy to-jewelry-brown-dark',
+    emoji: '✨',
+    displayOrder: 5,
+    isMainPage: true
+  },
+  lash_services: {
+    code: 'lash_services',
+    icon: 'lash_services',
+    name: 'Наращивание и ламинирование ресниц',
+    nameEn: 'Lash Services',
+    color: 'from-jewelry-brown-light to-jewelry-gold',
+    emoji: '👀',
+    displayOrder: 6,
+    isMainPage: true
+  },
+  massage_therapy: {
+    code: 'massage_therapy',
+    icon: 'massage_therapy',
     name: 'Массаж',
-    nameEn: 'Massage',
-    color: 'from-blue-400 to-blue-600'
+    nameEn: 'Massage Therapy',
+    color: 'from-jewelry-gold to-jewelry-brown-light',
+    emoji: '💆‍♀️',
+    displayOrder: 7,
+    isMainPage: true
   },
-  cosmetologist: {
-    icon: '🧴',
-    name: 'Косметолог',
-    nameEn: 'Cosmetologist',
-    color: 'from-teal-400 to-teal-600'
+  makeup_pmu: {
+    code: 'makeup_pmu',
+    icon: 'makeup_pmu',
+    name: 'Визаж и перманент',
+    nameEn: 'Make-up & PMU',
+    color: 'from-jewelry-burgundy to-jewelry-gold',
+    emoji: '💄',
+    displayOrder: 8,
+    isMainPage: true
   },
-  eyebrows: {
-    icon: '✨',
-    name: 'Брови',
-    nameEn: 'Eyebrows',
-    color: 'from-amber-400 to-amber-600'
+  body_wellness: {
+    code: 'body_wellness',
+    icon: 'body_wellness',
+    name: 'Телесная терапия',
+    nameEn: 'Body Wellness',
+    color: 'from-jewelry-gold to-jewelry-cream',
+    emoji: '🌸',
+    displayOrder: 9,
+    isMainPage: false
   },
-  eyelashes: {
-    icon: '👁️',
-    name: 'Ресницы',
-    nameEn: 'Eyelashes',
-    color: 'from-indigo-400 to-indigo-600'
+  nutrition_coaching: {
+    code: 'nutrition_coaching',
+    icon: 'nutrition_coaching',
+    name: 'Нутрициология и питание',
+    nameEn: 'Nutrition Coaching',
+    color: 'from-jewelry-gold-light to-jewelry-gold',
+    emoji: '🍎',
+    displayOrder: 10,
+    isMainPage: false
   },
-  laser: {
-    icon: '💫',
-    name: 'Лазерная эпиляция',
-    nameEn: 'Laser Hair Removal',
-    color: 'from-rose-400 to-rose-600'
+  mindfulness_coaching: {
+    code: 'mindfulness_coaching',
+    icon: 'mindfulness_coaching',
+    name: 'Ментальное здоровье',
+    nameEn: 'Mindfulness & Coaching',
+    color: 'from-jewelry-brown-light to-jewelry-burgundy',
+    emoji: '🧠',
+    displayOrder: 11,
+    isMainPage: false
   },
-  skincare: {
-    icon: '🌸',
-    name: 'Уход за кожей',
-    nameEn: 'Skincare',
-    color: 'from-pink-300 to-pink-500'
-  },
-  makeup: {
-    icon: '💄',
-    name: 'Визажист',
-    nameEn: 'Makeup Artist',
-    color: 'from-red-400 to-red-600'
+  image_consulting: {
+    code: 'image_consulting',
+    icon: 'image_consulting',
+    name: 'Стиль',
+    nameEn: 'Image Consulting',
+    color: 'from-jewelry-cream to-jewelry-gold-light',
+    emoji: '👗',
+    displayOrder: 12,
+    isMainPage: false
   },
   
-  // Дополнительные услуги
-  cleaning: {
-    icon: '🧹',
-    name: 'Уборка',
-    nameEn: 'Cleaning',
-    color: 'from-green-400 to-green-600'
+  // Старые категории для обратной совместимости
+  manicure: {
+    code: 'nail_care',
+    icon: 'nail_care',
+    name: 'Ногтевой сервис',
+    nameEn: 'Nail Care',
+    color: 'from-jewelry-burgundy to-jewelry-gold',
+    emoji: '💅'
   },
-  repair: {
-    icon: '🔧',
-    name: 'Ремонт',
-    nameEn: 'Repair',
-    color: 'from-gray-400 to-gray-600'
+  hairstyle: {
+    code: 'hair_salon',
+    icon: 'hair_salon',
+    name: 'Парикмахерские услуги',
+    nameEn: 'Hair Salon Services',
+    color: 'from-jewelry-brown-light to-jewelry-gold',
+    emoji: '💇‍♀️'
   },
-  delivery: {
-    icon: '🚗',
-    name: 'Доставка',
-    nameEn: 'Delivery',
-    color: 'from-blue-500 to-blue-700'
+  massage: {
+    code: 'massage_therapy',
+    icon: 'massage_therapy',
+    name: 'Массаж',
+    nameEn: 'Massage Therapy',
+    color: 'from-jewelry-gold to-jewelry-brown-light',
+    emoji: '💆‍♀️'
   },
-  fitness: {
-    icon: '🏃‍♀️',
-    name: 'Фитнес',
-    nameEn: 'Fitness',
-    color: 'from-orange-400 to-orange-600'
+  cosmetologist: {
+    code: 'facial_aesthetics',
+    icon: 'facial_aesthetics',
+    name: 'Косметология',
+    nameEn: 'Facial Aesthetics',
+    color: 'from-jewelry-burgundy to-jewelry-brown-dark',
+    emoji: '✨'
   },
-  spa: {
-    icon: '🛁',
-    name: 'SPA',
-    nameEn: 'SPA',
-    color: 'from-cyan-400 to-cyan-600'
+  eyebrows: {
+    code: 'brow_design',
+    icon: 'brow_design',
+    name: 'Коррекция и окрашивание бровей',
+    nameEn: 'Brow Design',
+    color: 'from-jewelry-gold to-jewelry-brown-light',
+    emoji: '👁️'
   },
-  yoga: {
-    icon: '🧘‍♀️',
-    name: 'Йога',
-    nameEn: 'Yoga',
-    color: 'from-purple-300 to-purple-500'
+  eyelashes: {
+    code: 'lash_services',
+    icon: 'lash_services',
+    name: 'Наращивание и ламинирование ресниц',
+    nameEn: 'Lash Services',
+    color: 'from-jewelry-brown-light to-jewelry-gold',
+    emoji: '👀'
   },
-  nutrition: {
-    icon: '🥗',
-    name: 'Питание',
-    nameEn: 'Nutrition',
-    color: 'from-lime-400 to-lime-600'
+  laser: {
+    code: 'hair_removal',
+    icon: 'hair_removal',
+    name: 'Депиляция',
+    nameEn: 'Hair Removal',
+    color: 'from-jewelry-gold to-jewelry-burgundy',
+    emoji: '⚡'
   },
-  psychology: {
-    icon: '🧠',
-    name: 'Психолог',
-    nameEn: 'Psychology',
-    color: 'from-violet-400 to-violet-600'
+  makeup: {
+    code: 'makeup_pmu',
+    icon: 'makeup_pmu',
+    name: 'Визаж и перманент',
+    nameEn: 'Make-up & PMU',
+    color: 'from-jewelry-burgundy to-jewelry-gold',
+    emoji: '💄'
   }
 }
 
 /**
- * Получить иконку для услуги по названию или категории
+ * Получить код категории для услуги по названию или категории
+ * Возвращает код категории (например, 'nail_care', 'hair_salon')
  */
 export const getServiceIcon = (serviceName = '', serviceCategory = '') => {
-  const searchStr = (serviceName + ' ' + serviceCategory).toLowerCase()
+  if (!serviceName || typeof serviceName !== 'string') {
+    return null
+  }
   
-  // Косметология
-  if (searchStr.includes('маникюр') || searchStr.includes('ногт')) return serviceCategories.manicure.icon
-  if (searchStr.includes('прическ') || searchStr.includes('волос') || searchStr.includes('стрижк')) return serviceCategories.hairstyle.icon
-  if (searchStr.includes('массаж')) return serviceCategories.massage.icon
-  if (searchStr.includes('косметолог') || searchStr.includes('чистка лица')) return serviceCategories.cosmetologist.icon
-  if (searchStr.includes('бров')) return serviceCategories.eyebrows.icon
-  if (searchStr.includes('реснниц')) return serviceCategories.eyelashes.icon
-  if (searchStr.includes('лазер') || searchStr.includes('эпиля')) return serviceCategories.laser.icon
-  if (searchStr.includes('уход') || searchStr.includes('кож')) return serviceCategories.skincare.icon
-  if (searchStr.includes('визаж') || searchStr.includes('макияж') || searchStr.includes('makeup')) return serviceCategories.makeup.icon
+  const searchStr = (serviceName + ' ' + serviceCategory).toLowerCase().trim()
   
-  // Дополнительные
-  if (searchStr.includes('убор') || searchStr.includes('clean')) return serviceCategories.cleaning.icon
-  if (searchStr.includes('ремонт') || searchStr.includes('repair')) return serviceCategories.repair.icon
-  if (searchStr.includes('достав') || searchStr.includes('delivery')) return serviceCategories.delivery.icon
-  if (searchStr.includes('фитнес') || searchStr.includes('тренир')) return serviceCategories.fitness.icon
-  if (searchStr.includes('spa') || searchStr.includes('спа')) return serviceCategories.spa.icon
-  if (searchStr.includes('йог')) return serviceCategories.yoga.icon
-  if (searchStr.includes('питан') || searchStr.includes('диет')) return serviceCategories.nutrition.icon
-  if (searchStr.includes('психол') || searchStr.includes('коуч')) return serviceCategories.psychology.icon
+  // Новые категории (основные 12)
+  if (searchStr.includes('маникюр') || searchStr.includes('ногт')) {
+    return 'nail_care'
+  }
+  if (searchStr.includes('бров')) {
+    return 'brow_design'
+  }
+  if (searchStr.includes('прическ') || searchStr.includes('волос') || searchStr.includes('стрижк')) {
+    return 'hair_salon'
+  }
+  if (searchStr.includes('лазер') || searchStr.includes('эпиля') || searchStr.includes('депиля')) {
+    return 'hair_removal'
+  }
+  if (searchStr.includes('косметолог') || searchStr.includes('чистка лица') || searchStr.includes('эстетик')) {
+    return 'facial_aesthetics'
+  }
+  if (searchStr.includes('реснниц') || searchStr.includes('ламинирован')) {
+    return 'lash_services'
+  }
+  if (searchStr.includes('массаж')) {
+    return 'massage_therapy'
+  }
+  if (searchStr.includes('визаж') || searchStr.includes('макияж') || searchStr.includes('makeup') || searchStr.includes('перманент') || searchStr.includes('pmu')) {
+    return 'makeup_pmu'
+  }
+  if (searchStr.includes('телесн') || searchStr.includes('body') || searchStr.includes('wellness')) {
+    return 'body_wellness'
+  }
+  if (searchStr.includes('питан') || searchStr.includes('диет') || searchStr.includes('нутрициолог')) {
+    return 'nutrition_coaching'
+  }
+  if (searchStr.includes('психол') || searchStr.includes('коуч') || searchStr.includes('ментальн')) {
+    return 'mindfulness_coaching'
+  }
+  if (searchStr.includes('стиль') || searchStr.includes('image') || searchStr.includes('консульт')) {
+    return 'image_consulting'
+  }
+  
+  // Старые категории для обратной совместимости
+  if (searchStr.includes('уход') || searchStr.includes('кож')) {
+    return 'facial_aesthetics' // Косметология
+  }
   
   // По умолчанию
-  return '✨'
+  return null
 }
 
 /**
@@ -155,34 +265,49 @@ export const getServiceCategory = (serviceName = '') => {
   }
   
   return {
-    icon: '✨',
+    icon: 'default',
     name: 'Услуга',
     nameEn: 'Service',
-    color: 'from-orange-400 to-orange-600'
+    color: 'from-jewelry-gold to-jewelry-brown-light'
   }
 }
 
 /**
- * Список всех доступных иконок для отображения в сетке
+ * Получить список всех категорий услуг (только основные 12)
  */
-export const defaultServiceIcons = [
-  serviceCategories.manicure,
-  serviceCategories.hairstyle,
-  serviceCategories.massage,
-  serviceCategories.cosmetologist,
-  serviceCategories.eyebrows,
-  serviceCategories.eyelashes,
-  serviceCategories.laser,
-  serviceCategories.makeup,
-  serviceCategories.skincare,
-  serviceCategories.spa,
-  serviceCategories.fitness,
-  serviceCategories.yoga,
-  serviceCategories.cleaning,
-  serviceCategories.repair,
-  serviceCategories.delivery,
-  serviceCategories.nutrition
-]
+export const getAllServiceCategories = () => {
+  const mainCategories = [
+    'nail_care', 'brow_design', 'hair_salon', 'hair_removal',
+    'facial_aesthetics', 'lash_services', 'massage_therapy', 'makeup_pmu',
+    'body_wellness', 'nutrition_coaching', 'mindfulness_coaching', 'image_consulting'
+  ]
+  return mainCategories
+    .map(code => serviceCategories[code])
+    .filter(Boolean)
+    .sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999))
+}
+
+/**
+ * Получить категории для главной страницы (первые 8)
+ */
+export const getMainPageCategories = () => {
+  return Object.values(serviceCategories)
+    .filter(cat => cat.isMainPage === true)
+    .sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999))
+}
+
+/**
+ * Получить категорию по коду business_type
+ */
+export const getCategoryByCode = (code) => {
+  if (!code) return null
+  return serviceCategories[code] || null
+}
+
+/**
+ * Список всех доступных иконок для отображения в сетке (для обратной совместимости)
+ */
+export const defaultServiceIcons = getMainPageCategories()
 
 export default serviceCategories
 

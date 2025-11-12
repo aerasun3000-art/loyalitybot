@@ -10,10 +10,10 @@ const LoyaltyProgress = ({ balance }) => {
 
   // Определение уровней лояльности
   const loyaltyLevels = [
-    { nameKey: 'loyalty_level_newbie', icon: 'diamond', emoji: '💎', min: 0, max: 99, color: 'from-gray-400 to-gray-500' },
-    { nameKey: 'loyalty_level_friend', icon: 'flower', emoji: '🌸', min: 100, max: 499, color: 'from-jewelry-brown-light to-jewelry-gold' },
-    { nameKey: 'loyalty_level_vip', icon: 'heart', emoji: '❤️', min: 500, max: 999, color: 'from-jewelry-gold to-jewelry-gold-dark' },
-    { nameKey: 'loyalty_level_platinum', icon: 'star', emoji: '⭐', min: 1000, max: Infinity, color: 'from-jewelry-gold-dark to-jewelry-brown-dark' }
+    { nameKey: 'loyalty_level_newbie', icon: 'diamond', emoji: '💎', min: 0, max: 99, color: 'from-sakura-border to-sakura-mid' },
+    { nameKey: 'loyalty_level_friend', icon: 'flower', emoji: '🌸', min: 100, max: 499, color: 'from-sakura-accent to-sakura-mid' },
+    { nameKey: 'loyalty_level_vip', icon: 'heart', emoji: '❤️', min: 500, max: 999, color: 'from-sakura-mid to-sakura-deep' },
+    { nameKey: 'loyalty_level_platinum', icon: 'star', emoji: '⭐', min: 1000, max: Infinity, color: 'from-sakura-deep to-sakura-dark' }
   ]
 
   // Определение текущего статуса
@@ -47,13 +47,13 @@ const LoyaltyProgress = ({ balance }) => {
       {/* Заголовок статуса */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-xl leading-none text-jewelry-gold">{currentLevel.emoji}</span>
-          <span className="text-sm font-semibold text-jewelry-brown-dark">
+          <span className="text-xl leading-none text-sakura-accent">{currentLevel.emoji}</span>
+          <span className="text-sm font-semibold text-sakura-deep">
             {t(currentLevel.nameKey)}
           </span>
         </div>
         {nextLevel && (
-          <span className="text-xs text-jewelry-gray-elegant flex items-center gap-1">
+          <span className="text-xs text-sakura-mid flex items-center gap-1">
             {t('loyalty_to')} <span className="text-sm leading-none">{nextLevel.emoji}</span> {t(nextLevel.nameKey)}: {pointsToNext}
           </span>
         )}
@@ -67,7 +67,7 @@ const LoyaltyProgress = ({ balance }) => {
         onClick={() => setShowTooltip(!showTooltip)}
       >
         {/* Фон прогресс-бара */}
-        <div className="h-2 bg-gray-200 rounded-lg overflow-hidden">
+        <div className="h-2 bg-sakura-border/30 rounded-lg overflow-hidden">
           {/* Заполненная часть */}
           <div
             className={`h-full bg-gradient-to-r ${currentLevel.color} rounded-lg transition-all duration-500 ease-out`}
@@ -93,8 +93,8 @@ const LoyaltyProgress = ({ balance }) => {
                 }`}
               >
                 <div
-                  className={`transition-all ${
-                    isActive ? 'opacity-100 scale-110 text-jewelry-gold' : 'opacity-30 scale-90 text-jewelry-gray-elegant'
+                className={`transition-all ${
+                    isActive ? 'opacity-100 scale-110 text-sakura-accent' : 'opacity-60 scale-90 text-sakura-border'
                   }`}
                 >
                   <span className="text-lg leading-none">{level.emoji}</span>
@@ -107,7 +107,7 @@ const LoyaltyProgress = ({ balance }) => {
         {/* Tooltip */}
         {showTooltip && (
           <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-10">
-            <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg whitespace-nowrap">
+            <div className="bg-sakura-deep text-white text-xs rounded-lg px-3 py-2 shadow-lg whitespace-nowrap">
               {nextLevel ? (
                 <>
                   <p className="font-semibold mb-1 flex items-center gap-1">
@@ -123,7 +123,7 @@ const LoyaltyProgress = ({ balance }) => {
                 </p>
               )}
               <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                <div className="w-2 h-2 bg-gray-900 rotate-45" />
+                <div className="w-2 h-2 bg-sakura-deep rotate-45" />
               </div>
             </div>
           </div>
@@ -132,7 +132,7 @@ const LoyaltyProgress = ({ balance }) => {
 
       {/* Мобильная подсказка (для тач-устройств) */}
       {!nextLevel && (
-        <p className="text-center text-xs text-jewelry-gold font-semibold mt-1 flex items-center justify-center gap-1">
+        <p className="text-center text-xs text-sakura-accent font-semibold mt-1 flex items-center justify-center gap-1">
           <span className="text-sm leading-none">⭐</span> {t('loyalty_max_reached')}
         </p>
       )}

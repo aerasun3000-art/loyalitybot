@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Title, Card, Button, Chip } from '@telegram-apps/telegram-ui'
 import { getActivePromotions } from '../services/supabase'
 import { hapticFeedback } from '../utils/telegram'
-// import LuxuryIcon from '../components/LuxuryIcons'
 import Loader from '../components/Loader'
 import { PromotionSkeleton } from '../components/SkeletonCard'
 
@@ -223,7 +221,7 @@ const Promotions = () => {
                         {/* Бэдж "Бесплатно" */}
                         {promo.required_points === 0 && (
                           <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto flex items-center gap-1">
-                            <span>🎉</span>
+                            <span>💸</span>
                             <span>FREE</span>
                           </div>
                         )}
@@ -268,7 +266,7 @@ const Promotions = () => {
                         {/* Бэдж "Бесплатно" */}
                         {promo.required_points === 0 && (
                           <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto flex items-center gap-1">
-                            <span>🎉</span>
+                            <span>💸</span>
                             <span>FREE</span>
                           </div>
                         )}
@@ -290,7 +288,7 @@ const Promotions = () => {
                       )}
                       {promo.required_points > 0 && (
                         <span className="bg-jewelry-gold/20 text-jewelry-gold px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
-                          <span>💰</span>
+                          <span>💸</span>
                           <span>{promo.required_points}</span>
                         </span>
                       )}
