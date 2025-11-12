@@ -259,9 +259,10 @@ const Services = () => {
           return
         }
 
-        const categoryData = resolveCategory(rawCode)
+        const canonicalCode = normalizeCategoryCode(rawCode)
+        if (!canonicalCode) return
+        const categoryData = resolveCategory(canonicalCode)
         if (!categoryData) return
-        const canonicalCode = categoryData.code || rawCode
 
         if (filter === 'search' && query) {
           const categoryNameRu = (categoryData.name || '').toLowerCase()
