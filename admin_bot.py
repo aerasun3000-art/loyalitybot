@@ -9,12 +9,27 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 import logging
+import sentry_sdk
 
 # Предполагается, что SupabaseManager находится в отдельном файле (например, supabase_manager.py)
 from supabase_manager import SupabaseManager
 from dashboard_urls import get_admin_dashboard_url, get_onepager_url 
 
 load_dotenv()
+
+# Инициализация Sentry для мониторинга ошибок
+sentry_dsn = os.getenv('SENTRY_DSN')
+if sentry_dsn:
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        environment=os.getenv('SENTRY_ENVIRONMENT', 'production'),
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        release=f"loyaltybot@{os.getenv('APP_VERSION', '1.0.0')}",
+        send_default_pii=True,  # Добавляет данные запросов (headers, IP) для отладки
+        before_send=lambda event, hint: event if event.get('level') in ['error', 'fatal'] else None,
+    )
+    print("✅ Sentry инициализирован для admin_bot")
 
 # Настройка логирования
 logging.basicConfig(
@@ -103,6 +118,7 @@ async def handle_start_admin(message: types.Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
         [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
+        [InlineKeyboardButton(text="🛠 Услуги Партнёров", callback_data="admin_manage_services")],
         [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
         [InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background")],
         [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
@@ -162,30 +178,42 @@ async def show_pending_partners(callback_query: types.CallbackQuery):
 @dp.callback_query(F.data.startswith("partner_"))
 async def handle_partner_approval(callback_query: types.CallbackQuery):
     """Обрабатывает одобрение или отклонение заявки партнера."""
-    action, partner_id = callback_query.data.split('_')[1], callback_query.data.split('_')[2]
-    
-    new_status = 'Approved' if action == 'approve' else 'Rejected'
-    success = db_manager.update_partner_status(partner_id, new_status)
-    
-    if success:
-        result_text = "🟢 Одобрена" if new_status == 'Approved' else "🔴 Отклонена"
+    try:
+        parts = callback_query.data.split('_')
+        action = parts[1]
+        partner_id = parts[2]
         
-        # Обновляем исходное сообщение, чтобы показать, что оно обработано
-        if callback_query.message.text:
-             processed_text = callback_query.message.text.split('\n')[0]
-             await callback_query.message.edit_text(f"{processed_text}\n\n**СТАТУС: {result_text}**")
+        logger.info(f"Processing partner {action} for partner_id: {partner_id} (type: {type(partner_id)})")
+        
+        new_status = 'Approved' if action == 'approve' else 'Rejected'
+        success = db_manager.update_partner_status(partner_id, new_status)
+        
+        logger.info(f"Update result for partner_id {partner_id}: success={success}, new_status={new_status}")
+        
+        if success:
+            result_text = "🟢 Одобрена" if new_status == 'Approved' else "🔴 Отклонена"
+            
+            # Обновляем исходное сообщение, чтобы показать, что оно обработано
+            if callback_query.message.text:
+                 processed_text = callback_query.message.text.split('\n')[0]
+                 await callback_query.message.edit_text(f"{processed_text}\n\n**СТАТУС: {result_text}**")
+            else:
+                await callback_query.message.edit_text(f"Заявка ID {partner_id}: {result_text}")
+            
+            # Уведомление Партнера (имитация)
+            # Отправляем уведомление в партнерский бот
+            if new_status == 'Approved':
+                send_partner_notification(partner_id, "🎉 **Поздравляем!** Ваш аккаунт партнера одобрен. Нажмите /start в партнерском боте.")
+            else:
+                send_partner_notification(partner_id, "❌ Ваша заявка Партнера была отклонена. Свяжитесь с администратором.")
+            
         else:
-            await callback_query.message.edit_text(f"Заявка ID {partner_id}: {result_text}")
-        
-        # Уведомление Партнера (имитация)
-        # Отправляем уведомление в партнерский бот
-        if new_status == 'Approved':
-            send_partner_notification(partner_id, "🎉 **Поздравляем!** Ваш аккаунт партнера одобрен. Нажмите /start в партнерском боте.")
-        else:
-            send_partner_notification(partner_id, "❌ Ваша заявка Партнера была отклонена. Свяжитесь с администратором.")
-        
-    else:
-        await callback_query.answer("Ошибка при обновлении статуса в БД.")
+            logger.error(f"Failed to update partner status for partner_id: {partner_id}")
+            await callback_query.answer("Ошибка при обновлении статуса в БД. Проверьте логи.", show_alert=True)
+            
+    except Exception as e:
+        logger.exception(f"Error in handle_partner_approval: {e}")
+        await callback_query.answer("Произошла ошибка при обработке запроса.", show_alert=True)
         
     await callback_query.answer()
 
@@ -325,7 +353,7 @@ async def handle_service_approval(callback_query: types.CallbackQuery):
     """Обрабатывает одобрение или отклонение услуги."""
     parts = callback_query.data.split('_')
     action = parts[1]
-    service_id = int(parts[2])
+    service_id = parts[2]
     
     new_status = 'Approved' if action == 'approve' else 'Rejected'
     # Используем новый метод из SupabaseManager
@@ -345,6 +373,302 @@ async def handle_service_approval(callback_query: types.CallbackQuery):
         await callback_query.answer("Ошибка при обновлении статуса услуги в БД.")
         
     await callback_query.answer()
+
+
+# --- Управление услугами текущих партнёров ---
+
+class ServiceManage(StatesGroup):
+    selecting_partner = State()
+    selecting_category = State()
+    selecting_city = State()
+    selecting_district = State()
+    choosing_services_action = State()
+    adding_title = State()
+    adding_description = State()
+    adding_price = State()
+    adding_category = State()
+    choosing_service_for_edit = State()
+    choosing_field_to_edit = State()
+    waiting_new_field_value = State()
+    choosing_service_for_delete = State()
+
+
+@dp.callback_query(F.data == "admin_manage_services")
+async def open_manage_services(callback_query: types.CallbackQuery, state: FSMContext):
+    if not is_admin(callback_query.message.chat.id):
+        await callback_query.answer("Нет доступа", show_alert=True)
+        return
+    await state.set_state(ServiceManage.selecting_partner)
+    await callback_query.message.edit_text(
+        "🛠 Управление услугами партнёров\n\nВведите partner_chat_id партнёра:" 
+    )
+
+
+@dp.message(ServiceManage.selecting_partner)
+async def receive_partner_id(message: types.Message, state: FSMContext):
+    partner_id = message.text.strip()
+    await state.update_data(partner_chat_id=partner_id)
+    # Главное меню действий для выбранного партнёра
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🗂 Редактировать категорию", callback_data="svc_edit_category")],
+        [InlineKeyboardButton(text="📍 Редактировать локацию", callback_data="svc_edit_location")],
+        [InlineKeyboardButton(text="🧾 Управлять услугами", callback_data="svc_manage_services")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    await message.answer(
+        f"Партнёр выбран: {partner_id}. Выберите действие:",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data == "svc_edit_category")
+async def choose_category(callback_query: types.CallbackQuery, state: FSMContext):
+    cats = db_manager.get_service_categories_list()
+    # Кнопки по 2 в ряд
+    rows = []
+    row = []
+    for i, c in enumerate(cats, 1):
+        row.append(InlineKeyboardButton(text=c, callback_data=f"svc_set_cat_{c}"))
+        if i % 2 == 0:
+            rows.append(row); row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_manage_services")])
+    await callback_query.message.edit_text("Выберите категорию (business_type) для партнёра:", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@dp.callback_query(F.data.startswith("svc_set_cat_"))
+async def set_partner_category(callback_query: types.CallbackQuery, state: FSMContext):
+    category = callback_query.data.replace("svc_set_cat_", "")
+    data = await state.get_data()
+    partner_id = data.get('partner_chat_id')
+    ok = db_manager.set_partner_business_type(partner_id, category)
+    if ok:
+        await callback_query.answer("✅ Категория обновлена")
+    else:
+        await callback_query.answer("❌ Ошибка обновления", show_alert=True)
+    await open_manage_services(callback_query, state)
+
+
+@dp.callback_query(F.data == "svc_edit_location")
+async def choose_city(callback_query: types.CallbackQuery, state: FSMContext):
+    cities = db_manager.get_distinct_cities()
+    if not cities:
+        await callback_query.answer("Нет доступных городов", show_alert=True)
+        return
+    rows = [[InlineKeyboardButton(text=city, callback_data=f"svc_city_{city}")] for city in cities[:50]]
+    rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_manage_services")])
+    await callback_query.message.edit_text("Выберите город:", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@dp.callback_query(F.data.startswith("svc_city_"))
+async def choose_district(callback_query: types.CallbackQuery, state: FSMContext):
+    city = callback_query.data.replace("svc_city_", "")
+    await state.update_data(city=city)
+    districts = db_manager.get_distinct_districts_for_city(city)
+    if not districts:
+        districts = ["All", "Все"]
+    rows = [[InlineKeyboardButton(text=d, callback_data=f"svc_district_{d}")] for d in districts[:50]]
+    rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="svc_edit_location")])
+    await callback_query.message.edit_text(f"Город: {city}. Выберите район:", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@dp.callback_query(F.data.startswith("svc_district_"))
+async def set_partner_location(callback_query: types.CallbackQuery, state: FSMContext):
+    district = callback_query.data.replace("svc_district_", "")
+    data = await state.get_data()
+    partner_id = data.get('partner_chat_id')
+    city = data.get('city')
+    ok = db_manager.set_partner_location(partner_id, city, district)
+    if ok:
+        await callback_query.answer("✅ Локация обновлена")
+    else:
+        await callback_query.answer("❌ Ошибка обновления", show_alert=True)
+    await open_manage_services(callback_query, state)
+
+
+@dp.callback_query(F.data == "svc_manage_services")
+async def services_menu(callback_query: types.CallbackQuery, state: FSMContext):
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Добавить услугу", callback_data="svc_add")],
+        [InlineKeyboardButton(text="✏️ Редактировать услугу", callback_data="svc_edit")],
+        [InlineKeyboardButton(text="🗑 Удалить услугу", callback_data="svc_delete")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_manage_services")]
+    ])
+    await callback_query.message.edit_text("Выберите действие с услугами:", reply_markup=keyboard)
+
+
+# Добавление услуги
+@dp.callback_query(F.data == "svc_add")
+async def svc_add_start(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.set_state(ServiceManage.adding_title)
+    await callback_query.message.edit_text("Введите название услуги (title):")
+
+
+@dp.message(ServiceManage.adding_title)
+async def svc_add_title(message: types.Message, state: FSMContext):
+    await state.update_data(new_title=message.text.strip())
+    await state.set_state(ServiceManage.adding_description)
+    await message.answer("Введите описание услуги (description):")
+
+
+@dp.message(ServiceManage.adding_description)
+async def svc_add_description(message: types.Message, state: FSMContext):
+    await state.update_data(new_description=message.text.strip())
+    await state.set_state(ServiceManage.adding_price)
+    await message.answer("Введите цену в баллах (целое число):")
+
+
+@dp.message(ServiceManage.adding_price)
+async def svc_add_price(message: types.Message, state: FSMContext):
+    try:
+        price = int(message.text.strip())
+    except Exception:
+        await message.answer("Нужно целое число. Введите цену ещё раз:")
+        return
+    await state.update_data(new_price=price)
+    # Выбор категории услуги
+    cats = db_manager.get_service_categories_list()
+    rows = [[InlineKeyboardButton(text=c, callback_data=f"svc_add_cat_{c}")] for c in cats]
+    await state.set_state(ServiceManage.adding_category)
+    await message.answer("Выберите категорию услуги:", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@dp.callback_query(F.data.startswith("svc_add_cat_"), ServiceManage.adding_category)
+async def svc_add_finish(callback_query: types.CallbackQuery, state: FSMContext):
+    category = callback_query.data.replace("svc_add_cat_", "")
+    data = await state.get_data()
+    service_data = {
+        'partner_chat_id': str(data.get('partner_chat_id')),
+        'title': data.get('new_title'),
+        'description': data.get('new_description'),
+        'price_points': data.get('new_price'),
+        'category': category,
+        'approval_status': 'Approved',
+        'is_active': True,
+    }
+    ok = db_manager.add_service(service_data)
+    await state.clear()
+    if ok:
+        await callback_query.message.edit_text("✅ Услуга добавлена")
+    else:
+        await callback_query.message.edit_text("❌ Ошибка добавления услуги")
+
+
+# Удаление услуги
+@dp.callback_query(F.data == "svc_delete")
+async def svc_delete_pick(callback_query: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    partner_id = data.get('partner_chat_id')
+    services = db_manager.get_partner_services(partner_id)
+    if not services:
+        await callback_query.message.edit_text("Нет услуг у партнёра")
+        return
+    rows = []
+    for s in services[:50]:
+        title = s.get('title', 'Без названия')
+        sid = s.get('id')
+        rows.append([InlineKeyboardButton(text=f"🗑 {title} ({sid})", callback_data=f"svc_del_{sid}")])
+    rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="svc_manage_services")])
+    await callback_query.message.edit_text("Выберите услугу для удаления:", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@dp.callback_query(F.data.startswith("svc_del_"))
+async def svc_delete_confirm(callback_query: types.CallbackQuery, state: FSMContext):
+    sid = callback_query.data.replace("svc_del_", "")
+    data = await state.get_data()
+    partner_id = data.get('partner_chat_id')
+    ok = db_manager.delete_service(sid, partner_id)
+    if ok:
+        await callback_query.answer("✅ Удалено")
+    else:
+        await callback_query.answer("❌ Ошибка удаления", show_alert=True)
+    await services_menu(callback_query, state)
+
+
+# Редактирование услуги
+@dp.callback_query(F.data == "svc_edit")
+async def svc_edit_pick(callback_query: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    partner_id = data.get('partner_chat_id')
+    services = db_manager.get_partner_services(partner_id)
+    if not services:
+        await callback_query.message.edit_text("Нет услуг у партнёра")
+        return
+    rows = []
+    for s in services[:50]:
+        title = s.get('title', 'Без названия')
+        sid = s.get('id')
+        rows.append([InlineKeyboardButton(text=f"✏️ {title} ({sid})", callback_data=f"svc_edit_{sid}")])
+    rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="svc_manage_services")])
+    await callback_query.message.edit_text("Выберите услугу для редактирования:", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@dp.callback_query(F.data.startswith("svc_edit_") & (~F.data.endswith("services")))
+async def svc_edit_fields(callback_query: types.CallbackQuery, state: FSMContext):
+    sid = callback_query.data.replace("svc_edit_", "")
+    await state.update_data(edit_service_id=sid)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Название", callback_data="svc_field_title")],
+        [InlineKeyboardButton(text="Описание", callback_data="svc_field_description")],
+        [InlineKeyboardButton(text="Цена (баллы)", callback_data="svc_field_price")],
+        [InlineKeyboardButton(text="Категория", callback_data="svc_field_category")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="svc_manage_services")]
+    ])
+    await callback_query.message.edit_text("Выберите поле для редактирования:", reply_markup=keyboard)
+
+
+@dp.callback_query(F.data.startswith("svc_field_"))
+async def svc_choose_field(callback_query: types.CallbackQuery, state: FSMContext):
+    field = callback_query.data.replace("svc_field_", "")
+    await state.update_data(edit_field=field)
+    if field == 'category':
+        cats = db_manager.get_service_categories_list()
+        rows = [[InlineKeyboardButton(text=c, callback_data=f"svc_set_service_cat_{c}")] for c in cats]
+        await callback_query.message.edit_text("Выберите категорию:", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+        return
+    await state.set_state(ServiceManage.waiting_new_field_value)
+    await callback_query.message.edit_text("Введите новое значение:")
+
+
+@dp.callback_query(F.data.startswith("svc_set_service_cat_"))
+async def svc_set_service_category(callback_query: types.CallbackQuery, state: FSMContext):
+    category = callback_query.data.replace("svc_set_service_cat_", "")
+    data = await state.get_data()
+    sid = data.get('edit_service_id')
+    partner_id = data.get('partner_chat_id')
+    ok = db_manager.update_service_category(sid, partner_id, category)
+    if ok:
+        await callback_query.answer("✅ Обновлено")
+    else:
+        await callback_query.answer("❌ Ошибка", show_alert=True)
+    await services_menu(callback_query, state)
+
+
+@dp.message(ServiceManage.waiting_new_field_value)
+async def svc_apply_field_edit(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    sid = data.get('edit_service_id')
+    partner_id = data.get('partner_chat_id')
+    field = data.get('edit_field')
+    title = description = None
+    price_points = None
+    if field == 'title':
+        title = message.text.strip()
+    elif field == 'description':
+        description = message.text.strip()
+    elif field == 'price':
+        try:
+            price_points = int(message.text.strip())
+        except Exception:
+            await message.answer("Нужно целое число. Введите цену ещё раз:")
+            return
+    ok = db_manager.update_service(sid, partner_id, title=title, description=description, price_points=price_points)
+    await state.clear()
+    if ok:
+        await message.answer("✅ Услуга обновлена")
+    else:
+        await message.answer("❌ Ошибка обновления услуги")
 
 
 # --- Управление Новостями ---

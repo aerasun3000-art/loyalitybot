@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import datetime
+import html
 import requests
 from io import BytesIO
 from PIL import Image
@@ -12,8 +13,23 @@ from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
 from image_handler import process_photo_for_promotion
 from dashboard_urls import get_partner_dashboard_url
+import sentry_sdk
 
 load_dotenv()
+
+# Инициализация Sentry для мониторинга ошибок
+sentry_dsn = os.getenv('SENTRY_DSN')
+if sentry_dsn:
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        environment=os.getenv('SENTRY_ENVIRONMENT', 'production'),
+        traces_sample_rate=0.1,  # 10% транзакций для отслеживания производительности
+        profiles_sample_rate=0.1,  # 10% профилирования
+        release=f"loyaltybot@{os.getenv('APP_VERSION', '1.0.0')}",
+        send_default_pii=True,  # Добавляет данные запросов (headers, IP) для отладки
+        before_send=lambda event, hint: event if event.get('level') in ['error', 'fatal'] else None,
+    )
+    print("✅ Sentry инициализирован для partner_bot")
 
 sys.path.append(os.path.dirname(__file__))
 # Предполагается, что 'supabase_manager' существует и содержит необходимые методы.
@@ -68,6 +84,7 @@ def get_partner_keyboard():
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     btn_add = types.KeyboardButton("➕ Начислить баллы")
     btn_subtract = types.KeyboardButton("➖ Списать баллы")
+    btn_queue = types.KeyboardButton("📦 Очередь операций")
     btn_promo = types.KeyboardButton("🌟 Акции")
     btn_service = types.KeyboardButton("🛠️ Услуги") 
     btn_invite = types.KeyboardButton("👥 Пригласить клиента")
@@ -77,6 +94,7 @@ def get_partner_keyboard():
     btn_settings = types.KeyboardButton("⚙️ Настройки")
 
     markup.add(btn_add, btn_subtract)
+    markup.add(btn_queue)
     markup.add(btn_promo, btn_service)
     markup.add(btn_invite, btn_stats)
     markup.add(btn_dashboard, btn_find)
@@ -134,7 +152,7 @@ def handle_partner_start(message):
 # ------------------------------------
 # ФУНКЦИОНАЛ: ОБЩИЕ КНОПКИ МЕНЮ
 # ------------------------------------
-@bot.message_handler(func=lambda message: message.text in ["➕ Начислить баллы", "➖ Списать баллы", "📊 Моя статистика", "📈 Дашборд", "👤 Найти клиента", "⚙️ Настройки"])
+@bot.message_handler(func=lambda message: message.text in ["➕ Начислить баллы", "➖ Списать баллы", "📊 Моя статистика", "📈 Дашборд", "👤 Найти клиента", "⚙️ Настройки", "📦 Очередь операций"])
 def handle_partner_menu_buttons(message):
     chat_id = message.chat.id
 
@@ -172,6 +190,10 @@ def handle_partner_menu_buttons(message):
         handle_find_client(message)
         return
     
+    if message.text == "📦 Очередь операций":
+        show_offline_queue(chat_id)
+        return
+
     if message.text == "⚙️ Настройки":
         handle_partner_settings(message)
         return
@@ -253,6 +275,302 @@ def decode_qr_from_photo(file_id: str) -> str | None:
         return None
 
 
+def show_offline_queue(chat_id: int):
+    """Отображает очередь отложенных операций для партнера."""
+    try:
+        pending = sm.transaction_queue.list_pending() if sm.transaction_queue else []
+    except Exception as e:
+        log_exception(logger, e, "Ошибка при чтении очереди транзакций")
+        bot.send_message(chat_id, "❌ Не удалось получить очередь операций. Попробуйте позже.")
+        return
+
+    count = len(pending)
+    message_lines = [
+        "<b>📦 Очередь операций</b>",
+        "",
+        f"Всего ожидает обработки: <b>{count}</b>"
+    ]
+
+    if count:
+        message_lines.append("")
+        preview = pending[:5]
+        for idx, payload in enumerate(preview, start=1):
+            txn_type = payload.get('txn_type', '?').upper()
+            client_id = html.escape(str(payload.get('client_chat_id', 'неизв.')))
+            amount = payload.get('raw_amount', 0)
+            try:
+                amount_display = int(amount) if float(amount).is_integer() else round(float(amount), 2)
+            except (TypeError, ValueError):
+                amount_display = amount
+            message_lines.append(f"{idx}. {txn_type} → {client_id} ({amount_display})")
+        if count > len(preview):
+            message_lines.append(f"... и ещё {count - len(preview)} операций")
+    else:
+        message_lines.append("")
+        message_lines.append("Очередь пуста — все операции обработаны.")
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("➕ Добавить", callback_data="queue_add"),
+        types.InlineKeyboardButton("🔄 Синхронизировать", callback_data="queue_sync")
+    )
+    markup.add(
+        types.InlineKeyboardButton("🧹 Очистить", callback_data="queue_clear"),
+        types.InlineKeyboardButton("⬅️ В меню", callback_data="queue_back")
+    )
+
+    bot.send_message(chat_id, "\n".join(message_lines), parse_mode='HTML', reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data in ['queue_add', 'queue_sync', 'queue_clear', 'queue_back'])
+def handle_queue_callbacks(call):
+    chat_id = call.message.chat.id
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+
+    action = call.data
+    if action == 'queue_add':
+        TEMP_DATA[chat_id] = {'offline': {'partner_id': str(chat_id)}}
+        USER_STATE[chat_id] = 'awaiting_offline_client'
+        bot.send_message(chat_id, "Введите Chat ID клиента для отложенной операции:")
+    elif action == 'queue_sync':
+        result = sm.transaction_queue.process_pending() if sm.transaction_queue else {"processed": 0, "failed": 0}
+        processed = result.get('processed', 0)
+        failed = result.get('failed', 0)
+        bot.send_message(
+            chat_id,
+            f"🔄 Синхронизация завершена.\n✅ Успешно: {processed}\n⚠️ Ошибок: {failed}",
+            parse_mode='Markdown'
+        )
+        show_offline_queue(chat_id)
+    elif action == 'queue_clear':
+        if sm.transaction_queue:
+            sm.transaction_queue.clear()
+        bot.send_message(chat_id, "🧹 Очередь операций очищена.")
+        show_offline_queue(chat_id)
+    elif action == 'queue_back':
+        partner_main_menu(chat_id)
+
+    bot.answer_callback_query(call.id)
+
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_offline_client')
+def process_offline_client_id(message):
+    chat_id = message.chat.id
+    client_id = message.text.strip()
+
+    if not client_id:
+        bot.send_message(chat_id, "❌ Укажите корректный Chat ID клиента.")
+        return
+
+    data = TEMP_DATA.setdefault(chat_id, {}).setdefault('offline', {})
+    data['client_id'] = client_id
+
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("Начисление", callback_data="txn_offline_type_accrual"),
+        types.InlineKeyboardButton("Списание", callback_data="txn_offline_type_spend")
+    )
+
+    USER_STATE[chat_id] = 'awaiting_offline_type'
+    bot.send_message(chat_id, "Выберите тип операции для очереди:", reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('txn_offline_type_'))
+def handle_offline_type(call):
+    chat_id = call.message.chat.id
+    data = TEMP_DATA.setdefault(chat_id, {}).setdefault('offline', {})
+    selected = call.data.replace('txn_offline_type_', '', 1)
+    data['txn_type'] = 'accrual' if selected == 'accrual' else 'spend'
+    USER_STATE[chat_id] = 'awaiting_offline_amount'
+
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+
+    if data['txn_type'] == 'accrual':
+        prompt = "Введите сумму чека (в рублях), которую хотите добавить в очередь:"
+    else:
+        prompt = "Введите количество баллов для списания, которое хотите добавить в очередь:"
+
+    bot.send_message(chat_id, prompt)
+    bot.answer_callback_query(call.id)
+
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_offline_amount')
+def process_offline_amount(message):
+    chat_id = message.chat.id
+    entry = TEMP_DATA.get(chat_id, {}).get('offline', {})
+    raw_amount_text = message.text.strip()
+
+    try:
+        amount = float(raw_amount_text.replace(',', '.'))
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        bot.send_message(chat_id, "❌ Неверный формат. Введите положительное число.")
+        return
+
+    client_id = entry.get('client_id')
+    txn_type = entry.get('txn_type')
+    partner_id = entry.get('partner_id', str(chat_id))
+
+    if not client_id or not txn_type:
+        bot.send_message(chat_id, "❌ Сессия устарела. Попробуйте добавить операцию заново.")
+        TEMP_DATA.pop(chat_id, None)
+        USER_STATE.pop(chat_id, None)
+        return
+
+    success = sm.transaction_queue.enqueue_manual(client_id, partner_id, txn_type, amount)
+    TEMP_DATA.pop(chat_id, None)
+    USER_STATE.pop(chat_id, None)
+
+    if success:
+        bot.send_message(chat_id, "✅ Операция добавлена в очередь.")
+    else:
+        bot.send_message(chat_id, "❌ Не удалось добавить операцию. Попробуйте позже.")
+
+    show_offline_queue(chat_id)
+
+
+def prompt_transaction_amount(chat_id: int, client_id: str, txn_type: str, current_balance: int):
+    templates = sm.get_operation_templates(str(chat_id), txn_type) if sm else []
+    markup = None
+    if templates:
+        markup = types.InlineKeyboardMarkup(row_width=3)
+        for template in templates:
+            value = template.get('value')
+            label = template.get('label', value)
+            if value is None:
+                continue
+            markup.add(types.InlineKeyboardButton(
+                str(label),
+                callback_data=f"txn_template_{txn_type}_{value}"
+            ))
+        markup.add(types.InlineKeyboardButton("✏️ Ввести вручную", callback_data="txn_manual"))
+
+    if txn_type == 'accrual':
+        text = (
+            f"Текущий баланс клиента: *{current_balance}* баллов.\n\n"
+            "Выберите сумму чека (в рублях) из подсказок ниже или введите значение вручную."
+        )
+    else:
+        text = (
+            f"Текущий баланс клиента: *{current_balance}* баллов.\n\n"
+            "Выберите количество баллов для списания или введите значение вручную."
+        )
+
+    bot.send_message(chat_id, text, parse_mode="Markdown", reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('txn_template_'))
+def handle_template_selection(call):
+    chat_id = call.message.chat.id
+    parts = call.data.split('_', 3)
+    if len(parts) < 4:
+        bot.answer_callback_query(call.id, "Некорректный шаблон.", show_alert=True)
+        return
+
+    txn_type = parts[2]
+    raw_value = parts[3]
+
+    txn_data = TEMP_DATA.get(chat_id)
+    if not txn_data or txn_data.get('txn_type') != txn_type:
+        bot.answer_callback_query(call.id, "Сессия устарела. Начните заново.", show_alert=True)
+        partner_main_menu(chat_id)
+        return
+
+    try:
+        amount = float(raw_value)
+    except ValueError:
+        bot.answer_callback_query(call.id, "Не удалось применить шаблон.", show_alert=True)
+        return
+
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+
+    TEMP_DATA.pop(chat_id, None)
+    USER_STATE.pop(chat_id, None)
+
+    bot.answer_callback_query(call.id, "Шаблон применён")
+    complete_partner_transaction(chat_id, txn_data['client_id'], txn_type, amount)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'txn_manual')
+def handle_manual_selection(call):
+    chat_id = call.message.chat.id
+    USER_STATE[chat_id] = 'awaiting_amount'
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+
+    txn_data = TEMP_DATA.get(chat_id, {})
+    txn_type = txn_data.get('txn_type', 'accrual')
+    if txn_type == 'accrual':
+        prompt = "Введите сумму чека (в рублях):"
+    else:
+        prompt = "Введите количество баллов для списания:"
+
+    bot.send_message(chat_id, prompt)
+    bot.answer_callback_query(call.id)
+
+
+def complete_partner_transaction(chat_id: int, client_id: str, txn_type: str, amount: float):
+    try:
+        logger.info(f"Партнёр {chat_id} инициирует транзакцию: тип={txn_type}, клиент={client_id}, сумма={amount}")
+        result = sm.execute_transaction(client_id, str(chat_id), txn_type, amount)
+        display_amount = int(amount) if float(amount).is_integer() else round(float(amount), 2)
+
+        if result['success']:
+            if result.get('queued'):
+                msg = (
+                    "⏳ **Операция поставлена в очередь.**\n"
+                    "Мы повторим её автоматически, как только связь с базой восстановится.\n"
+                )
+                if txn_type == 'accrual':
+                    msg += f"Планируется начислить: **{result.get('points', 0)}** баллов.\n"
+                else:
+                    msg += f"Планируется списать: **{display_amount}** баллов.\n"
+                predicted_balance = result.get('new_balance')
+                if predicted_balance is not None:
+                    msg += f"Ожидаемый баланс после выполнения: **{predicted_balance}**.\n"
+                if result.get('error'):
+                    msg += f"\nℹ️ {result['error']}"
+            else:
+                msg = f"✅ **Транзакция успешна!**\n"
+                if txn_type == 'accrual':
+                    msg += f"Начислено: **{result.get('points', 0)}** баллов.\n"
+                else:
+                    msg += f"Списано: **{display_amount}** баллов.\n"
+
+                msg += f"Текущий баланс клиента: **{result.get('new_balance', 'N/A')}**."
+            bot.send_message(chat_id, msg, parse_mode="Markdown")
+            logger.info(f"Транзакция успешна: {txn_type} для клиента {client_id}")
+
+            if not result.get('queued') and not str(client_id).startswith('VIA_PARTNER_'):
+                try:
+                    send_nps_request(client_id, str(chat_id))
+                    logger.info(f"NPS запрос отправлен клиенту {client_id}")
+                except Exception as e:
+                    log_exception(logger, e, f"Ошибка отправки NPS запроса клиенту {client_id}")
+
+        else:
+            error_msg = result.get('error', 'Неизвестная ошибка')
+            logger.warning(f"Транзакция не удалась для клиента {client_id}: {error_msg}")
+            bot.send_message(chat_id, f"❌ Ошибка транзакции: {error_msg}")
+
+    except Exception as e:
+        log_exception(logger, e, f"Критическая ошибка при выполнении транзакции партнёра {chat_id}")
+        bot.send_message(chat_id, "Произошла системная ошибка при проведении транзакции. Обратитесь в поддержку.")
+    finally:
+        partner_main_menu(chat_id)
+
 @bot.message_handler(content_types=['photo'], func=lambda message: USER_STATE.get(message.chat.id) in ['awaiting_client_id_issue', 'awaiting_client_id_spend'])
 def process_qr_photo(message):
     """Обрабатывает фото с QR-кодом для сканирования ID клиента."""
@@ -283,7 +601,8 @@ def process_qr_photo(message):
     
     # Парсим данные из QR-кода (формат: CLIENT_ID:<chat_id>)
     if qr_data.startswith('CLIENT_ID:'):
-        client_id = qr_data.replace('CLIENT_ID:', '').strip()
+        client_id_payload = qr_data.replace('CLIENT_ID:', '', 1).strip()
+        client_id = client_id_payload.split(';', 1)[0].strip()
     else:
         # Если формат другой, пытаемся использовать как есть
         client_id = qr_data.strip()
@@ -304,14 +623,9 @@ def process_qr_photo(message):
     }
     USER_STATE[chat_id] = 'awaiting_amount'
     
-    prompt = ""
     current_balance = sm.get_client_balance(client_id)
-    if TEMP_DATA[chat_id]['txn_type'] == 'accrual':
-        prompt = f"✅ QR-код успешно распознан!\n\nКлиент ID: `{client_id}`\nТекущий баланс: **{current_balance}** баллов.\n\nВведите *сумму чека (в рублях)* для начисления баллов:"
-    else:
-        prompt = f"✅ QR-код успешно распознан!\n\nКлиент ID: `{client_id}`\nТекущий баланс: **{current_balance}** баллов.\n\nВведите *количество баллов* для списания:"
-    
-    bot.send_message(chat_id, prompt, parse_mode="Markdown")
+    bot.send_message(chat_id, f"✅ QR-код успешно распознан!\n\nКлиент ID: `{client_id}`", parse_mode="Markdown")
+    prompt_transaction_amount(chat_id, client_id, TEMP_DATA[chat_id]['txn_type'], current_balance)
     logger.info(f"Партнёр {chat_id} отсканировал QR-код клиента {client_id}")
 
 
@@ -336,14 +650,8 @@ def process_client_id(message):
     }
     USER_STATE[chat_id] = 'awaiting_amount'
 
-    prompt = ""
     current_balance = sm.get_client_balance(client_id)
-    if TEMP_DATA[chat_id]['txn_type'] == 'accrual':
-        prompt = f"Текущий баланс клиента: **{current_balance}** баллов.\nВведите *сумму чека (в рублях)* для начисления баллов:"
-    else:
-        prompt = f"Текущий баланс клиента: **{current_balance}** баллов.\nВведите *количество баллов* для списания:"
-
-    bot.send_message(chat_id, prompt, parse_mode="Markdown")
+    prompt_transaction_amount(chat_id, client_id, TEMP_DATA[chat_id]['txn_type'], current_balance)
 
 
 @bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_amount')
@@ -365,39 +673,7 @@ def process_amount(message):
         bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать снова: /start")
         return
 
-    try:
-        logger.info(f"Партнёр {chat_id} инициирует транзакцию: тип={txn_data['txn_type']}, клиент={txn_data['client_id']}, сумма={amount}")
-        result = sm.execute_transaction(txn_data['client_id'], str(chat_id), txn_data['txn_type'], amount)
-
-        if result['success']:
-            msg = f"✅ **Транзакция успешна!**\n"
-            if txn_data['txn_type'] == 'accrual':
-                msg += f"Начислено: **{result.get('points', 0)}** баллов.\n"
-            else:
-                msg += f"Списано: **{amount}** баллов.\n"
-
-            msg += f"Текущий баланс клиента: **{result.get('new_balance', 'N/A')}**."
-            bot.send_message(chat_id, msg, parse_mode="Markdown")
-            logger.info(f"Транзакция успешна: {txn_data['txn_type']} для клиента {txn_data['client_id']}")
-
-            # --- КЛЮЧЕВОЙ ШАГ: ЗАПРОС NPS (Отправляется в Клиентский бот) ---
-            if not str(txn_data['client_id']).startswith('VIA_PARTNER_'):
-                try:
-                    send_nps_request(txn_data['client_id'], str(chat_id))
-                    logger.info(f"NPS запрос отправлен клиенту {txn_data['client_id']}")
-                except Exception as e:
-                    log_exception(logger, e, f"Ошибка отправки NPS запроса клиенту {txn_data['client_id']}")
-
-        else:
-            error_msg = result.get('error', 'Неизвестная ошибка')
-            logger.warning(f"Транзакция не удалась для клиента {txn_data['client_id']}: {error_msg}")
-            bot.send_message(chat_id, f"❌ Ошибка транзакции: {error_msg}")
-
-    except Exception as e:
-        log_exception(logger, e, f"Критическая ошибка при выполнении транзакции партнёра {chat_id}")
-        bot.send_message(chat_id, "Произошла системная ошибка при проведении транзакции. Обратитесь в поддержку.")
-
-    partner_main_menu(chat_id)
+    complete_partner_transaction(chat_id, txn_data['client_id'], txn_data['txn_type'], amount)
 
 
 # ------------------------------------
@@ -946,15 +1222,22 @@ def handle_service_callbacks(call):
         bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None) 
     except Exception:
         pass
+    
+    # Обработка выбора категории услуги
+    if call.data.startswith('service_category_'):
+        category = call.data.replace('service_category_', '')
+        process_service_category_save(chat_id, category)
+        bot.answer_callback_query(call.id, f"Категория выбрана: {category}")
+        return
         
     if call.data == 'service_add':
         USER_STATE[chat_id] = 'awaiting_service_title'
         TEMP_DATA[chat_id] = {
             'partner_chat_id': str(chat_id),
-            'status': 'Pending'  # Явно устанавливаем статус
+            'approval_status': 'Pending'  # Явно устанавливаем статус
         }
         
-        msg = bot.send_message(chat_id, "✍️ *Создание Услуги (Шаг 1 из 3):*\n\n1. Введите **Название** услуги (например: 'Бесплатный кофе', 'Скидка 500 руб.'):", parse_mode='Markdown')
+        msg = bot.send_message(chat_id, "✍️ *Создание Услуги (Шаг 1 из 4):*\n\n1. Введите **Название** услуги (например: 'Бесплатный кофе', 'Скидка 500 руб.'):", parse_mode='Markdown')
         bot.register_next_step_handler(msg, process_service_title)
     
     elif call.data == 'service_status':
@@ -962,18 +1245,6 @@ def handle_service_callbacks(call):
     
     elif call.data == 'service_edit_list':
         handle_service_edit_list(chat_id)
-    
-    elif call.data.startswith('edit_service_'):
-        # Формат: edit_service_<service_id>
-        service_id = int(call.data.replace('edit_service_', ''))
-        handle_service_edit_menu(chat_id, service_id)
-    
-    elif call.data.startswith('edit_field_'):
-        # Формат: edit_field_<service_id>_<field>
-        parts = call.data.replace('edit_field_', '').split('_')
-        service_id = int(parts[0])
-        field = '_'.join(parts[1:])  # На случай, если field содержит _
-        handle_service_field_edit(chat_id, service_id, field)
     
     elif call.data == 'service_back':
         # Возвращаемся в меню услуг
@@ -997,12 +1268,46 @@ def handle_service_callbacks(call):
     # Важно: отвечаем на callback query
     bot.answer_callback_query(call.id)
 
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('edit_service_') or call.data.startswith('edit_field_'))
+def handle_service_edit_callbacks(call):
+    """Обработчик callback'ов для редактирования услуг."""
+    chat_id = call.message.chat.id
+    
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    
+    if call.data.startswith('edit_service_'):
+        # Формат: edit_service_<service_id>
+        try:
+            service_id = int(call.data.replace('edit_service_', ''))
+            handle_service_edit_menu(chat_id, service_id)
+        except ValueError as e:
+            log_exception(logger, e, f"Ошибка парсинга service_id из {call.data}")
+            bot.send_message(chat_id, "❌ Ошибка при обработке запроса. Попробуйте еще раз.")
+    
+    elif call.data.startswith('edit_field_'):
+        # Формат: edit_field_<service_id>_<field>
+        try:
+            parts = call.data.replace('edit_field_', '').split('_')
+            service_id = int(parts[0])
+            field = '_'.join(parts[1:])  # На случай, если field содержит _
+            handle_service_field_edit(chat_id, service_id, field)
+        except (ValueError, IndexError) as e:
+            log_exception(logger, e, f"Ошибка парсинга edit_field из {call.data}")
+            bot.send_message(chat_id, "❌ Ошибка при обработке запроса. Попробуйте еще раз.")
+    
+    bot.answer_callback_query(call.id)
+
+
 def process_service_title(message):
     chat_id = message.chat.id
     TEMP_DATA[chat_id]['title'] = message.text.strip()
     USER_STATE[chat_id] = 'awaiting_service_description'
     
-    msg = bot.send_message(chat_id, "✍️ *Создание Услуги (Шаг 2 из 3):*\n\n2. Введите **Описание** услуги (подробности, ограничения, как получить):", parse_mode='Markdown')
+    msg = bot.send_message(chat_id, "✍️ *Создание Услуги (Шаг 2 из 4):*\n\n2. Введите **Описание** услуги (подробности, ограничения, как получить):", parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_service_description)
 
 def process_service_description(message):
@@ -1010,7 +1315,7 @@ def process_service_description(message):
     TEMP_DATA[chat_id]['description'] = message.text.strip()
     USER_STATE[chat_id] = 'awaiting_service_price'
     
-    msg = bot.send_message(chat_id, "✍️ *Создание Услуги (Шаг 3 из 3):*\n\n3. Введите **Стоимость** услуги в *баллах* (целое число, например: 100):", parse_mode='Markdown')
+    msg = bot.send_message(chat_id, "✍️ *Создание Услуги (Шаг 3 из 4):*\n\n3. Введите **Стоимость** услуги в *баллах* (целое число, например: 100):", parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_service_price)
 
 def process_service_price(message):
@@ -1026,7 +1331,56 @@ def process_service_price(message):
         bot.register_next_step_handler(msg, process_service_price)
         return
 
-    # Сохраняем Услугу со статусом 'Pending'
+    # Переходим к выбору категории
+    USER_STATE[chat_id] = 'awaiting_service_category'
+    
+    # Создаём клавиатуру с категориями услуг
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    
+    categories = [
+        ('💅', 'manicure', 'Маникюр'),
+        ('💇‍♀️', 'hairstyle', 'Прически'),
+        ('💆‍♀️', 'massage', 'Массаж'),
+        ('🧴', 'cosmetologist', 'Косметолог'),
+        ('✨', 'eyebrows', 'Брови'),
+        ('👁️', 'eyelashes', 'Ресницы'),
+        ('💫', 'laser', 'Лазерная эпиляция'),
+        ('💄', 'makeup', 'Визажист'),
+        ('🌸', 'skincare', 'Уход за кожей'),
+        ('🧹', 'cleaning', 'Уборка'),
+        ('🔧', 'repair', 'Ремонт'),
+        ('🚗', 'delivery', 'Доставка'),
+        ('🏃‍♀️', 'fitness', 'Фитнес'),
+        ('🛁', 'spa', 'SPA'),
+        ('🧘‍♀️', 'yoga', 'Йога'),
+        ('🥗', 'nutrition', 'Питание'),
+        ('🧠', 'psychology', 'Психолог')
+    ]
+    
+    # Добавляем кнопки по 2 в ряд
+    for i in range(0, len(categories), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(categories):
+                emoji, category_key, category_name = categories[i + j]
+                row.append(types.InlineKeyboardButton(
+                    f"{emoji} {category_name}",
+                    callback_data=f"service_category_{category_key}"
+                ))
+        markup.add(*row)
+    
+    msg = bot.send_message(
+        chat_id,
+        "✍️ *Создание Услуги (Шаг 4 из 4):*\n\n4. Выберите **Категорию** услуги:",
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
+
+
+def process_service_category_save(chat_id, category):
+    """Сохраняет услугу после выбора категории"""
+    TEMP_DATA[chat_id]['category'] = category
+    
     service_data = TEMP_DATA.pop(chat_id, None)
     USER_STATE.pop(chat_id, None)
 
@@ -1034,16 +1388,20 @@ def process_service_price(message):
         bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать снова: /start")
         return
 
+    # Логируем данные услуги для отладки
+    logger.info(f"Saving service data: {service_data}")
+
     try:
         success = sm.add_service(service_data)
 
         if success:
             bot.send_message(chat_id, "✅ **Услуга отправлена на модерацию!**\nАдминистратор рассмотрит вашу заявку и одобрит услугу, после чего она станет доступна клиентам.", parse_mode='Markdown')
         else:
+            logger.error(f"Failed to save service for partner {chat_id}. Data: {service_data}")
             bot.send_message(chat_id, "❌ Ошибка при сохранении услуги. Проверьте логи.")
             
     except Exception as e:
-        print(f"Error saving service: {e}")
+        log_exception(logger, e, f"Exception saving service for partner {chat_id}")
         bot.send_message(chat_id, "Произошла системная ошибка при сохранении услуги.")
 
     partner_main_menu(chat_id)
@@ -1389,7 +1747,7 @@ def handle_service_status_list(chat_id):
             service_id = service.get('id')
             title = service.get('title', 'Без названия')
             price = service.get('price_points', 0)
-            status = service.get('status', 'Unknown')
+            status = service.get('approval_status', 'Unknown')
             
             # Эмодзи в зависимости от статуса
             status_emoji = {

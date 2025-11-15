@@ -13,8 +13,23 @@ import io
 import qrcode
 from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
+import sentry_sdk
 
 load_dotenv()
+
+# Инициализация Sentry для мониторинга ошибок
+sentry_dsn = os.getenv('SENTRY_DSN')
+if sentry_dsn:
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        environment=os.getenv('SENTRY_ENVIRONMENT', 'production'),
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        release=f"loyaltybot@{os.getenv('APP_VERSION', '1.0.0')}",
+        send_default_pii=True,  # Добавляет данные запросов (headers, IP) для отладки
+        before_send=lambda event, hint: event if event.get('level') in ['error', 'fatal'] else None,
+    )
+    print("✅ Sentry инициализирован для client_bot")
 
 sys.path.append(os.path.dirname(__file__))
 from supabase_manager import SupabaseManager

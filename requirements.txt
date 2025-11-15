@@ -6,3 +6,6 @@ python-dotenv
 gigachat>=0.1.20
 qrcode[pil]
 pyzbar
+fastapi
+uvicorn
+sentry-sdk[fastapi]>=2.0.0

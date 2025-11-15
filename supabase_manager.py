@@ -1,13 +1,33 @@
 import os
+import json
+import math
 import datetime
+from typing import Any, Optional, Union
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from postgrest.exceptions import APIError
+from transaction_queue import TransactionQueue
 import pandas as pd
 import logging 
 from dateutil import parser # Добавлена библиотека для безопасного парсинга дат
+from transaction_queue import TransactionQueue
+import sentry_sdk
 
 load_dotenv()
+
+# Инициализация Sentry для мониторинга ошибок
+sentry_dsn = os.getenv('SENTRY_DSN')
+if sentry_dsn:
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        environment=os.getenv('SENTRY_ENVIRONMENT', 'production'),
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        release=f"loyaltybot@{os.getenv('APP_VERSION', '1.0.0')}",
+        send_default_pii=True,
+    )
+    print("✅ Sentry инициализирован для supabase_manager")
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # -----------------------------------------------------------------
@@ -40,6 +60,70 @@ class SupabaseManager:
             logging.error("Некорректное значение CASHBACK_PERCENT. Использую значение по умолчанию 0.05")
             self.CASHBACK_PERCENT = 0.05
         
+        self._cashback_rules_env = None
+        self._cashback_rules_cache = None
+        self._cashback_rules_cache_ts: Optional[datetime.datetime] = None
+        rules_from_env = os.getenv("CASHBACK_RULES_JSON")
+        if rules_from_env:
+            try:
+                parsed_rules = json.loads(rules_from_env)
+                if isinstance(parsed_rules, dict):
+                    self._cashback_rules_env = parsed_rules
+                else:
+                    logging.error("CASHBACK_RULES_JSON должен содержать JSON-объект. Игнорирую значение.")
+            except json.JSONDecodeError as e:
+                logging.error(f"Не удалось разобрать CASHBACK_RULES_JSON: {e}")
+
+        self._operation_templates_env = None
+        self._operation_templates_cache = None
+        self._operation_templates_cache_ts: Optional[datetime.datetime] = None
+
+        self._transaction_rules_env = None
+        self._transaction_rules_cache = None
+        self._transaction_rules_cache_ts: Optional[datetime.datetime] = None
+
+        self._transaction_limits_env = None
+        self._transaction_limits_cache = None
+        self._transaction_limits_cache_ts: Optional[datetime.datetime] = None
+
+        self._analytics_cache_memory: dict[str, dict[str, Any]] = {}
+        self.analytics_cache_ttl = int(os.getenv("ANALYTICS_CACHE_TTL", "300"))
+
+        transaction_rules_env = os.getenv("TRANSACTION_RULES_JSON")
+        if transaction_rules_env:
+            try:
+                parsed_rules = json.loads(transaction_rules_env)
+                if isinstance(parsed_rules, dict):
+                    self._transaction_rules_env = parsed_rules
+                else:
+                    logging.error("TRANSACTION_RULES_JSON должен содержать JSON-объект. Игнорирую значение.")
+            except json.JSONDecodeError as e:
+                logging.error(f"Не удалось разобрать TRANSACTION_RULES_JSON: {e}")
+
+        operation_templates_env = os.getenv("OPERATION_TEMPLATES_JSON")
+        if operation_templates_env:
+            try:
+                parsed_templates = json.loads(operation_templates_env)
+                if isinstance(parsed_templates, dict):
+                    self._operation_templates_env = parsed_templates
+                else:
+                    logging.error("OPERATION_TEMPLATES_JSON должен содержать JSON-объект. Игнорирую значение.")
+            except json.JSONDecodeError as e:
+                logging.error(f"Не удалось разобрать OPERATION_TEMPLATES_JSON: {e}")
+
+        transaction_limits_env = os.getenv("TRANSACTION_LIMITS_JSON")
+        if transaction_limits_env:
+            try:
+                parsed_limits = json.loads(transaction_limits_env)
+                if isinstance(parsed_limits, dict):
+                    self._transaction_limits_env = parsed_limits
+                else:
+                    logging.error("TRANSACTION_LIMITS_JSON должен содержать JSON-объект. Игнорирую значение.")
+            except json.JSONDecodeError as e:
+                logging.error(f"Не удалось разобрать TRANSACTION_LIMITS_JSON: {e}")
+
+        self.transaction_queue = TransactionQueue(self, os.getenv("TRANSACTION_QUEUE_PATH"))
+        
         bonus_from_env = os.getenv("WELCOME_BONUS_AMOUNT", "100") 
         try:
             self._WELCOME_BONUS = int(bonus_from_env) 
@@ -67,7 +151,7 @@ class SupabaseManager:
         except Exception:
             return False
 
-    def get_client_by_phone(self, phone: str) -> dict | None:
+    def get_client_by_phone(self, phone: str) -> Optional[dict]:
         """Возвращает данные клиента по номеру телефона."""
         if not self.client: return None
         try:
@@ -86,7 +170,7 @@ class SupabaseManager:
     # -----------------------------------------------------------------
     # НОВЫЙ МЕТОД: Ручная регистрация (для bot.py) - заменяет 2 старых метода.
     # -----------------------------------------------------------------
-    def handle_manual_registration(self, phone: str, partner_id: str, welcome_bonus: int = None) -> tuple[str, str | None]:
+    def handle_manual_registration(self, phone: str, partner_id: str, welcome_bonus: int = None) -> tuple[str, Optional[str]]:
         """
         Атомарно обрабатывает регистрацию клиента по номеру телефона, устраняя дублирование.
         Возвращает: (сообщение_для_бота, ошибка_текст)
@@ -184,7 +268,7 @@ class SupabaseManager:
     # -----------------------------------------------------------------
     # МЕТОДЫ РЕГИСТРАЦИИ ПО ССЫЛКЕ (для client_handler.py)
     # -----------------------------------------------------------------
-    def register_client_via_link(self, chat_id: int, partner_chat_id: str, phone: str | None, name: str | None, welcome_bonus: int = None) -> tuple[str, str | None] | tuple[None, str]:
+    def register_client_via_link(self, chat_id: int, partner_chat_id: str, phone: Optional[str], name: Optional[str], welcome_bonus: int = None) -> Union[tuple[str, Optional[str]], tuple[None, str]]:
         """Регистрирует клиента, пришедшего по ссылке (Клиентский бот)."""
         if not self.client: return None, "DB is not initialized."
         client_chat_id = str(chat_id)
@@ -288,18 +372,23 @@ class SupabaseManager:
             logging.error(f"Error recording transaction: {e}")
             return False
 
-    def execute_transaction(self, client_chat_id: int, partner_chat_id: int, txn_type: str, raw_amount: float) -> dict:
+    def execute_transaction(self, client_chat_id: int, partner_chat_id: int, txn_type: str, raw_amount: float, allow_queue: bool = True) -> dict:
         """Выполняет атомарное начисление или списание баллов."""
         if not self.client: return {"success": False, "error": "DB is not initialized.", "new_balance": 0}
+
+        if allow_queue and self.transaction_queue:
+            self.transaction_queue.process_pending()
 
         current_balance = self.get_client_balance(client_chat_id)
         
         transaction_amount_points = 0 
         type_for_record = ''
+        predicted_balance = current_balance
 
         if txn_type == 'accrual':
-            transaction_amount_points = int(raw_amount * self.CASHBACK_PERCENT) 
+            transaction_amount_points = self._calculate_accrual_points(partner_chat_id, raw_amount)
             new_balance = current_balance + transaction_amount_points
+            predicted_balance = new_balance
             description = f"Начисление {transaction_amount_points} бонусов за чек {raw_amount} руб. (Партнер: {partner_chat_id})"
             type_for_record = 'accrual'
             
@@ -309,24 +398,532 @@ class SupabaseManager:
                 return {"success": False, "error": "Недостаточно бонусов для списания.", "new_balance": current_balance}
 
             new_balance = current_balance - transaction_amount_points
+            predicted_balance = new_balance
             description = f"Списание {transaction_amount_points} бонусов (Партнер: {partner_chat_id})"
             type_for_record = 'redemption'
         
         else:
             return {"success": False, "error": "Неверный тип транзакции.", "new_balance": current_balance}
             
+        payload_for_queue = None
+        if allow_queue and self.transaction_queue:
+            payload_for_queue = {
+                "client_chat_id": str(client_chat_id),
+                "partner_chat_id": str(partner_chat_id),
+                "txn_type": txn_type,
+                "raw_amount": raw_amount
+            }
+
+        if allow_queue:
+            limits_ok, limits_error = self._check_transaction_limits(client_chat_id, partner_chat_id, txn_type, transaction_amount_points, raw_amount)
+            if not limits_ok:
+                return {"success": False, "error": limits_error, "new_balance": current_balance}
+
         try:
             self.client.from_(USER_TABLE).update({BALANCE_COLUMN: new_balance}).eq('chat_id', str(client_chat_id)).execute()
             self.record_transaction(client_chat_id, partner_chat_id, transaction_amount_points, type_for_record, description, raw_amount=raw_amount)
-            
+            if allow_queue and self.transaction_queue:
+                self.transaction_queue.process_pending()
             return {"success": True, "new_balance": new_balance, "points": transaction_amount_points}
             
         except APIError as e:
             logging.error(f"Ошибка БД при execute_transaction: {e}")
+            if allow_queue and self.transaction_queue.enqueue(payload_for_queue):
+                return {
+                    "success": True,
+                    "queued": True,
+                    "new_balance": predicted_balance,
+                    "points": transaction_amount_points,
+                    "error": f"Операция поставлена в очередь: {e.message if hasattr(e, 'message') else e}"
+                }
             return {"success": False, "error": f"Ошибка БД: {e}", "new_balance": current_balance}
         except Exception as e:
             logging.error(f"Неизвестная ошибка при execute_transaction: {e}")
+            if allow_queue and self.transaction_queue.enqueue(payload_for_queue):
+                return {
+                    "success": True,
+                    "queued": True,
+                    "new_balance": predicted_balance,
+                    "points": transaction_amount_points,
+                    "error": f"Операция поставлена в очередь: {e}"
+                }
             return {"success": False, "error": f"Неизвестная ошибка: {e}", "new_balance": current_balance}
+
+    def _calculate_accrual_points(self, partner_chat_id: int, raw_amount: float) -> int:
+        """Рассчитывает количество баллов с учётом гибких правил начисления."""
+        if raw_amount <= 0:
+            return 0
+
+        percent = max(self.CASHBACK_PERCENT, 0.0)
+        multiplier = 1.0
+        min_points = 0
+        rounding_mode = 'floor'
+
+        rules = self._get_cashback_rules()
+        if isinstance(rules, dict):
+            percent = self._extract_float(rules.get('default_percent'), percent)
+            multiplier *= self._extract_float(rules.get('global_multiplier'), 1.0)
+            rounding_mode = rules.get('rounding', rounding_mode) or rounding_mode
+            min_points = max(min_points, int(self._extract_float(rules.get('min_points'), 0)))
+
+            partner_rules = rules.get('partners', {}).get(str(partner_chat_id))
+            if isinstance(partner_rules, dict):
+                percent = self._extract_float(partner_rules.get('percent'), percent)
+                min_points = max(min_points, int(self._extract_float(partner_rules.get('min_points'), min_points)))
+                partner_multiplier = self._extract_float(partner_rules.get('multiplier'), 1.0)
+                if partner_multiplier > 0:
+                    multiplier *= self._resolve_multiplier_with_expiry(partner_rules, partner_multiplier)
+
+        percent = max(percent, 0.0)
+        multiplier = max(multiplier, 0.0)
+
+        raw_points = raw_amount * percent * multiplier
+        raw_points = self._apply_bonus_rules(partner_chat_id, 'accrual', raw_amount, raw_points)
+        points = self._apply_rounding(raw_points, rounding_mode)
+        points = max(points, min_points)
+        return max(points, 0)
+
+    def _resolve_multiplier_with_expiry(self, rule: dict, multiplier: float) -> float:
+        """Применяет множитель с учётом срока действия (если указан)."""
+        multiplier_until = rule.get('multiplier_until')
+        if not multiplier_until:
+            return multiplier
+
+        try:
+            expires_at = parser.isoparse(multiplier_until)
+            now_dt = datetime.datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.datetime.now()
+            if now_dt <= expires_at:
+                return multiplier
+            return 1.0
+        except Exception as e:
+            logging.error(f"Ошибка обработки multiplier_until '{multiplier_until}': {e}")
+            return multiplier
+
+    def _apply_rounding(self, value: float, mode: str) -> int:
+        """Применяет стратегию округления к значению."""
+        mode = (mode or 'floor').lower()
+        if mode == 'ceil':
+            return int(math.ceil(value))
+        if mode == 'round':
+            return int(round(value))
+        if mode == 'truncate':
+            return int(math.trunc(value))
+        return int(math.floor(value))
+
+    def _extract_float(self, candidate, default: float) -> float:
+        """Преобразует значение к float с запасным вариантом."""
+        try:
+            if candidate is None:
+                return default
+            return float(candidate)
+        except (TypeError, ValueError):
+            return default
+
+    def _get_daily_transactions_summary(self, client_chat_id: str, txn_type: str) -> dict:
+        summary = {'points': 0, 'amount': 0.0}
+        if not self.client:
+            return summary
+
+        try:
+            day_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            response = (
+                self.client
+                .from_(TRANSACTION_TABLE)
+                .select('operation_type, earned_points, spent_points, total_amount')
+                .eq('client_chat_id', str(client_chat_id))
+                .eq('operation_type', 'accrual' if txn_type == 'accrual' else 'redemption')
+                .gte('date_time', day_start.isoformat())
+                .execute()
+            )
+
+            records = response.data if isinstance(response.data, list) else []
+            for txn in records:
+                if txn_type == 'accrual':
+                    summary['points'] += int(txn.get('earned_points') or 0)
+                    summary['amount'] += float(txn.get('total_amount') or 0.0)
+                else:
+                    summary['points'] += int(txn.get('spent_points') or 0)
+                    summary['amount'] += float(txn.get('total_amount') or 0.0)
+        except Exception as e:
+            logging.error(f"Ошибка получения суточных лимитов для {client_chat_id}: {e}")
+
+        return summary
+
+    def _check_transaction_limits(self, client_chat_id: int, partner_chat_id: int, txn_type: str, points: int, raw_amount: float) -> tuple[bool, Optional[str]]:
+        limits = self._get_transaction_limits()
+        if not limits:
+            return True, None
+
+        config = limits.get(txn_type) or limits.get(txn_type.upper())
+        if not isinstance(config, dict):
+            return True, None
+
+        max_points = config.get('max_points_per_transaction')
+        if max_points is not None:
+            try:
+                if points > int(max_points):
+                    return False, f"Превышен лимит по {txn_type}: максимум {int(max_points)} баллов за одну операцию."
+            except (TypeError, ValueError):
+                pass
+
+        max_amount = config.get('max_amount_per_transaction')
+        if max_amount is not None:
+            try:
+                if raw_amount > float(max_amount):
+                    return False, f"Сумма операции превышает лимит {float(max_amount)}."
+            except (TypeError, ValueError):
+                pass
+
+        daily_summary = self._get_daily_transactions_summary(client_chat_id, txn_type)
+
+        daily_points_limit = config.get('max_points_per_day')
+        if daily_points_limit is not None:
+            try:
+                if daily_summary['points'] + points > int(daily_points_limit):
+                    return False, f"Превышен дневной лимит: максимум {int(daily_points_limit)} баллов за день."
+            except (TypeError, ValueError):
+                pass
+
+        daily_amount_limit = config.get('max_amount_per_day')
+        if daily_amount_limit is not None:
+            try:
+                if daily_summary['amount'] + raw_amount > float(daily_amount_limit):
+                    return False, f"Превышен дневной лимит по сумме операций: {float(daily_amount_limit)}."
+            except (TypeError, ValueError):
+                pass
+
+        return True, None
+
+    def _get_cashback_rules(self) -> dict:
+        """Возвращает правила кэшбэка из окружения или Supabase."""
+        if self._cashback_rules_env is not None:
+            return self._cashback_rules_env
+
+        if not self.client:
+            return {}
+
+        now = datetime.datetime.now()
+        if self._cashback_rules_cache and self._cashback_rules_cache_ts:
+            delta = now - self._cashback_rules_cache_ts
+            if delta.total_seconds() < 60:
+                return self._cashback_rules_cache
+
+        rules_raw = self.get_app_setting('cashback_rules')
+        if not rules_raw:
+            self._cashback_rules_cache = {}
+            self._cashback_rules_cache_ts = now
+            return self._cashback_rules_cache
+
+        try:
+            parsed = json.loads(rules_raw)
+            if isinstance(parsed, dict):
+                self._cashback_rules_cache = parsed
+            else:
+                logging.error("Настройка cashback_rules должна быть JSON-объектом.")
+                self._cashback_rules_cache = {}
+        except json.JSONDecodeError as e:
+            logging.error(f"Ошибка разбора cashback_rules: {e}")
+            self._cashback_rules_cache = {}
+
+        self._cashback_rules_cache_ts = now
+        return self._cashback_rules_cache
+
+    def _get_operation_templates_config(self) -> dict:
+        if self._operation_templates_env is not None:
+            return self._operation_templates_env
+
+        if not self.client:
+            return {}
+
+        now = datetime.datetime.now()
+        if self._operation_templates_cache and self._operation_templates_cache_ts:
+            if (now - self._operation_templates_cache_ts).total_seconds() < 60:
+                return self._operation_templates_cache
+
+        raw = self.get_app_setting('operation_templates')
+        if not raw:
+            self._operation_templates_cache = {}
+            self._operation_templates_cache_ts = now
+            return self._operation_templates_cache
+
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                self._operation_templates_cache = parsed
+            else:
+                logging.error("Настройка operation_templates должна быть JSON-объектом.")
+                self._operation_templates_cache = {}
+        except json.JSONDecodeError as e:
+            logging.error(f"Ошибка разбора operation_templates: {e}")
+            self._operation_templates_cache = {}
+
+        self._operation_templates_cache_ts = now
+        return self._operation_templates_cache
+
+    def get_operation_templates(self, partner_chat_id: str, txn_type: str) -> list[dict]:
+        config = self._get_operation_templates_config()
+        if not config:
+            return []
+
+        partner_templates = config.get('partners', {}).get(str(partner_chat_id), {})
+        templates = partner_templates.get(txn_type)
+        if templates is None:
+            templates = config.get('default', {}).get(txn_type, [])
+
+        result = []
+        for template in templates:
+            if not isinstance(template, dict):
+                continue
+            value = template.get('value')
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                continue
+
+            label = template.get('label')
+            if not label:
+                label = f"{int(value) if value.is_integer() else value}"
+
+            result.append({
+                'label': str(label),
+                'value': value,
+                'type': template.get('type', 'fixed')
+            })
+        return result
+
+    def _get_transaction_rules_config(self) -> dict:
+        if self._transaction_rules_env is not None:
+            return self._transaction_rules_env
+
+        if not self.client:
+            return {}
+
+        now = datetime.datetime.now()
+        if self._transaction_rules_cache and self._transaction_rules_cache_ts:
+            if (now - self._transaction_rules_cache_ts).total_seconds() < 60:
+                return self._transaction_rules_cache
+
+        raw = self.get_app_setting('transaction_rules')
+        if not raw:
+            self._transaction_rules_cache = {}
+            self._transaction_rules_cache_ts = now
+            return self._transaction_rules_cache
+
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                self._transaction_rules_cache = parsed
+            else:
+                logging.error("Настройка transaction_rules должна быть JSON-объектом.")
+                self._transaction_rules_cache = {}
+        except json.JSONDecodeError as e:
+            logging.error(f"Ошибка разбора transaction_rules: {e}")
+            self._transaction_rules_cache = {}
+
+        self._transaction_rules_cache_ts = now
+        return self._transaction_rules_cache
+
+    def _rule_matches_partner(self, rule: dict, partner_chat_id: str) -> bool:
+        partners = rule.get('partners')
+        if not partners:
+            return True
+        if isinstance(partners, str):
+            return partners == '*' or partners == str(partner_chat_id)
+        if isinstance(partners, list):
+            return str(partner_chat_id) in [str(p) for p in partners] or '*' in partners
+        return True
+
+    def _rule_matches_time(self, rule: dict) -> bool:
+        now = datetime.datetime.now()
+        days = rule.get('days_of_week')
+        if isinstance(days, list) and days:
+            try:
+                if now.weekday() not in [int(d) for d in days]:
+                    return False
+            except (TypeError, ValueError):
+                pass
+
+        date_start = rule.get('date_start')
+        if date_start:
+            try:
+                if now < parser.isoparse(date_start):
+                    return False
+            except Exception:
+                pass
+
+        date_end = rule.get('date_end')
+        if date_end:
+            try:
+                if now > parser.isoparse(date_end):
+                    return False
+            except Exception:
+                pass
+
+        time_start = rule.get('time_start')
+        time_end = rule.get('time_end')
+        if time_start or time_end:
+            try:
+                current_time = now.time()
+                if time_start:
+                    h, m = [int(x) for x in time_start.split(':')]
+                    if current_time < datetime.time(hour=h, minute=m):
+                        return False
+                if time_end:
+                    h, m = [int(x) for x in time_end.split(':')]
+                    if current_time > datetime.time(hour=h, minute=m):
+                        return False
+            except Exception:
+                pass
+
+        return True
+
+    def _apply_bonus_rules(self, partner_chat_id: int, txn_type: str, raw_amount: float, base_points: float) -> float:
+        config = self._get_transaction_rules_config()
+        if not config:
+            return base_points
+
+        rules = config.get('rules', [])
+        if not isinstance(rules, list):
+            return base_points
+
+        total_multiplier = 1.0
+        extra_points = 0.0
+
+        for rule in rules:
+            if not isinstance(rule, dict):
+                continue
+            rule_type = rule.get('type')
+            rule_txn = rule.get('txn_type')
+            if rule_txn and rule_txn != txn_type:
+                continue
+            if not self._rule_matches_partner(rule, partner_chat_id):
+                continue
+            if not self._rule_matches_time(rule):
+                continue
+
+            min_amount = self._extract_float(rule.get('min_amount'), None)
+            max_amount = self._extract_float(rule.get('max_amount'), None)
+            if min_amount is not None and raw_amount < min_amount:
+                continue
+            if max_amount is not None and raw_amount > max_amount:
+                continue
+
+            if rule_type == 'multiplier':
+                total_multiplier *= self._extract_float(rule.get('value'), 1.0)
+            elif rule_type == 'extra_points':
+                extra_points += self._extract_float(rule.get('value'), 0.0)
+            elif rule_type == 'fixed_points':
+                base_points = self._extract_float(rule.get('value'), base_points)
+
+        adjusted = max(base_points * total_multiplier + extra_points, 0.0)
+        return adjusted
+
+    def _get_transaction_limits(self) -> dict:
+        if self._transaction_limits_env is not None:
+            return self._transaction_limits_env
+
+        if not self.client:
+            return {}
+
+        now = datetime.datetime.now()
+        if self._transaction_limits_cache and self._transaction_limits_cache_ts:
+            if (now - self._transaction_limits_cache_ts).total_seconds() < 60:
+                return self._transaction_limits_cache
+
+        raw = self.get_app_setting('transaction_limits')
+        if not raw:
+            self._transaction_limits_cache = {}
+            self._transaction_limits_cache_ts = now
+            return self._transaction_limits_cache
+
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                self._transaction_limits_cache = parsed
+            else:
+                logging.error("Настройка transaction_limits должна быть JSON-объектом.")
+                self._transaction_limits_cache = {}
+        except json.JSONDecodeError as e:
+            logging.error(f"Ошибка разбора transaction_limits: {e}")
+            self._transaction_limits_cache = {}
+
+        self._transaction_limits_cache_ts = now
+        return self._transaction_limits_cache
+
+    def _get_cache_entry(self, cache_key: str) -> Optional[dict]:
+        memory_entry = self._analytics_cache_memory.get(cache_key)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if memory_entry:
+            updated_at = memory_entry.get('updated_at')
+            if isinstance(updated_at, datetime.datetime):
+                if (now - updated_at).total_seconds() <= self.analytics_cache_ttl:
+                    return memory_entry.get('payload')
+
+        if not self.client:
+            return None
+
+        try:
+            response = (
+                self.client
+                .from_('analytics_cache')
+                .select('payload, updated_at')
+                .eq('cache_key', cache_key)
+                .limit(1)
+                .execute()
+            )
+            if response.data:
+                entry = response.data[0]
+                updated_at = entry.get('updated_at')
+                try:
+                    updated_at_dt = parser.isoparse(updated_at) if isinstance(updated_at, str) else None
+                except Exception:
+                    updated_at_dt = None
+                if updated_at_dt and (now - updated_at_dt).total_seconds() <= self.analytics_cache_ttl:
+                    self._analytics_cache_memory[cache_key] = {
+                        'payload': entry.get('payload'),
+                        'updated_at': updated_at_dt
+                    }
+                    return entry.get('payload')
+        except Exception as e:
+            logging.error(f"Ошибка чтения analytics_cache [{cache_key}]: {e}")
+
+        return None
+
+    def _set_cache_entry(self, cache_key: str, payload: dict):
+        updated_at = datetime.datetime.now(datetime.timezone.utc)
+        self._analytics_cache_memory[cache_key] = {
+            'payload': payload,
+            'updated_at': updated_at
+        }
+
+        if not self.client:
+            return
+
+        try:
+            self.client.from_('analytics_cache').upsert({
+                'cache_key': cache_key,
+                'payload': payload,
+                'updated_at': updated_at.isoformat()
+            }).execute()
+        except Exception as e:
+            logging.error(f"Ошибка записи analytics_cache [{cache_key}]: {e}")
+
+    def _log_setting_change(self, setting_key: str, old_value: Any, new_value: Any, updated_by: str):
+        if not self.client:
+            return
+        if old_value == new_value:
+            return
+        try:
+            payload = {
+                'setting_key': setting_key,
+                'old_value': old_value,
+                'new_value': new_value,
+                'updated_by': updated_by,
+                'updated_at': datetime.datetime.now().isoformat()
+            }
+            self.client.from_('settings_change_log').insert(payload).execute()
+        except Exception as e:
+            logging.error(f"Ошибка записи settings_change_log для {setting_key}: {e}")
 
 
     # -----------------------------------------------------------------
@@ -380,7 +977,7 @@ class SupabaseManager:
 
         return stats
 
-    def get_client_details_for_partner(self, client_chat_id: int) -> dict | None:
+    def get_client_details_for_partner(self, client_chat_id: int) -> Optional[dict]:
         """Получает основные детали клиента, включая аналитические метрики LTV и Частоту."""
         if not self.client: return None
         try:
@@ -409,6 +1006,11 @@ class SupabaseManager:
         """Собирает ключевую статистику для Партнера."""
         if not self.client: return {}
         partner_chat_id = str(partner_chat_id)
+        cache_key = f"partner_stats:{partner_chat_id}"
+        cached = self._get_cache_entry(cache_key)
+        if cached:
+            return cached
+
         stats = {
             'total_referrals': 0, 'total_transactions': 0, 'total_accrued_points': 0,
             'total_spent_rub': 0.0, 'avg_nps_rating': 0.0, 'promoters': 0, 'detractors': 0
@@ -441,6 +1043,7 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error fetching partner stats for {partner_chat_id}: {e}")
 
+        self._set_cache_entry(cache_key, stats)
         return stats
     
     def get_advanced_partner_stats(self, partner_chat_id: str, period_days: int = 30) -> dict:
@@ -458,6 +1061,11 @@ class SupabaseManager:
             return {}
         
         partner_chat_id = str(partner_chat_id)
+        cache_key = f"partner_stats:{partner_chat_id}:{period_days}"
+        cached = self._get_cache_entry(cache_key)
+        if cached:
+            return cached
+
         now = datetime.datetime.now()
         period_start = now - datetime.timedelta(days=period_days)
         
@@ -591,6 +1199,7 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error fetching advanced partner stats for {partner_chat_id}: {e}")
         
+        self._set_cache_entry(cache_key, stats)
         return stats
     
     def get_partner_stats_by_period(self, partner_chat_id: str, start_date: str, end_date: str) -> dict:
@@ -837,14 +1446,50 @@ class SupabaseManager:
             
     def update_partner_status(self, partner_id: str, new_status: str) -> bool:
         """Обновляет статус партнера."""
-        if not self.client: return False
+        if not self.client: 
+            logging.error("Supabase client not initialized")
+            return False
         try:
-            self.client.from_('partner_applications').update({'status': new_status}).eq('chat_id', partner_id).execute()
+            # Преобразуем partner_id в строку для консистентности
+            partner_id_str = str(partner_id)
+            
+            # Сначала проверяем, существует ли запись
+            check_response = self.client.from_('partner_applications').select('id, chat_id, status').eq('chat_id', partner_id_str).execute()
+            
+            if not check_response.data or len(check_response.data) == 0:
+                logging.error(f"Partner application with chat_id {partner_id_str} not found in database")
+                return False
+            
+            logging.info(f"Found partner application: {check_response.data[0]}")
+            
+            # Обновляем статус в partner_applications
+            response = self.client.from_('partner_applications').update({'status': new_status}).eq('chat_id', partner_id_str).execute()
+            
+            # Проверяем, что обновление прошло успешно
+            if not response.data or len(response.data) == 0:
+                logging.error(f"Update returned no data for partner_id {partner_id_str}. RLS policy may be blocking.")
+                # Пробуем получить обновленную запись для проверки
+                verify_response = self.client.from_('partner_applications').select('id, chat_id, status').eq('chat_id', partner_id_str).execute()
+                if verify_response.data:
+                    current_status = verify_response.data[0].get('status')
+                    logging.info(f"Current status in DB: {current_status}")
+                    if current_status == new_status:
+                        logging.info(f"Status was actually updated to {new_status}")
+                        # Если партнер одобрен — гарантируем наличие записи в таблице partners (для FK)
+                        if new_status == 'Approved':
+                            self.ensure_partner_record(partner_id_str)
+                        return True
+                return False
+            
+            logging.info(f"Successfully updated partner {partner_id_str} status to {new_status}. Response: {response.data[0]}")
+            
             # Если партнер одобрен — гарантируем наличие записи в таблице partners (для FK)
             if new_status == 'Approved':
-                self.ensure_partner_record(partner_id)
+                self.ensure_partner_record(partner_id_str)
+            
             return True
-        except Exception:
+        except Exception as e:
+            logging.error(f"Error updating partner status for {partner_id}: {e}", exc_info=True)
             return False
 
     def update_partner_data(self, partner_id: str, name: str = None, company_name: str = None, phone: str = None) -> bool:
@@ -869,7 +1514,7 @@ class SupabaseManager:
             logging.error(f"Error updating partner data: {e}")
             return False
 
-    def record_nps_rating(self, client_chat_id: str, partner_chat_id: str, rating: int, master_name: str | None = None) -> bool:
+    def record_nps_rating(self, client_chat_id: str, partner_chat_id: str, rating: int, master_name: Optional[str] = None) -> bool:
         """Записывает оценку NPS клиента."""
         if not self.client: return False
         try:
@@ -953,7 +1598,10 @@ class SupabaseManager:
             record = {
                 'chat_id': str(partner_chat_id),
                 'name': app_data.get('name') or app_data.get('contact_person') or 'Партнер',
-                'company_name': app_data.get('company_name', '')
+                'company_name': app_data.get('company_name', ''),
+                'business_type': app_data.get('business_type'),
+                'city': app_data.get('city', ''),
+                'district': app_data.get('district', '')
             }
             
             # upsert по chat_id — если строка есть, не меняем другие поля
@@ -962,6 +1610,113 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"ensure_partner_record failed for {partner_chat_id}: {e}")
             return False
+
+    def set_partner_business_type(self, partner_chat_id: str, business_type: str) -> bool:
+        """Устанавливает категорию услуг партнёра (business_type) в tables partner_applications и partners."""
+        if not self.client:
+            return False
+        try:
+            partner_chat_id = str(partner_chat_id)
+            # Обновляем в заявке
+            self.client.from_('partner_applications').update({'business_type': business_type}).eq('chat_id', partner_chat_id).execute()
+            # Обновляем/создаём запись партнёра
+            self.ensure_partner_record(partner_chat_id)
+            self.client.from_('partners').update({'business_type': business_type}).eq('chat_id', partner_chat_id).execute()
+            return True
+        except Exception as e:
+            logging.error(f"Error setting partner business_type for {partner_chat_id}: {e}")
+            return False
+
+    def set_partner_location(self, partner_chat_id: str, city: str, district: str) -> bool:
+        """Обновляет город и район партнёра в partner_applications и partners."""
+        if not self.client:
+            return False
+        try:
+            partner_chat_id = str(partner_chat_id)
+            update = {'city': city, 'district': district}
+            self.client.from_('partner_applications').update(update).eq('chat_id', partner_chat_id).execute()
+            self.ensure_partner_record(partner_chat_id)
+            self.client.from_('partners').update(update).eq('chat_id', partner_chat_id).execute()
+            return True
+        except Exception as e:
+            logging.error(f"Error setting partner location for {partner_chat_id}: {e}")
+            return False
+
+    def get_partner_services(self, partner_chat_id: str, category: Optional[str] = None) -> list[dict]:
+        """Возвращает услуги партнёра, опционально фильтруя по category."""
+        if not self.client:
+            return []
+        try:
+            query = self.client.from_('services').select('*').eq('partner_chat_id', str(partner_chat_id))
+            if category:
+                query = query.eq('category', category)
+            resp = query.order('created_at', desc=True).execute()
+            return resp.data or []
+        except Exception as e:
+            logging.error(f"Error fetching partner services for {partner_chat_id}: {e}")
+            return []
+
+    def delete_service(self, service_id: str, partner_chat_id: str) -> bool:
+        """Удаляет услугу по ID, проверяя принадлежность партнёру."""
+        if not self.client:
+            return False
+        try:
+            # Проверка принадлежности
+            check = self.client.from_('services').select('id').eq('id', service_id).eq('partner_chat_id', str(partner_chat_id)).limit(1).execute()
+            if not check.data:
+                return False
+            self.client.from_('services').delete().eq('id', service_id).execute()
+            return True
+        except Exception as e:
+            logging.error(f"Error deleting service {service_id} for partner {partner_chat_id}: {e}")
+            return False
+
+    def update_service_category(self, service_id: str, partner_chat_id: str, category: str) -> bool:
+        """Обновляет категорию услуги."""
+        if not self.client:
+            return False
+        try:
+            # Проверка принадлежности
+            check = self.client.from_('services').select('id').eq('id', service_id).eq('partner_chat_id', str(partner_chat_id)).limit(1).execute()
+            if not check.data:
+                return False
+            self.client.from_('services').update({'category': category}).eq('id', service_id).execute()
+            return True
+        except Exception as e:
+            logging.error(f"Error updating service category for {service_id}: {e}")
+            return False
+
+    def get_service_categories_list(self) -> list[str]:
+        """Возвращает список кодов категорий услуг (соответствует frontend)."""
+        return [
+            'nail_care', 'brow_design', 'hair_salon', 'hair_removal',
+            'facial_aesthetics', 'lash_services', 'massage_therapy', 'makeup_pmu',
+            'body_wellness', 'nutrition_coaching', 'mindfulness_coaching', 'image_consulting'
+        ]
+
+    def get_distinct_cities(self) -> list[str]:
+        """Возвращает список уникальных городов из таблицы partners."""
+        if not self.client:
+            return []
+        try:
+            resp = self.client.from_('partners').select('city').neq('city', '').execute()
+            cities = sorted({row.get('city') for row in (resp.data or []) if row.get('city')})
+            return cities
+        except Exception as e:
+            logging.error(f"Error fetching distinct cities: {e}")
+            return []
+
+    def get_distinct_districts_for_city(self, city: str) -> list[str]:
+        """Возвращает список уникальных районов по городу из таблицы partners."""
+        if not self.client:
+            return []
+        try:
+            resp = self.client.from_('partners').select('district').eq('city', city).execute()
+            districts = sorted({row.get('district') for row in (resp.data or []) if row.get('district')})
+            return districts
+        except Exception as e:
+            logging.error(f"Error fetching distinct districts for {city}: {e}")
+            return []
 
     def add_promotion(self, promo_data: dict) -> bool:
         """Добавляет новую акцию с валидацией и нормализацией полей.
@@ -1135,7 +1890,7 @@ class SupabaseManager:
             logging.error(f"Error updating service: {e}")
             return False
 
-    def get_service_by_id(self, service_id: int, partner_chat_id: str) -> dict | None:
+    def get_service_by_id(self, service_id: int, partner_chat_id: str) -> Optional[dict]:
         """Получает услугу по ID с проверкой принадлежности партнеру."""
         if not self.client: return None
         try:
@@ -1149,7 +1904,7 @@ class SupabaseManager:
     # VI. МЕТОДЫ ДЛЯ РАБОТЫ С НОВОСТЯМИ
     # -----------------------------------------------------------------
 
-    def create_news(self, news_data: dict) -> tuple[bool, int | None]:
+    def create_news(self, news_data: dict) -> tuple[bool, Optional[int]]:
         """
         Создает новую новость.
         
@@ -1163,7 +1918,7 @@ class SupabaseManager:
                 - is_published (bool, optional): Опубликована ли новость (по умолчанию True)
         
         Returns:
-            tuple[bool, int | None]: (успех операции, ID созданной новости)
+            tuple[bool, Optional[int]]: (успех операции, ID созданной новости)
         """
         if not self.client:
             return False, None
@@ -1228,7 +1983,7 @@ class SupabaseManager:
             logging.error(f"Error getting news: {e}")
             return pd.DataFrame()
 
-    def get_news_by_id(self, news_id: int) -> dict | None:
+    def get_news_by_id(self, news_id: int) -> Optional[dict]:
         """
         Получает новость по ID.
         
@@ -1778,7 +2533,7 @@ class SupabaseManager:
     # НАСТРОЙКИ ПРИЛОЖЕНИЯ
     # ============================================
 
-    def get_app_setting(self, setting_key: str, default_value: str = None) -> str | None:
+    def get_app_setting(self, setting_key: str, default_value: str = None) -> Optional[str]:
         """Получить значение настройки приложения."""
         if not self.client:
             return default_value
@@ -1795,9 +2550,12 @@ class SupabaseManager:
         """Установить значение настройки приложения."""
         if not self.client:
             return False
+        success = False
         try:
-            # Проверяем, существует ли настройка
-            existing = self.client.from_('app_settings').select('id').eq('setting_key', setting_key).limit(1).execute()
+            old_value = self.get_app_setting(setting_key)
+
+            # Проверяем, существует ли настройка (используем setting_key вместо id)
+            existing = self.client.from_('app_settings').select('setting_key').eq('setting_key', setting_key).limit(1).execute()
             
             if existing.data and len(existing.data) > 0:
                 # Обновляем существующую настройку
@@ -1815,10 +2573,17 @@ class SupabaseManager:
                 }).execute()
             
             logging.info(f"App setting {setting_key} updated to {setting_value}")
+            success = True
             return True
         except Exception as e:
             logging.error(f"Error setting app setting {setting_key}: {e}")
             return False
+        finally:
+            if success:
+                try:
+                    self._log_setting_change(setting_key, old_value, setting_value, updated_by)
+                except Exception as e:
+                    logging.error(f"Error logging setting change for {setting_key}: {e}")
 
     def get_background_image(self) -> str:
         """Получить путь к фоновому изображению."""
