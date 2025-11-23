@@ -54,6 +54,21 @@ const PartnerAnalytics = () => {
       
       if (npsError) throw npsError;
 
+      // Загружаем промоутеров среди клиентов партнёра
+      const clientIds = clients?.map(c => c.chat_id) || [];
+      let totalPromoters = 0;
+      if (clientIds.length > 0) {
+        const { data: promoters, error: promotersError } = await supabase
+          .from('promoters')
+          .select('client_chat_id')
+          .in('client_chat_id', clientIds)
+          .eq('is_active', true);
+        
+        if (!promotersError && promoters) {
+          totalPromoters = promoters.length;
+        }
+      }
+
       // Вычисляем метрики
       const totalRevenue = transactions
         ?.filter(t => t.operation_type === 'accrual')
@@ -112,6 +127,7 @@ const PartnerAnalytics = () => {
         promoters,
         passives,
         detractors,
+        totalPromoters,
       });
 
     } catch (error) {
@@ -309,6 +325,14 @@ const PartnerAnalytics = () => {
                   </span>
                   <span className="text-lg font-bold text-gray-900 dark:text-white">
                     {stats.detractors}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <span className="text-purple-600 dark:text-purple-400 font-medium">
+                    👑 Активных промоутеров
+                  </span>
+                  <span className="text-lg font-bold text-gray-900 dark:text-white">
+                    {stats.totalPromoters || 0}
                   </span>
                 </div>
               </div>

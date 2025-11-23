@@ -109,6 +109,35 @@ export const getActivePromotions = async () => {
 }
 
 /**
+ * Получить акцию по ID
+ */
+export const getPromotionById = async (id) => {
+  const { data, error } = await supabase
+    .from('promotions')
+    .select(`
+      *,
+      partners(name, company_name)
+    `)
+    .eq('id', id)
+    .single()
+  
+  if (error) {
+    console.error('Error fetching promotion:', error)
+    return null
+  }
+  
+  if (!data) {
+    return null
+  }
+  
+  // Переименовываем partners в partner для совместимости с кодом
+  return {
+    ...data,
+    partner: data.partners
+  }
+}
+
+/**
  * Получить все одобренные услуги
  */
 export const getApprovedServices = async () => {
@@ -139,7 +168,7 @@ export const getApprovedServices = async () => {
   // Получаем данные партнёров отдельным запросом
   const { data: partners, error: partnersError } = await supabase
     .from('partners')
-    .select('chat_id, name, company_name, city, district, business_type')
+    .select('chat_id, name, company_name, city, district, business_type, username, contact_link')
     .in('chat_id', partnerIds)
   
   if (partnersError) {
@@ -150,9 +179,15 @@ export const getApprovedServices = async () => {
   
   // Создаём мапу партнёров для быстрого поиска
   const partnersMap = {}
-  partners?.forEach(p => {
-    partnersMap[p.chat_id] = p
-  })
+  if (partners && partners.length > 0) {
+    console.log('📊 Partners loaded from DB (getApprovedServices):', partners.length, 'partners')
+    partners.forEach(p => {
+      partnersMap[p.chat_id] = p
+      console.log(`📋 Partner ${p.chat_id}: username=${p.username}, contact_link=${p.contact_link}`)
+    })
+  } else {
+    console.warn('⚠️ No partners loaded or empty array')
+  }
   
   // Объединяем услуги с данными партнёров
   return services.map(service => ({
@@ -195,13 +230,17 @@ export const getFilteredServices = async (city = null, district = null, category
   if (partnerIds.length > 0) {
     const { data: partners, error: partnersError } = await supabase
       .from('partners')
-      .select('chat_id, name, company_name, city, district, business_type')
+      .select('chat_id, name, company_name, city, district, business_type, username, contact_link, booking_url')
       .in('chat_id', partnerIds)
     
     if (!partnersError && partners) {
+      console.log('📊 Partners loaded from DB:', partners.length, 'partners')
       partners.forEach(p => {
         partnersMap[p.chat_id] = p
+        console.log(`📋 Partner ${p.chat_id}: username=${p.username}, contact_link=${p.contact_link}`)
       })
+    } else if (partnersError) {
+      console.error('❌ Error loading partners:', partnersError)
     }
   }
   
@@ -262,6 +301,72 @@ export const getClientRatedPartners = async (clientChatId) => {
   } catch (err) {
     console.error('Unexpected error fetching client rated partners:', err)
     return []
+  }
+}
+
+/**
+ * Получить метрики партнёров (NPS, средняя оценка, количество отзывов)
+ * @param {string[]} partnerIds - Массив ID партнёров
+ * @returns {Promise<Object>} Объект с метриками для каждого партнёра
+ */
+export const getPartnersMetrics = async (partnerIds) => {
+  if (!partnerIds || partnerIds.length === 0) {
+    return {}
+  }
+
+  try {
+    // Получаем все NPS оценки для указанных партнёров
+    const { data: npsRatings, error: npsError } = await supabase
+      .from('nps_ratings')
+      .select('partner_chat_id, rating')
+      .in('partner_chat_id', partnerIds)
+    
+    if (npsError) {
+      console.error('Error fetching partners NPS ratings:', npsError)
+      return {}
+    }
+
+    // Группируем оценки по партнёрам и считаем метрики
+    const metricsMap = {}
+    
+    partnerIds.forEach(partnerId => {
+      const partnerRatings = npsRatings?.filter(r => r.partner_chat_id === partnerId) || []
+      
+      if (partnerRatings.length === 0) {
+        metricsMap[partnerId] = {
+          npsScore: 0,
+          avgRating: 0,
+          ratingsCount: 0,
+          promoters: 0,
+          passives: 0,
+          detractors: 0
+        }
+        return
+      }
+
+      const ratings = partnerRatings.map(r => r.rating)
+      const promoters = ratings.filter(r => r >= 9).length
+      const passives = ratings.filter(r => r >= 7 && r <= 8).length
+      const detractors = ratings.filter(r => r <= 6).length
+      const totalRatings = ratings.length
+
+      const npsScore = Math.round(((promoters - detractors) / totalRatings) * 100)
+      const avgRating = parseFloat((ratings.reduce((sum, r) => sum + r, 0) / totalRatings).toFixed(2))
+
+      metricsMap[partnerId] = {
+        npsScore,
+        avgRating,
+        ratingsCount: totalRatings,
+        promoters,
+        passives,
+        detractors
+      }
+    })
+
+    return metricsMap
+  } catch (error) {
+    console.error('Error in getPartnersMetrics:', error)
+    return {}
   }
 }
 
@@ -361,6 +466,8 @@ export const createPartnerApplication = async (applicationData) => {
       business_type: applicationData.businessType || null,
       city: applicationData.city || '',
       district: applicationData.district || '',
+      username: applicationData.username || null, // Username мастера
+      booking_url: applicationData.bookingUrl || null, // Ссылка на бронирование
       status: 'Pending',
       created_at: new Date().toISOString()
     }
@@ -571,6 +678,7 @@ export const getAdvancedPartnerStats = async (partnerChatId, periodDays = 30) =>
       promoters: 0,
       passives: 0,
       detractors: 0,
+      total_promoters: 0,
       
       registration_to_first_purchase: 0,
       repeat_purchase_rate: 0
@@ -656,6 +764,20 @@ export const getAdvancedPartnerStats = async (partnerChatId, periodDays = 30) =>
     }
     if (clientsWithPurchases > 0) {
       stats.repeat_purchase_rate = parseFloat(((stats.returning_clients / clientsWithPurchases) * 100).toFixed(2))
+    }
+    
+    // Получаем промоутеров среди клиентов партнера
+    const clientIds = allClients?.map(c => c.chat_id) || []
+    if (clientIds.length > 0) {
+      const { data: promoters } = await supabase
+        .from('promoters')
+        .select('client_chat_id')
+        .in('client_chat_id', clientIds)
+        .eq('is_active', true)
+      
+      if (promoters) {
+        stats.total_promoters = promoters.length
+      }
     }
     
     return stats
@@ -1097,5 +1219,102 @@ export const getAppSetting = async (settingKey, defaultValue = null) => {
  */
 export const getBackgroundImage = async () => {
   return await getAppSetting('background_image', '/bg/sakura.jpg')
+}
+
+/**
+ * Получить реферальную статистику пользователя
+ */
+export const getReferralStats = async (chatId) => {
+  if (!chatId) {
+    return null
+  }
+
+  try {
+    // Получаем данные пользователя
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('referral_code, total_referrals, active_referrals, total_referral_earnings, referral_level')
+      .eq('chat_id', chatId)
+      .maybeSingle()
+
+    if (userError) {
+      console.error('Error fetching user referral data:', userError)
+      return null
+    }
+
+    if (!userData) {
+      return null
+    }
+
+    // Получаем список рефералов
+    const { data: referrals, error: referralsError } = await supabase
+      .from('referral_tree')
+      .select('referred_chat_id, level, registered_at, is_active, total_earned_points, total_transactions')
+      .eq('referrer_chat_id', chatId)
+      .order('registered_at', { ascending: false })
+
+    if (referralsError) {
+      console.error('Error fetching referrals:', referralsError)
+    }
+
+    // Получаем последние награды
+    const { data: rewards, error: rewardsError } = await supabase
+      .from('referral_rewards')
+      .select('referred_chat_id, reward_type, points, created_at, description')
+      .eq('referrer_chat_id', chatId)
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    if (rewardsError) {
+      console.error('Error fetching rewards:', rewardsError)
+    }
+
+    return {
+      referral_code: userData.referral_code,
+      total_referrals: userData.total_referrals || 0,
+      active_referrals: userData.active_referrals || 0,
+      total_earnings: userData.total_referral_earnings || 0,
+      referral_level: userData.referral_level || 'bronze',
+      referrals_list: referrals || [],
+      recent_rewards: rewards || []
+    }
+  } catch (error) {
+    console.error('Error in getReferralStats:', error)
+    return null
+  }
+}
+
+/**
+ * Получить или создать реферальный код для пользователя
+ */
+export const getOrCreateReferralCode = async (chatId) => {
+  if (!chatId) {
+    return null
+  }
+
+  try {
+    // Проверяем, есть ли уже код
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('referral_code')
+      .eq('chat_id', chatId)
+      .maybeSingle()
+
+    if (userError) {
+      console.error('Error fetching referral code:', userError)
+      return null
+    }
+
+    if (userData?.referral_code) {
+      return userData.referral_code
+    }
+
+    // Если кода нет, создаём его через RPC функцию или просто возвращаем null
+    // (код должен создаваться на бэкенде при первом использовании)
+    return null
+  } catch (error) {
+    console.error('Error in getOrCreateReferralCode:', error)
+    return null
+  }
 }
 

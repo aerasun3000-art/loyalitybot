@@ -193,7 +193,7 @@ const News = () => {
                                       {item.preview_text}
                                     </p>
                                   )}
-                                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-sakura-accent">
+                                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
                                     {t('news_read_more')}
                                     <svg
                                       width="16"
@@ -295,7 +295,7 @@ const News = () => {
                             {item.preview_text}
                           </p>
                         )}
-                        <span className="text-[11px] font-semibold text-sakura-accent flex items-center gap-1">
+                        <span className="text-[11px] font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)] flex items-center gap-1">
                           {t('news_read_more')}
                           <svg
                             width="14"

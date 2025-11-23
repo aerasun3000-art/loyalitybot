@@ -47,7 +47,7 @@ const LoyaltyProgress = ({ balance }) => {
       {/* Заголовок статуса */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-xl leading-none text-sakura-accent">{currentLevel.emoji}</span>
+          <span className="text-xl leading-none text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">{currentLevel.emoji}</span>
           <span className="text-sm font-semibold text-sakura-deep">
             {t(currentLevel.nameKey)}
           </span>
@@ -94,7 +94,7 @@ const LoyaltyProgress = ({ balance }) => {
               >
                 <div
                 className={`transition-all ${
-                    isActive ? 'opacity-100 scale-110 text-sakura-accent' : 'opacity-60 scale-90 text-sakura-border'
+                    isActive ? 'opacity-100 scale-110 text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]' : 'opacity-60 scale-90 text-sakura-border'
                   }`}
                 >
                   <span className="text-lg leading-none">{level.emoji}</span>
@@ -132,7 +132,7 @@ const LoyaltyProgress = ({ balance }) => {
 
       {/* Мобильная подсказка (для тач-устройств) */}
       {!nextLevel && (
-        <p className="text-center text-xs text-sakura-accent font-semibold mt-1 flex items-center justify-center gap-1">
+        <p className="text-center text-xs text-sakura-deep font-semibold mt-1 flex items-center justify-center gap-1 drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
           <span className="text-sm leading-none">⭐</span> {t('loyalty_max_reached')}
         </p>
       )}

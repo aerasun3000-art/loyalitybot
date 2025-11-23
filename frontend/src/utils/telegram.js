@@ -69,40 +69,110 @@ export const closeApp = () => {
 // Показать alert
 export const showAlert = (message) => {
   const tg = getTelegramWebApp()
-  tg?.showAlert(message)
+  
+  // В версии 6.0 showAlert не поддерживается - используем alert() сразу
+  if (!tg || (tg.version && parseFloat(tg.version) >= 6.0)) {
+    // Браузер или версия 6.0+ - используем обычный alert
+    alert(message)
+    return
+  }
+  
+  // Пытаемся использовать showAlert только для версий < 6.0
+  try {
+    if (tg.showAlert && typeof tg.showAlert === 'function') {
+      tg.showAlert(message)
+    } else {
+      // Fallback
+      alert(message)
+    }
+  } catch (error) {
+    // Fallback при любой ошибке
+    alert(message)
+  }
 }
 
 // Показать confirm
 export const showConfirm = (message, callback) => {
   const tg = getTelegramWebApp()
-  tg?.showConfirm(message, callback)
+  if (!tg) {
+    // Fallback для браузера
+    const result = confirm(message)
+    if (callback) callback(result)
+    return
+  }
+  
+  try {
+    if (tg.showConfirm && typeof tg.showConfirm === 'function') {
+      tg.showConfirm(message, callback)
+    } else {
+      // Fallback для версий без showConfirm
+      const result = confirm(message)
+      if (callback) callback(result)
+    }
+  } catch (error) {
+    // Fallback при ошибке
+    console.warn('showConfirm not supported, using confirm:', error)
+    const result = confirm(message)
+    if (callback) callback(result)
+  }
 }
 
 // Вызвать haptic feedback
 export const hapticFeedback = (type = 'medium') => {
   const tg = getTelegramWebApp()
   
-  switch (type) {
-    case 'light':
-      tg?.HapticFeedback?.impactOccurred('light')
-      break
-    case 'medium':
-      tg?.HapticFeedback?.impactOccurred('medium')
-      break
-    case 'heavy':
-      tg?.HapticFeedback?.impactOccurred('heavy')
-      break
-    case 'success':
-      tg?.HapticFeedback?.notificationOccurred('success')
-      break
-    case 'error':
-      tg?.HapticFeedback?.notificationOccurred('error')
-      break
-    case 'warning':
-      tg?.HapticFeedback?.notificationOccurred('warning')
-      break
-    default:
-      tg?.HapticFeedback?.impactOccurred('medium')
+  // В версии 6.0 HapticFeedback не поддерживается - просто игнорируем
+  if (!tg || !tg.HapticFeedback) {
+    return
+  }
+  
+  // Проверяем версию - в 6.0+ HapticFeedback не работает
+  if (tg.version && parseFloat(tg.version) >= 6.0) {
+    // Версия 6.0+ - HapticFeedback не поддерживается, просто игнорируем
+    return
+  }
+  
+  // Пытаемся вызвать только если версия < 6.0
+  try {
+    switch (type) {
+      case 'light':
+        if (tg.HapticFeedback?.impactOccurred) {
+          tg.HapticFeedback.impactOccurred('light')
+        }
+        break
+      case 'medium':
+        if (tg.HapticFeedback?.impactOccurred) {
+          tg.HapticFeedback.impactOccurred('medium')
+        }
+        break
+      case 'heavy':
+        if (tg.HapticFeedback?.impactOccurred) {
+          tg.HapticFeedback.impactOccurred('heavy')
+        }
+        break
+      case 'success':
+        if (tg.HapticFeedback?.notificationOccurred) {
+          tg.HapticFeedback.notificationOccurred('success')
+        }
+        break
+      case 'error':
+        if (tg.HapticFeedback?.notificationOccurred) {
+          tg.HapticFeedback.notificationOccurred('error')
+        }
+        break
+      case 'warning':
+        if (tg.HapticFeedback?.notificationOccurred) {
+          tg.HapticFeedback.notificationOccurred('warning')
+        }
+        break
+      default:
+        if (tg.HapticFeedback?.impactOccurred) {
+          tg.HapticFeedback.impactOccurred('medium')
+        }
+    }
+  } catch (error) {
+    // Игнорируем все ошибки HapticFeedback (не критично)
+    // Не логируем, чтобы не засорять консоль
   }
 }
 

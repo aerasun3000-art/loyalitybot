@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getFilteredServices, getClientBalance, getClientRatedPartners } from '../services/supabase'
+import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics } from '../services/supabase'
 import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
 import { getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
 import Loader from '../components/Loader'
@@ -41,6 +41,7 @@ const Services = () => {
   const [favoritePartnerIds, setFavoritePartnerIds] = useState([])
   const [categoryFilter, setCategoryFilter] = useState(categoryParam || null)
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false)
+  const [partnersMetrics, setPartnersMetrics] = useState({})
 
   const resolveCategory = useCallback((code) => {
     if (!code) return null
@@ -95,6 +96,13 @@ const Services = () => {
       setSelectedCity(cityParam || '')
       setSelectedDistrict(districtParam || '')
       setFavoritePartnerIds(ratedPartners || [])
+
+      // Загружаем метрики партнёров
+      const partnerIds = [...new Set(servicesData.map(s => s.partner_chat_id).filter(Boolean))]
+      if (partnerIds.length > 0) {
+        const metrics = await getPartnersMetrics(partnerIds)
+        setPartnersMetrics(metrics)
+      }
     } catch (error) {
       console.error('Error loading services:', error)
     } finally {
@@ -134,6 +142,16 @@ const Services = () => {
       const canonicalCode = category.code || rawCategoryCode
       const key = `${canonicalCode}_${partnerId}`
       
+      // Получаем метрики партнёра
+      const metrics = partnersMetrics[partnerId] || {
+        npsScore: 0,
+        avgRating: 0,
+        ratingsCount: 0,
+        promoters: 0,
+        passives: 0,
+        detractors: 0
+      }
+      
       if (!groupsMap[key]) {
         groupsMap[key] = {
           id: key,
@@ -144,16 +162,34 @@ const Services = () => {
           partnerId,
           partner: service.partner,
           services: [],
-          rating: 4.8 // Заглушка рейтинга
+          // Используем реальные метрики вместо заглушки
+          rating: metrics.avgRating || 0,
+          npsScore: metrics.npsScore || 0,
+          ratingsCount: metrics.ratingsCount || 0,
+          metrics
         }
       }
       
       groupsMap[key].services.push(service)
     })
     
-    return Object.values(groupsMap).sort(
-      (a, b) => getCategorySortValue(a.categoryCode) - getCategorySortValue(b.categoryCode)
-    )
+    // Сортируем: сначала по категории, потом по метрикам (NPS, затем средняя оценка)
+    return Object.values(groupsMap).sort((a, b) => {
+      const categoryDiff = getCategorySortValue(a.categoryCode) - getCategorySortValue(b.categoryCode)
+      if (categoryDiff !== 0) return categoryDiff
+      
+      // В рамках одной категории сортируем по метрикам (лучшие партнёры выше)
+      // 1. По NPS (выше = лучше)
+      const npsDiff = (b.npsScore || 0) - (a.npsScore || 0)
+      if (npsDiff !== 0) return npsDiff
+      
+      // 2. По средней оценке (выше = лучше)
+      const ratingDiff = (b.rating || 0) - (a.rating || 0)
+      if (ratingDiff !== 0) return ratingDiff
+      
+      // 3. По количеству отзывов (больше = лучше, так как больше доверия)
+      return (b.ratingsCount || 0) - (a.ratingsCount || 0)
+    })
   }
 
   const favoritePartnerIdsSet = useMemo(() => new Set(favoritePartnerIds), [favoritePartnerIds])
@@ -380,15 +416,8 @@ const Services = () => {
       setIsQrLoading(true)
       setQrError(null)
 
-      const payloadParts = [`CLIENT_ID:${chatId}`]
-      if (selectedService.id) {
-        payloadParts.push(`SERVICE_ID:${selectedService.id}`)
-      }
-      if (selectedService.partner_chat_id) {
-        payloadParts.push(`PARTNER_ID:${selectedService.partner_chat_id}`)
-      }
-
-      const qrPayload = payloadParts.join(';')
+      // QR код содержит только chat_id
+      const qrPayload = chatId
       const dataUrl = await QRCode.toDataURL(qrPayload, { margin: 1, scale: 6 })
       setQrImage(dataUrl)
     } catch (error) {
@@ -397,6 +426,23 @@ const Services = () => {
     } finally {
       setIsQrLoading(false)
     }
+  }
+
+  const handleBookTime = () => {
+    if (!selectedService) {
+      return
+    }
+
+    const bookingUrl = selectedService.booking_url || selectedService.partner?.booking_url
+    
+    if (!bookingUrl) {
+      showAlert('Ссылка на бронирование не указана для этой услуги.')
+      return
+    }
+
+    // Открываем ссылку в новой вкладке
+    window.open(bookingUrl, '_blank')
+    hapticFeedback('medium')
   }
 
   if (loading) {
@@ -600,9 +646,30 @@ const Services = () => {
                         <p className="text-sm text-sakura-dark/70 mb-1 adaptive-subtext">
                           {group.companyName}
                         </p>
-                        <div className="flex items-center gap-1 text-xs text-sakura-dark/60">
-                          <span>⭐</span>
-                          <span>{group.rating}</span>
+                        <div className="flex items-center gap-3 text-xs text-sakura-dark/60">
+                          {/* Средняя оценка */}
+                          {group.ratingsCount > 0 && (
+                            <div className="flex items-center gap-1">
+                              <span>⭐</span>
+                              <span className="font-semibold">{group.rating.toFixed(1)}</span>
+                              <span className="text-sakura-dark/50">({group.ratingsCount})</span>
+                            </div>
+                          )}
+                          {/* NPS Score */}
+                          {group.ratingsCount > 0 && group.npsScore !== 0 && (
+                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                              group.npsScore >= 50 ? 'bg-green-100/80 text-green-700' :
+                              group.npsScore >= 0 ? 'bg-yellow-100/80 text-yellow-700' :
+                              'bg-red-100/80 text-red-700'
+                            }`}>
+                              <span className="font-semibold">NPS</span>
+                              <span className="font-bold">{group.npsScore > 0 ? '+' : ''}{group.npsScore}</span>
+                            </div>
+                          )}
+                          {/* Если нет отзывов */}
+                          {group.ratingsCount === 0 && (
+                            <span className="text-sakura-dark/40 italic">Нет отзывов</span>
+                          )}
                         </div>
                       </>
                     )}
@@ -683,7 +750,7 @@ const Services = () => {
                           </div>
                           <div className="flex items-center gap-2 ml-3">
                             <span className="text-xs text-sakura-dark/80">💸</span>
-                            <span className="text-sm font-bold text-sakura-accent">
+                            <span className="text-sm font-bold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
                               {service.price_points}
                             </span>
                           </div>
@@ -706,17 +773,25 @@ const Services = () => {
       />
 
       {isServiceModalOpen && selectedService && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-sakura-deep/50 backdrop-blur-sm" onClick={handleCloseServiceModal} />
-          <div className="relative z-10 w-full max-w-md bg-sakura-surface/85 border border-sakura-border/60 rounded-3xl shadow-2xl p-6">
+        <div className="fixed inset-0 z-[100]" onClick={handleCloseServiceModal}>
+          <div className="absolute inset-0 bg-sakura-deep/50 backdrop-blur-sm" />
+          <div 
+            className="relative h-full flex items-center justify-center px-4 py-4"
+            onClick={(e) => e.stopPropagation()}
+            style={{ paddingBottom: '80px', maxHeight: '100vh', overflow: 'hidden' }}
+          >
+            <div 
+              className="relative z-10 w-full max-w-md bg-sakura-surface/85 border border-sakura-border/60 rounded-3xl shadow-2xl p-6 max-h-[calc(100vh-8rem)] overflow-y-auto"
+              style={{ maxHeight: 'calc(100vh - 8rem)', WebkitOverflowScrolling: 'touch' }}
+            >
             <button
               onClick={handleCloseServiceModal}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full border border-sakura-border/40 bg-sakura-surface/20 text-sakura-dark hover:bg-sakura-surface/30 transition-colors"
+              className="absolute top-4 right-4 w-10 h-10 rounded-full border border-sakura-border/40 bg-sakura-surface/20 text-sakura-dark hover:bg-sakura-surface/30 transition-colors z-20"
               aria-label="Закрыть"
             >
               ×
             </button>
-            <div className="space-y-4 text-sakura-dark">
+            <div className="space-y-4 text-sakura-dark pb-8">
               <div>
                 <p className="text-sm text-sakura-dark/60 mb-1 uppercase tracking-wide">Услуга</p>
                 <h2 className="text-xl font-bold">{selectedService.title}</h2>
@@ -733,24 +808,27 @@ const Services = () => {
                 <span className="text-2xl">💸</span>
                 <div>
                   <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">Ориентировочная стоимость</p>
-                  <p className="text-lg font-semibold text-sakura-accent">{selectedService.price_points}</p>
+                  <p className="text-lg font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">{selectedService.price_points}</p>
                 </div>
               </div>
 
-              <div className="bg-sakura-surface/10 border border-sakura-border/30 rounded-2xl p-4 text-sm text-sakura-dark/80 space-y-2">
-                <p className="font-semibold text-sakura-dark">Как получить кэшбэк</p>
-                <p>1. Нажмите кнопку ниже, чтобы сгенерировать персональный QR-код.</p>
-                <p>2. Покажите QR-код администратору салона. Он подтвердит начисление.</p>
-                <p>3. После сканирования вы получите уведомление в Telegram.</p>
-              </div>
+              <div className="space-y-3">
+                <button
+                  onClick={handleGetCashback}
+                  disabled={isQrLoading}
+                  className="w-full py-3 rounded-full bg-sakura-accent text-white font-semibold shadow-md hover:bg-sakura-accent/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isQrLoading ? 'Генерируем QR...' : 'Получить кэшбэк в баллах'}
+                </button>
 
-              <button
-                onClick={handleGetCashback}
-                disabled={isQrLoading}
-                className="w-full py-3 rounded-full bg-sakura-accent text-white font-semibold shadow-md hover:bg-sakura-accent/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {isQrLoading ? 'Генерируем QR...' : 'Получить кэшбэк в баллах'}
-              </button>
+                <button
+                  onClick={handleBookTime}
+                  disabled={!selectedService.booking_url && !selectedService.partner?.booking_url}
+                  className="w-full py-3 rounded-full bg-sakura-deep text-white font-semibold shadow-md hover:bg-sakura-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Забронировать время
+                </button>
+              </div>
 
               {qrError && (
                 <div className="text-sm text-red-500 bg-red-100/60 border border-red-200 rounded-2xl p-3">
@@ -759,13 +837,14 @@ const Services = () => {
               )}
 
               {qrImage && (
-                <div className="flex flex-col items-center gap-3 bg-white/90 border border-sakura-border/40 rounded-3xl p-4">
+                <div className="flex flex-col items-center gap-3 bg-white/90 border border-sakura-border/40 rounded-3xl p-4 mb-8 pb-8">
                   <img src={qrImage} alt="QR для начисления" className="w-48 h-48 object-contain" />
-                  <p className="text-xs text-sakura-dark/70 text-center">
+                  <p className="text-xs text-sakura-dark/70 text-center px-2">
                     Партнёр сканирует QR-код и подтверждает начисление баллов.
                   </p>
                 </div>
               )}
+            </div>
             </div>
           </div>
         </div>

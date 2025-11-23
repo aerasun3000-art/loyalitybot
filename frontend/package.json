@@ -12,6 +12,7 @@
     "preview:bg": "cross-env VITE_BG_IMAGE=/bg/sakura.jpg vite preview"
   },
   "dependencies": {
+    "@sentry/react": "^7.99.0",
     "@supabase/supabase-js": "^2.39.0",
     "@telegram-apps/telegram-ui": "^2.1.5",
     "@twa-dev/sdk": "^7.0.1",

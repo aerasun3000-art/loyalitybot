@@ -6,6 +6,7 @@ import { getTelegramWebApp, getChatId, getColorScheme } from './utils/telegram'
 // Pages
 import Home from './pages/Home'
 import Promotions from './pages/Promotions'
+import PromotionDetail from './pages/PromotionDetail'
 import Services from './pages/Services'
 import History from './pages/History'
 import Profile from './pages/Profile'
@@ -80,6 +81,7 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/promotions" element={<Promotions />} />
+          <Route path="/promotions/:id" element={<PromotionDetail />} />
           <Route path="/services" element={<Services />} />
           <Route path="/news" element={<News />} />
           <Route path="/news/:id" element={<NewsDetail />} />

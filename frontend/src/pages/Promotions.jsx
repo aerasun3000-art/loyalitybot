@@ -57,6 +57,20 @@ const Promotions = () => {
     }
   }
 
+  const getCardColor = (index) => {
+    const colors = [
+      { bg: 'bg-yellow-400', text: 'text-yellow-900' },
+      { bg: 'bg-teal-500', text: 'text-teal-900' },
+      { bg: 'bg-pink-400', text: 'text-pink-900' },
+      { bg: 'bg-purple-400', text: 'text-purple-900' },
+      { bg: 'bg-blue-400', text: 'text-blue-900' },
+      { bg: 'bg-green-400', text: 'text-green-900' },
+      { bg: 'bg-orange-400', text: 'text-orange-900' },
+      { bg: 'bg-indigo-400', text: 'text-indigo-900' }
+    ]
+    return colors[index % colors.length]
+  }
+
   const handleFilterChange = (newFilter) => {
     hapticFeedback('light')
     setFilter(newFilter)
@@ -96,63 +110,80 @@ const Promotions = () => {
   const filteredPromotions = getFilteredPromotions()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F5F5DC]">
       {/* Шапка */}
-      <div className="bg-gradient-to-r from-jewelry-brown-dark to-jewelry-burgundy px-4 pt-6 pb-8">
-        <div className="flex items-center mb-6">
-          <button
-            onClick={() => navigate('/')}
-            className="text-white mr-3"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M15 18L9 12L15 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
+      <div className="bg-[#F5F5DC] px-4 pt-6 pb-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <button
+              onClick={() => navigate('/')}
+              className="text-gray-800 mr-3"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M15 18L9 12L15 6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+            <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: 'serif' }}>Акции</h1>
+          </div>
+          <button className="text-gray-800">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
             </svg>
           </button>
-          <h1 className="text-2xl font-bold text-white">Акции партнёров</h1>
         </div>
 
-        {/* Фильтры */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-              <button
-                onClick={() => handleFilterChange('all')}
-                className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 ${
-                  filter === 'all'
-                    ? 'bg-jewelry-cream text-jewelry-gold shadow-lg'
-                    : 'bg-jewelry-cream/20 text-jewelry-cream hover:bg-jewelry-cream/30'
-                }`}
-              >
-            Все ({promotions.length})
+        {/* Фильтры (категории) */}
+        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+          <button
+            onClick={() => handleFilterChange('all')}
+            className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 relative ${
+              filter === 'all'
+                ? 'text-gray-900'
+                : 'text-gray-600'
+            }`}
+          >
+            Все
+            {filter === 'all' && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-500 rounded-full" />
+            )}
           </button>
-              <button
-                onClick={() => handleFilterChange('active')}
-                className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 ${
-                  filter === 'active'
-                    ? 'bg-jewelry-cream text-jewelry-gold shadow-lg'
-                    : 'bg-jewelry-cream/20 text-jewelry-cream hover:bg-jewelry-cream/30'
-                }`}
-              >
+          <button
+            onClick={() => handleFilterChange('active')}
+            className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 relative ${
+              filter === 'active'
+                ? 'text-gray-900'
+                : 'text-gray-600'
+            }`}
+          >
             Активные
+            {filter === 'active' && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-500 rounded-full" />
+            )}
           </button>
-              <button
-                onClick={() => handleFilterChange('ending')}
-                className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 ${
-                  filter === 'ending'
-                    ? 'bg-jewelry-cream text-jewelry-gold shadow-lg'
-                    : 'bg-jewelry-cream/20 text-jewelry-cream hover:bg-jewelry-cream/30'
-                }`}
-              >
+          <button
+            onClick={() => handleFilterChange('ending')}
+            className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 relative ${
+              filter === 'ending'
+                ? 'text-gray-900'
+                : 'text-gray-600'
+            }`}
+          >
             Скоро закончатся
+            {filter === 'ending' && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-500 rounded-full" />
+            )}
           </button>
         </div>
       </div>
 
       {/* Список акций */}
-      <div className="px-4 -mt-4 pb-20">
+      <div className="px-4 pb-20 pt-2">
         {filteredPromotions.length === 0 ? (
           <div className="bg-jewelry-cream rounded-xl p-8 text-center shadow-lg border border-jewelry-gold/20">
             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-jewelry-gray-elegant">
@@ -161,168 +192,72 @@ const Promotions = () => {
             <p className="text-jewelry-brown-dark">Нет активных акций</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             {filteredPromotions.map((promo, index) => {
               const daysLeft = getDaysRemaining(promo.end_date)
               const isHighlighted = promo.id === highlightId
-              
-              // Разнообразные градиенты для каждой карточки
-              const gradients = [
-                'from-jewelry-brown-dark via-jewelry-burgundy to-jewelry-gold',
-                'from-jewelry-burgundy via-jewelry-gold to-jewelry-brown-dark',
-                'from-jewelry-gold via-jewelry-brown-dark to-jewelry-burgundy',
-                'from-jewelry-brown-light via-jewelry-burgundy to-jewelry-gold',
-                'from-jewelry-burgundy via-jewelry-gold to-jewelry-brown-light',
-                'from-jewelry-gold via-jewelry-brown-light to-jewelry-burgundy'
-              ]
-              const gradient = gradients[index % gradients.length]
-              
-              // Разнообразные иконки
-              const iconNames = ['celebration', 'celebration', 'default', 'heart', 'flower', 'celebration', 'star', 'diamond', 'star']
-              const iconName = iconNames[index % iconNames.length]
+              const colors = getCardColor(parseInt(promo.id) || index)
               
               return (
-                  <div
-                    key={promo.id}
-                    className={`bg-jewelry-cream rounded-xl overflow-hidden shadow-lg border border-jewelry-gold/20 hover:shadow-xl transition-all duration-300 ${
-                      isHighlighted ? 'ring-2 ring-jewelry-gold' : ''
-                    }`}
-                  >
-                  {/* Баннер с изображением */}
-                  {promo.image_url ? (
-                    // Реальное фото
-                    <div className="h-48 relative overflow-hidden">
-                      <img 
-                        src={promo.image_url} 
-                        alt={promo.title}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                      
-                      {/* Бэджи */}
-                      <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-10">
-                        {/* Бэдж "Заканчивается" */}
-                        {daysLeft <= 3 && (
-                          <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
-                            {daysLeft === 0 ? (
-                              <>
-                                <span>⚠️</span>
-                                <span>Последний день!</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>ℹ️</span>
-                                <span>{daysLeft} дн.</span>
-                              </>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Бэдж "Бесплатно" */}
-                        {promo.required_points === 0 && (
-                          <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto flex items-center gap-1">
-                            <span>💸</span>
-                            <span>FREE</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    // Placeholder с градиентом
-                    <div className={`h-48 bg-gradient-to-br ${gradient} flex items-center justify-center relative overflow-hidden`}>
-                      {/* Фоновые эффекты */}
-                      <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                      
-                      {/* Фоновая иконка */}
-                      <div className="absolute opacity-20 text-9xl leading-none">
-                        ⭐
-                      </div>
-                      
-                      {/* Основная иконка */}
-                      <div className="relative z-10 text-center text-6xl leading-none">
-                        ⭐
-                      </div>
-                      
-                      {/* Бэджи */}
-                      <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
-                        {/* Бэдж "Заканчивается" */}
-                        {daysLeft <= 3 && (
-                          <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
-                            {daysLeft === 0 ? (
-                              <>
-                                <span>⚠️</span>
-                                <span>Последний день!</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>ℹ️</span>
-                                <span>{daysLeft} дн.</span>
-                              </>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Бэдж "Бесплатно" */}
-                        {promo.required_points === 0 && (
-                          <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg ml-auto flex items-center gap-1">
-                            <span>💸</span>
-                            <span>FREE</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Контент */}
-                  <div className="p-4">
-                    <h3 className="text-xl font-bold text-jewelry-brown-dark mb-2 line-clamp-2">
-                      {promo.title}
+                <div
+                  key={promo.id}
+                  onClick={() => {
+                    hapticFeedback('light')
+                    navigate(`/promotions/${promo.id}`)
+                  }}
+                  className={`${colors.bg} rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 hover:shadow-xl relative ${
+                    isHighlighted ? 'ring-2 ring-white ring-offset-2' : ''
+                  }`}
+                  style={{ aspectRatio: '1 / 1.2' }}
+                >
+                  {/* Название вверху слева */}
+                  <div className="absolute top-3 left-3 right-3 z-10">
+                    <h3 
+                      className="text-white font-bold leading-tight drop-shadow-lg"
+                      style={{
+                        fontSize: 'clamp(11px, 3vw, 14px)',
+                        lineHeight: '1.2',
+                        maxHeight: '2.4em',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical'
+                      }}
+                    >
+                      {promo.title.toUpperCase()}
                     </h3>
-                    
-                    <div className="flex items-center gap-2 mb-3">
-                      {(promo.partner?.company_name || promo.partner?.name) && (
-                        <span className="text-jewelry-gold font-semibold text-sm">
-                          {promo.partner?.company_name || promo.partner?.name}
-                        </span>
-                      )}
-                      {promo.required_points > 0 && (
-                        <span className="bg-jewelry-gold/20 text-jewelry-gold px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
-                          <span>💸</span>
-                          <span>{promo.required_points}</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="text-jewelry-gray-elegant text-sm mb-4 line-clamp-3">
-                      {promo.description || 'Подробности уточняйте у партнёра'}
-                    </p>
-
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6z"/>
-                          <path d="M8 4v4.5l3.5 2.1.7-1.2-3-1.8V4z"/>
-                        </svg>
-                        <span>
-                          До {new Date(promo.end_date).toLocaleDateString('ru', {
-                            day: 'numeric',
-                            month: 'long'
-                          })}
-                        </span>
+                    {daysLeft <= 3 && (
+                      <div className="mt-1.5 inline-block bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold">
+                        {daysLeft === 0 ? '⚠️' : `ℹ️ ${daysLeft}д`}
                       </div>
-                      <button
-                        onClick={() => {
-                          hapticFeedback('medium')
-                          // TODO: Открыть детали акции
+                    )}
+                  </div>
+
+                  {/* Большое изображение (70-80% карточки) */}
+                  <div className="absolute inset-0 flex items-end justify-center pt-12 pb-16">
+                    {promo.image_url ? (
+                      <img
+                        src={promo.image_url}
+                        alt={promo.title}
+                        className="w-full h-auto max-h-[75%] object-contain"
+                        style={{ 
+                          objectPosition: 'center bottom'
                         }}
-                        className="text-jewelry-gold font-semibold flex items-center gap-1 hover:gap-2 transition-all active:scale-95"
-                      >
-                        Подробнее
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                        </svg>
-                      </button>
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center max-h-[75%]">
+                        <span className="text-8xl leading-none opacity-40">⭐</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Цена/скидка внизу */}
+                  <div className="absolute bottom-4 left-4 right-4 z-10">
+                    <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2">
+                      <div className="text-white text-sm font-semibold">
+                        {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} баллов` : 'Бесплатно')}
+                      </div>
                     </div>
                   </div>
                 </div>

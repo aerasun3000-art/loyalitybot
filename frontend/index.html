@@ -4,17 +4,95 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    <meta name="telegram-web-app-version" content="3.0" />
     <title>LoyalityBot</title>
-    <!-- Build: 2025-11-12-16:40 -->
+    <!-- Build: 2025-11-22-NEW-PROJECT-v13 -->
+    <script>
+      // АГРЕССИВНАЯ очистка кэша для Telegram Web App v6.0
+      (function() {
+        // Очистка всех кэшей
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(name) {
+              caches.delete(name)
+            })
+          })
+        }
+        
+        // Принудительная перезагрузка при обнаружении старой версии
+        // ВАЖНО: Проверяем версию ПЕРЕД очисткой sessionStorage
+        const currentVersion = 'v13-new-project-fix'
+        const storedVersion = sessionStorage.getItem('app_version_v13')
+        const needsReload = storedVersion !== currentVersion
+        
+        // АГРЕССИВНАЯ очистка кэша - всегда очищаем всё для новой версии
+        try {
+          localStorage.clear()
+          sessionStorage.clear()
+          // Очищаем все кэши
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              names.forEach(function(name) {
+                caches.delete(name)
+              })
+            })
+          }
+        } catch(e) {}
+        
+        // Устанавливаем версию и перезагружаем только если нужно
+        if (needsReload) {
+          sessionStorage.setItem('app_version_v13', currentVersion)
+          // Перезагружаем только если это Telegram Web App
+          if (window.Telegram?.WebApp) {
+            setTimeout(function() {
+              var url = window.location.href.split('?')[0]
+              window.location.href = url + '?v=' + Date.now() + '&_reload=1&_v12=1&_buttons_removed=1&_nocache=' + Date.now()
+            }, 100)
+          }
+        }
+      })()
+    </script>
     
     <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="padding: 20px; text-align: center; font-family: system-ui;">
+        <h1>Загрузка приложения...</h1>
+        <p>Если это сообщение не исчезло, проверьте консоль браузера (F12)</p>
+      </div>
+    </div>
+    <script>
+      // Диагностика загрузки
+      console.log('✅ HTML загружен')
+      console.log('✅ Root element:', document.getElementById('root'))
+      console.log('✅ Telegram WebApp SDK:', typeof window.Telegram !== 'undefined' ? 'загружен' : 'не загружен')
+    </script>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Проверка загрузки модуля
+      setTimeout(() => {
+        const root = document.getElementById('root')
+        if (root && root.children.length === 1 && root.children[0].textContent.includes('Загрузка приложения')) {
+          console.error('❌ React не загрузился! Проверьте вкладку Network на наличие ошибок загрузки файлов.')
+          root.innerHTML = `
+            <div style="padding: 20px; text-align: center; font-family: system-ui;">
+              <h1 style="color: red;">Ошибка загрузки</h1>
+              <p>React приложение не загрузилось.</p>
+              <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                Откройте консоль разработчика (F12) и проверьте вкладку Network на наличие ошибок.
+              </p>
+              <button onclick="window.location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;">
+                Перезагрузить
+              </button>
+            </div>
+          `
+        }
+      }, 3000)
+    </script>
   </body>
 </html>
