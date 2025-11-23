@@ -41,6 +41,8 @@ env/
 .env
 .env.local
 .env.*.local
+.env.bak
+*.env.bak
 
 # Credentials and secrets (КРИТИЧНО!)
 service_account.json
