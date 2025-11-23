@@ -35,7 +35,7 @@ const Footer = () => {
 
         {/* Copyright */}
         <div className="text-center text-xs text-gray-500 dark:text-gray-600">
-          <p>© 2025 LoyaltyBot. {language === 'ru' ? 'Все права защищены' : 'All rights reserved'}.</p>
+          <p>© 2025 Mind`N`Beauty. {language === 'ru' ? 'Все права защищены' : 'All rights reserved'}.</p>
         </div>
       </div>
     </div>

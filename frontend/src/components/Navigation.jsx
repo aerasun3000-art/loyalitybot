@@ -69,24 +69,14 @@ const Navigation = () => {
       labelKey: 'nav_community',
       icon: (active) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect
-            x="3"
-            y="4"
-            width="18"
-            height="16"
-            rx="2"
+          <path
+            d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
             stroke="currentColor"
             strokeWidth={active ? "2" : "1.5"}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill={active ? "currentColor" : "none"}
-            fillOpacity={active ? "0.1" : "0"}
-          />
-          <path
-            d="M8 10H16M8 14H16M8 6H16"
-            stroke="currentColor"
-            strokeWidth={active ? "2" : "1.5"}
-            strokeLinecap="round"
+            fillOpacity={active ? "0.15" : "0"}
           />
         </svg>
       )
@@ -94,11 +84,16 @@ const Navigation = () => {
     // Message -> акции
     {
       path: '/promotions',
-      labelKey: 'nav_message',
+      labelKey: 'nav_promotions',
       icon: (active) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M12 2L2 7L12 12L22 7L12 2Z"
+          {/* Коробка подарка */}
+          <rect
+            x="5"
+            y="8"
+            width="14"
+            height="12"
+            rx="1"
             stroke="currentColor"
             strokeWidth={active ? "2" : "1.5"}
             strokeLinecap="round"
@@ -106,12 +101,43 @@ const Navigation = () => {
             fill={active ? "currentColor" : "none"}
             fillOpacity={active ? "0.1" : "0"}
           />
-          <path
-            d="M2 17L12 22L22 17M2 12L12 17L22 12"
+          {/* Крышка коробки */}
+          <rect
+            x="5"
+            y="6"
+            width="14"
+            height="3"
+            rx="1"
             stroke="currentColor"
             strokeWidth={active ? "2" : "1.5"}
             strokeLinecap="round"
             strokeLinejoin="round"
+            fill={active ? "currentColor" : "none"}
+            fillOpacity={active ? "0.15" : "0"}
+          />
+          {/* Бант - вертикальная лента */}
+          <path
+            d="M12 6V20"
+            stroke="currentColor"
+            strokeWidth={active ? "2" : "1.5"}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Бант - горизонтальная лента */}
+          <path
+            d="M5 12H19"
+            stroke="currentColor"
+            strokeWidth={active ? "2" : "1.5"}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Центр банта */}
+          <circle
+            cx="12"
+            cy="12"
+            r="2"
+            fill="currentColor"
+            fillOpacity={active ? "1" : "0.7"}
           />
         </svg>
       )
@@ -155,7 +181,7 @@ const Navigation = () => {
               key={item.path}
               onClick={() => handleNavigation(item.path)}
               className={`relative flex flex-col items-center justify-center min-w-[60px] h-full transition-colors ${
-                active ? 'text-sakura-accent' : 'text-jewelry-gray-elegant'
+                active ? 'text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]' : 'text-jewelry-gray-elegant'
               }`}
             >
               <div className="transition-opacity">
