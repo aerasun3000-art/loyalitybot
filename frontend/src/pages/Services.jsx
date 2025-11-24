@@ -842,6 +842,11 @@ const Services = () => {
                   <p className="text-xs text-sakura-dark/70 text-center px-2">
                     Партнёр сканирует QR-код и подтверждает начисление баллов.
                   </p>
+                  {chatId && (
+                    <p className="text-xs text-sakura-dark/50 text-center px-2 font-mono">
+                      ID: {chatId}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

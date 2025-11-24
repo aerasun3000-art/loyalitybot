@@ -338,14 +338,14 @@ const Home = () => {
       {/* Шапка с приветствием */}
       <div className="px-4 pt-6 pb-4">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-sakura-deep bg-sakura-surface/13 backdrop-blur-sm px-3 py-1 rounded-lg drop-shadow">
+          <h1 className="text-2xl font-bold text-sakura-deep bg-gradient-to-br from-white/35 to-sakura-surface/33 backdrop-blur-sm px-3 py-1 rounded-lg drop-shadow">
             {t('home_greeting')} {userName}
           </h1>
           <LanguageSwitcher />
         </div>
 
         {/* Карточка с балансом и прогрессом */}
-        <div className="bg-sakura-surface/8 backdrop-blur-sm rounded-xl p-4 shadow-xl border border-sakura-border/40 transition-shadow hover:shadow-2xl">
+        <div className="bg-gradient-to-br from-white/30 to-sakura-surface/28 backdrop-blur-sm rounded-xl p-4 shadow-xl border border-sakura-border/40 transition-shadow hover:shadow-2xl">
           <p className="text-sakura-deep font-bold text-base mb-3">
             {t('home_balance_text')}
           </p>
@@ -353,7 +353,7 @@ const Home = () => {
           {/* Баланс */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center border border-sakura-border/50 bg-sakura-surface/18 backdrop-blur-sm shadow">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center border border-sakura-border/50 bg-gradient-to-br from-white/35 to-sakura-surface/38 backdrop-blur-sm shadow">
                 <span className="text-sakura-deep text-base leading-none">💸</span>
               </div>
               <div className="flex flex-col">
@@ -383,7 +383,7 @@ const Home = () => {
       </div>
 
       {/* Секция новостей */}
-      <div className="bg-sakura-surface/8 backdrop-blur-sm rounded-t-[2rem] px-4 pt-6 pb-4">
+      <div className="bg-gradient-to-br from-white/30 to-sakura-surface/28 backdrop-blur-sm rounded-t-[2rem] px-4 pt-6 pb-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-sakura-deep flex items-center gap-2">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
@@ -419,7 +419,7 @@ const Home = () => {
                 <div
                   key={item.id}
                   onClick={() => handleNewsClick(item.id)}
-                  className="group flex-shrink-0 w-64 bg-sakura-surface/8 backdrop-blur-sm rounded-xl overflow-hidden border border-sakura-border/40 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer snap-start active:scale-[0.985]"
+                  className="group flex-shrink-0 w-64 bg-gradient-to-br from-white/30 to-sakura-surface/28 backdrop-blur-sm rounded-xl overflow-hidden border border-sakura-border/40 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer snap-start active:scale-[0.985]"
                 >
                   {item.image_url ? (
                     <div className="h-24 relative overflow-hidden">
@@ -430,7 +430,7 @@ const Home = () => {
                         decoding="async"
                         className="w-full h-full object-cover opacity-65 transition-transform duration-500 group-hover:scale-105"
                       />
-                      <div className="absolute top-2 right-2 bg-sakura-surface/18 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
+                      <div className="absolute top-2 right-2 bg-gradient-to-br from-white/40 to-sakura-surface/38 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
                         <span className="text-xs font-semibold text-jewelry-brown-dark">
                           {formatDate(item.created_at)}
                         </span>
@@ -443,7 +443,7 @@ const Home = () => {
                         <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         <path d="M8 10H16M8 14H16M8 6H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                       </svg>
-                      <div className="absolute top-2 right-2 bg-sakura-surface/18 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
+                      <div className="absolute top-2 right-2 bg-gradient-to-br from-white/40 to-sakura-surface/38 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
                         <span className="text-xs font-semibold text-jewelry-brown-dark">
                           {formatDate(item.created_at)}
                         </span>
@@ -492,7 +492,7 @@ const Home = () => {
               </div>
               
               {/* Карточка 2: Акции месяца */}
-              <div className="flex-shrink-0 w-64 bg-sakura-surface/8 backdrop-blur-sm rounded-xl overflow-hidden border border-sakura-border/40 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer snap-start active:scale-[0.985]"
+              <div className="flex-shrink-0 w-64 bg-gradient-to-br from-white/30 to-sakura-surface/28 backdrop-blur-sm rounded-xl overflow-hidden border border-sakura-border/40 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer snap-start active:scale-[0.985]"
                 onClick={() => navigate('/promotions')}>
                 <div className="h-24 bg-gradient-to-br from-sakura-accent to-sakura-mid flex items-center justify-center relative">
                   <div className="absolute inset-0 bg-jewelry-rose/10" />
@@ -515,7 +515,7 @@ const Home = () => {
               </div>
               
               {/* Карточка 3: Реферальная программа */}
-              <div className="flex-shrink-0 w-64 bg-sakura-surface/8 backdrop-blur-sm rounded-xl overflow-hidden border border-sakura-border/40 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer snap-start active:scale-[0.985]"
+              <div className="flex-shrink-0 w-64 bg-gradient-to-br from-white/30 to-sakura-surface/28 backdrop-blur-sm rounded-xl overflow-hidden border border-sakura-border/40 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer snap-start active:scale-[0.985]"
                 onClick={() => navigate('/profile')}>
                 <div className="h-24 bg-gradient-to-br from-sakura-mid to-sakura-deep flex items-center justify-center relative">
                   <div className="absolute inset-0 bg-jewelry-rose/10" />
@@ -576,7 +576,7 @@ const Home = () => {
                 onClick={() => handleServiceClick(null, categoryCode)}
                 className="flex flex-col items-center cursor-pointer active:scale-[0.98] transition-transform"
               >
-                <div className="w-16 h-16 bg-sakura-surface/18 backdrop-blur-sm rounded-xl flex items-center justify-center mb-2 relative hover:bg-sakura-accent/10 transition-colors border border-sakura-border/50 shadow-sm active:shadow-md">
+                <div className="w-16 h-16 bg-gradient-to-br from-white/35 to-sakura-surface/38 backdrop-blur-sm rounded-xl flex items-center justify-center mb-2 relative hover:bg-sakura-accent/10 transition-colors border border-sakura-border/50 shadow-sm active:shadow-md">
                   <div className="flex items-center justify-center w-full h-full text-3xl">
                     {emojiToDisplay}
                   </div>
@@ -631,7 +631,7 @@ const Home = () => {
                   onClick={() => handlePromotionClick(promo.id)}
                   className="flex-shrink-0 w-72 cursor-pointer group snap-start active:scale-[0.985] transition-transform"
                 >
-                  <div className="bg-sakura-surface/13 backdrop-blur-sm rounded-xl overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-300 border border-sakura-border/40">
+                  <div className="bg-gradient-to-br from-white/33 to-sakura-surface/33 backdrop-blur-sm rounded-xl overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-300 border border-sakura-border/40">
                     {/* Изображение */}
                     {promo.image_url ? (
                       // Реальное фото
@@ -672,7 +672,7 @@ const Home = () => {
                     )}
                     
                     {/* Контент */}
-                    <div className="p-4 bg-sakura-surface/13 backdrop-blur-sm">
+                    <div className="p-4 bg-gradient-to-br from-white/33 to-sakura-surface/33 backdrop-blur-sm">
                       <h3 className="font-bold text-sakura-deep mb-1 line-clamp-2 min-h-[2.5rem]">
                         {promo.title}
                       </h3>

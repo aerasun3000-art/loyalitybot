@@ -90,7 +90,7 @@ export const getActivePromotions = async () => {
     .from('promotions')
     .select(`
       *,
-      partners(name, company_name)
+      partners(name, company_name, booking_url)
     `)
     .eq('is_active', true)
     .gte('end_date', today)
@@ -116,7 +116,7 @@ export const getPromotionById = async (id) => {
     .from('promotions')
     .select(`
       *,
-      partners(name, company_name)
+      partners(name, company_name, booking_url)
     `)
     .eq('id', id)
     .single()

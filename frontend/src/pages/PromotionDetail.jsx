@@ -95,7 +95,7 @@ const PromotionDetail = () => {
       return
     }
 
-    const bookingUrl = promotion.partner?.booking_url
+    const bookingUrl = promotion.booking_url || promotion.partner?.booking_url
     
     if (!bookingUrl) {
       showAlert('Ссылка на бронирование не указана для этой акции.')
@@ -228,7 +228,7 @@ const PromotionDetail = () => {
 
               <button
                 onClick={handleBookTime}
-                disabled={!promotion.partner?.booking_url}
+                disabled={!promotion.booking_url && !promotion.partner?.booking_url}
                 className="w-full py-3 rounded-full bg-sakura-deep text-white font-semibold shadow-md hover:bg-sakura-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Забронировать время
@@ -249,6 +249,11 @@ const PromotionDetail = () => {
                 <p className="text-xs text-sakura-dark/70 text-center px-2">
                   Покажите этот QR специалисту чтобы начислить или списать баллы
                 </p>
+                {chatId && (
+                  <p className="text-xs text-sakura-dark/50 text-center px-2 font-mono">
+                    ID: {chatId}
+                  </p>
+                )}
               </div>
             )}
           </div>

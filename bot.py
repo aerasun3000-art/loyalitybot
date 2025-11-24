@@ -7,10 +7,28 @@ import datetime
 import html
 import requests
 from io import BytesIO
+import io
+import qrcode
 from PIL import Image
-from pyzbar.pyzbar import decode as decode_qr
 from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
+
+# Устанавливаем путь к libzbar для arm64 (если установлен через нативный Homebrew)
+if os.path.exists('/opt/homebrew/lib/libzbar.dylib'):
+    os.environ['DYLD_LIBRARY_PATH'] = '/opt/homebrew/lib:' + os.environ.get('DYLD_LIBRARY_PATH', '')
+
+# Инициализация логгера до импорта pyzbar
+logger = get_bot_logger('partner_bot')
+
+# Попытка импортировать pyzbar (может не работать на некоторых архитектурах)
+try:
+    from pyzbar.pyzbar import decode as decode_qr
+    QR_DECODE_AVAILABLE = True
+    logger.info("✅ QR декодирование доступно (libzbar найден)")
+except (ImportError, OSError) as e:
+    QR_DECODE_AVAILABLE = False
+    decode_qr = None
+    logger.warning(f"QR декодирование недоступно (libzbar не установлен или неправильная архитектура): {e}")
 from image_handler import process_photo_for_promotion
 from dashboard_urls import get_partner_dashboard_url
 import sentry_sdk
@@ -35,9 +53,6 @@ sys.path.append(os.path.dirname(__file__))
 # Предполагается, что 'supabase_manager' существует и содержит необходимые методы.
 from supabase_manager import SupabaseManager
 
-# Инициализация логгера
-logger = get_bot_logger('partner_bot')
-
 # --- Инициализация ---
 PARTNER_TOKEN = os.environ.get('TOKEN_PARTNER')
 if not PARTNER_TOKEN:
@@ -46,6 +61,15 @@ if not PARTNER_TOKEN:
 
 logger.info("Инициализация партнёрского бота...")
 bot = telebot.TeleBot(PARTNER_TOKEN)
+
+# Инициализация клиентского бота для отправки сообщений клиентам
+CLIENT_TOKEN = os.environ.get('TOKEN_CLIENT')
+if CLIENT_TOKEN:
+    client_bot = telebot.TeleBot(CLIENT_TOKEN)
+    logger.info("Клиентский бот инициализирован для отправки сообщений")
+else:
+    client_bot = None
+    logger.warning("TOKEN_CLIENT не найден, отправка сообщений клиентам недоступна")
 
 try:
     sm = SupabaseManager()
@@ -85,6 +109,7 @@ def get_partner_keyboard():
     btn_add = types.KeyboardButton("➕ Начислить баллы")
     btn_subtract = types.KeyboardButton("➖ Списать баллы")
     btn_queue = types.KeyboardButton("📦 Очередь операций")
+    btn_messages = types.KeyboardButton("💬 Мои сообщения")
     btn_promo = types.KeyboardButton("🌟 Акции")
     btn_service = types.KeyboardButton("🛠️ Услуги") 
     btn_invite = types.KeyboardButton("👥 Пригласить клиента")
@@ -94,7 +119,7 @@ def get_partner_keyboard():
     btn_settings = types.KeyboardButton("⚙️ Настройки")
 
     markup.add(btn_add, btn_subtract)
-    markup.add(btn_queue)
+    markup.add(btn_queue, btn_messages)
     markup.add(btn_promo, btn_service)
     markup.add(btn_invite, btn_stats)
     markup.add(btn_dashboard, btn_find)
@@ -152,7 +177,7 @@ def handle_partner_start(message):
 # ------------------------------------
 # ФУНКЦИОНАЛ: ОБЩИЕ КНОПКИ МЕНЮ
 # ------------------------------------
-@bot.message_handler(func=lambda message: message.text in ["➕ Начислить баллы", "➖ Списать баллы", "📊 Моя статистика", "📈 Дашборд", "👤 Найти клиента", "⚙️ Настройки", "📦 Очередь операций"])
+@bot.message_handler(func=lambda message: message.text in ["➕ Начислить баллы", "➖ Списать баллы", "📊 Моя статистика", "📈 Дашборд", "👤 Найти клиента", "⚙️ Настройки", "📦 Очередь операций", "💬 Мои сообщения"])
 def handle_partner_menu_buttons(message):
     chat_id = message.chat.id
 
@@ -197,11 +222,32 @@ def handle_partner_menu_buttons(message):
     if message.text == "⚙️ Настройки":
         handle_partner_settings(message)
         return
+    
+    if message.text == "💬 Мои сообщения":
+        handle_partner_messages(message)
+        return
 
 
 # ------------------------------------
 # ФУНКЦИОНАЛ: ПРИГЛАШЕНИЕ КЛИЕНТА
 # ------------------------------------
+
+def generate_qr_code(data: str) -> io.BytesIO:
+    """Генерирует QR-код с данными и возвращает BytesIO объект."""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    return img_byte_arr
 
 @bot.message_handler(func=lambda message: message.text == '👥 Пригласить клиента')
 def handle_invite_start(message):
@@ -232,13 +278,71 @@ def handle_invite_callbacks(call):
     if call.data == 'invite_by_link':
         partner_id = str(chat_id)
         # Ссылка на клиентский бот @mindbeatybot
-        link = f"https://t.me/mindbeatybot?start=partner_{partner_id}" 
+        link = f"https://t.me/mindbeatybot?start=partner_{partner_id}"
+        
+        # Создаем кнопки для действий со ссылкой
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_copy = types.InlineKeyboardButton("📋 Копировать ссылку", callback_data="invite_copy_link")
+        btn_send = types.InlineKeyboardButton("📤 Отправить клиенту", callback_data="invite_send_to_client")
+        btn_qr = types.InlineKeyboardButton("📱 Получить QR-код", callback_data="invite_get_qr")
+        markup.add(btn_copy, btn_send, btn_qr)
+        
         bot.send_message(
             chat_id,
-            f"🔗 **Ваша реферальная ссылка:**\n\n`{link}`\n\n📱 Отправьте эту ссылку клиенту. При переходе по ссылке клиент автоматически получит приветственные баллы!",
+            f"🔗 **Ваша реферальная ссылка:**\n\n`{link}`\n\n📱 Выберите действие:",
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+        
+    elif call.data == 'invite_copy_link':
+        partner_id = str(chat_id)
+        link = f"https://t.me/mindbeatybot?start=partner_{partner_id}"
+        # Отправляем ссылку как текст для копирования
+        bot.send_message(
+            chat_id,
+            f"📋 **Скопируйте ссылку:**\n\n`{link}`\n\n"
+            f"💡 *Нажмите на ссылку выше, чтобы скопировать её*",
             parse_mode='Markdown'
         )
-        partner_main_menu(chat_id)
+        bot.answer_callback_query(call.id, "Ссылка отправлена для копирования")
+        
+    elif call.data == 'invite_send_to_client':
+        # Запрашиваем chat_id клиента
+        USER_STATE[chat_id] = 'awaiting_client_id_for_invite'
+        bot.send_message(
+            chat_id,
+            "📤 **Отправка ссылки клиенту**\n\n"
+            "Введите *Chat ID клиента* (число), которому хотите отправить реферальную ссылку.\n\n"
+            "💡 *Подсказка: Chat ID можно узнать, если клиент напишет боту @userinfobot*",
+            parse_mode='Markdown'
+        )
+        
+    elif call.data == 'invite_get_qr':
+        partner_id = str(chat_id)
+        link = f"https://t.me/mindbeatybot?start=partner_{partner_id}"
+        
+        try:
+            # Генерируем QR-код
+            qr_image = generate_qr_code(link)
+            
+            bot.send_photo(
+                chat_id,
+                qr_image,
+                caption=(
+                    f"📱 **QR-код реферальной ссылки**\n\n"
+                    f"🔗 Ссылка: `{link}`\n\n"
+                    f"💡 **Как использовать:**\n"
+                    f"• Покажите QR-код клиенту\n"
+                    f"• Клиент отсканирует его камерой\n"
+                    f"• Клиент автоматически получит приветственные баллы!"
+                ),
+                parse_mode='Markdown'
+            )
+            bot.answer_callback_query(call.id, "QR-код отправлен")
+        except Exception as e:
+            log_exception(logger, e, f"Ошибка генерации QR-кода для партнера {chat_id}")
+            bot.answer_callback_query(call.id, "Ошибка при генерации QR-кода")
+            bot.send_message(chat_id, "❌ Произошла ошибка при генерации QR-кода. Попробуйте позже.")
         
 
 
@@ -248,6 +352,10 @@ def handle_invite_callbacks(call):
 # ------------------------------------
 def decode_qr_from_photo(file_id: str) -> str | None:
     """Декодирует QR-код из фото и возвращает данные или None."""
+    if not QR_DECODE_AVAILABLE:
+        logger.warning("QR декодирование недоступно. Установите libzbar для arm64 архитектуры.")
+        return None
+    
     try:
         # Получаем информацию о файле
         file_info = bot.get_file(file_id)
@@ -378,6 +486,31 @@ def process_offline_client_id(message):
     bot.send_message(chat_id, "Выберите тип операции для очереди:", reply_markup=markup)
 
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('reply_to_client_'))
+def handle_reply_to_client(call):
+    """Обработчик кнопки 'Ответить клиенту'"""
+    chat_id = call.message.chat.id
+    client_chat_id = call.data.replace('reply_to_client_', '')
+    
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    
+    # Сохраняем chat_id клиента в состояние партнера
+    USER_STATE[chat_id] = f'replying_to_client_{client_chat_id}'
+    TEMP_DATA.setdefault(chat_id, {})['client_chat_id'] = client_chat_id
+    
+    bot.send_message(
+        chat_id,
+        f"💬 **Ответ клиенту**\n\n"
+        f"Клиент ID: `{client_chat_id}`\n\n"
+        f"Напишите ваш ответ клиенту. Сообщение будет отправлено через клиентского бота.",
+        parse_mode='Markdown'
+    )
+    bot.answer_callback_query(call.id, "Напишите ваш ответ клиенту")
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('txn_offline_type_'))
 def handle_offline_type(call):
     chat_id = call.message.chat.id
@@ -398,6 +531,87 @@ def handle_offline_type(call):
 
     bot.send_message(chat_id, prompt)
     bot.answer_callback_query(call.id)
+
+
+@bot.message_handler(func=lambda message: str(USER_STATE.get(message.chat.id, '')).startswith('replying_to_client_'))
+def handle_partner_reply_message(message):
+    """Обработчик ответа партнера клиенту"""
+    chat_id = message.chat.id
+    state = USER_STATE.get(chat_id, '')
+    
+    # Извлекаем client_chat_id из состояния
+    client_chat_id = state.replace('replying_to_client_', '')
+    
+    if not client_chat_id:
+        bot.send_message(chat_id, "❌ Ошибка: не указан клиент")
+        USER_STATE.pop(chat_id, None)
+        partner_main_menu(chat_id)
+        return
+    
+    reply_text = message.text
+    
+    # Отправляем ответ клиенту через клиентского бота
+    try:
+        if client_bot:
+            # Получаем информацию о партнере
+            partner_data = sm.get_all_partners()
+            partner_info = partner_data[partner_data['chat_id'] == str(chat_id)]
+            partner_name = partner_info.iloc[0].get('name', 'Специалист') if not partner_info.empty else 'Специалист'
+            partner_company = partner_info.iloc[0].get('company_name', '') if not partner_info.empty else ''
+            
+            # Сначала сохраняем сообщение в БД
+            message_id = sm.save_message(
+                client_chat_id=str(client_chat_id),
+                partner_chat_id=str(chat_id),
+                sender_type='partner',
+                message_text=reply_text,
+                message_type='text'
+            )
+            
+            # Формируем сообщение для клиента
+            client_message = (
+                f"💬 **Ответ от специалиста**\n\n"
+            )
+            if partner_company:
+                client_message += f"🏢 {partner_company}\n"
+            client_message += f"👤 {partner_name}\n\n"
+            client_message += f"_{reply_text}_"
+            
+            # Пытаемся отправить клиенту
+            try:
+                client_bot.send_message(
+                    int(client_chat_id),
+                    client_message,
+                    parse_mode='Markdown'
+                )
+                # Если сообщение отправлено, отмечаем как прочитанное
+                if message_id:
+                    sm.mark_message_as_read(message_id)
+            except Exception as send_error:
+                # Если клиент недоступен, сообщение уже сохранено в БД
+                logger.warning(f"Не удалось отправить сообщение клиенту {client_chat_id}, но оно сохранено в БД: {send_error}")
+            
+            # Подтверждаем партнеру
+            bot.send_message(
+                chat_id,
+                f"✅ **Ответ сохранён!**\n\n"
+                f"Клиент ID: `{client_chat_id}`\n"
+                f"Сообщение: _{reply_text}_\n\n"
+                f"_Ответ сохранён в истории переписки._",
+                parse_mode='Markdown'
+            )
+            
+            logger.info(f"Партнёр {chat_id} отправил ответ клиенту {client_chat_id} (сохранено в БД: ID={message_id})")
+        else:
+            bot.send_message(chat_id, "❌ Клиентский бот не настроен")
+    except Exception as e:
+        logger.error(f"Ошибка отправки ответа клиенту {client_chat_id} от партнёра {chat_id}: {e}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при отправке ответа клиенту. Попробуйте позже.")
+    
+    # Очищаем состояние
+    USER_STATE.pop(chat_id, None)
+    TEMP_DATA.pop(chat_id, None)
+    partner_main_menu(chat_id)
 
 
 @bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_offline_amount')
@@ -555,9 +769,11 @@ def complete_partner_transaction(chat_id: int, client_id: str, txn_type: str, am
 
             if not result.get('queued') and not str(client_id).startswith('VIA_PARTNER_'):
                 try:
+                    logger.info(f"[NPS] Отправка NPS запроса клиенту {client_id} от партнёра {chat_id}")
                     send_nps_request(client_id, str(chat_id))
-                    logger.info(f"NPS запрос отправлен клиенту {client_id}")
+                    logger.info(f"[NPS] ✅ NPS запрос успешно отправлен клиенту {client_id}")
                 except Exception as e:
+                    logger.error(f"[NPS] ❌ Ошибка отправки NPS запроса клиенту {client_id}: {e}", exc_info=True)
                     log_exception(logger, e, f"Ошибка отправки NPS запроса клиенту {client_id}")
 
         else:
@@ -589,14 +805,28 @@ def process_qr_photo(message):
     qr_data = decode_qr_from_photo(file_id)
     
     if not qr_data:
-        bot.send_message(chat_id, 
+        error_msg = (
             "❌ Не удалось распознать QR-код на фото.\n\n"
-            "Пожалуйста, убедитесь, что:\n"
-            "• QR-код четко виден на фото\n"
-            "• Фото хорошо освещено\n"
-            "• QR-код не поврежден\n\n"
-            "Или введите Chat ID клиента вручную."
         )
+        if not QR_DECODE_AVAILABLE:
+            error_msg += (
+                "⚠️ QR декодирование временно недоступно на сервере.\n\n"
+                "📝 **Как ввести Chat ID вручную:**\n"
+                "1. Посмотрите на QR-код клиента - под ним указан Chat ID (например: ID: 1234567890)\n"
+                "2. Или попросите клиента показать его Chat ID из приложения\n"
+                "3. Введите Chat ID вручную в следующем сообщении\n\n"
+            )
+        else:
+            error_msg += (
+                "Пожалуйста, убедитесь, что:\n"
+                "• QR-код четко виден на фото\n"
+                "• Фото хорошо освещено\n"
+                "• QR-код не поврежден\n\n"
+                "📝 **Альтернатива:** Введите Chat ID клиента вручную.\n"
+                "Chat ID указан под QR-кодом в приложении клиента.\n\n"
+            )
+        error_msg += "💡 Просто отправьте Chat ID следующим сообщением."
+        bot.send_message(chat_id, error_msg, parse_mode='Markdown')
         return
     
     # Парсим данные из QR-кода (формат: CLIENT_ID:<chat_id>)
@@ -652,6 +882,89 @@ def process_client_id(message):
 
     current_balance = sm.get_client_balance(client_id)
     prompt_transaction_amount(chat_id, client_id, TEMP_DATA[chat_id]['txn_type'], current_balance)
+
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_client_id_for_invite')
+def process_send_invite_to_client(message):
+    """Обрабатывает отправку реферальной ссылки клиенту."""
+    chat_id = message.chat.id
+    partner_id = str(chat_id)
+    client_id_input = message.text.strip()
+    
+    # Очищаем состояние
+    USER_STATE.pop(chat_id, None)
+    
+    # Проверяем, что клиентский бот доступен
+    if not client_bot:
+        bot.send_message(
+            chat_id,
+            "❌ Отправка сообщений клиентам временно недоступна. Используйте кнопку 'Копировать ссылку' для ручной отправки."
+        )
+        partner_main_menu(chat_id)
+        return
+    
+    # Формируем реферальную ссылку
+    link = f"https://t.me/mindbeatybot?start=partner_{partner_id}"
+    
+    try:
+        # Создаем кнопку с прямой ссылкой для клиента
+        client_markup = types.InlineKeyboardMarkup()
+        client_btn = types.InlineKeyboardButton("🎉 Присоединиться и получить баллы", url=link)
+        client_markup.add(client_btn)
+        
+        # Отправляем ссылку клиенту
+        client_bot.send_message(
+            client_id_input,
+            f"🎉 **Приглашение от партнера!**\n\n"
+            f"Вы получили приглашение присоединиться к программе лояльности.\n\n"
+            f"💎 При переходе по ссылке вы автоматически получите приветственные баллы!\n\n"
+            f"🔗 Ссылка: `{link}`",
+            parse_mode='Markdown',
+            reply_markup=client_markup
+        )
+        
+        # Подтверждаем партнеру
+        bot.send_message(
+            chat_id,
+            f"✅ **Ссылка успешно отправлена клиенту!**\n\n"
+            f"📱 Chat ID клиента: `{client_id_input}`\n"
+            f"🔗 Ссылка: `{link}`\n\n"
+            f"Клиент получит приветственные баллы при переходе по ссылке.",
+            parse_mode='Markdown'
+        )
+        logger.info(f"Партнер {chat_id} отправил реферальную ссылку клиенту {client_id_input}")
+        
+    except telebot.apihelper.ApiTelegramException as e:
+        if e.error_code == 403:
+            bot.send_message(
+                chat_id,
+                f"❌ **Не удалось отправить сообщение клиенту**\n\n"
+                f"Клиент с Chat ID `{client_id_input}` не начал диалог с ботом @mindbeatybot.\n\n"
+                f"💡 *Попросите клиента сначала написать боту @mindbeatybot, а затем попробуйте снова.*",
+                parse_mode='Markdown'
+            )
+        elif e.error_code == 400:
+            bot.send_message(
+                chat_id,
+                f"❌ **Неверный Chat ID клиента**\n\n"
+                f"Chat ID `{client_id_input}` недействителен.\n\n"
+                f"💡 *Проверьте правильность Chat ID и попробуйте снова.*",
+                parse_mode='Markdown'
+            )
+        else:
+            log_exception(logger, e, f"Ошибка отправки ссылки клиенту {client_id_input} от партнера {chat_id}")
+            bot.send_message(
+                chat_id,
+                f"❌ Произошла ошибка при отправке ссылки клиенту. Попробуйте позже или используйте кнопку 'Копировать ссылку'."
+            )
+    except Exception as e:
+        log_exception(logger, e, f"Неожиданная ошибка при отправке ссылки клиенту {client_id_input} от партнера {chat_id}")
+        bot.send_message(
+            chat_id,
+            f"❌ Произошла ошибка при отправке ссылки клиенту. Попробуйте позже или используйте кнопку 'Копировать ссылку'."
+        )
+    
+    partner_main_menu(chat_id)
 
 
 @bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_amount')
@@ -823,7 +1136,8 @@ def handle_stats_callbacks(call):
 ├─ Чистый NPS: **{stats['nps_score']}**
 ├─ 🟢 Промоутеры (9-10): **{stats['promoters']}**
 ├─ 🟡 Нейтральные (7-8): **{stats['passives']}**
-└─ 🔴 Детракторы (0-6): **{stats['detractors']}**
+├─ 🔴 Детракторы (0-6): **{stats['detractors']}**
+└─ 👑 Активных промоутеров: **{stats.get('total_promoters', 0)}**
 
 🎯 **КОНВЕРСИИ:**
 ├─ Регистрация → Покупка: **{stats['registration_to_first_purchase']}%**
@@ -1517,8 +1831,9 @@ def handle_settings_callbacks(call):
         btn_name = types.InlineKeyboardButton("👤 Редактировать имя", callback_data="edit_name")
         btn_company = types.InlineKeyboardButton("🏢 Редактировать компанию", callback_data="edit_company")
         btn_phone = types.InlineKeyboardButton("📱 Редактировать телефон", callback_data="edit_phone")
+        btn_booking = types.InlineKeyboardButton("📅 Редактировать ссылку на бронирование", callback_data="edit_booking_url")
         btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="settings_back")
-        markup.add(btn_name, btn_company, btn_phone, btn_back)
+        markup.add(btn_name, btn_company, btn_phone, btn_booking, btn_back)
         
         bot.send_message(chat_id, "✏️ *Редактирование данных:*\n\nВыберите поле, которое хотите изменить:", reply_markup=markup, parse_mode='Markdown')
     
@@ -1565,6 +1880,11 @@ def handle_edit_callbacks(call):
         USER_STATE[chat_id] = 'awaiting_edit_phone'
         msg = bot.send_message(chat_id, "✏️ *Редактирование телефона*\n\nВведите новый номер телефона:", parse_mode='Markdown')
         bot.register_next_step_handler(msg, process_edit_phone)
+    
+    elif call.data == 'edit_booking_url':
+        USER_STATE[chat_id] = 'awaiting_edit_booking_url'
+        msg = bot.send_message(chat_id, "✏️ *Редактирование ссылки на бронирование*\n\nВведите новую ссылку на систему бронирования (или отправьте 'удалить' для удаления):", parse_mode='Markdown')
+        bot.register_next_step_handler(msg, process_edit_booking_url)
     
     bot.answer_callback_query(call.id)
 
@@ -1653,6 +1973,43 @@ def process_edit_phone(message):
     except Exception as e:
         log_exception(logger, e, f"Ошибка обновления телефона партнёра {chat_id}")
         bot.send_message(chat_id, "❌ Произошла ошибка при обновлении номера телефона.")
+    
+    USER_STATE.pop(chat_id, None)
+    partner_main_menu(chat_id)
+
+
+def process_edit_booking_url(message):
+    """Обрабатывает ввод новой ссылки на бронирование партнера."""
+    chat_id = message.chat.id
+    
+    if chat_id not in USER_STATE or USER_STATE[chat_id] != 'awaiting_edit_booking_url':
+        return
+    
+    new_booking_url = message.text.strip()
+    
+    # Если пользователь хочет удалить ссылку
+    if new_booking_url.lower() in ['удалить', 'delete', 'нет', 'no', '']:
+        new_booking_url = None
+    else:
+        # Простая валидация URL
+        if not (new_booking_url.startswith('http://') or new_booking_url.startswith('https://')):
+            msg = bot.send_message(chat_id, "❌ Ссылка должна начинаться с http:// или https://. Введите корректную ссылку (или отправьте 'удалить' для удаления):")
+            bot.register_next_step_handler(msg, process_edit_booking_url)
+            return
+    
+    try:
+        success = sm.update_partner_data(str(chat_id), booking_url=new_booking_url)
+        if success:
+            if new_booking_url:
+                bot.send_message(chat_id, f"✅ Ссылка на бронирование успешно обновлена на: **{new_booking_url}**", parse_mode='Markdown')
+            else:
+                bot.send_message(chat_id, "✅ Ссылка на бронирование успешно удалена.")
+            logger.info(f"Партнёр {chat_id} обновил ссылку на бронирование: {new_booking_url}")
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при обновлении ссылки на бронирование. Попробуйте позже.")
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обновления ссылки на бронирование партнёра {chat_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при обновлении ссылки на бронирование.")
     
     USER_STATE.pop(chat_id, None)
     partner_main_menu(chat_id)
@@ -1997,6 +2354,202 @@ def handle_partner_all_messages(message):
 
     elif chat_id in USER_STATE:
         pass # Ожидаем ввода в рамках текущего шага диалога
+
+
+# ------------------------------------
+# ФУНКЦИОНАЛ: МОИ СООБЩЕНИЯ ПАРТНЕРА
+# ------------------------------------
+
+def handle_partner_messages(message):
+    """Показывает список сообщений от клиентов партнёру."""
+    chat_id = message.chat.id
+    
+    try:
+        # Получаем все переписки партнёра
+        conversations = sm.get_partner_conversations(str(chat_id))
+        
+        if not conversations:
+            bot.send_message(
+                chat_id,
+                "📭 **У вас пока нет сообщений**\n\n"
+                "Клиенты смогут написать вам через приложение, и их сообщения появятся здесь.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Сортируем по дате последнего сообщения
+        conversations.sort(key=lambda x: x['last_message'].get('created_at', ''), reverse=True)
+        
+        # Показываем первые 10 переписок
+        message_text = "💬 **Мои сообщения**\n\n"
+        message_text += f"Всего переписок: {len(conversations)}\n\n"
+        message_text += "Выберите переписку для просмотра:\n\n"
+        
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        
+        for idx, conv in enumerate(conversations[:10], 1):
+            client_id = conv['client_chat_id']
+            last_msg = conv['last_message']
+            unread_count = conv.get('unread_count', 0)
+            
+            # Получаем информацию о клиенте
+            try:
+                client_data = sm.get_client_details_for_partner(int(client_id)) if client_id.isdigit() else None
+                client_name = client_data.get('name', 'Не указано') if client_data else 'Неизвестный клиент'
+            except:
+                client_name = 'Неизвестный клиент'
+            
+            # Информация о последнем сообщении
+            msg_type = last_msg.get('message_type', 'text')
+            msg_text = last_msg.get('message_text', '')
+            service_title = last_msg.get('service_title', '')
+            
+            # Формируем краткое описание
+            preview = ""
+            if msg_type == 'qr_code':
+                preview = "📱 QR-код"
+            elif msg_type == 'text' and msg_text:
+                preview = msg_text[:25] + "..." if len(msg_text) > 25 else msg_text
+            else:
+                preview = f"📎 {msg_type}"
+            
+            # Формируем текст кнопки
+            unread_badge = f" ({unread_count})" if unread_count > 0 else ""
+            button_text = f"{idx}. {client_name}{unread_badge}"
+            if service_title:
+                service_short = service_title[:20] + "..." if len(service_title) > 20 else service_title
+                button_text += f" | {service_short}"
+            
+            markup.add(types.InlineKeyboardButton(
+                button_text,
+                callback_data=f"view_conversation_{client_id}"
+            ))
+        
+        bot.send_message(chat_id, message_text, reply_markup=markup, parse_mode='Markdown')
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка получения сообщений партнёра {chat_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при загрузке сообщений. Попробуйте позже.")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('view_conversation_'))
+def handle_view_conversation(call):
+    """Показывает историю переписки с конкретным клиентом."""
+    chat_id = call.message.chat.id
+    client_chat_id = call.data.replace('view_conversation_', '')
+    
+    try:
+        bot.answer_callback_query(call.id)
+        
+        # Получаем информацию о клиенте
+        try:
+            client_data = sm.get_client_details_for_partner(int(client_chat_id)) if client_chat_id.isdigit() else None
+            client_name = client_data.get('name', 'Не указано') if client_data else 'Неизвестный клиент'
+            client_phone = client_data.get('phone', 'Не указан') if client_data else 'Не указан'
+        except:
+            client_name = 'Неизвестный клиент'
+            client_phone = 'Не указан'
+        
+        # Получаем историю переписки
+        messages = sm.get_conversation(
+            client_chat_id=str(client_chat_id),
+            partner_chat_id=str(chat_id),
+            limit=50
+        )
+        
+        if not messages:
+            bot.send_message(chat_id, "❌ Переписка не найдена.")
+            return
+        
+        # Отмечаем все сообщения как прочитанные
+        sm.mark_conversation_as_read(str(client_chat_id), str(chat_id), 'partner')
+        
+        # Формируем сообщение с историей (показываем последние 20 сообщений)
+        recent_messages = messages[-20:]
+        
+        message_text = f"💬 **Переписка с клиентом**\n\n"
+        message_text += f"👤 **Имя:** {client_name}\n"
+        message_text += f"🆔 **Chat ID:** `{client_chat_id}`\n"
+        message_text += f"📱 **Телефон:** {client_phone}\n"
+        message_text += f"\n{'='*35}\n\n"
+        
+        # Добавляем сообщения
+        for msg in recent_messages:
+            sender_type = msg.get('sender_type', 'client')
+            msg_type = msg.get('message_type', 'text')
+            msg_text = msg.get('message_text', '')
+            service_title = msg.get('service_title', '')
+            created_at = msg.get('created_at', '')
+            
+            # Форматируем дату
+            try:
+                from datetime import datetime
+                if 'T' in created_at:
+                    dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                else:
+                    dt = datetime.fromisoformat(created_at)
+                date_str = dt.strftime('%d.%m.%Y %H:%M')
+            except:
+                date_str = created_at[:16] if created_at else 'Неизвестно'
+            
+            # Определяем автора
+            if sender_type == 'client':
+                message_text += f"👤 **Клиент** ({date_str}):\n"
+            else:
+                message_text += f"🤝 **Вы** ({date_str}):\n"
+            
+            # Добавляем информацию об услуге, если есть
+            if service_title:
+                message_text += f"📋 Услуга: _{service_title}_\n"
+            
+            # Добавляем содержимое сообщения
+            if msg_type == 'qr_code':
+                message_text += f"📱 Отправлен QR-код\n"
+                if msg_text:
+                    message_text += f"_{msg_text}_\n"
+            elif msg_type == 'text' and msg_text:
+                message_text += f"{msg_text}\n"
+            else:
+                message_text += f"📎 {msg_type}\n"
+            
+            message_text += "\n"
+        
+        # Создаём кнопки
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        reply_btn = types.InlineKeyboardButton(
+            "💬 Ответить",
+            callback_data=f"reply_to_client_{client_chat_id}"
+        )
+        back_btn = types.InlineKeyboardButton(
+            "⬅️ Назад",
+            callback_data="back_to_messages_list"
+        )
+        markup.add(reply_btn, back_btn)
+        
+        # Отправляем сообщение
+        bot.send_message(chat_id, message_text, reply_markup=markup, parse_mode='Markdown')
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка просмотра переписки партнёром {chat_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при загрузке переписки.")
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'back_to_messages_list')
+def handle_back_to_messages(call):
+    """Возвращает партнёра к списку сообщений."""
+    chat_id = call.message.chat.id
+    try:
+        bot.answer_callback_query(call.id)
+        # Создаём временное сообщение для обработки
+        class FakeMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "💬 Мои сообщения"
+        
+        handle_partner_messages(FakeMessage(chat_id))
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка возврата к списку сообщений {chat_id}")
+        partner_main_menu(chat_id)
 
 
 # ------------------------------------
