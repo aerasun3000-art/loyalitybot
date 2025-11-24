@@ -11,6 +11,9 @@ import datetime
 import time
 import io
 import qrcode
+import requests
+import base64
+import urllib.parse
 from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
 import sentry_sdk
@@ -57,11 +60,13 @@ except Exception as e:
 
 # Используем переменную окружения или актуальный URL последнего деплоя
 # Новый URL создан для обхода кэша Telegram WebView
-BASE_DOMAIN = os.environ.get('FRONTEND_URL', 'https://frontend-2nmw8tish-alekseis-projects-3b6bffb8.vercel.app')
+# Production URL: используем основной домен Vercel или последний деплой
+BASE_DOMAIN = os.environ.get('FRONTEND_URL', 'https://loyalitybot-frontend-7mdv03lt0-alekseis-projects-3b6bffb8.vercel.app')
 
 # Регулярное выражение для парсинга реферальной ссылки
-# Ожидаемый формат: /start partner_<ID>
+# Ожидаемый формат: /start partner_<ID> или /start ref_<CODE>
 REFERRAL_PATTERN = re.compile(r'partner_(\d+)', re.IGNORECASE)
+CLIENT_REFERRAL_PATTERN = re.compile(r'ref_([A-Z0-9]{6})', re.IGNORECASE)
 
 # --- ГЛОБАЛЬНОЕ ХРАНИЛИЩЕ ДЛЯ NPS ---
 # Ключ: chat_id клиента (str), Значение: chat_id партнера (str)
@@ -75,8 +80,12 @@ LAST_TRANSACTION_PARTNER = {}
 def send_nps_request(chat_id: str, partner_chat_id: str):
     """Отправляет клиенту запрос на оценку NPS."""
     chat_id = str(chat_id)
+    partner_chat_id = str(partner_chat_id)
 
+    logger.info(f"[NPS] Отправка NPS запроса: client={chat_id}, partner={partner_chat_id}")
+    
     LAST_TRANSACTION_PARTNER[chat_id] = partner_chat_id
+    logger.debug(f"[NPS] Сохранён partner_chat_id в LAST_TRANSACTION_PARTNER для клиента {chat_id}")
 
     markup = types.InlineKeyboardMarkup(row_width=6)
 
@@ -86,14 +95,18 @@ def send_nps_request(chat_id: str, partner_chat_id: str):
     markup.add(*row1)
     markup.add(*row2)
 
-    client_bot.send_message(
-        chat_id,
-        "⭐ **Оцените, пожалуйста, качество обслуживания!**\n\n"
-        "Насколько вероятно, что вы порекомендуете нас другу или коллеге?\n"
-        "(0 - крайне маловероятно, 10 - обязательно порекомендую)",
-        reply_markup=markup,
-        parse_mode='Markdown'
-    )
+    try:
+        client_bot.send_message(
+            chat_id,
+            "⭐ **Оцените, пожалуйста, работу мастера!**\n\n"
+            "Насколько вероятно, что вы порекомендуете этого мастера другу или коллеге?\n"
+            "(0 - крайне маловероятно, 10 - обязательно порекомендую)",
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+        logger.info(f"[NPS] ✅ NPS запрос успешно отправлен клиенту {chat_id}")
+    except Exception as e:
+        logger.error(f"[NPS] ❌ Ошибка отправки NPS запроса клиенту {chat_id}: {e}", exc_info=True)
 
 
 @client_bot.callback_query_handler(func=lambda call: call.data.startswith('nps_rate_'))
@@ -102,28 +115,86 @@ def callback_nps_rating(call):
     
     try:
         rating = int(call.data.split('_')[-1])
-        partner_chat_id = LAST_TRANSACTION_PARTNER.pop(client_chat_id, 'SYSTEM')
+        logger.info(f"[NPS] Получен callback от клиента {client_chat_id}, оценка: {rating}")
         
-        logger.info(f"Клиент {client_chat_id} поставил NPS оценку {rating} для партнёра {partner_chat_id}")
+        # Пытаемся получить partner_chat_id из словаря, если не найден - будет получен из БД в record_nps_rating
+        partner_chat_id = LAST_TRANSACTION_PARTNER.pop(client_chat_id, None)
+        
+        if partner_chat_id:
+            logger.info(f"[NPS] partner_chat_id найден в словаре: {partner_chat_id}")
+        else:
+            logger.info(f"[NPS] partner_chat_id не найден в словаре, будет поиск из БД")
 
-        success = sm.record_nps_rating(client_chat_id, partner_chat_id, rating, master_name='N/A')
+        logger.info(f"[NPS] Запись оценки: client={client_chat_id}, partner={partner_chat_id or 'SYSTEM'}, rating={rating}")
+        success = sm.record_nps_rating(client_chat_id, partner_chat_id or 'SYSTEM', rating, master_name='N/A')
 
         if success:
-            client_bot.edit_message_text(
-                chat_id=client_chat_id,
-                message_id=call.message.message_id,
-                text=f"⭐ Спасибо за вашу оценку: **{rating}**!\n"
-                     "Ваше мнение помогает нам стать лучше.",
-                parse_mode='Markdown'
-            )
-            logger.info(f"NPS оценка {rating} успешно записана для клиента {client_chat_id}")
+            logger.info(f"[NPS] ✅ Оценка успешно записана в БД для клиента {client_chat_id}")
+            
+            # Проверяем, был ли создан промоутер (при оценке 10)
+            is_promoter = False
+            if rating == 10:
+                logger.info(f"[NPS] Проверка создания промоутера для клиента {client_chat_id}")
+                promoter_info = sm.get_promoter_info(client_chat_id)
+                if promoter_info:
+                    is_promoter = True
+                    promo_code = promoter_info.get('promo_code', '')
+                    logger.info(f"[NPS] ✅ Промоутер найден для клиента {client_chat_id}, промо-код: {promo_code}")
+                    
+                    try:
+                        client_bot.edit_message_text(
+                            chat_id=client_chat_id,
+                            message_id=call.message.message_id,
+                            text=f"⭐⭐ **ОТЛИЧНО! Оценка: {rating}** ⭐⭐\n\n"
+                                 "🎉 **Поздравляем! Вы стали промоутером!**\n\n"
+                                 f"🎁 Ваш промо-код: `{promo_code}`\n\n"
+                                 "📸 Теперь вы можете:\n"
+                                 "• Создавать UGC контент для продвижения\n"
+                                 "• Получать бонусы за публикации\n"
+                                 "• Участвовать в конкурсах лидерборда\n"
+                                 "• Выигрывать ценные призы!\n\n"
+                                 "💬 Используйте /promoter для просмотра вашей статистики\n"
+                                 "📝 Используйте /ugc для добавления контента",
+                            parse_mode='Markdown'
+                        )
+                        logger.info(f"[NPS] ✅ Сообщение о промоутере отправлено клиенту {client_chat_id}")
+                    except Exception as e:
+                        logger.error(f"[NPS] ❌ Ошибка отправки сообщения о промоутере клиенту {client_chat_id}: {e}")
+                else:
+                    logger.warning(f"[NPS] ⚠️ Промоутер не найден для клиента {client_chat_id} после оценки 10")
+                    try:
+                        client_bot.edit_message_text(
+                            chat_id=client_chat_id,
+                            message_id=call.message.message_id,
+                            text=f"⭐ Спасибо за вашу оценку: **{rating}**!\n"
+                                 "Ваше мнение помогает нам стать лучше.",
+                            parse_mode='Markdown'
+                        )
+                    except Exception as e:
+                        logger.error(f"[NPS] ❌ Ошибка отправки сообщения клиенту {client_chat_id}: {e}")
+            else:
+                logger.info(f"[NPS] Оценка {rating} (не 10), промоутер не создаётся")
+                try:
+                    client_bot.edit_message_text(
+                        chat_id=client_chat_id,
+                        message_id=call.message.message_id,
+                        text=f"⭐ Спасибо за вашу оценку: **{rating}**!\n"
+                             "Ваше мнение помогает нам стать лучше.",
+                        parse_mode='Markdown'
+                    )
+                    logger.info(f"[NPS] ✅ Сообщение об оценке отправлено клиенту {client_chat_id}")
+                except Exception as e:
+                    logger.error(f"[NPS] ❌ Ошибка отправки сообщения клиенту {client_chat_id}: {e}")
         else:
-            logger.error(f"Не удалось записать NPS оценку для клиента {client_chat_id}")
-            client_bot.edit_message_text(
-                chat_id=client_chat_id,
-                message_id=call.message.message_id,
-                text="❌ Извините, произошла ошибка при записи вашей оценки.",
-            )
+            logger.error(f"[NPS] ❌ Не удалось записать NPS оценку для клиента {client_chat_id}")
+            try:
+                client_bot.edit_message_text(
+                    chat_id=client_chat_id,
+                    message_id=call.message.message_id,
+                    text="❌ Извините, произошла ошибка при записи вашей оценки.",
+                )
+            except Exception as e:
+                logger.error(f"[NPS] ❌ Ошибка отправки сообщения об ошибке клиенту {client_chat_id}: {e}")
 
         client_bot.answer_callback_query(call.id)
     
@@ -155,6 +226,99 @@ def generate_qr_code(data: str) -> io.BytesIO:
     img.save(img_byte_arr, format='PNG')
     img_byte_arr.seek(0)
     return img_byte_arr
+
+
+@client_bot.callback_query_handler(func=lambda call: call.data.startswith('view_conversation_'))
+def handle_view_conversation(call):
+    """Обработчик для просмотра переписки со специалистом."""
+    chat_id = str(call.message.chat.id)
+    partner_chat_id = call.data.replace('view_conversation_', '')
+    
+    try:
+        # Получаем переписку из БД
+        conversation = sm.get_conversation(chat_id, partner_chat_id, limit=20)
+        
+        if not conversation:
+            client_bot.answer_callback_query(call.id, "Переписка пуста")
+            client_bot.send_message(
+                chat_id,
+                "💬 **Переписка со специалистом**\n\n"
+                "Пока нет сообщений. Ваше первое сообщение будет отправлено специалисту.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Получаем информацию о партнёре
+        partner_data = sm.get_all_partners()
+        partner_info = partner_data[partner_data['chat_id'] == partner_chat_id]
+        partner_name = partner_info.iloc[0].get('name', 'Специалист') if not partner_info.empty else 'Специалист'
+        partner_company = partner_info.iloc[0].get('company_name', '') if not partner_info.empty else ''
+        
+        # Формируем сообщение с перепиской
+        messages_text = f"💬 **Переписка со специалистом**\n\n"
+        if partner_company:
+            messages_text += f"🏢 {partner_company}\n"
+        messages_text += f"👤 {partner_name}\n\n"
+        messages_text += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        # Показываем сообщения в хронологическом порядке
+        for msg in reversed(conversation):
+            sender_type = msg.get('sender_type', '')
+            message_text = msg.get('message_text', '')
+            message_type = msg.get('message_type', 'text')
+            created_at = msg.get('created_at', '')
+            
+            # Форматируем время
+            try:
+                if created_at:
+                    dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    time_str = dt.strftime('%H:%M')
+                else:
+                    time_str = ''
+            except:
+                time_str = ''
+            
+            if sender_type == 'client':
+                messages_text += f"👤 **Вы** ({time_str}):\n"
+            else:
+                messages_text += f"💼 **Специалист** ({time_str}):\n"
+            
+            if message_type == 'qr_code':
+                messages_text += "📱 QR-код\n"
+            elif message_type == 'image':
+                messages_text += "📷 Изображение\n"
+            elif message_text:
+                messages_text += f"{message_text}\n"
+            else:
+                messages_text += "📎 Вложение\n"
+            
+            messages_text += "\n"
+        
+        # Добавляем кнопку для ответа (используем /start с параметром для отправки сообщения)
+        markup = types.InlineKeyboardMarkup()
+        reply_btn = types.InlineKeyboardButton(
+            "✍️ Написать сообщение",
+            url=f"https://t.me/{client_bot.get_me().username}?start=msg_{partner_chat_id}"
+        )
+        markup.add(reply_btn)
+        
+        client_bot.send_message(
+            chat_id,
+            messages_text,
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+        
+        client_bot.answer_callback_query(call.id, "Переписка загружена")
+        logger.info(f"Клиент {chat_id} просмотрел переписку со специалистом {partner_chat_id}")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка показа переписки для клиента {chat_id} со специалистом {partner_chat_id}")
+        try:
+            client_bot.answer_callback_query(call.id, "Ошибка загрузки переписки")
+            client_bot.send_message(chat_id, "❌ Произошла ошибка при загрузке переписки. Попробуйте позже.")
+        except:
+            pass
 
 
 @client_bot.callback_query_handler(func=lambda call: call.data == 'show_qr_code')
@@ -216,6 +380,253 @@ def handle_new_user_start(message):
     chat_id = str(message.chat.id)
     text = message.text or ''
     
+    # Проверяем, есть ли данные от sendData через start_param
+    # sendData отправляет данные через start_param в формате JSON
+    try:
+        # Получаем start_param из текста (формат: /start <param>)
+        parts = text.split(' ', 1)
+        if len(parts) > 1:
+            start_param = parts[1]
+            
+            # Проверяем, это запрос на контакт со специалистом через бота (новый формат)
+            # НОВЫЙ ФОРМАТ: contact_<base64> - полностью обходит проблему кэширования
+            if start_param.startswith('contact_'):
+                # Извлекаем base64 данные
+                data_part = start_param.replace('contact_', '')
+                try:
+                    # Добавляем padding для base64
+                    padding = 4 - (len(data_part) % 4)
+                    if padding != 4:
+                        data_part += '=' * padding
+                    qr_data_json = base64.b64decode(data_part).decode('utf-8')
+                    qr_data = json.loads(qr_data_json)
+                    
+                    # Если это contact_specialist action, обрабатываем ниже
+                    # Не возвращаемся здесь, продолжаем выполнение к обработке contact_specialist
+                    if not qr_data or qr_data.get('action') != 'contact_specialist':
+                        # Старый формат - просто приветствие
+                        client_bot.send_message(
+                            chat_id,
+                            "👋 **Здравствуйте! Специалист на связи.**\n\n"
+                            "Напишите ваш вопрос, и я постараюсь помочь! 💬",
+                            parse_mode='Markdown'
+                        )
+                        return
+                except Exception as e:
+                    logger.error(f"Ошибка парсинга contact_ параметра: {e}")
+                    client_bot.send_message(
+                        chat_id,
+                        "❌ Ошибка обработки запроса. Попробуйте позже.",
+                        parse_mode='Markdown'
+                    )
+                    return
+            else:
+                # Старый формат - пытаемся распарсить JSON или base64 напрямую
+                try:
+                    qr_data = json.loads(start_param)
+                except json.JSONDecodeError:
+                    # Если не JSON, пробуем декодировать как base64
+                    try:
+                        # Добавляем padding для base64 если нужно
+                        padding = 4 - (len(start_param) % 4)
+                        if padding != 4:
+                            start_param_padded = start_param + '=' * padding
+                        else:
+                            start_param_padded = start_param
+                        qr_data_json = base64.b64decode(start_param_padded).decode('utf-8')
+                        qr_data = json.loads(qr_data_json)
+                    except:
+                        # Если не удалось распарсить, проверяем старый формат
+                        if start_param.startswith('send_qr_'):
+                            data_part = start_param.replace('send_qr_', '')
+                            # Добавляем padding для base64
+                            padding = 4 - (len(data_part) % 4)
+                            if padding != 4:
+                                data_part += '=' * padding
+                            qr_data_json = base64.b64decode(data_part).decode('utf-8')
+                            qr_data = json.loads(qr_data_json)
+                        else:
+                            # Если не удалось распарсить, qr_data останется None
+                            qr_data = None
+            
+            # Проверяем действие (только если qr_data не None)
+            if qr_data and qr_data.get('action') == 'contact_specialist':
+                partner_chat_id = qr_data.get('partner_chat_id')
+                message_text = qr_data.get('message_text', '')
+                client_chat_id = qr_data.get('client_chat_id', chat_id)
+                service_title = qr_data.get('service_title', '')
+                
+                if not partner_chat_id:
+                    client_bot.send_message(chat_id, "❌ Ошибка: не указан специалист", parse_mode='Markdown')
+                    return
+                
+                # Проверяем, существует ли партнёр
+                partner_exists = sm.partner_exists(partner_chat_id)
+                if not partner_exists:
+                    client_bot.send_message(chat_id, "❌ Специалист не найден в системе.", parse_mode='Markdown')
+                    return
+
+                # Сначала сохраняем сообщение в БД
+                service_id_uuid = qr_data.get('service_id', None)
+                # service_id может быть UUID (строка) или числом - приводим к строке
+                if service_id_uuid:
+                    service_id_uuid = str(service_id_uuid)
+                
+                message_id = sm.save_message(
+                    client_chat_id=client_chat_id,
+                    partner_chat_id=partner_chat_id,
+                    sender_type='client',
+                    message_text=message_text,
+                    message_type='text',
+                    service_id=service_id_uuid,
+                    service_title=service_title
+                )
+                
+                # Получаем информацию о клиенте для отображения партнёру
+                client_info = sm.get_client_details_for_partner(int(client_chat_id)) if client_chat_id.isdigit() else None
+                client_name = client_info.get('name', 'Не указано') if client_info else 'Неизвестный клиент'
+                client_phone = client_info.get('phone', 'Не указан') if client_info else 'Не указан'
+                
+                # Отправляем сообщение партнёру через партнёрского бота
+                try:
+                    from bot import bot as partner_bot
+                    
+                    # Создаем inline-кнопку для ответа клиенту
+                    markup = types.InlineKeyboardMarkup()
+                    reply_btn = types.InlineKeyboardButton(
+                        "💬 Ответить клиенту",
+                        callback_data=f"reply_to_client_{client_chat_id}"
+                    )
+                    markup.add(reply_btn)
+                    
+                    # Формируем сообщение для партнёра с полной информацией
+                    partner_message = (
+                        f"📩 **Новое сообщение от клиента!**\n\n"
+                        f"👤 **Имя:** {client_name}\n"
+                        f"🆔 **Chat ID:** `{client_chat_id}`\n"
+                        f"📱 **Телефон:** {client_phone}\n"
+                    )
+                    if service_title:
+                        partner_message += f"📋 **Услуга:** {service_title}\n"
+                    partner_message += f"\n💬 **Сообщение:**\n_{message_text}_\n\n"
+                    partner_message += "Нажмите кнопку ниже, чтобы ответить клиенту.\n"
+                    partner_message += "Или используйте раздел '💬 Мои сообщения' для просмотра всей переписки."
+                    
+                    # Пытаемся отправить партнёру
+                    try:
+                        partner_bot.send_message(
+                            partner_chat_id,
+                            partner_message,
+                            parse_mode='Markdown',
+                            reply_markup=markup
+                        )
+                        # Если сообщение отправлено, отмечаем как прочитанное
+                        if message_id:
+                            sm.mark_message_as_read(message_id)
+                    except Exception as send_error:
+                        # Если партнёр недоступен, сообщение уже сохранено в БД
+                        logger.warning(f"Не удалось отправить сообщение партнёру {partner_chat_id}, но оно сохранено в БД: {send_error}")
+                    
+                    # Подтверждаем клиенту с кнопкой для просмотра переписки
+                    markup = types.InlineKeyboardMarkup()
+                    view_conversation_btn = types.InlineKeyboardButton(
+                        "💬 Открыть переписку",
+                        callback_data=f"view_conversation_{partner_chat_id}"
+                    )
+                    markup.add(view_conversation_btn)
+                    
+                    client_bot.send_message(
+                        chat_id,
+                        "✅ **Ваше сообщение отправлено специалисту!**\n\n"
+                        "Он получит уведомление и ответит вам в ближайшее время. 💬\n\n"
+                        "_Сообщение сохранено в истории переписки._\n\n"
+                        "Нажмите кнопку ниже, чтобы открыть переписку:",
+                        parse_mode='Markdown',
+                        reply_markup=markup
+                    )
+                    
+                    logger.info(f"Клиент {chat_id} отправил сообщение специалисту {partner_chat_id} (сохранено в БД: ID={message_id})")
+                except Exception as e:
+                    log_exception(logger, e, f"Ошибка отправки сообщения специалисту {partner_chat_id} от клиента {chat_id}")
+                    # Сообщение уже сохранено в БД, даже если отправка не удалась
+                    client_bot.send_message(
+                        chat_id, 
+                        "✅ **Ваше сообщение сохранено!**\n\n"
+                        "Специалист получит его, как только станет доступен. 💬",
+                        parse_mode='Markdown'
+                    )
+                return
+            
+            elif qr_data and qr_data.get('action') == 'send_qr_to_partner':
+                partner_chat_id = qr_data.get('partner_chat_id')
+                # Поддерживаем оба формата: qr_image (data URL) и qr_image_base64 (чистый base64)
+                qr_image = qr_data.get('qr_image', '') or qr_data.get('qr_image_base64', '')
+                client_chat_id = qr_data.get('client_chat_id', chat_id)
+                service_title = qr_data.get('service_title', '')
+                
+                if not partner_chat_id:
+                    client_bot.send_message(chat_id, "❌ Ошибка: не указан партнёр", parse_mode='Markdown')
+                    return
+                
+                if not qr_image:
+                    client_bot.send_message(chat_id, "❌ Ошибка: QR-код не найден", parse_mode='Markdown')
+                    return
+                
+                # Сохраняем QR-код в истории переписки
+                service_id_uuid = qr_data.get('service_id', None)
+                # service_id может быть UUID (строка) или числом - приводим к строке
+                if service_id_uuid:
+                    service_id_uuid = str(service_id_uuid)
+                
+                # Сохраняем сообщение с QR-кодом (используем data URL как attachment_url)
+                message_id = sm.save_message(
+                    client_chat_id=client_chat_id,
+                    partner_chat_id=partner_chat_id,
+                    sender_type='client',
+                    message_text=f"Отправлен QR-код для услуги: {service_title}" if service_title else "Отправлен QR-код",
+                    message_type='qr_code',
+                    attachment_url=qr_image,  # Сохраняем data URL целиком
+                    attachment_type='qr_code',
+                    service_id=service_id_uuid,
+                    service_title=service_title
+                )
+                
+                # Отправляем QR партнёру
+                result = send_qr_to_partner(partner_chat_id, qr_image, client_chat_id, service_title)
+                
+                if result.get('success'):
+                    # Если QR отправлен успешно, отмечаем сообщение как прочитанное
+                    if message_id:
+                        sm.mark_message_as_read(message_id)
+                    
+                    client_bot.send_message(
+                        chat_id,
+                        "✅ **QR-код успешно отправлен партнёру!**\n\n"
+                        "Партнёр получит QR-код и сможет сканировать его для начисления баллов.\n\n"
+                        "_QR-код сохранён в истории переписки._",
+                        parse_mode='Markdown'
+                    )
+                else:
+                    # QR сохранён в БД, даже если отправка не удалась
+                    error_msg = result.get('error', 'Неизвестная ошибка')
+                    client_bot.send_message(
+                        chat_id,
+                        f"✅ **QR-код сохранён!**\n\n"
+                        f"Партнёр получит его, как только станет доступен.\n\n"
+                        f"_QR-код сохранён в истории переписки._",
+                        parse_mode='Markdown'
+                    )
+                    logger.info(f"QR-код сохранён в истории переписки (ID={message_id}), но не удалось отправить: {error_msg}")
+                
+                logger.info(f"Обработан sendData запрос от {chat_id} для партнёра {partner_chat_id}")
+                return
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        # Это нормально, если start_param не наш формат - продолжаем обычную обработку
+        pass
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обработки sendData от {chat_id}")
+        # Продолжаем обычную обработку /start
+    
     # Rate limiting: 5 команд в минуту
     allowed, error = check_rate_limit(chat_id, 'command')
     if not allowed:
@@ -227,11 +638,17 @@ def handle_new_user_start(message):
 
     # --- 1. ПАРСИНГ РЕФЕРАЛЬНОЙ ССЫЛКИ ---
     partner_id = None
+    client_referral_code = None
     # Ищем совпадение в тексте сообщения, пропуская '/start '
-    match = REFERRAL_PATTERN.search(text)
-    if match:
-        partner_id = match.group(1)
+    partner_match = REFERRAL_PATTERN.search(text)
+    client_match = CLIENT_REFERRAL_PATTERN.search(text)
+    
+    if partner_match:
+        partner_id = partner_match.group(1)
         logger.info(f"Обнаружен partner_id из реферальной ссылки: {partner_id}")
+    elif client_match:
+        client_referral_code = client_match.group(1).upper()
+        logger.info(f"Обнаружен реферальный код клиента: {client_referral_code}")
 
     try:
         client_exists = sm.client_exists(chat_id)
@@ -239,10 +656,16 @@ def handle_new_user_start(message):
         log_exception(logger, e, f"Ошибка проверки существования клиента {chat_id}")
         # Даже при ошибке показываем меню, чтобы пользователь мог попробовать
         markup = types.InlineKeyboardMarkup(row_width=1)
+        # UX-ФОКУСНОЕ РЕШЕНИЕ: Возвращаем Web App, но используем tg.openLink() во фронтенде
+        import random
+        cache_bust = int(time.time() * 1000)
+        random_suffix = random.randint(100000, 999999)
+        # АГРЕССИВНЫЙ CACHE BUSTING - добавляем версию и timestamp
+        version = 'v13-netlify-deploy'
+        web_app_url = f"{BASE_DOMAIN}?v={cache_bust}&nocache=1&_t={cache_bust}&_r={cache_bust}&_cache_bust={cache_bust}&_refresh={cache_bust}&_cb={cache_bust}&timestamp={cache_bust}&rand={random_suffix}&_v13={version}&_force={random_suffix}&_netlify=1&_nocache={cache_bust}"
         webapp_btn = types.InlineKeyboardButton(
             "🚀 Открыть приложение",
-            # Добавляем версию и nocache, чтобы обойти кэш Telegram WebView/CDN
-            web_app=types.WebAppInfo(url=f"{BASE_DOMAIN}?v={int(time.time())}&nocache=1&_t={int(time.time())}&_r={int(time.time()*1000)}&_cache_bust={int(time.time()*1000)}&_refresh={int(time.time())}")
+            web_app=types.WebAppInfo(url=web_app_url)  # Возвращаем Web App
         )
         qr_btn = types.InlineKeyboardButton(
             "📱 Показать QR-код",
@@ -286,6 +709,37 @@ def handle_new_user_start(message):
             log_exception(logger, e, f"Критическая ошибка при регистрации клиента {chat_id} через ссылку")
             # Показываем меню даже при критической ошибке
             client_exists = False
+    
+    # --- 2.1. ЛОГИКА: РЕГИСТРАЦИЯ ПО РЕФЕРАЛЬНОЙ ССЫЛКЕ КЛИЕНТА ---
+    if not client_exists and client_referral_code:
+        try:
+            # Регистрируем клиента по реферальной ссылке другого клиента
+            result = sm.register_client_via_client_referral(chat_id, client_referral_code, phone=None, name=None)
+            
+            if result and not result[1]:  # Успешная регистрация
+                bonus_amount = sm.WELCOME_BONUS_AMOUNT
+                logger.info(f"Клиент {chat_id} успешно зарегистрирован по реферальной ссылке клиента {client_referral_code}")
+                client_bot.send_message(
+                    chat_id,
+                    f"🎉 **Добро пожаловать!**\n\n"
+                    f"Вы зарегистрировались по реферальной ссылке и получили **{bonus_amount}** приветственных баллов!\n\n"
+                    f"💡 Приглашайте друзей и получайте бонусы за каждого нового пользователя!",
+                    parse_mode='Markdown'
+                )
+                client_exists = True
+            else:
+                error_msg = result[1] if result else "Неизвестная ошибка"
+                logger.error(f"Ошибка регистрации клиента {chat_id} по реферальной ссылке {client_referral_code}: {error_msg}")
+                client_bot.send_message(
+                    chat_id,
+                    f"❌ Ошибка регистрации: {error_msg}\n\n"
+                    f"Проверьте правильность реферальной ссылки.",
+                    parse_mode='Markdown'
+                )
+                client_exists = False
+        except Exception as e:
+            log_exception(logger, e, f"Критическая ошибка при регистрации клиента {chat_id} через реферальную ссылку")
+            client_exists = False
 
     # --- 3. ЛОГИКА: СУЩЕСТВУЮЩИЙ КЛИЕНТ (включая только что зарегистрированных) ---
     if client_exists:
@@ -303,10 +757,16 @@ def handle_new_user_start(message):
 
         # Всегда показываем меню для существующего клиента
         markup = types.InlineKeyboardMarkup(row_width=1)
+        # UX-ФОКУСНОЕ РЕШЕНИЕ: Возвращаем Web App, но используем tg.openLink() во фронтенде
+        import random
+        cache_bust = int(time.time() * 1000)
+        random_suffix = random.randint(100000, 999999)
+        # АГРЕССИВНЫЙ CACHE BUSTING - добавляем версию и timestamp
+        version = 'v13-netlify-deploy'
+        web_app_url = f"{BASE_DOMAIN}?v={cache_bust}&nocache=1&_t={cache_bust}&_r={cache_bust}&_cache_bust={cache_bust}&_refresh={cache_bust}&_cb={cache_bust}&timestamp={cache_bust}&rand={random_suffix}&_v13={version}&_force={random_suffix}&_netlify=1&_nocache={cache_bust}"
         webapp_btn = types.InlineKeyboardButton(
             "🚀 Открыть приложение",
-            # Добавляем версию и nocache, чтобы обойти кэш Telegram WebView/CDN
-            web_app=types.WebAppInfo(url=f"{BASE_DOMAIN}?v={int(time.time())}&nocache=1&_t={int(time.time())}&_r={int(time.time()*1000)}&_cache_bust={int(time.time()*1000)}&_refresh={int(time.time())}")
+            web_app=types.WebAppInfo(url=web_app_url)  # Возвращаем Web App
         )
         qr_btn = types.InlineKeyboardButton(
             "📱 Показать QR-код",
@@ -329,10 +789,16 @@ def handle_new_user_start(message):
     # --- 4. ЛОГИКА: НЕЗАРЕГИСТРИРОВАННЫЙ КЛИЕНТ (БЕЗ РЕФЕРАЛА) ---
     # Предлагаем открыть приложение для регистрации
     markup = types.InlineKeyboardMarkup(row_width=1)
+    # НОВОЕ РЕШЕНИЕ: Бот как посредник - полностью обходит проблему кэширования
+    import random
+    cache_bust = int(time.time() * 1000)
+    random_suffix = random.randint(100000, 999999)
+    # АГРЕССИВНЫЙ CACHE BUSTING - новая версия для бота-посредника
+    version = 'v13-netlify-deploy'
+    web_app_url = f"{BASE_DOMAIN}?v={cache_bust}&nocache=1&_t={cache_bust}&_r={cache_bust}&_cache_bust={cache_bust}&_refresh={cache_bust}&_cb={cache_bust}&timestamp={cache_bust}&rand={random_suffix}&_v13={version}&_force={random_suffix}&_netlify=1&_nocache={cache_bust}&_reload={cache_bust}&_clear_cache=1&_version={version}"
     webapp_btn = types.InlineKeyboardButton(
         "🚀 Открыть приложение",
-        # Добавляем версию и nocache, чтобы обойти кэш Telegram WebView/CDN
-        web_app=types.WebAppInfo(url=f"{BASE_DOMAIN}?v={int(time.time())}&nocache=1&_t={int(time.time())}&_r={int(time.time()*1000)}")
+        web_app=types.WebAppInfo(url=web_app_url)  # Возвращаем Web App
     )
     qr_btn = types.InlineKeyboardButton(
         "📱 Показать QR-код",
@@ -355,6 +821,306 @@ def handle_new_user_start(message):
 # ------------------------------------
 # AI ПОДДЕРЖКА
 # ------------------------------------
+
+@client_bot.message_handler(commands=['referral', 'рефералы', 'пригласить'])
+def handle_referral_command(message):
+    """Обработчик команды для реферальной программы."""
+    chat_id = str(message.chat.id)
+    
+    # Rate limiting
+    allowed, error = check_rate_limit(chat_id, 'command')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        return
+    
+    try:
+        # Получаем или создаём реферальный код
+        referral_code = sm.get_or_create_referral_code(chat_id)
+        if not referral_code:
+            client_bot.send_message(chat_id, "❌ Ошибка получения реферального кода. Попробуйте позже.")
+            return
+        
+        # Получаем статистику
+        stats = sm.get_referral_stats(chat_id)
+        
+        # Формируем реферальную ссылку
+        bot_username = client_bot.get_me().username
+        referral_link = f"https://t.me/{bot_username}?start=ref_{referral_code}"
+        
+        # Формируем сообщение
+        level_emoji = {
+            'bronze': '🥉',
+            'silver': '🥈',
+            'gold': '🥇',
+            'platinum': '💎'
+        }
+        level_name = {
+            'bronze': 'Бронза',
+            'silver': 'Серебро',
+            'gold': 'Золото',
+            'platinum': 'Платина'
+        }
+        
+        level = stats.get('referral_level', 'bronze')
+        emoji = level_emoji.get(level, '🥉')
+        level_text = level_name.get(level, 'Бронза')
+        
+        message_text = (
+            f"🎯 **Реферальная программа**\n\n"
+            f"📊 **Ваша статистика:**\n"
+            f"• Уровень: {emoji} {level_text}\n"
+            f"• Всего приглашено: {stats.get('total_referrals', 0)}\n"
+            f"• Активных рефералов: {stats.get('active_referrals', 0)}\n"
+            f"• Заработано баллов: {stats.get('total_earnings', 0)} 💸\n\n"
+            f"🔗 **Ваша реферальная ссылка:**\n"
+            f"`{referral_link}`\n\n"
+            f"💡 **Как это работает:**\n"
+            f"• За регистрацию друга: +100 баллов\n"
+            f"• За покупки друга: 8% от его баллов\n"
+            f"• За внучатого реферала: 25 баллов + 4% с покупок\n"
+            f"• За правнучатого: 10 баллов + 2% с покупок\n\n"
+            f"🎁 **Достижения:**\n"
+            f"• 5 рефералов: +200 баллов\n"
+            f"• 10 рефералов: +500 баллов\n"
+            f"• 25 рефералов: +1500 баллов\n"
+            f"• 50 рефералов: +3000 баллов"
+        )
+        
+        # Кнопки для копирования ссылки и QR-кода
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        qr_btn = types.InlineKeyboardButton(
+            "📱 QR-код реферальной ссылки",
+            callback_data=f"referral_qr_{referral_code}"
+        )
+        copy_btn = types.InlineKeyboardButton(
+            "📋 Копировать ссылку",
+            callback_data=f"copy_referral_{referral_code}"
+        )
+        stats_btn = types.InlineKeyboardButton(
+            "📊 Подробная статистика",
+            callback_data="referral_stats_detail"
+        )
+        markup.add(qr_btn, copy_btn, stats_btn)
+        
+        client_bot.send_message(
+            chat_id,
+            message_text,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка при обработке команды referral для {chat_id}")
+        client_bot.send_message(chat_id, "❌ Произошла ошибка при получении данных. Попробуйте позже.")
+
+@client_bot.message_handler(commands=['promoter', 'промоутер'])
+def handle_promoter_command(message):
+    """Обработчик команды для промоутеров."""
+    chat_id = str(message.chat.id)
+    
+    # Rate limiting
+    allowed, error = check_rate_limit(chat_id, 'command')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        return
+    
+    try:
+        # Получаем информацию о промоутере
+        promoter_info = sm.get_promoter_info(chat_id)
+        
+        if not promoter_info:
+            client_bot.send_message(
+                chat_id,
+                "❌ Вы ещё не являетесь промоутером.\n\n"
+                "⭐ Чтобы стать промоутером, поставьте оценку **10** при следующем визите в партнёрскую организацию!"
+            )
+            return
+        
+        # Получаем UGC контент
+        all_content = sm.get_ugc_content_for_promoter(chat_id)
+        approved_content = [c for c in all_content if c.get('status') == 'approved']
+        pending_content = [c for c in all_content if c.get('status') == 'pending']
+        
+        # Уровни промоутера
+        level_emoji = {
+            'novice': '🌱',
+            'active': '⭐',
+            'pro': '🔥',
+            'master': '👑'
+        }
+        level_name = {
+            'novice': 'Новичок',
+            'active': 'Активный',
+            'pro': 'Профессионал',
+            'master': 'Мастер'
+        }
+        
+        level = promoter_info.get('promoter_level', 'novice')
+        emoji = level_emoji.get(level, '🌱')
+        level_text = level_name.get(level, 'Новичок')
+        
+        promo_code = promoter_info.get('promo_code', 'N/A')
+        
+        message_text = (
+            f"🎯 **Статистика промоутера**\n\n"
+            f"📊 **Уровень:** {emoji} {level_text}\n"
+            f"🎁 **Промо-код:** `{promo_code}`\n\n"
+            f"📸 **Публикации:**\n"
+            f"• Всего: {promoter_info.get('total_publications', 0)}\n"
+            f"• Одобрено: {len(approved_content)}\n"
+            f"• На модерации: {len(pending_content)}\n\n"
+            f"💸 **Заработано:** {promoter_info.get('total_earned_points', 0)} баллов\n\n"
+            f"🏆 **Призы:**\n"
+            f"• Выиграно: {promoter_info.get('prizes_won', 0)}\n"
+            f"• Общая стоимость: {promoter_info.get('total_prize_value', 0)} 💰\n"
+        )
+        
+        # Получаем позицию в лидерборде, если есть активный период
+        active_period = sm.get_active_leaderboard_period()
+        if active_period:
+            rank_info = sm.get_leaderboard_rank_for_user(active_period['id'], chat_id)
+            if rank_info:
+                message_text += f"\n📈 **Лидерборд:**\n"
+                message_text += f"• Текущая позиция: #{rank_info.get('final_rank', 'N/A')}\n"
+                message_text += f"• Баллы: {rank_info.get('total_score', 0):.2f}\n"
+        
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        qr_btn = types.InlineKeyboardButton(
+            "📱 QR-код промо-кода",
+            callback_data=f"promoter_qr_{promo_code}"
+        )
+        ugc_btn = types.InlineKeyboardButton("📸 Добавить UGC контент", callback_data="add_ugc_content")
+        materials_btn = types.InlineKeyboardButton("📁 Промо-материалы", callback_data="promo_materials")
+        leaderboard_btn = types.InlineKeyboardButton("🏆 Лидерборд", callback_data="view_leaderboard")
+        markup.add(qr_btn, ugc_btn, materials_btn, leaderboard_btn)
+        
+        client_bot.send_message(
+            chat_id,
+            message_text,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка при обработке команды promoter для {chat_id}")
+        client_bot.send_message(chat_id, "❌ Произошла ошибка при получении данных. Попробуйте позже.")
+
+@client_bot.message_handler(commands=['ugc'])
+def handle_ugc_command(message):
+    """Обработчик команды для добавления UGC контента."""
+    chat_id = str(message.chat.id)
+    
+    # Rate limiting
+    allowed, error = check_rate_limit(chat_id, 'command')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        return
+    
+    try:
+        # Проверяем, является ли промоутером
+        promoter_info = sm.get_promoter_info(chat_id)
+        if not promoter_info:
+            client_bot.send_message(
+                chat_id,
+                "❌ Вы не являетесь промоутером.\n\n"
+                "⭐ Чтобы стать промоутером, поставьте оценку **10** при следующем визите!"
+            )
+            return
+        
+        # Получаем промо-материалы
+        materials = sm.get_promo_materials()
+        
+        message_text = (
+            "📸 **Добавление UGC контента**\n\n"
+            "📝 **Инструкция:**\n"
+            "1. Создайте публикацию с нашими материалами\n"
+            "2. Отправьте ссылку на публикацию в формате:\n"
+            "`/ugc_add <ссылка> <платформа>`\n\n"
+            "**Платформы:** instagram, telegram, vk, other\n\n"
+            "**Пример:**\n"
+            "`/ugc_add https://instagram.com/p/abc123 instagram`\n\n"
+        )
+        
+        if materials:
+            message_text += "📁 **Доступные материалы:**\n"
+            for mat in materials[:5]:  # Показываем первые 5
+                message_text += f"• {mat.get('title', 'Материал')}\n"
+        
+        client_bot.send_message(chat_id, message_text, parse_mode='Markdown')
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка при обработке команды ugc для {chat_id}")
+        client_bot.send_message(chat_id, "❌ Произошла ошибка. Попробуйте позже.")
+
+@client_bot.message_handler(commands=['leaderboard', 'лидерборд'])
+def handle_leaderboard_command(message):
+    """Обработчик команды для просмотра лидерборда."""
+    chat_id = str(message.chat.id)
+    
+    # Rate limiting
+    allowed, error = check_rate_limit(chat_id, 'command')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        return
+    
+    try:
+        # Получаем активный период
+        active_period = sm.get_active_leaderboard_period()
+        
+        if not active_period:
+            client_bot.send_message(
+                chat_id,
+                "⏳ Сейчас нет активного периода лидерборда.\n\n"
+                "Следующий конкурс скоро начнётся!"
+            )
+            return
+        
+        # Получаем топ участников
+        top_users = sm.get_leaderboard_top(active_period['id'], limit=10)
+        
+        # Получаем позицию пользователя
+        user_rank = sm.get_leaderboard_rank_for_user(active_period['id'], chat_id)
+        
+        message_text = (
+            f"🏆 **Лидерборд** 🏆\n\n"
+            f"📅 **Период:** {active_period.get('period_name', 'Текущий месяц')}\n"
+            f"📊 **Статус:** {'Активен' if active_period.get('status') == 'active' else 'Завершён'}\n\n"
+            f"🥇 **ТОП-10:**\n\n"
+        )
+        
+        medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+        
+        for idx, user in enumerate(top_users[:10], start=1):
+            rank_emoji = medals[idx - 1] if idx <= 10 else f"{idx}."
+            name = user.get('users', {}).get('name', 'Аноним') if isinstance(user.get('users'), dict) else user.get('client_chat_id', 'N/A')
+            score = float(user.get('total_score', 0))
+            message_text += f"{rank_emoji} {name}: {score:.2f} баллов\n"
+        
+        if user_rank:
+            user_final_rank = user_rank.get('final_rank', 'N/A')
+            user_score = float(user_rank.get('total_score', 0))
+            message_text += f"\n📈 **Ваша позиция:** #{user_final_rank}\n"
+            message_text += f"💯 **Ваши баллы:** {user_score:.2f}\n"
+        
+        # Показываем призы
+        prizes_config = active_period.get('prizes_config', {})
+        if prizes_config:
+            message_text += f"\n🎁 **Призы:**\n"
+            if '1' in prizes_config:
+                prize = prizes_config['1']
+                message_text += f"🥇 1 место: {prize.get('name', 'Приз')}\n"
+            if '2' in prizes_config:
+                prize = prizes_config['2']
+                message_text += f"🥈 2 место: {prize.get('name', 'Приз')}\n"
+            if '3' in prizes_config:
+                prize = prizes_config['3']
+                message_text += f"🥉 3 место: {prize.get('name', 'Приз')}\n"
+        
+        client_bot.send_message(chat_id, message_text, parse_mode='Markdown')
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка при обработке команды leaderboard для {chat_id}")
+        client_bot.send_message(chat_id, "❌ Произошла ошибка при получении данных. Попробуйте позже.")
 
 @client_bot.message_handler(commands=['ask', 'спросить'])
 def handle_ask_command(message):
@@ -641,6 +1407,408 @@ def handle_gdpr_delete_callback(call):
                 message_id=call.message.message_id,
                 parse_mode='Markdown'
             )
+
+
+@client_bot.message_handler(commands=['ugc_add'])
+def handle_ugc_add_command(message):
+    """Обработчик команды для добавления UGC контента."""
+    chat_id = str(message.chat.id)
+    
+    # Rate limiting
+    allowed, error = check_rate_limit(chat_id, 'command')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        return
+    
+    try:
+        # Проверяем, является ли промоутером
+        promoter_info = sm.get_promoter_info(chat_id)
+        if not promoter_info:
+            client_bot.send_message(
+                chat_id,
+                "❌ Вы не являетесь промоутером.\n\n"
+                "⭐ Чтобы стать промоутером, поставьте оценку **10** при следующем визите!"
+            )
+            return
+        
+        # Парсим команду: /ugc_add <ссылка> <платформа>
+        text = message.text.strip()
+        parts = text.split(None, 2)
+        
+        if len(parts) < 3:
+            client_bot.send_message(
+                chat_id,
+                "❌ Неверный формат команды.\n\n"
+                "**Использование:**\n"
+                "`/ugc_add <ссылка> <платформа>`\n\n"
+                "**Платформы:** instagram, telegram, vk, other\n\n"
+                "**Пример:**\n"
+                "`/ugc_add https://instagram.com/p/abc123 instagram`"
+            )
+            return
+        
+        content_url = parts[1]
+        platform = parts[2].lower()
+        
+        # Проверяем платформу
+        valid_platforms = ['instagram', 'telegram', 'vk', 'other']
+        if platform not in valid_platforms:
+            client_bot.send_message(
+                chat_id,
+                f"❌ Неверная платформа: {platform}\n\n"
+                f"**Доступные платформы:** {', '.join(valid_platforms)}"
+            )
+            return
+        
+        # Добавляем UGC контент
+        promo_code = promoter_info.get('promo_code')
+        success, ugc_id = sm.add_ugc_content(chat_id, content_url, platform, promo_code)
+        
+        if success:
+            client_bot.send_message(
+                chat_id,
+                f"✅ **UGC контент добавлен!**\n\n"
+                f"📸 Ссылка: {content_url}\n"
+                f"📱 Платформа: {platform}\n"
+                f"🎁 Промо-код: `{promo_code}`\n\n"
+                f"⏳ Ваш контент отправлен на модерацию. После одобрения вы получите бонусные баллы!"
+            )
+            logger.info(f"UGC контент добавлен промоутером {chat_id}, ID: {ugc_id}")
+        else:
+            client_bot.send_message(
+                chat_id,
+                "❌ Ошибка при добавлении контента. Попробуйте позже."
+            )
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка при обработке команды ugc_add для {chat_id}")
+        client_bot.send_message(chat_id, "❌ Произошла ошибка. Попробуйте позже.")
+
+@client_bot.callback_query_handler(func=lambda call: call.data == 'add_ugc_content')
+def callback_add_ugc_content(call):
+    """Callback для кнопки 'Добавить UGC контент'."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        client_bot.answer_callback_query(call.id)
+        client_bot.send_message(
+            chat_id,
+            "📸 **Добавление UGC контента**\n\n"
+            "📝 **Инструкция:**\n"
+            "1. Создайте публикацию с нашими материалами\n"
+            "2. Отправьте ссылку на публикацию в формате:\n"
+            "`/ugc_add <ссылка> <платформа>`\n\n"
+            "**Платформы:** instagram, telegram, vk, other\n\n"
+            "**Пример:**\n"
+            "`/ugc_add https://instagram.com/p/abc123 instagram`",
+            parse_mode='Markdown'
+        )
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обработки callback add_ugc_content для {chat_id}")
+
+@client_bot.callback_query_handler(func=lambda call: call.data == 'promo_materials')
+def callback_promo_materials(call):
+    """Callback для кнопки 'Промо-материалы'."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        client_bot.answer_callback_query(call.id)
+        
+        # Получаем промо-материалы
+        materials = sm.get_promo_materials()
+        
+        if not materials:
+            client_bot.send_message(
+                chat_id,
+                "📁 Промо-материалы скоро появятся!\n\n"
+                "Следите за обновлениями."
+            )
+            return
+        
+        message_text = "📁 **Промо-материалы**\n\n"
+        
+        for mat in materials[:10]:  # Показываем первые 10
+            title = mat.get('title', 'Материал')
+            description = mat.get('description', '')
+            material_type = mat.get('material_type', '')
+            file_url = mat.get('file_url', '')
+            
+            message_text += f"📎 **{title}**\n"
+            if description:
+                message_text += f"   {description}\n"
+            message_text += f"   Тип: {material_type}\n"
+            if file_url:
+                message_text += f"   📥 [Скачать]({file_url})\n"
+            message_text += "\n"
+        
+        client_bot.send_message(chat_id, message_text, parse_mode='Markdown', disable_web_page_preview=True)
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обработки callback promo_materials для {chat_id}")
+
+@client_bot.callback_query_handler(func=lambda call: call.data == 'view_leaderboard')
+def callback_view_leaderboard(call):
+    """Callback для кнопки 'Лидерборд'."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        client_bot.answer_callback_query(call.id)
+        
+        # Получаем активный период
+        active_period = sm.get_active_leaderboard_period()
+        
+        if not active_period:
+            client_bot.send_message(
+                chat_id,
+                "⏳ Сейчас нет активного периода лидерборда.\n\n"
+                "Следующий конкурс скоро начнётся!"
+            )
+            return
+        
+        # Получаем топ участников
+        top_users = sm.get_leaderboard_top(active_period['id'], limit=10)
+        
+        # Получаем позицию пользователя
+        user_rank = sm.get_leaderboard_rank_for_user(active_period['id'], chat_id)
+        
+        message_text = (
+            f"🏆 **Лидерборд** 🏆\n\n"
+            f"📅 **Период:** {active_period.get('period_name', 'Текущий месяц')}\n"
+            f"📊 **Статус:** {'Активен' if active_period.get('status') == 'active' else 'Завершён'}\n\n"
+            f"🥇 **ТОП-10:**\n\n"
+        )
+        
+        medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+        
+        for idx, user in enumerate(top_users[:10], start=1):
+            rank_emoji = medals[idx - 1] if idx <= 10 else f"{idx}."
+            name = user.get('users', {}).get('name', 'Аноним') if isinstance(user.get('users'), dict) else user.get('client_chat_id', 'N/A')
+            score = float(user.get('total_score', 0))
+            message_text += f"{rank_emoji} {name}: {score:.2f} баллов\n"
+        
+        if user_rank:
+            user_final_rank = user_rank.get('final_rank', 'N/A')
+            user_score = float(user_rank.get('total_score', 0))
+            message_text += f"\n📈 **Ваша позиция:** #{user_final_rank}\n"
+            message_text += f"💯 **Ваши баллы:** {user_score:.2f}\n"
+        
+        # Показываем призы
+        prizes_config = active_period.get('prizes_config', {})
+        if prizes_config:
+            message_text += f"\n🎁 **Призы:**\n"
+            if '1' in prizes_config:
+                prize = prizes_config['1']
+                message_text += f"🥇 1 место: {prize.get('name', 'Приз')}\n"
+            if '2' in prizes_config:
+                prize = prizes_config['2']
+                message_text += f"🥈 2 место: {prize.get('name', 'Приз')}\n"
+            if '3' in prizes_config:
+                prize = prizes_config['3']
+                message_text += f"🥉 3 место: {prize.get('name', 'Приз')}\n"
+        
+        client_bot.send_message(chat_id, message_text, parse_mode='Markdown')
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обработки callback view_leaderboard для {chat_id}")
+
+
+@client_bot.callback_query_handler(func=lambda call: call.data.startswith('referral_qr_'))
+def handle_referral_qr(call):
+    """Генерирует QR-код для реферальной ссылки."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        referral_code = call.data.replace('referral_qr_', '')
+        bot_username = client_bot.get_me().username
+        referral_link = f"https://t.me/{bot_username}?start=ref_{referral_code}"
+        
+        # Генерируем QR-код с реферальной ссылкой
+        qr_image = generate_qr_code(referral_link)
+        
+        client_bot.send_photo(
+            chat_id,
+            qr_image,
+            caption=(
+                f"📱 **QR-код реферальной ссылки**\n\n"
+                f"🔗 Ссылка: `{referral_link}`\n\n"
+                f"💡 **Как использовать:**\n"
+                f"• Поделитесь QR-кодом с друзьями\n"
+                f"• Они отсканируют и присоединятся по вашей ссылке\n"
+                f"• Вы получите бонусы за их регистрацию и покупки!"
+            ),
+            parse_mode='Markdown'
+        )
+        
+        client_bot.answer_callback_query(call.id, "QR-код отправлен")
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка генерации QR-кода реферальной ссылки для {chat_id}")
+        client_bot.answer_callback_query(call.id, "Ошибка при генерации QR-кода")
+
+
+@client_bot.callback_query_handler(func=lambda call: call.data.startswith('promoter_qr_'))
+def handle_promoter_qr(call):
+    """Генерирует QR-код для промо-кода промоутера."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        promo_code = call.data.replace('promoter_qr_', '')
+        
+        # Формируем данные для QR-кода (промо-код)
+        qr_data = f"PROMO:{promo_code}"
+        
+        # Генерируем QR-код
+        qr_image = generate_qr_code(qr_data)
+        
+        client_bot.send_photo(
+            chat_id,
+            qr_image,
+            caption=(
+                f"📱 **QR-код промо-кода**\n\n"
+                f"🎁 Промо-код: `{promo_code}`\n\n"
+                f"💡 **Как использовать:**\n"
+                f"• Добавьте QR-код в свой UGC контент\n"
+                f"• Друзья сканируют и присоединяются по вашему коду\n"
+                f"• Вы получаете бонусы за их активность!"
+            ),
+            parse_mode='Markdown'
+        )
+        
+        client_bot.answer_callback_query(call.id, "QR-код отправлен")
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка генерации QR-кода промо-кода для {chat_id}")
+        client_bot.answer_callback_query(call.id, "Ошибка при генерации QR-кода")
+
+
+# ------------------------------------
+# ОТПРАВКА QR КОДА ПАРТНЕРУ
+# ------------------------------------
+
+def send_qr_to_partner(partner_chat_id: str, qr_image_data: str, client_chat_id: str, service_title: str = "") -> dict:
+    """Отправка QR-кода партнёру через партнёрского бота"""
+    token = os.getenv('TOKEN_PARTNER')
+    
+    if not token:
+        logger.warning("TOKEN_PARTNER не настроен")
+        return {"success": False, "error": "Telegram бот не настроен"}
+    
+    # Нормализуем partner_chat_id (убираем пробелы, приводим к строке)
+    partner_chat_id = str(partner_chat_id).strip()
+    
+    logger.info(f"Попытка отправить QR партнёру {partner_chat_id} от клиента {client_chat_id}")
+    
+    try:
+        # Сначала проверяем, может ли бот отправить сообщение партнёру через getChat
+        try:
+            check_url = f"https://api.telegram.org/bot{token}/getChat"
+            check_response = requests.post(check_url, data={'chat_id': partner_chat_id}, timeout=5)
+            check_json = check_response.json()
+            
+            if not check_response.ok:
+                error_desc = check_json.get('description', 'Неизвестная ошибка')
+                if 'chat not found' in error_desc.lower() or 'user not found' in error_desc.lower():
+                    logger.error(f"Партнёр {partner_chat_id} не найден. Партнёр должен запустить партнёрского бота командой /start")
+                    return {
+                        "success": False, 
+                        "error": f"Партнёр не найден. Партнёр должен сначала запустить партнёрского бота командой /start (Chat ID: {partner_chat_id})"
+                    }
+                elif check_response.status_code == 403:
+                    logger.error(f"Партнёр {partner_chat_id} заблокировал бота или не разрешил отправку сообщений")
+                    return {
+                        "success": False,
+                        "error": f"Партнёр заблокировал бота или не разрешил отправку сообщений. Попросите партнёра запустить партнёрского бота командой /start"
+                    }
+        except Exception as check_error:
+            logger.warning(f"Не удалось проверить доступность партнёра {partner_chat_id}: {check_error}. Продолжаем отправку...")
+        
+        # Декодируем base64 изображение
+        # Поддерживаем два формата:
+        # 1. data:image/png;base64,<base64_data>
+        # 2. <base64_data> (чистый base64)
+        if ',' in qr_image_data:
+            # Формат data URL
+            qr_image_bytes = base64.b64decode(qr_image_data.split(',')[1])
+        else:
+            # Чистый base64
+            qr_image_bytes = base64.b64decode(qr_image_data)
+        
+        # Отправляем фото через Telegram API
+        url = f"https://api.telegram.org/bot{token}/sendPhoto"
+        
+        # Формируем caption с информацией о клиенте
+        caption = (
+            f"📱 **QR-код от клиента**\n\n"
+            f"Клиент ID: `{client_chat_id}`\n"
+        )
+        if service_title:
+            caption += f"Услуга: {service_title}\n"
+        caption += (
+            f"\nСканируйте QR-код для начисления баллов клиенту.\n"
+            f"Или используйте команду: `➕ Начислить баллы`"
+        )
+        
+        files = {
+            'photo': ('qr-code.png', qr_image_bytes, 'image/png')
+        }
+        
+        payload = {
+            'chat_id': str(partner_chat_id),
+            'caption': caption,
+            'parse_mode': 'Markdown'
+        }
+        
+        response = requests.post(url, files=files, data=payload, timeout=10)
+        
+        # Проверяем ответ API
+        response_json = response.json()
+        if not response.ok:
+            error_description = response_json.get('description', 'Неизвестная ошибка')
+            error_code = response_json.get('error_code', response.status_code)
+            
+            # Обрабатываем разные типы ошибок
+            if error_code == 403:
+                error_msg = "Партнёр не разрешил боту отправлять сообщения. Попросите партнёра запустить партнёрского бота командой /start"
+            elif error_code == 400:
+                if 'chat not found' in error_description.lower() or 'user not found' in error_description.lower():
+                    error_msg = f"Партнёр не найден. Убедитесь, что партнёр запустил партнёрского бота командой /start. Chat ID: {partner_chat_id}"
+                else:
+                    error_msg = f"Неверный запрос: {error_description}"
+            else:
+                error_msg = f"Ошибка API: {error_description} (код: {error_code})"
+            
+            logger.error(f"Ошибка отправки QR партнёру {partner_chat_id} от клиента {client_chat_id}: {error_msg} (ответ API: {response_json})")
+            return {"success": False, "error": error_msg}
+        
+        response.raise_for_status()
+        
+        logger.info(f"QR-код успешно отправлен партнёру {partner_chat_id} от клиента {client_chat_id}")
+        return {"success": True}
+        
+    except requests.exceptions.HTTPError as e:
+        # Если raise_for_status() вызвал исключение
+        error_description = 'Неизвестная ошибка'
+        try:
+            response_json = e.response.json()
+            error_description = response_json.get('description', str(e))
+        except:
+            error_description = str(e)
+        
+        error_msg = f"HTTP ошибка {e.response.status_code}: {error_description}"
+        if e.response.status_code == 403:
+            error_msg = "Партнёр не разрешил боту отправлять сообщения. Попросите партнёра запустить партнёрского бота командой /start"
+        elif e.response.status_code == 400:
+            if 'chat not found' in error_description.lower() or 'user not found' in error_description.lower():
+                error_msg = f"Партнёр не найден. Убедитесь, что партнёр запустил партнёрского бота командой /start"
+            else:
+                error_msg = f"Неверный chat_id партнёра: {error_description}"
+        
+        logger.error(f"Ошибка отправки QR партнёру {partner_chat_id}: {error_msg}")
+        return {"success": False, "error": error_msg}
+    except Exception as e:
+        error_msg = f"Ошибка отправки QR: {str(e)}"
+        logger.error(f"Ошибка отправки QR партнёру {partner_chat_id}: {error_msg}")
+        return {"success": False, "error": error_msg}
 
 
 @client_bot.message_handler(func=lambda message: True)

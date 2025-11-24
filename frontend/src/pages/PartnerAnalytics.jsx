@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import Loader from '../components/Loader';
+import { openTelegramLink } from '../utils/telegram';
 
 const PartnerAnalytics = () => {
   const [searchParams] = useSearchParams();
@@ -11,6 +12,7 @@ const PartnerAnalytics = () => {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [period, setPeriod] = useState(30); // дней
+  const [ratedClients, setRatedClients] = useState([]); // Клиенты, которые поставили оценку
 
   useEffect(() => {
     if (partnerId) {
@@ -45,14 +47,45 @@ const PartnerAnalytics = () => {
       
       if (clientsError) throw clientsError;
 
-      // Загружаем NPS оценки
+      // Загружаем NPS оценки с данными о клиентах
       const { data: npsRatings, error: npsError } = await supabase
         .from('nps_ratings')
-        .select('rating')
+        .select('client_chat_id, rating, created_at, master_name')
         .eq('partner_chat_id', partnerId)
-        .gte('created_at', startDate.toISOString());
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false });
       
       if (npsError) throw npsError;
+
+      // Загружаем информацию о клиентах, которые поставили оценку
+      let clientsWithRatings = [];
+      if (npsRatings && npsRatings.length > 0) {
+        const clientChatIds = [...new Set(npsRatings.map(r => r.client_chat_id).filter(Boolean))];
+        
+        if (clientChatIds.length > 0) {
+          const { data: clientsData, error: clientsDataError } = await supabase
+            .from('users')
+            .select('chat_id, name, phone')
+            .in('chat_id', clientChatIds);
+          
+          if (clientsDataError) {
+            console.error('Ошибка загрузки данных клиентов:', clientsDataError);
+          } else {
+            // Объединяем данные об оценках с данными о клиентах
+            clientsWithRatings = npsRatings.map(rating => {
+              const client = clientsData?.find(c => c.chat_id === rating.client_chat_id);
+              return {
+                ...rating,
+                clientName: client?.name || 'Неизвестный клиент',
+                clientPhone: client?.phone || null,
+                clientChatId: rating.client_chat_id
+              };
+            });
+          }
+        }
+      }
+      
+      setRatedClients(clientsWithRatings);
 
       // Загружаем промоутеров среди клиентов партнёра
       const clientIds = clients?.map(c => c.chat_id) || [];
@@ -339,6 +372,96 @@ const PartnerAnalytics = () => {
             </div>
           </div>
         </div>
+
+        {/* Клиенты, которые поставили оценку */}
+        {ratedClients.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              💬 Клиенты, которые поставили оценку
+            </h2>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Клиент
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Оценка
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Дата
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Действия
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {ratedClients.map((client, index) => {
+                      const ratingColor = 
+                        client.rating >= 9 ? 'text-green-600 dark:text-green-400' :
+                        client.rating >= 7 ? 'text-yellow-600 dark:text-yellow-400' :
+                        'text-red-600 dark:text-red-400';
+                      
+                      const ratingEmoji = 
+                        client.rating >= 9 ? '🟢' :
+                        client.rating >= 7 ? '🟡' :
+                        '🔴';
+                      
+                      const date = new Date(client.created_at);
+                      const formattedDate = date.toLocaleDateString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+
+                      return (
+                        <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {client.clientName}
+                            </div>
+                            {client.clientPhone && (
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                {client.clientPhone}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className={`text-lg font-bold ${ratingColor} flex items-center gap-2`}>
+                              <span>{ratingEmoji}</span>
+                              <span>{client.rating}/10</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {formattedDate}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {client.clientChatId && (
+                              <button
+                                onClick={() => {
+                                  openTelegramLink(`tg://user?id=${client.clientChatId}`);
+                                }}
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+                              >
+                                <span>💬</span>
+                                <span>Написать</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Рекомендации */}
         {stats.npsScore < 0 && (
