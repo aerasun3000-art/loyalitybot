@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '../services/supabase';
+import { supabase, getPartnerInfo } from '../services/supabase';
+import { formatCurrencySimple } from '../utils/currency';
 import Loader from '../components/Loader';
 import { openTelegramLink } from '../utils/telegram';
 
@@ -13,6 +14,7 @@ const PartnerAnalytics = () => {
   const [error, setError] = useState(null);
   const [period, setPeriod] = useState(30); // дней
   const [ratedClients, setRatedClients] = useState([]); // Клиенты, которые поставили оценку
+  const [partnerCity, setPartnerCity] = useState(null);
 
   useEffect(() => {
     if (partnerId) {
@@ -26,6 +28,12 @@ const PartnerAnalytics = () => {
     try {
       setLoading(true);
       setError(null);
+      
+      // Загружаем информацию о партнере (для определения валюты)
+      const partnerInfo = await getPartnerInfo(partnerId);
+      if (partnerInfo?.city) {
+        setPartnerCity(partnerInfo.city);
+      }
       
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - period);
@@ -270,8 +278,8 @@ const PartnerAnalytics = () => {
             <MetricCard
               icon="💵"
               title="Общий оборот"
-              value={`${stats.totalRevenue.toLocaleString('ru-RU')} ₽`}
-              subtitle={`Средний чек: ${stats.avgCheck.toLocaleString('ru-RU', {maximumFractionDigits: 0})} ₽`}
+              value={formatCurrencySimple(stats.totalRevenue, partnerCity)}
+              subtitle={`Средний чек: ${formatCurrencySimple(stats.avgCheck, partnerCity)}`}
             />
             <MetricCard
               icon="🧾"

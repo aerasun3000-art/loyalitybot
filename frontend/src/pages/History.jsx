@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getClientTransactions, getClientBalance } from '../services/supabase'
 import { getChatId, hapticFeedback } from '../utils/telegram'
+import { formatCurrencySimple } from '../utils/currency'
 // import LuxuryIcon from '../components/LuxuryIcons'
 import Loader from '../components/Loader'
 
@@ -295,7 +296,7 @@ const History = () => {
                           </div>
                           {transaction.total_amount > 0 && (
                             <div className="text-xs text-gray-500">
-                              {transaction.total_amount} ₽
+                              {formatCurrencySimple(transaction.total_amount, transaction.partner?.city)}
                             </div>
                           )}
                         </div>

@@ -2,10 +2,14 @@
 Unit-тесты для SupabaseManager
 """
 
+import json
 import pytest
+import datetime
 import os
 from unittest.mock import Mock, patch, MagicMock
+from postgrest.exceptions import APIError
 from supabase_manager import SupabaseManager
+from transaction_queue import TransactionQueue
 
 
 @pytest.fixture
@@ -25,7 +29,10 @@ def manager(mock_supabase):
         'SUPABASE_KEY': 'test-key',
         'WELCOME_BONUS_AMOUNT': '100'
     }):
-        return SupabaseManager()
+        manager = SupabaseManager()
+        manager.transaction_queue = MagicMock()
+        manager.transaction_queue.enqueue.return_value = True
+        return manager
 
 
 class TestSupabaseManagerInit:
@@ -108,12 +115,16 @@ class TestTransactions:
         mock_supabase.from_().select().eq().limit().execute.return_value = balance_response
         mock_supabase.from_().update().eq().execute.return_value = update_response
         mock_supabase.from_().insert().execute.return_value = transaction_response
-        
-        result = manager.execute_transaction('123456', 'partner_1', 'accrual', 1000.0)
+        manager.transaction_queue.process_pending.reset_mock()
+
+        with patch.object(manager, '_calculate_accrual_points', return_value=50) as mock_calc:
+            result = manager.execute_transaction('123456', 'partner_1', 'accrual', 1000.0)
+            mock_calc.assert_called_once_with('partner_1', 1000.0)
         
         assert result['success'] is True
         assert result['points'] == 50  # 5% от 1000
         assert result['new_balance'] == 150
+        assert manager.transaction_queue.process_pending.call_count == 2
     
     def test_execute_transaction_spend_insufficient_balance(self, manager, mock_supabase):
         """Тест списания при недостаточном балансе"""
@@ -121,11 +132,13 @@ class TestTransactions:
         balance_response.data = [{'balance': 50}]
         
         mock_supabase.from_().select().eq().limit().execute.return_value = balance_response
+        manager.transaction_queue.process_pending.reset_mock()
         
         result = manager.execute_transaction('123456', 'partner_1', 'spend', 100.0)
         
         assert result['success'] is False
         assert 'Недостаточно бонусов' in result['error']
+        assert manager.transaction_queue.process_pending.call_count == 1
     
     def test_execute_transaction_spend_success(self, manager, mock_supabase):
         """Тест успешного списания баллов"""
@@ -141,11 +154,50 @@ class TestTransactions:
         mock_supabase.from_().select().eq().limit().execute.return_value = balance_response
         mock_supabase.from_().update().eq().execute.return_value = update_response
         mock_supabase.from_().insert().execute.return_value = transaction_response
-        
+        manager.transaction_queue.process_pending.reset_mock()
+
         result = manager.execute_transaction('123456', 'partner_1', 'spend', 50.0)
         
         assert result['success'] is True
         assert result['new_balance'] == 150
+        assert manager.transaction_queue.process_pending.call_count == 2
+
+    def test_execute_transaction_limit_exceeded(self, manager, mock_supabase):
+        """Тест ограничения по максимальному начислению"""
+        balance_response = Mock()
+        balance_response.data = [{'balance': 100}]
+        mock_supabase.from_().select().eq().limit().execute.return_value = balance_response
+
+        manager.transaction_queue.process_pending.reset_mock()
+        manager._get_transaction_limits = MagicMock(return_value={
+            'accrual': {'max_points_per_transaction': 10}
+        })
+
+        result = manager.execute_transaction('123456', 'partner_1', 'accrual', 1000.0)
+
+        assert result['success'] is False
+        assert 'Превышен лимит' in result['error']
+        assert manager.transaction_queue.process_pending.call_count == 1
+
+    def test_execute_transaction_queue_on_failure(self, manager, mock_supabase):
+        """Тест постановки транзакции в очередь при ошибке БД"""
+        balance_response = Mock()
+        balance_response.data = [{'balance': 100}]
+        mock_supabase.from_().select().eq().limit().execute.return_value = balance_response
+
+        mock_update = mock_supabase.from_().update().eq().execute
+        mock_update.side_effect = APIError(message="db error", details=None, code=None, hint=None)
+
+        manager.transaction_queue.process_pending.reset_mock()
+        manager.transaction_queue.enqueue.reset_mock()
+        manager.transaction_queue.enqueue.return_value = True
+
+        result = manager.execute_transaction('123456', 'partner_1', 'accrual', 1000.0)
+
+        assert result['success'] is True
+        assert result.get('queued') is True
+        manager.transaction_queue.enqueue.assert_called_once()
+        manager.transaction_queue.process_pending.assert_called_once()  # только попытка до ошибки
 
 
 class TestPartnerMethods:
@@ -182,6 +234,70 @@ class TestPartnerMethods:
         with patch.object(manager, 'ensure_partner_record', return_value=True):
             result = manager.approve_partner('partner_1')
             assert result is True
+
+
+class TestCashbackRules:
+    """Тесты гибких правил начисления"""
+
+    def test_calculate_accrual_points_partner_override(self, manager):
+        manager._cashback_rules_env = {
+            "default_percent": 0.05,
+            "partners": {
+                "partner_1": {
+                    "percent": 0.1,
+                    "multiplier": 2
+                }
+            }
+        }
+
+        points = manager._calculate_accrual_points('partner_1', 1000.0)
+        assert points == 200
+
+    def test_calculate_accrual_points_expired_multiplier(self, manager):
+        past_date = (datetime.datetime.now() - datetime.timedelta(days=1)).isoformat()
+        manager._cashback_rules_env = {
+            "default_percent": 0.05,
+            "partners": {
+                "partner_1": {
+                    "multiplier": 3,
+                    "multiplier_until": past_date
+                }
+            }
+        }
+
+        points = manager._calculate_accrual_points('partner_1', 1000.0)
+        assert points == 50
+
+
+class TestTransactionQueue:
+    """Тесты очереди транзакций"""
+
+    def test_enqueue_and_process_success(self, tmp_path):
+        manager = MagicMock()
+        manager.execute_transaction.return_value = {"success": True}
+        queue_path = tmp_path / "queue.json"
+        payload = {"client_chat_id": "1", "partner_chat_id": "2", "txn_type": "accrual", "raw_amount": 100}
+
+        queue = TransactionQueue(manager, storage_path=str(queue_path))
+        assert queue.enqueue(payload) is True
+
+        queue.process_pending()
+
+        manager.execute_transaction.assert_called_once_with("1", "2", "accrual", 100, allow_queue=False)
+        assert json.loads(queue_path.read_text(encoding='utf-8')) == []
+
+    def test_process_pending_failure_keeps_payload(self, tmp_path):
+        manager = MagicMock()
+        manager.execute_transaction.return_value = {"success": False, "error": "db down"}
+        queue_path = tmp_path / "queue.json"
+        payload = {"client_chat_id": "1", "partner_chat_id": "2", "txn_type": "accrual", "raw_amount": 100}
+
+        queue = TransactionQueue(manager, storage_path=str(queue_path))
+        assert queue.enqueue(payload) is True
+
+        queue.process_pending()
+
+        assert json.loads(queue_path.read_text(encoding='utf-8')) == [payload]
 
 
 class TestNPSMethods:

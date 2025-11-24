@@ -1,0 +1,67 @@
+# Railway ignore file
+# Файлы которые не нужно деплоить
+
+# Логи
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Документация
+*.md
+!README.md
+
+# Тесты
+tests/
+htmlcov/
+.pytest_cache/
+
+# Временные файлы
+*.bak
+.env.bak
+*.tmp
+
+# Бэкапы
+backups/
+
+# Frontend (деплоим отдельно)
+frontend/
+
+# Боты (не нужны для secure_api)
+bot.py
+admin_bot.py
+client_handler.py
+
+# Streamlit
+admin_dashboard.py
+
+# SQL файлы
+*.sql
+
+# Shell скрипты
+*.sh
+!get_railway_env.sh
+
+# Другие файлы
+systemd-services/
+service_account.json
+
+

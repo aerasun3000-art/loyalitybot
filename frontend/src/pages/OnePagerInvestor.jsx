@@ -17,11 +17,11 @@ const OnePagerInvestor = () => {
               </p>
               <div className="flex gap-6">
                 <div>
-                  <div className="text-4xl font-bold">₽15M</div>
+                  <div className="text-4xl font-bold">$15M</div>
                   <div className="text-purple-200 text-sm">Оценка проекта</div>
                 </div>
                 <div>
-                  <div className="text-4xl font-bold">₽3M</div>
+                  <div className="text-4xl font-bold">$3M</div>
                   <div className="text-purple-200 text-sm">Привлекаем</div>
                 </div>
                 <div>
@@ -33,7 +33,7 @@ const OnePagerInvestor = () => {
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8">
               <h3 className="text-2xl font-bold mb-6">Ключевые метрики</h3>
               <div className="space-y-4">
-                <MetricRow label="MRR" value="₽450K" />
+                <MetricRow label="MRR" value="$450K" />
                 <MetricRow label="Количество партнёров" value="127" />
                 <MetricRow label="Активных пользователей" value="15,000+" />
                 <MetricRow label="MoM Growth" value="+35%" />
@@ -144,7 +144,7 @@ const OnePagerInvestor = () => {
               />
               <RevenueItem
                 model="Premium подписка"
-                description="₽2,990/мес за расширенную аналитику"
+                description="$2,990/мес за расширенную аналитику"
                 share="10%"
               />
               <RevenueItem
@@ -160,9 +160,9 @@ const OnePagerInvestor = () => {
               Unit Economics
             </h3>
             <div className="space-y-4">
-              <UnitEconItem label="Средний чек партнёра" value="₽15,000/мес" />
-              <UnitEconItem label="CAC" value="₽4,500" />
-              <UnitEconItem label="LTV" value="₽180,000" />
+              <UnitEconItem label="Средний чек партнёра" value="$15,000/мес" />
+              <UnitEconItem label="CAC" value="$4,500" />
+              <UnitEconItem label="LTV" value="$180,000" />
               <UnitEconItem label="LTV/CAC" value="4.2x" highlight />
               <UnitEconItem label="Payback period" value="3 месяца" />
               <UnitEconItem label="Churn rate" value="8%/год" />
@@ -181,7 +181,7 @@ const OnePagerInvestor = () => {
           <div className="grid md:grid-cols-4 gap-6 mb-12">
             <TractionCard value="127" label="Активных партнёров" />
             <TractionCard value="15K+" label="Пользователей" />
-            <TractionCard value="₽12M" label="GMV (месячный)" />
+            <TractionCard value="$12M" label="GMV (месячный)" />
             <TractionCard value="+35%" label="MoM рост" />
           </div>
 
@@ -194,20 +194,20 @@ const OnePagerInvestor = () => {
                 period="Через 12 мес"
                 partners="500"
                 users="75K"
-                mrr="₽2.5M"
+                mrr="$2.5M"
               />
               <ProjectionCard
                 period="Через 18 мес"
                 partners="1,200"
                 users="180K"
-                mrr="₽7M"
+                mrr="$7M"
                 highlight
               />
               <ProjectionCard
                 period="Через 24 мес"
                 partners="2,500"
                 users="400K"
-                mrr="₽15M"
+                mrr="$15M"
               />
             </div>
           </div>
@@ -243,14 +243,14 @@ const OnePagerInvestor = () => {
       <div className="bg-white dark:bg-gray-800 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-center text-gray-900 dark:text-white mb-12">
-            💵 Использование инвестиций (₽3M)
+            💵 Использование инвестиций ($3M)
           </h2>
           
           <div className="space-y-4">
-            <UseOfFundsBar label="Маркетинг и продажи" percentage={50} amount="₽1.5M" />
-            <UseOfFundsBar label="Разработка продукта" percentage={30} amount="₽900K" />
-            <UseOfFundsBar label="Операционные расходы" percentage={15} amount="₽450K" />
-            <UseOfFundsBar label="Резерв" percentage={5} amount="₽150K" />
+            <UseOfFundsBar label="Маркетинг и продажи" percentage={50} amount="$1.5M" />
+            <UseOfFundsBar label="Разработка продукта" percentage={30} amount="$900K" />
+            <UseOfFundsBar label="Операционные расходы" percentage={15} amount="$450K" />
+            <UseOfFundsBar label="Резерв" percentage={5} amount="$150K" />
           </div>
         </div>
       </div>

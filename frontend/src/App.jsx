@@ -128,6 +128,20 @@ function App() {
       tg.ready()
       tg.expand()
       
+      // Отключаем случайное закрытие приложения свайпом
+      try {
+        // Показываем подтверждение перед закрытием
+        if (tg.enableClosingConfirmation && typeof tg.enableClosingConfirmation === 'function') {
+          tg.enableClosingConfirmation()
+        }
+        // Отключаем вертикальные свайпы (может не работать в новых версиях)
+        if (tg.disableVerticalSwipes && typeof tg.disableVerticalSwipes === 'function') {
+          tg.disableVerticalSwipes()
+        }
+      } catch (error) {
+        console.warn('Could not disable swipe-to-close:', error)
+      }
+      
       // Устанавливаем цветовую схему
       document.documentElement.className = colorScheme
     } else {

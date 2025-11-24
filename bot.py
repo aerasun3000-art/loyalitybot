@@ -52,6 +52,7 @@ if sentry_dsn:
 sys.path.append(os.path.dirname(__file__))
 # Предполагается, что 'supabase_manager' существует и содержит необходимые методы.
 from supabase_manager import SupabaseManager
+from currency_utils import format_currency, get_currency_by_city
 
 # --- Инициализация ---
 PARTNER_TOKEN = os.environ.get('TOKEN_PARTNER')
@@ -104,26 +105,19 @@ except ImportError:
 # ------------------------------------
 
 def get_partner_keyboard():
-    """Главная клавиатура Партнера, включая Акции и Услуги."""
+    """Главная клавиатура Партнера - оптимизированная версия."""
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    btn_add = types.KeyboardButton("➕ Начислить баллы")
-    btn_subtract = types.KeyboardButton("➖ Списать баллы")
-    btn_queue = types.KeyboardButton("📦 Очередь операций")
-    btn_messages = types.KeyboardButton("💬 Мои сообщения")
-    btn_promo = types.KeyboardButton("🌟 Акции")
-    btn_service = types.KeyboardButton("🛠️ Услуги") 
+    
+    # Основные категории (5 кнопок)
+    btn_operations = types.KeyboardButton("💰 Операции")
+    btn_content = types.KeyboardButton("📝 Контент")
+    btn_analytics = types.KeyboardButton("📊 Аналитика")
     btn_invite = types.KeyboardButton("👥 Пригласить клиента")
-    btn_stats = types.KeyboardButton("📊 Моя статистика")
-    btn_dashboard = types.KeyboardButton("📈 Дашборд")
-    btn_find = types.KeyboardButton("👤 Найти клиента")
-    btn_settings = types.KeyboardButton("⚙️ Настройки")
-
-    markup.add(btn_add, btn_subtract)
-    markup.add(btn_queue, btn_messages)
-    markup.add(btn_promo, btn_service)
-    markup.add(btn_invite, btn_stats)
-    markup.add(btn_dashboard, btn_find)
-    markup.add(btn_settings)
+    btn_more = types.KeyboardButton("⚙️ Ещё")
+    
+    markup.add(btn_operations, btn_content)
+    markup.add(btn_analytics, btn_invite)
+    markup.add(btn_more)
     return markup
 
 def partner_main_menu(chat_id, message_text="Выберите следующее действие:"):
@@ -175,57 +169,179 @@ def handle_partner_start(message):
 
 
 # ------------------------------------
-# ФУНКЦИОНАЛ: ОБЩИЕ КНОПКИ МЕНЮ
+# ФУНКЦИОНАЛ: ОБЩИЕ КНОПКИ МЕНЮ (ОПТИМИЗИРОВАННОЕ)
 # ------------------------------------
-@bot.message_handler(func=lambda message: message.text in ["➕ Начислить баллы", "➖ Списать баллы", "📊 Моя статистика", "📈 Дашборд", "👤 Найти клиента", "⚙️ Настройки", "📦 Очередь операций", "💬 Мои сообщения"])
-def handle_partner_menu_buttons(message):
+@bot.message_handler(func=lambda message: message.text in [
+    "💰 Операции", "📝 Контент", "📊 Аналитика", "⚙️ Ещё"
+])
+def handle_partner_categories(message):
+    """Обработчик категорий главного меню."""
     chat_id = message.chat.id
-
+    
     if not sm.partner_exists(chat_id) or sm.get_partner_status(chat_id) != 'Approved':
         bot.send_message(chat_id, "У вас нет прав для выполнения этой операции.")
         return
+    
+    if message.text == "💰 Операции":
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_add = types.InlineKeyboardButton("➕ Начислить баллы", callback_data="menu_add_points")
+        btn_subtract = types.InlineKeyboardButton("➖ Списать баллы", callback_data="menu_subtract_points")
+        btn_queue = types.InlineKeyboardButton("📦 Очередь операций", callback_data="menu_queue")
+        btn_find = types.InlineKeyboardButton("👤 Найти клиента", callback_data="menu_find_client")
+        btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="partner_main_menu")
+        markup.add(btn_add, btn_subtract, btn_queue, btn_find, btn_back)
+        bot.send_message(chat_id, "*💰 Операции:*\nВыберите действие:", reply_markup=markup, parse_mode='Markdown')
+        return
+    
+    if message.text == "📝 Контент":
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_promo = types.InlineKeyboardButton("🌟 Акции", callback_data="menu_promotions")
+        btn_service = types.InlineKeyboardButton("🛠️ Услуги", callback_data="menu_services")
+        btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="partner_main_menu")
+        markup.add(btn_promo, btn_service, btn_back)
+        bot.send_message(chat_id, "*📝 Контент:*\nВыберите действие:", reply_markup=markup, parse_mode='Markdown')
+        return
+    
+    if message.text == "📊 Аналитика":
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_stats = types.InlineKeyboardButton("📊 Моя статистика", callback_data="menu_stats")
+        btn_dashboard = types.InlineKeyboardButton("📈 Дашборд", callback_data="menu_dashboard")
+        btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="partner_main_menu")
+        markup.add(btn_stats, btn_dashboard, btn_back)
+        bot.send_message(chat_id, "*📊 Аналитика:*\nВыберите действие:", reply_markup=markup, parse_mode='Markdown')
+        return
+    
+    if message.text == "⚙️ Ещё":
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_messages = types.InlineKeyboardButton("💬 Мои сообщения", callback_data="menu_messages")
+        btn_settings = types.InlineKeyboardButton("⚙️ Настройки", callback_data="menu_settings")
+        btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="partner_main_menu")
+        markup.add(btn_messages, btn_settings, btn_back)
+        bot.send_message(chat_id, "*⚙️ Ещё:*\nВыберите действие:", reply_markup=markup, parse_mode='Markdown')
+        return
 
-    if message.text == "➕ Начислить баллы":
+
+# ------------------------------------
+# ОБРАБОТЧИК CALLBACK ДЛЯ ПОДМЕНЮ
+# ------------------------------------
+@bot.callback_query_handler(func=lambda call: call.data.startswith('menu_'))
+def handle_menu_callbacks(call):
+    """Обработчик callback для кнопок подменю."""
+    chat_id = call.message.chat.id
+    
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    
+    if call.data == 'menu_add_points':
         USER_STATE[chat_id] = 'awaiting_client_id_issue'
         bot.send_message(chat_id, 
             "Введите *Chat ID клиента* или *ID телефона клиента*.\n\n"
             "📱 Или отправьте фото с QR-кодом клиента для быстрого сканирования.",
             parse_mode="Markdown"
         )
+        bot.answer_callback_query(call.id)
         return
-
-    if message.text == "➖ Списать баллы":
+    
+    if call.data == 'menu_subtract_points':
         USER_STATE[chat_id] = 'awaiting_client_id_spend'
         bot.send_message(chat_id, 
             "Введите *Chat ID клиента* или *ID телефона клиента* для списания баллов.\n\n"
             "📱 Или отправьте фото с QR-кодом клиента для быстрого сканирования.",
             parse_mode="Markdown"
         )
-        return
-
-    if message.text == "📊 Моя статистика":
-        handle_partner_stats(message)
-        return
-
-    if message.text == "📈 Дашборд":
-        handle_partner_dashboard(message)
-        return
-
-    if message.text == "👤 Найти клиента":
-        handle_find_client(message)
+        bot.answer_callback_query(call.id)
         return
     
-    if message.text == "📦 Очередь операций":
+    if call.data == 'menu_queue':
         show_offline_queue(chat_id)
-        return
-
-    if message.text == "⚙️ Настройки":
-        handle_partner_settings(message)
+        bot.answer_callback_query(call.id)
         return
     
-    if message.text == "💬 Мои сообщения":
-        handle_partner_messages(message)
+    if call.data == 'menu_find_client':
+        # Создаём временное сообщение для передачи в handle_find_client
+        class TempMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "👤 Найти клиента"
+        
+        handle_find_client(TempMessage(chat_id))
+        bot.answer_callback_query(call.id)
         return
+    
+    if call.data == 'menu_promotions':
+        # Создаём временное сообщение для передачи в handle_promotions_menu
+        class TempMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "🌟 Акции"
+        
+        handle_promotions_menu(TempMessage(chat_id))
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'menu_services':
+        # Создаём временное сообщение для передачи в handle_services_menu
+        class TempMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "🛠️ Услуги"
+        
+        handle_services_menu(TempMessage(chat_id))
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'menu_stats':
+        # Создаём временное сообщение для передачи в handle_partner_stats
+        class TempMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "📊 Моя статистика"
+        
+        handle_partner_stats(TempMessage(chat_id))
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'menu_dashboard':
+        # Создаём временное сообщение для передачи в handle_partner_dashboard
+        class TempMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "📈 Дашборд"
+        
+        handle_partner_dashboard(TempMessage(chat_id))
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'menu_messages':
+        # Создаём временное сообщение для передачи в handle_partner_messages
+        class TempMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "💬 Мои сообщения"
+        
+        handle_partner_messages(TempMessage(chat_id))
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'menu_settings':
+        # Создаём временное сообщение для передачи в handle_partner_settings
+        class TempMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "⚙️ Настройки"
+        
+        handle_partner_settings(TempMessage(chat_id))
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'partner_main_menu':
+        partner_main_menu(chat_id)
+        bot.answer_callback_query(call.id)
+        return
+    
+    bot.answer_callback_query(call.id)
 
 
 # ------------------------------------
@@ -525,7 +641,7 @@ def handle_offline_type(call):
         pass
 
     if data['txn_type'] == 'accrual':
-        prompt = "Введите сумму чека (в рублях), которую хотите добавить в очередь:"
+        prompt = "Введите сумму чека (в долларах), которую хотите добавить в очередь:"
     else:
         prompt = "Введите количество баллов для списания, которое хотите добавить в очередь:"
 
@@ -669,7 +785,7 @@ def prompt_transaction_amount(chat_id: int, client_id: str, txn_type: str, curre
     if txn_type == 'accrual':
         text = (
             f"Текущий баланс клиента: *{current_balance}* баллов.\n\n"
-            "Выберите сумму чека (в рублях) из подсказок ниже или введите значение вручную."
+            "Выберите сумму чека (в долларах) из подсказок ниже или введите значение вручную."
         )
     else:
         text = (
@@ -727,7 +843,7 @@ def handle_manual_selection(call):
     txn_data = TEMP_DATA.get(chat_id, {})
     txn_type = txn_data.get('txn_type', 'accrual')
     if txn_type == 'accrual':
-        prompt = "Введите сумму чека (в рублях):"
+        prompt = "Введите сумму чека (в долларах):"
     else:
         prompt = "Введите количество баллов для списания:"
 
@@ -1102,6 +1218,17 @@ def handle_stats_callbacks(call):
             bot.answer_callback_query(call.id)
             return
         
+        # Получаем информацию о партнере для определения валюты
+        partner_city = None
+        try:
+            partner_data = sm.get_all_partners()
+            if partner_data is not None and not partner_data.empty:
+                partner_info = partner_data[partner_data['chat_id'] == str(chat_id)]
+                if not partner_info.empty:
+                    partner_city = partner_info.iloc[0].get('city')
+        except Exception as e:
+            logger.warning(f"Could not get partner city: {e}")
+        
         # Формируем красивый отчет
         period_label = "7 дней" if period_days == 7 else f"{period_days} дней" if period_days < 365 else "Всё время"
 
@@ -1116,9 +1243,9 @@ def handle_stats_callbacks(call):
 └─ Повторные покупки: **{stats['returning_clients']}** чел.
 
 💰 **ФИНАНСЫ:**
-├─ Общий оборот: **{stats['total_revenue']:,.2f}** ₽
-├─ Средний чек: **{stats['avg_check']:,.2f}** ₽
-└─ Средний LTV: **{stats['avg_ltv']:,.2f}** ₽/клиент
+├─ Общий оборот: **{format_currency(stats['total_revenue'], partner_city)}**
+├─ Средний чек: **{format_currency(stats['avg_check'], partner_city)}**
+└─ Средний LTV: **{format_currency(stats['avg_ltv'], partner_city)}**/клиент
 
 🧾 **ТРАНЗАКЦИИ:**
 ├─ Всего операций: **{stats['total_transactions']}**
@@ -1237,15 +1364,26 @@ def handle_cohort_analysis(chat_id):
             partner_main_menu(chat_id)
             return
         
+        # Получаем город партнера для форматирования валюты
+        partner_city = None
+        try:
+            partner_data = sm.get_all_partners()
+            if partner_data is not None and not partner_data.empty:
+                partner_info = partner_data[partner_data['chat_id'] == str(chat_id)]
+                if not partner_info.empty:
+                    partner_city = partner_info.iloc[0].get('city')
+        except Exception:
+            pass
+        
         response_text = "👥 **КОГОРТНЫЙ АНАЛИЗ**\n"
         response_text += "(клиенты по месяцам регистрации)\n\n"
         
         for cohort in cohort_data['cohorts']:
             response_text += f"📅 **{cohort['month']}**\n"
             response_text += f"├─ Клиентов: {cohort['clients_count']}\n"
-            response_text += f"├─ Оборот: {cohort['total_revenue']:,.2f} ₽\n"
+            response_text += f"├─ Оборот: {format_currency(cohort['total_revenue'], partner_city)}\n"
             response_text += f"├─ Транзакций: {cohort['total_transactions']}\n"
-            response_text += f"└─ Средний чек/клиент: {cohort['avg_revenue_per_client']:,.2f} ₽\n\n"
+            response_text += f"└─ Средний чек/клиент: {format_currency(cohort['avg_revenue_per_client'], partner_city)}\n\n"
         
         bot.send_message(chat_id, response_text, parse_mode='Markdown')
         
@@ -1260,7 +1398,6 @@ def handle_cohort_analysis(chat_id):
 # ФУНКЦИОНАЛ: УПРАВЛЕНИЕ АКЦИЯМИ (ОСТАВЛЕНО)
 # ------------------------------------
 
-@bot.message_handler(func=lambda message: message.text == "🌟 Акции")
 def handle_promotions_menu(message):
     chat_id = message.chat.id
     if not sm.partner_exists(chat_id) or sm.get_partner_status(chat_id) != 'Approved':
@@ -1512,7 +1649,6 @@ def save_promotion(chat_id):
 # ФУНКЦИОНАЛ: УПРАВЛЕНИЕ УСЛУГАМИ (ОСТАВЛЕНО)
 # ------------------------------------
 
-@bot.message_handler(func=lambda message: message.text == "🛠️ Услуги")
 def handle_services_menu(message):
     chat_id = message.chat.id
     if not sm.partner_exists(chat_id) or sm.get_partner_status(chat_id) != 'Approved':

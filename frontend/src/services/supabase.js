@@ -66,7 +66,7 @@ export const getClientTransactions = async (chatId, limit = 50) => {
     .from('transactions')
     .select(`
       *,
-      partner:partners!transactions_partner_chat_id_fkey(name, company_name)
+      partner:partners!transactions_partner_chat_id_fkey(name, company_name, city)
     `)
     .eq('client_chat_id', chatId)
     .order('date_time', { ascending: false })
@@ -309,6 +309,28 @@ export const getClientRatedPartners = async (clientChatId) => {
  * @param {string[]} partnerIds - Массив ID партнёров
  * @returns {Promise<Object>} Объект с метриками для каждого партнёра
  */
+/**
+ * Получить информацию о партнере
+ */
+export const getPartnerInfo = async (partnerChatId) => {
+  if (!partnerChatId) {
+    return null
+  }
+  
+  const { data, error } = await supabase
+    .from('partners')
+    .select('chat_id, name, company_name, city, district')
+    .eq('chat_id', partnerChatId)
+    .maybeSingle()
+  
+  if (error) {
+    console.error('Error fetching partner info:', error)
+    return null
+  }
+  
+  return data
+}
+
 export const getPartnersMetrics = async (partnerIds) => {
   if (!partnerIds || partnerIds.length === 0) {
     return {}

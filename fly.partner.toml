@@ -1,0 +1,21 @@
+# Fly.io конфигурация для партнерского бота
+# Использование: flyctl deploy --config fly.partner.toml --app loyalitybot-partner
+
+app = "loyalitybot-partner"
+primary_region = "ams"  # Амстердам
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PYTHONUNBUFFERED = "1"
+  LOG_LEVEL = "INFO"
+
+[processes]
+  app = "python bot.py"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+

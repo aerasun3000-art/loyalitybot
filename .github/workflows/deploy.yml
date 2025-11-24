@@ -1,0 +1,76 @@
+name: Deploy Bots
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      bot:
+        description: 'Which bot to deploy (all, admin, partner, client)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - admin
+          - partner
+          - client
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Fly.io CLI
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      
+      - name: Deploy Admin Bot
+        if: github.event.inputs.bot == 'all' || github.event.inputs.bot == 'admin' || github.event_name == 'push'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if flyctl apps list | grep -q "loyalitybot-admin"; then
+            flyctl deploy --app loyalitybot-admin --remote-only
+          else
+            echo "App loyalitybot-admin not found. Create it first with: flyctl launch --app loyalitybot-admin"
+          fi
+        continue-on-error: true
+      
+      - name: Deploy Partner Bot
+        if: github.event.inputs.bot == 'all' || github.event.inputs.bot == 'partner' || github.event_name == 'push'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if flyctl apps list | grep -q "loyalitybot-partner"; then
+            flyctl deploy --app loyalitybot-partner --remote-only
+          else
+            echo "App loyalitybot-partner not found. Create it first with: flyctl launch --app loyalitybot-partner"
+          fi
+        continue-on-error: true
+      
+      - name: Deploy Client Bot
+        if: github.event.inputs.bot == 'all' || github.event.inputs.bot == 'client' || github.event_name == 'push'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if flyctl apps list | grep -q "loyalitybot-client"; then
+            flyctl deploy --app loyalitybot-client --remote-only
+          else
+            echo "App loyalitybot-client not found. Create it first with: flyctl launch --app loyalitybot-client"
+          fi
+        continue-on-error: true
+      
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Deployment completed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check status:" >> $GITHUB_STEP_SUMMARY
+          echo "- Admin Bot: \`flyctl status --app loyalitybot-admin\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Partner Bot: \`flyctl status --app loyalitybot-partner\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Client Bot: \`flyctl status --app loyalitybot-client\`" >> $GITHUB_STEP_SUMMARY
+

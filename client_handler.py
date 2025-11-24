@@ -158,6 +158,51 @@ def callback_nps_rating(call):
                             parse_mode='Markdown'
                         )
                         logger.info(f"[NPS] ✅ Сообщение о промоутере отправлено клиенту {client_chat_id}")
+                        
+                        # Отправляем дополнительное уведомление о спецвозможностях
+                        try:
+                            import time
+                            time.sleep(0.5)  # Небольшая задержка для лучшего UX
+                            
+                            markup = types.InlineKeyboardMarkup(row_width=1)
+                            special_btn = types.InlineKeyboardButton(
+                                "⭐ Открыть мои спецвозможности",
+                                callback_data="show_special_features"
+                            )
+                            markup.add(special_btn)
+                            
+                            client_bot.send_message(
+                                client_chat_id,
+                                "⭐ **ВАМ ДОСТУПНЫ СПЕЦВОЗМОЖНОСТИ!** ⭐\n\n"
+                                "🎯 **Что это дает вам:**\n\n"
+                                "📊 **Статистика промоутера**\n"
+                                "• Отслеживайте свой уровень и прогресс\n"
+                                "• Смотрите количество публикаций\n"
+                                "• Видите заработанные баллы\n\n"
+                                "📸 **Создание UGC контента**\n"
+                                "• Публикуйте посты с нашими материалами\n"
+                                "• Получайте 100-200 баллов за каждую публикацию\n"
+                                "• Участвуйте в конкурсах\n\n"
+                                "📁 **Промо-материалы**\n"
+                                "• Готовые тексты для постов\n"
+                                "• Хештеги и шаблоны\n"
+                                "• Инструкции по созданию контента\n\n"
+                                "🏆 **Лидерборд**\n"
+                                "• Соревнуйтесь с другими промоутерами\n"
+                                "• Выигрывайте ценные призы\n"
+                                "• Получайте бонусы за активность\n\n"
+                                "📱 **QR-код промо-кода**\n"
+                                "• Быстро делитесь своим промо-кодом\n"
+                                "• Получайте бонусы за рефералов\n\n"
+                                "💡 **Как использовать:**\n"
+                                "• Нажмите кнопку ниже или используйте команду /special\n"
+                                "• Все функции доступны в одном месте!",
+                                reply_markup=markup,
+                                parse_mode='Markdown'
+                            )
+                            logger.info(f"[NPS] ✅ Уведомление о спецвозможностях отправлено клиенту {client_chat_id}")
+                        except Exception as e:
+                            logger.error(f"[NPS] ❌ Ошибка отправки уведомления о спецвозможностях клиенту {client_chat_id}: {e}")
                     except Exception as e:
                         logger.error(f"[NPS] ❌ Ошибка отправки сообщения о промоутере клиенту {client_chat_id}: {e}")
                 else:
@@ -773,6 +818,18 @@ def handle_new_user_start(message):
             callback_data="show_qr_code"
         )
         markup.add(webapp_btn, qr_btn)
+        
+        # Проверяем, является ли промоутером, и добавляем кнопку "Мои спецвозможности"
+        try:
+            promoter_info = sm.get_promoter_info(chat_id)
+            if promoter_info:
+                special_btn = types.InlineKeyboardButton(
+                    "⭐ Мои спецвозможности",
+                    callback_data="show_special_features"
+                )
+                markup.add(special_btn)
+        except Exception as e:
+            logger.debug(f"Не удалось проверить статус промоутера для {chat_id}: {e}")
 
         client_bot.send_message(
             chat_id,
@@ -1052,6 +1109,214 @@ def handle_ugc_command(message):
         log_exception(logger, e, f"Ошибка при обработке команды ugc для {chat_id}")
         client_bot.send_message(chat_id, "❌ Произошла ошибка. Попробуйте позже.")
 
+@client_bot.message_handler(commands=['special', 'спецвозможности', 'specials'])
+def handle_special_features_command(message):
+    """Обработчик команды для просмотра спецвозможностей промоутера."""
+    chat_id = str(message.chat.id)
+    
+    # Rate limiting
+    allowed, error = check_rate_limit(chat_id, 'command')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        return
+    
+    try:
+        # Проверяем, является ли промоутером
+        promoter_info = sm.get_promoter_info(chat_id)
+        
+        if not promoter_info:
+            client_bot.send_message(
+                chat_id,
+                "❌ **Спецвозможности доступны только промоутерам**\n\n"
+                "⭐ Чтобы стать промоутером, поставьте оценку **10** при следующем визите в партнёрскую организацию!\n\n"
+                "Промоутеры получают:\n"
+                "• 🎁 Уникальный промо-код\n"
+                "• 📸 Возможность создавать UGC контент\n"
+                "• 💰 Бонусы за публикации\n"
+                "• 🏆 Участие в конкурсах лидерборда\n"
+                "• 🎁 Ценные призы!",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Показываем меню спецвозможностей
+        show_special_features_menu(chat_id)
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка при обработке команды special для {chat_id}")
+        client_bot.send_message(chat_id, "❌ Произошла ошибка. Попробуйте позже.")
+
+
+@client_bot.callback_query_handler(func=lambda call: call.data == 'show_special_features')
+def callback_show_special_features(call):
+    """Callback для кнопки 'Мои спецвозможности'."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        client_bot.answer_callback_query(call.id)
+        show_special_features_menu(chat_id)
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обработки callback show_special_features для {chat_id}")
+
+
+def show_special_features_menu(chat_id: str):
+    """Показывает меню спецвозможностей для промоутера."""
+    try:
+        promoter_info = sm.get_promoter_info(chat_id)
+        
+        if not promoter_info:
+            client_bot.send_message(
+                chat_id,
+                "❌ Вы ещё не являетесь промоутером.\n\n"
+                "⭐ Чтобы стать промоутером, поставьте оценку **10** при следующем визите!",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Получаем статистику
+        all_content = sm.get_ugc_content_for_promoter(chat_id)
+        approved_content = [c for c in all_content if c.get('status') == 'approved']
+        pending_content = [c for c in all_content if c.get('status') == 'pending']
+        
+        level_emoji = {
+            'novice': '🌱',
+            'active': '⭐',
+            'pro': '🔥',
+            'master': '👑'
+        }
+        level_name = {
+            'novice': 'Новичок',
+            'active': 'Активный',
+            'pro': 'Профессионал',
+            'master': 'Мастер'
+        }
+        
+        level = promoter_info.get('promoter_level', 'novice')
+        emoji = level_emoji.get(level, '🌱')
+        level_text = level_name.get(level, 'Новичок')
+        
+        message_text = (
+            f"⭐ **МОИ СПЕЦВОЗМОЖНОСТИ** ⭐\n\n"
+            f"📊 **Ваш уровень:** {emoji} {level_text}\n"
+            f"🎁 **Промо-код:** `{promoter_info.get('promo_code', 'N/A')}`\n\n"
+            f"📸 **Публикации:**\n"
+            f"• Одобрено: {len(approved_content)}\n"
+            f"• На модерации: {len(pending_content)}\n"
+            f"• Заработано: {promoter_info.get('total_earned_points', 0)} баллов\n\n"
+            f"💡 **Выберите действие:**"
+        )
+        
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        
+        # Кнопка "Статистика промоутера" (вызывает /promoter)
+        promoter_btn = types.InlineKeyboardButton(
+            "🎯 Статистика промоутера",
+            callback_data="special_promoter_stats"
+        )
+        
+        # Кнопка "Добавить UGC контент" (вызывает /ugc)
+        ugc_btn = types.InlineKeyboardButton(
+            "📸 Добавить UGC контент",
+            callback_data="special_add_ugc"
+        )
+        
+        # Кнопка "Промо-материалы"
+        materials_btn = types.InlineKeyboardButton(
+            "📁 Промо-материалы",
+            callback_data="promo_materials"
+        )
+        
+        # Кнопка "Лидерборд"
+        leaderboard_btn = types.InlineKeyboardButton(
+            "🏆 Лидерборд",
+            callback_data="view_leaderboard"
+        )
+        
+        # Кнопка "QR-код промо-кода"
+        qr_btn = types.InlineKeyboardButton(
+            "📱 QR-код промо-кода",
+            callback_data=f"promoter_qr_{promoter_info.get('promo_code', '')}"
+        )
+        
+        # Кнопка "Конвертировать баллы" (если есть завершённые периоды)
+        completed_periods = sm.get_completed_periods_for_user(chat_id)
+        available_periods = [p for p in completed_periods if p.get('can_convert')]
+        
+        markup.add(promoter_btn, ugc_btn, materials_btn, leaderboard_btn, qr_btn)
+        
+        if available_periods:
+            convert_btn = types.InlineKeyboardButton(
+                f"💱 Конвертировать баллы ({len(available_periods)})",
+                callback_data="special_convert_points"
+            )
+            markup.add(convert_btn)
+        
+        client_bot.send_message(
+            chat_id,
+            message_text,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка показа меню спецвозможностей для {chat_id}")
+        client_bot.send_message(chat_id, "❌ Произошла ошибка. Попробуйте позже.")
+
+
+@client_bot.callback_query_handler(func=lambda call: call.data == 'special_promoter_stats')
+def callback_special_promoter_stats(call):
+    """Callback для кнопки 'Статистика промоутера' из меню спецвозможностей."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        client_bot.answer_callback_query(call.id)
+        # Вызываем обработчик команды /promoter
+        class TempMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "/promoter"
+        
+        handle_promoter_command(TempMessage(chat_id))
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обработки callback special_promoter_stats для {chat_id}")
+
+
+@client_bot.callback_query_handler(func=lambda call: call.data == 'special_add_ugc')
+def callback_special_add_ugc(call):
+    """Callback для кнопки 'Добавить UGC контент' из меню спецвозможностей."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        client_bot.answer_callback_query(call.id)
+        # Вызываем обработчик команды /ugc
+        class TempMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "/ugc"
+        
+        handle_ugc_command(TempMessage(chat_id))
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обработки callback special_add_ugc для {chat_id}")
+
+
+@client_bot.callback_query_handler(func=lambda call: call.data == 'special_convert_points')
+def callback_special_convert_points(call):
+    """Callback для кнопки 'Конвертировать баллы' из меню спецвозможностей."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        client_bot.answer_callback_query(call.id)
+        # Вызываем обработчик команды /convert_points
+        class TempMessage:
+            def __init__(self, chat_id):
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = "/convert_points"
+        
+        handle_convert_points_command(TempMessage(chat_id))
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обработки callback special_convert_points для {chat_id}")
+
+
 @client_bot.message_handler(commands=['leaderboard', 'лидерборд'])
 def handle_leaderboard_command(message):
     """Обработчик команды для просмотра лидерборда."""
@@ -1121,6 +1386,171 @@ def handle_leaderboard_command(message):
     except Exception as e:
         log_exception(logger, e, f"Ошибка при обработке команды leaderboard для {chat_id}")
         client_bot.send_message(chat_id, "❌ Произошла ошибка при получении данных. Попробуйте позже.")
+
+
+@client_bot.message_handler(commands=['convert_points', 'конвертировать', 'convert'])
+def handle_convert_points_command(message):
+    """Обработчик команды для конвертации баллов лидерборда."""
+    chat_id = str(message.chat.id)
+    
+    # Rate limiting
+    allowed, error = check_rate_limit(chat_id, 'command')
+    if not allowed:
+        client_bot.send_message(chat_id, f"⏸️ {error}")
+        return
+    
+    try:
+        # Получаем завершённые периоды, где можно конвертировать баллы
+        completed_periods = sm.get_completed_periods_for_user(chat_id)
+        
+        if not completed_periods:
+            client_bot.send_message(
+                chat_id,
+                "❌ **Нет доступных периодов для конвертации**\n\n"
+                "Конвертация доступна только для:\n"
+                "• Завершённых периодов лидерборда\n"
+                "• Участников, которые не получили призы\n"
+                "• Периодов с включённой конвертацией",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Фильтруем периоды, где можно конвертировать
+        available_periods = [p for p in completed_periods if p.get('can_convert')]
+        
+        if not available_periods:
+            # Показываем периоды, где уже конвертировано или есть приз
+            converted_periods = [p for p in completed_periods if p.get('points_converted')]
+            prize_periods = [p for p in completed_periods if p.get('has_prize')]
+            
+            message_text = "📊 **Ваши периоды лидерборда:**\n\n"
+            
+            if converted_periods:
+                message_text += "✅ **Уже конвертировано:**\n"
+                for period in converted_periods:
+                    message_text += (
+                        f"• {period['period_name']}: "
+                        f"{period['points_converted_amount']:.2f} баллов "
+                        f"(было {period['total_score']:.2f})\n"
+                    )
+                message_text += "\n"
+            
+            if prize_periods:
+                message_text += "🎁 **Получены призы:**\n"
+                for period in prize_periods:
+                    message_text += f"• {period['period_name']}: {period['total_score']:.2f} баллов\n"
+                message_text += "\n"
+            
+            if not converted_periods and not prize_periods:
+                message_text += "Нет доступных периодов для конвертации."
+            
+            client_bot.send_message(chat_id, message_text, parse_mode='Markdown')
+            return
+        
+        # Если только один период доступен, сразу конвертируем
+        if len(available_periods) == 1:
+            period = available_periods[0]
+            success, result = sm.convert_leaderboard_points_to_loyalty(period['period_id'], chat_id)
+            
+            if success:
+                loyalty_points = result.get('loyalty_points', 0)
+                leaderboard_points = result.get('leaderboard_points', 0)
+                conversion_rate = result.get('conversion_rate', 10.0)
+                
+                client_bot.send_message(
+                    chat_id,
+                    f"✅ **Баллы успешно конвертированы!**\n\n"
+                    f"📊 **Период:** {period['period_name']}\n"
+                    f"🎯 **Баллы лидерборда:** {leaderboard_points:.2f}\n"
+                    f"💱 **Курс конвертации:** {conversion_rate}%\n"
+                    f"💰 **Получено баллов:** {loyalty_points:.2f}\n\n"
+                    f"Баллы добавлены на ваш счёт!",
+                    parse_mode='Markdown'
+                )
+            else:
+                error_msg = result.get('error', 'Неизвестная ошибка')
+                client_bot.send_message(
+                    chat_id,
+                    f"❌ **Ошибка конвертации**\n\n{error_msg}",
+                    parse_mode='Markdown'
+                )
+            return
+        
+        # Если несколько периодов, показываем список для выбора
+        message_text = "📊 **Выберите период для конвертации:**\n\n"
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        
+        for period in available_periods:
+            loyalty_points = period['total_score'] * (period['conversion_rate'] / 100.0)
+            message_text += (
+                f"• {period['period_name']}\n"
+                f"  Баллы: {period['total_score']:.2f} → {loyalty_points:.2f} "
+                f"(курс: {period['conversion_rate']}%)\n\n"
+            )
+            
+            btn = types.InlineKeyboardButton(
+                f"🔄 {period['period_name']} ({loyalty_points:.0f} баллов)",
+                callback_data=f"convert_period_{period['period_id']}"
+            )
+            markup.add(btn)
+        
+        client_bot.send_message(chat_id, message_text, reply_markup=markup, parse_mode='Markdown')
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка при обработке команды convert_points для {chat_id}")
+        client_bot.send_message(chat_id, "❌ Произошла ошибка. Попробуйте позже.")
+
+
+@client_bot.callback_query_handler(func=lambda call: call.data.startswith('convert_period_'))
+def callback_convert_period(call):
+    """Callback для конвертации баллов конкретного периода."""
+    chat_id = str(call.message.chat.id)
+    
+    try:
+        client_bot.answer_callback_query(call.id)
+        
+        period_id = int(call.data.replace('convert_period_', ''))
+        
+        # Получаем информацию о периоде
+        period_info = sm.client.from_('leaderboard_periods').select('period_name, points_conversion_rate').eq('id', period_id).limit(1).execute()
+        
+        if not period_info.data:
+            client_bot.send_message(chat_id, "❌ Период не найден.")
+            return
+        
+        period_name = period_info.data[0].get('period_name', 'Период')
+        conversion_rate = float(period_info.data[0].get('points_conversion_rate', 10.0))
+        
+        # Конвертируем баллы
+        success, result = sm.convert_leaderboard_points_to_loyalty(period_id, chat_id)
+        
+        if success:
+            loyalty_points = result.get('loyalty_points', 0)
+            leaderboard_points = result.get('leaderboard_points', 0)
+            
+            client_bot.edit_message_text(
+                f"✅ **Баллы успешно конвертированы!**\n\n"
+                f"📊 **Период:** {period_name}\n"
+                f"🎯 **Баллы лидерборда:** {leaderboard_points:.2f}\n"
+                f"💱 **Курс конвертации:** {conversion_rate}%\n"
+                f"💰 **Получено баллов:** {loyalty_points:.2f}\n\n"
+                f"Баллы добавлены на ваш счёт!",
+                chat_id=chat_id,
+                message_id=call.message.message_id,
+                parse_mode='Markdown'
+            )
+        else:
+            error_msg = result.get('error', 'Неизвестная ошибка')
+            client_bot.edit_message_text(
+                f"❌ **Ошибка конвертации**\n\n{error_msg}",
+                chat_id=chat_id,
+                message_id=call.message.message_id,
+                parse_mode='Markdown'
+            )
+        
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка обработки callback convert_period для {chat_id}")
+        client_bot.answer_callback_query(call.id, "Произошла ошибка", show_alert=True)
 
 @client_bot.message_handler(commands=['ask', 'спросить'])
 def handle_ask_command(message):

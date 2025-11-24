@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
+import { formatCurrencySimple } from '../utils/currency';
 import Loader from '../components/Loader';
 
 const AdminAnalytics = () => {
@@ -189,7 +190,7 @@ const AdminAnalytics = () => {
             <AdminMetricCard
               icon="💰"
               title="Общий оборот"
-              value={`${systemStats.totalRevenue.toLocaleString('ru-RU')} ₽`}
+              value={formatCurrencySimple(systemStats.totalRevenue, null)}
               color="purple"
             />
             <AdminMetricCard
@@ -276,7 +277,7 @@ const AdminAnalytics = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-bold text-gray-900 dark:text-white">
-                          {partner.revenue.toLocaleString('ru-RU')} ₽
+                          {formatCurrencySimple(partner.revenue, partner.city)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

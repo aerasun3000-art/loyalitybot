@@ -4,8 +4,10 @@ import {
   getAdvancedPartnerStats,
   getPartnerStatsByPeriod,
   getPartnerCohortAnalysis,
-  getTopClientsByLTV
+  getTopClientsByLTV,
+  getPartnerInfo
 } from '../services/supabase'
+import { formatCurrency } from '../utils/currency'
 import Loader from '../components/Loader'
 
 export default function Analytics() {
@@ -17,6 +19,7 @@ export default function Analytics() {
   const [cohorts, setCohorts] = useState([])
   const [topClients, setTopClients] = useState([])
   const [activeTab, setActiveTab] = useState('overview') // overview, charts, cohorts, clients
+  const [partnerCity, setPartnerCity] = useState(null)
 
   useEffect(() => {
     loadAnalytics()
@@ -33,6 +36,12 @@ export default function Analytics() {
 
     try {
       setLoading(true)
+
+      // Загружаем информацию о партнере (для определения валюты)
+      const partnerInfo = await getPartnerInfo(partnerChatId)
+      if (partnerInfo?.city) {
+        setPartnerCity(partnerInfo.city)
+      }
 
       // Загружаем расширенную статистику
       const advancedStats = await getAdvancedPartnerStats(partnerChatId, selectedPeriod)
@@ -64,13 +73,8 @@ export default function Analytics() {
     }
   }
 
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'RUB',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value)
+  const formatCurrencyValue = (value) => {
+    return formatCurrency(value, partnerCity)
   }
 
   const formatPercent = (value) => {
@@ -130,7 +134,7 @@ export default function Analytics() {
               >
                 <span className="text-xs text-white font-medium">
                   {typeof item[dataKey] === 'number' && dataKey === 'revenue'
-                    ? formatCurrency(item[dataKey])
+                    ? formatCurrencyValue(item[dataKey])
                     : item[dataKey]}
                 </span>
               </div>
@@ -222,13 +226,13 @@ export default function Analytics() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <MetricCard
                 title="Оборот"
-                value={formatCurrency(stats.total_revenue)}
+                value={formatCurrencyValue(stats.total_revenue)}
                 icon="💰"
                 color="bg-green-500"
               />
               <MetricCard
                 title="Средний чек"
-                value={formatCurrency(stats.avg_check)}
+                value={formatCurrencyValue(stats.avg_check)}
                 icon="📊"
                 color="bg-blue-500"
               />
@@ -459,9 +463,9 @@ export default function Analytics() {
                       <tr key={index} className="border-b border-gray-100 dark:border-gray-700/50">
                         <td className="py-3 px-4 font-medium text-gray-900 dark:text-white">{cohort.month}</td>
                         <td className="py-3 px-4 text-right text-gray-700 dark:text-gray-300">{cohort.clients_count}</td>
-                        <td className="py-3 px-4 text-right font-medium text-green-600">{formatCurrency(cohort.total_revenue)}</td>
+                        <td className="py-3 px-4 text-right font-medium text-green-600">{formatCurrencyValue(cohort.total_revenue)}</td>
                         <td className="py-3 px-4 text-right text-gray-700 dark:text-gray-300">{cohort.total_transactions}</td>
-                        <td className="py-3 px-4 text-right font-medium text-blue-600">{formatCurrency(cohort.avg_revenue_per_client)}</td>
+                        <td className="py-3 px-4 text-right font-medium text-blue-600">{formatCurrencyValue(cohort.avg_revenue_per_client)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -494,7 +498,7 @@ export default function Analytics() {
                       <p className="text-sm text-gray-600 dark:text-gray-400">{client.phone}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-green-600">{formatCurrency(client.ltv)}</p>
+                      <p className="font-bold text-green-600">{formatCurrencyValue(client.ltv)}</p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">{client.transactions_count} транз.</p>
                     </div>
                   </div>

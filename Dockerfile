@@ -29,6 +29,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD pgrep -f python || exit 1
 
 # По умолчанию запускаем партнёрский бот
-# В docker-compose.yml переопределяется для каждого сервиса
+# В docker-compose.yml или fly.toml переопределяется для каждого сервиса
+# Для Fly.io команда задаётся в [processes] секции fly.toml
 CMD ["python", "bot.py"]
 

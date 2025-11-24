@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: loyalitybot-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: PYTHONPATH=. python3 -m uvicorn secure_api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: production
+      - key: SENTRY_ALERT_TELEGRAM_TOKEN
+        sync: false
+      - key: SENTRY_ALERT_CHAT_ID
+        sync: false
+      - key: SENTRY_WEBHOOK_SECRET
+        sync: false
+      - key: APP_VERSION
+        value: 1.0.0
+      - key: LOG_LEVEL
+        value: INFO
+

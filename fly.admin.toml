@@ -1,0 +1,21 @@
+# Fly.io конфигурация для админ-бота
+# Использование: flyctl deploy --config fly.admin.toml --app loyalitybot-admin
+
+app = "loyalitybot-admin"
+primary_region = "ams"  # Амстердам (близко к России)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PYTHONUNBUFFERED = "1"
+  LOG_LEVEL = "INFO"
+
+[processes]
+  app = "python admin_bot.py"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+

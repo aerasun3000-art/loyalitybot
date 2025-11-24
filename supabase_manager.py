@@ -131,6 +131,27 @@ class SupabaseManager:
             self._WELCOME_BONUS = 100
             logging.error(f"Не удалось преобразовать WELCOME_BONUS_AMOUNT '{bonus_from_env}' в число. Установлено значение 100.")
 
+        # Конфигурация реферальной системы (гибридная модель)
+        self.REFERRAL_CONFIG = {
+            'levels': 3,
+            'registration_bonus': {
+                'level_1': 100,  # баллов за прямого реферала
+                'level_2': 25,   # баллов за внучатого
+                'level_3': 10    # баллов за правнучатого
+            },
+            'transaction_percent': {
+                'level_1': 0.08,  # 8% от начисленных баллов
+                'level_2': 0.04,  # 4% от начисленных баллов
+                'level_3': 0.02   # 2% от начисленных баллов
+            },
+            'achievements': {
+                '5_referrals': 200,
+                '10_referrals': 500,
+                '25_referrals': 1500,
+                '50_referrals': 3000
+            }
+        }
+
     # Доступ к константе для client_handler.py (согласно контракту)
     @property
     def WELCOME_BONUS_AMOUNT(self):
@@ -422,6 +443,22 @@ class SupabaseManager:
         try:
             self.client.from_(USER_TABLE).update({BALANCE_COLUMN: new_balance}).eq('chat_id', str(client_chat_id)).execute()
             self.record_transaction(client_chat_id, partner_chat_id, transaction_amount_points, type_for_record, description, raw_amount=raw_amount)
+            
+            # Обрабатываем реферальные бонусы при начислении баллов
+            if txn_type == 'accrual' and transaction_amount_points > 0:
+                try:
+                    # Получаем ID транзакции для связи
+                    transaction_id = None
+                    recent_txn = self.client.from_(TRANSACTION_TABLE).select('id').eq('client_chat_id', str(client_chat_id)).order('date_time', desc=True).limit(1).execute()
+                    if recent_txn.data:
+                        transaction_id = recent_txn.data[0].get('id')
+                    
+                    # Обрабатываем реферальные бонусы
+                    self.process_referral_transaction_bonuses(str(client_chat_id), transaction_amount_points, transaction_id)
+                except Exception as e:
+                    logging.error(f"Error processing referral transaction bonuses: {e}")
+                    # Не прерываем основную транзакцию из-за ошибки реферальных бонусов
+            
             if allow_queue and self.transaction_queue:
                 self.transaction_queue.process_pending()
             return {"success": True, "new_balance": new_balance, "points": transaction_amount_points}
@@ -933,10 +970,10 @@ class SupabaseManager:
     def get_client_analytics(self, client_chat_id: int) -> dict:
         """Calculates key analytical metrics (LTV, transaction frequency) for a client."""
         if not self.client:
-            return {'ltv_rub': 0.0, 'total_transactions': 0, 'months_active': 0, 'freq_per_month': 0.0, 'reg_date': None}
+            return {'ltv_usd': 0.0, 'total_transactions': 0, 'months_active': 0, 'freq_per_month': 0.0, 'reg_date': None}
 
         client_chat_id = str(client_chat_id)
-        stats = {'ltv_rub': 0.0, 'total_transactions': 0, 'months_active': 0, 'freq_per_month': 0.0, 'reg_date': None}
+        stats = {'ltv_usd': 0.0, 'total_transactions': 0, 'months_active': 0, 'freq_per_month': 0.0, 'reg_date': None}
 
         try:
             user_response = self.client.from_(USER_TABLE).select('reg_date').eq('chat_id', client_chat_id).limit(1).execute()
@@ -966,7 +1003,7 @@ class SupabaseManager:
                 if txn.get('operation_type') == 'accrual': 
                     total_accrual_amount += txn.get('total_amount', 0.0) 
 
-            stats['ltv_rub'] = round(total_accrual_amount, 2)
+            stats['ltv_usd'] = round(total_accrual_amount, 2)
             stats['total_transactions'] = total_transactions
             
             if months_active > 0:
@@ -994,7 +1031,7 @@ class SupabaseManager:
                 "status": client_data.get('status', 'Bronze'),
                 "phone": client_data.get(PHONE_COLUMN, 'Не указан'),
                 "reg_date": analytics['reg_date'],
-                "ltv_rub": analytics['ltv_rub'], 
+                "ltv_usd": analytics['ltv_usd'], 
                 "total_transactions": analytics['total_transactions'], 
                 "freq_per_month": analytics['freq_per_month'], 
             }
@@ -1013,7 +1050,7 @@ class SupabaseManager:
 
         stats = {
             'total_referrals': 0, 'total_transactions': 0, 'total_accrued_points': 0,
-            'total_spent_rub': 0.0, 'avg_nps_rating': 0.0, 'promoters': 0, 'detractors': 0
+            'total_spent_usd': 0.0, 'avg_nps_rating': 0.0, 'promoters': 0, 'detractors': 0
         }
 
         try:
@@ -1027,7 +1064,7 @@ class SupabaseManager:
             
             for txn in transactions:
                 if txn.get('operation_type') == 'accrual': 
-                    stats['total_spent_rub'] += txn.get('total_amount', 0.0) 
+                    stats['total_spent_usd'] += txn.get('total_amount', 0.0) 
                     
                 if txn.get('operation_type') in ['accrual', 'enrollment_bonus']: 
                     stats['total_accrued_points'] += txn.get('earned_points', 0) 
@@ -1061,12 +1098,13 @@ class SupabaseManager:
             return {}
         
         partner_chat_id = str(partner_chat_id)
-        cache_key = f"partner_stats:{partner_chat_id}:{period_days}"
-        cached = self._get_cache_entry(cache_key)
-        if cached:
-            return cached
+        # Не используем кеш для NPS метрик, чтобы данные всегда были актуальными
+        # cache_key = f"partner_stats:{partner_chat_id}:{period_days}"
+        # cached = self._get_cache_entry(cache_key)
+        # if cached:
+        #     return cached
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(datetime.timezone.utc)
         period_start = now - datetime.timedelta(days=period_days)
         
         stats = {
@@ -1099,6 +1137,7 @@ class SupabaseManager:
             'promoters': 0,
             'passives': 0,
             'detractors': 0,
+            'total_promoters': 0,  # Количество промоутеров среди клиентов партнера
             
             # Конверсионные метрики
             'registration_to_first_purchase': 0.0,  # % клиентов с первой покупкой
@@ -1172,19 +1211,59 @@ class SupabaseManager:
                 inactive_clients = stats['total_clients'] - stats['active_clients']
                 stats['churn_rate'] = round((inactive_clients / stats['total_clients']) * 100, 2)
             
-            # NPS метрики за период
+            # NPS метрики за период (как в дашборде)
             nps_response = self.client.from_('nps_ratings').select('rating').eq('partner_chat_id', partner_chat_id).gte('created_at', period_start.isoformat()).execute()
-            ratings = [r['rating'] for r in nps_response.data]
+            nps_ratings = nps_response.data if nps_response.data else []
             
-            if ratings:
-                stats['avg_nps'] = round(sum(ratings) / len(ratings), 2)
-                stats['promoters'] = sum(1 for r in ratings if r >= 9)
-                stats['passives'] = sum(1 for r in ratings if r in [7, 8])
-                stats['detractors'] = sum(1 for r in ratings if r <= 6)
+            if nps_ratings:
+                # Используем точно такую же логику, как в дашборде
+                # В дашборде: const promoters = npsRatings?.filter(r => r.rating >= 9).length || 0;
+                ratings = [r.get('rating') for r in nps_ratings if r.get('rating') is not None]
                 
-                # Чистый NPS индекс
-                total_ratings = len(ratings)
-                stats['nps_score'] = round(((stats['promoters'] - stats['detractors']) / total_ratings) * 100, 0)
+                if ratings:
+                    stats['avg_nps'] = round(sum(ratings) / len(ratings), 2)
+                    # Промоутеры: оценки >= 9 (как в дашборде)
+                    stats['promoters'] = len([r for r in ratings if r >= 9])
+                    # Нейтральные: оценки 7-8
+                    stats['passives'] = len([r for r in ratings if r in [7, 8]])
+                    # Детракторы: оценки <= 6
+                    stats['detractors'] = len([r for r in ratings if r <= 6])
+                    
+                    # Чистый NPS индекс (как в дашборде: Math.round(((promoters - detractors) / totalNPS) * 100))
+                    total_ratings = len(ratings)
+                    if total_ratings > 0:
+                        nps_calculation = ((stats['promoters'] - stats['detractors']) / total_ratings) * 100
+                        stats['nps_score'] = int(round(nps_calculation))
+                    else:
+                        stats['nps_score'] = 0
+                else:
+                    # Если нет валидных оценок
+                    stats['avg_nps'] = 0.0
+                    stats['nps_score'] = 0
+                    stats['promoters'] = 0
+                    stats['passives'] = 0
+                    stats['detractors'] = 0
+            else:
+                # Если нет оценок, устанавливаем нулевые значения
+                stats['avg_nps'] = 0.0
+                stats['nps_score'] = 0
+                stats['promoters'] = 0
+                stats['passives'] = 0
+                stats['detractors'] = 0
+            
+            # Получаем промоутеров партнера (клиенты партнера, которые стали промоутерами)
+            try:
+                # Получаем всех клиентов партнера
+                partner_clients = [c['chat_id'] for c in all_clients]
+                if partner_clients:
+                    # Получаем промоутеров среди клиентов партнера
+                    promoters_response = self.client.from_('promoters').select('client_chat_id').in_('client_chat_id', partner_clients).eq('is_active', True).execute()
+                    stats['total_promoters'] = len(promoters_response.data) if promoters_response.data else 0
+                else:
+                    stats['total_promoters'] = 0
+            except Exception as e:
+                logging.error(f"Error fetching promoters for partner {partner_chat_id}: {e}")
+                stats['total_promoters'] = 0
             
             # Конверсионные метрики
             # Регистрация -> Первая покупка
@@ -1199,7 +1278,8 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error fetching advanced partner stats for {partner_chat_id}: {e}")
         
-        self._set_cache_entry(cache_key, stats)
+        # Не кешируем, чтобы NPS метрики всегда были актуальными
+        # self._set_cache_entry(cache_key, stats)
         return stats
     
     def get_partner_stats_by_period(self, partner_chat_id: str, start_date: str, end_date: str) -> dict:
@@ -1492,8 +1572,8 @@ class SupabaseManager:
             logging.error(f"Error updating partner status for {partner_id}: {e}", exc_info=True)
             return False
 
-    def update_partner_data(self, partner_id: str, name: str = None, company_name: str = None, phone: str = None) -> bool:
-        """Обновляет данные партнера (имя, название компании, телефон)."""
+    def update_partner_data(self, partner_id: str, name: str = None, company_name: str = None, phone: str = None, booking_url: str = None) -> bool:
+        """Обновляет данные партнера (имя, название компании, телефон, ссылка на бронирование)."""
         if not self.client: return False
         try:
             update_data = {}
@@ -1505,30 +1585,22 @@ class SupabaseManager:
                 # Очищаем номер телефона от форматирования
                 clean_phone = phone.replace('+', '').replace(' ', '').replace('-', '').strip()
                 update_data['phone'] = clean_phone
+            if booking_url is not None:
+                update_data['booking_url'] = booking_url if booking_url else None
             
             if update_data:
+                # Обновляем в partner_applications
                 self.client.from_('partner_applications').update(update_data).eq('chat_id', str(partner_id)).execute()
+                # Также обновляем в partners, если партнер одобрен
+                try:
+                    self.client.from_('partners').update(update_data).eq('chat_id', str(partner_id)).execute()
+                except Exception as e:
+                    # Если партнер еще не одобрен, это нормально
+                    logging.debug(f"Partner {partner_id} not in partners table yet: {e}")
                 return True
             return False
         except Exception as e:
             logging.error(f"Error updating partner data: {e}")
-            return False
-
-    def record_nps_rating(self, client_chat_id: str, partner_chat_id: str, rating: int, master_name: Optional[str] = None) -> bool:
-        """Записывает оценку NPS клиента."""
-        if not self.client: return False
-        try:
-            data = {
-                "client_chat_id": client_chat_id, "partner_chat_id": partner_chat_id, "rating": rating,
-                "master_name": master_name, "created_at": datetime.datetime.now().isoformat(),
-            }
-            self.client.from_('nps_ratings').insert(data).execute()
-            return True
-        except APIError as e:
-            logging.error(f"Error recording NPS rating (API): {e}")
-            return False
-        except Exception as e:
-            logging.error(f"Unknown error recording NPS rating: {e}")
             return False
 
     # -----------------------------------------------------------------
@@ -1601,7 +1673,9 @@ class SupabaseManager:
                 'company_name': app_data.get('company_name', ''),
                 'business_type': app_data.get('business_type'),
                 'city': app_data.get('city', ''),
-                'district': app_data.get('district', '')
+                'district': app_data.get('district', ''),
+                'username': app_data.get('username'),  # Копируем username мастера
+                'booking_url': app_data.get('booking_url')  # Копируем ссылку на бронирование
             }
             
             # upsert по chat_id — если строка есть, не меняем другие поля
@@ -1655,6 +1729,47 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error fetching partner services for {partner_chat_id}: {e}")
             return []
+
+    def delete_partner(self, partner_chat_id: str) -> bool:
+        """Удаляет партнера и все связанные данные (услуги, акции, заявки)."""
+        if not self.client:
+            return False
+        try:
+            partner_chat_id = str(partner_chat_id)
+            
+            # Удаляем услуги партнера
+            try:
+                self.client.from_('services').delete().eq('partner_chat_id', partner_chat_id).execute()
+                logging.info(f"Deleted services for partner {partner_chat_id}")
+            except Exception as e:
+                logging.warning(f"Error deleting services for partner {partner_chat_id}: {e}")
+            
+            # Удаляем акции партнера
+            try:
+                self.client.from_('promotions').delete().eq('partner_chat_id', partner_chat_id).execute()
+                logging.info(f"Deleted promotions for partner {partner_chat_id}")
+            except Exception as e:
+                logging.warning(f"Error deleting promotions for partner {partner_chat_id}: {e}")
+            
+            # Удаляем запись из partners
+            try:
+                self.client.from_('partners').delete().eq('chat_id', partner_chat_id).execute()
+                logging.info(f"Deleted partner record for {partner_chat_id}")
+            except Exception as e:
+                logging.warning(f"Error deleting partner record for {partner_chat_id}: {e}")
+            
+            # Удаляем заявку партнера
+            try:
+                self.client.from_('partner_applications').delete().eq('chat_id', partner_chat_id).execute()
+                logging.info(f"Deleted partner application for {partner_chat_id}")
+            except Exception as e:
+                logging.warning(f"Error deleting partner application for {partner_chat_id}: {e}")
+            
+            logging.info(f"Successfully deleted partner {partner_chat_id} and all related data")
+            return True
+        except Exception as e:
+            logging.error(f"Error deleting partner {partner_chat_id}: {e}")
+            return False
 
     def delete_service(self, service_id: str, partner_chat_id: str) -> bool:
         """Удаляет услугу по ID, проверяя принадлежность партнёру."""
@@ -2285,114 +2400,7 @@ class SupabaseManager:
     # -----------------------------------------------------------------
     # PARTNER ANALYTICS METHODS
     # -----------------------------------------------------------------
-    
-    def get_advanced_partner_stats(self, partner_chat_id: str, period_days: int = 30) -> dict:
-        """
-        Получает расширенную статистику партнера за указанный период.
-        
-        Args:
-            partner_chat_id: Chat ID партнера
-            period_days: Количество дней для анализа
-        
-        Returns:
-            Словарь с детальной статистикой
-        """
-        if not self.client:
-            logging.error("Supabase client not initialized")
-            return None
-        
-        try:
-            # Определяем период
-            now = datetime.datetime.now(datetime.timezone.utc)
-            period_start = now - datetime.timedelta(days=period_days)
-            
-            # 1. Получаем всех клиентов партнера
-            all_clients_response = self.client.from_('clients').select('chat_id, reg_date').eq('referrer_chat_id', partner_chat_id).execute()
-            all_clients = all_clients_response.data if all_clients_response.data else []
-            
-            total_clients = len(all_clients)
-            new_clients = sum(1 for c in all_clients if c.get('reg_date') and parser.parse(c['reg_date']) >= period_start)
-            
-            # 2. Получаем транзакции за период
-            transactions_response = self.client.from_('transactions').select('*').eq('partner_chat_id', partner_chat_id).gte('date_time', period_start.isoformat()).execute()
-            transactions = transactions_response.data if transactions_response.data else []
-            
-            # 3. Анализируем транзакции
-            total_transactions = len(transactions)
-            accrual_transactions = [t for t in transactions if t.get('operation_type') == 'accrual']
-            redemption_transactions = [t for t in transactions if t.get('operation_type') == 'spend']
-            
-            total_revenue = sum(float(t.get('total_amount', 0)) for t in accrual_transactions)
-            avg_check = total_revenue / len(accrual_transactions) if accrual_transactions else 0
-            
-            total_points_accrued = sum(int(t.get('points_change', 0)) for t in accrual_transactions)
-            total_points_redeemed = sum(abs(int(t.get('points_change', 0))) for t in redemption_transactions)
-            
-            # 4. Уникальные активные клиенты
-            active_client_ids = set(t.get('client_chat_id') for t in transactions if t.get('client_chat_id'))
-            active_clients = len(active_client_ids)
-            
-            # 5. Повторные покупки
-            client_txn_count = {}
-            for t in accrual_transactions:
-                client_id = t.get('client_chat_id')
-                if client_id:
-                    client_txn_count[client_id] = client_txn_count.get(client_id, 0) + 1
-            
-            returning_clients = sum(1 for count in client_txn_count.values() if count > 1)
-            retention_rate = (returning_clients / active_clients * 100) if active_clients > 0 else 0
-            
-            # 6. LTV расчет
-            avg_ltv = total_revenue / total_clients if total_clients > 0 else 0
-            
-            # 7. NPS (если есть данные)
-            nps_response = self.client.from_('nps_ratings').select('rating').eq('partner_chat_id', partner_chat_id).gte('created_at', period_start.isoformat()).execute()
-            nps_ratings = nps_response.data if nps_response.data else []
-            
-            promoters = sum(1 for r in nps_ratings if r.get('rating', 0) >= 9)
-            detractors = sum(1 for r in nps_ratings if r.get('rating', 0) <= 6)
-            total_nps = len(nps_ratings)
-            
-            nps_score = ((promoters - detractors) / total_nps * 100) if total_nps > 0 else 0
-            avg_nps = sum(r.get('rating', 0) for r in nps_ratings) / total_nps if total_nps > 0 else 0
-            
-            # 8. Топ клиенты по выручке
-            client_revenue = {}
-            for t in accrual_transactions:
-                client_id = t.get('client_chat_id')
-                if client_id:
-                    client_revenue[client_id] = client_revenue.get(client_id, 0) + float(t.get('total_amount', 0))
-            
-            top_clients = sorted(client_revenue.items(), key=lambda x: x[1], reverse=True)[:5]
-            
-            # Формируем результат
-            stats = {
-                'period_days': period_days,
-                'total_clients': total_clients,
-                'new_clients': new_clients,
-                'active_clients': active_clients,
-                'returning_clients': returning_clients,
-                'retention_rate': round(retention_rate, 2),
-                'total_revenue': round(total_revenue, 2),
-                'avg_check': round(avg_check, 2),
-                'avg_ltv': round(avg_ltv, 2),
-                'total_transactions': total_transactions,
-                'accrual_transactions': len(accrual_transactions),
-                'redemption_transactions': len(redemption_transactions),
-                'total_points_accrued': total_points_accrued,
-                'total_points_redeemed': total_points_redeemed,
-                'nps_score': round(nps_score, 1),
-                'avg_nps': round(avg_nps, 2),
-                'total_nps_responses': total_nps,
-                'top_clients': [{'client_id': cid, 'revenue': round(rev, 2)} for cid, rev in top_clients]
-            }
-            
-            logging.info(f"Advanced stats generated for partner {partner_chat_id} ({period_days} days)")
-            return stats
-            
-        except Exception as e:
-            logging.error(f"Error getting advanced partner stats for {partner_chat_id}: {e}")
-            return None
+    # Примечание: get_advanced_partner_stats определена выше (строка 1086)
     
     def export_partner_data_to_csv(self, partner_chat_id: str, period_days: int = 90) -> tuple:
         """
@@ -2432,7 +2440,7 @@ class SupabaseManager:
                 'Дата и время',
                 'Тип операции',
                 'Клиент ID',
-                'Сумма чека (₽)',
+                'Сумма чека ($)',
                 'Изменение баллов',
                 'Баланс после',
                 'Описание'
@@ -2447,7 +2455,7 @@ class SupabaseManager:
                     'Дата и время': txn.get('date_time', ''),
                     'Тип операции': 'Начисление' if txn.get('operation_type') == 'accrual' else 'Списание',
                     'Клиент ID': txn.get('client_chat_id', ''),
-                    'Сумма чека (₽)': txn.get('total_amount', 0),
+                    'Сумма чека ($)': txn.get('total_amount', 0),
                     'Изменение баллов': txn.get('points_change', 0),
                     'Баланс после': txn.get('balance_after', 0),
                     'Описание': txn.get('description', '')
@@ -2576,15 +2584,1464 @@ class SupabaseManager:
             success = True
             return True
         except Exception as e:
-            logging.error(f"Error setting app setting {setting_key}: {e}")
+            logging.error(f"Error updating app setting: {e}")
             return False
-        finally:
-            if success:
-                try:
-                    self._log_setting_change(setting_key, old_value, setting_value, updated_by)
-                except Exception as e:
-                    logging.error(f"Error logging setting change for {setting_key}: {e}")
+
+    # -----------------------------------------------------------------
+    # REFERRAL SYSTEM METHODS (MLM для клиентов)
+    # -----------------------------------------------------------------
+
+    def generate_referral_code(self, chat_id: str) -> str:
+        """Генерирует уникальный реферальный код для пользователя."""
+        import hashlib
+        import random
+        
+        if not self.client:
+            return None
+        
+        # Генерируем код на основе chat_id и времени
+        base_string = f"{chat_id}_{datetime.datetime.now().isoformat()}"
+        code = hashlib.md5(base_string.encode()).hexdigest()[:6].upper()
+        
+        # Проверяем уникальность
+        max_attempts = 10
+        attempt = 0
+        while attempt < max_attempts:
+            try:
+                existing = self.client.from_(USER_TABLE).select('chat_id').eq('referral_code', code).limit(1).execute()
+                if not existing.data:
+                    return code
+                # Если код существует, генерируем новый
+                code = hashlib.md5(f"{base_string}_{random.random()}".encode()).hexdigest()[:6].upper()
+                attempt += 1
+            except Exception as e:
+                logging.error(f"Error checking referral code uniqueness: {e}")
+                return code
+        
+        # Если не удалось сгенерировать уникальный код, используем chat_id
+        return f"REF{chat_id[-6:].upper()}"
+
+    def get_or_create_referral_code(self, chat_id: str) -> Optional[str]:
+        """Получает существующий реферальный код или создаёт новый."""
+        if not self.client:
+            return None
+        
+        try:
+            # Проверяем, есть ли уже код
+            user_data = self.client.from_(USER_TABLE).select('referral_code').eq('chat_id', chat_id).limit(1).execute()
+            if user_data.data and user_data.data[0].get('referral_code'):
+                return user_data.data[0]['referral_code']
+            
+            # Создаём новый код
+            code = self.generate_referral_code(chat_id)
+            self.client.from_(USER_TABLE).update({'referral_code': code}).eq('chat_id', chat_id).execute()
+            return code
+        except Exception as e:
+            logging.error(f"Error getting/creating referral code: {e}")
+            return None
+
+    def _create_referral_tree_links(self, new_user_chat_id: str, direct_referrer_chat_id: str):
+        """Создаёт связи в referral_tree для всех уровней (до 3 уровней вверх)."""
+        if not self.client:
+            return
+        
+        try:
+            # Уровень 1: прямой реферер
+            tree_data_1 = {
+                'referrer_chat_id': direct_referrer_chat_id,
+                'referred_chat_id': new_user_chat_id,
+                'level': 1,
+                'is_active': True
+            }
+            # Проверяем, не существует ли уже связь
+            existing = self.client.from_('referral_tree').select('id').eq('referrer_chat_id', direct_referrer_chat_id).eq('referred_chat_id', new_user_chat_id).limit(1).execute()
+            if not existing.data:
+                self.client.from_('referral_tree').insert(tree_data_1).execute()
+            
+            # Уровень 2: реферер реферера
+            referrer_2_data = self.client.from_(USER_TABLE).select('referred_by_chat_id').eq('chat_id', direct_referrer_chat_id).limit(1).execute()
+            if referrer_2_data.data and referrer_2_data.data[0].get('referred_by_chat_id'):
+                referrer_2_id = referrer_2_data.data[0]['referred_by_chat_id']
+                tree_data_2 = {
+                    'referrer_chat_id': referrer_2_id,
+                    'referred_chat_id': new_user_chat_id,
+                    'level': 2,
+                    'is_active': True
+                }
+                existing_2 = self.client.from_('referral_tree').select('id').eq('referrer_chat_id', referrer_2_id).eq('referred_chat_id', new_user_chat_id).limit(1).execute()
+                if not existing_2.data:
+                    self.client.from_('referral_tree').insert(tree_data_2).execute()
+                
+                # Уровень 3: реферер реферера реферера
+                referrer_3_data = self.client.from_(USER_TABLE).select('referred_by_chat_id').eq('chat_id', referrer_2_id).limit(1).execute()
+                if referrer_3_data.data and referrer_3_data.data[0].get('referred_by_chat_id'):
+                    referrer_3_id = referrer_3_data.data[0]['referred_by_chat_id']
+                    tree_data_3 = {
+                        'referrer_chat_id': referrer_3_id,
+                        'referred_chat_id': new_user_chat_id,
+                        'level': 3,
+                        'is_active': True
+                    }
+                    existing_3 = self.client.from_('referral_tree').select('id').eq('referrer_chat_id', referrer_3_id).eq('referred_chat_id', new_user_chat_id).limit(1).execute()
+                    if not existing_3.data:
+                        self.client.from_('referral_tree').insert(tree_data_3).execute()
+        except Exception as e:
+            logging.error(f"Error creating referral tree links: {e}")
+
+    def _build_referral_tree(self, referred_chat_id: str, level: int = 1, max_level: int = 3) -> list:
+        """Строит дерево рефералов для начисления бонусов (от приглашённого к пригласившему)."""
+        if not self.client or level > max_level:
+            return []
+        
+        tree = []
+        try:
+            # Получаем реферера для данного пользователя (кто его пригласил)
+            referrals = self.client.from_('referral_tree').select('referrer_chat_id, level').eq('referred_chat_id', referred_chat_id).eq('level', level).execute()
+            
+            for ref in referrals.data:
+                referrer_id = ref['referrer_chat_id']
+                tree.append({
+                    'chat_id': referrer_id,
+                    'level': level
+                })
+                # Рекурсивно получаем следующий уровень (кто пригласил реферера)
+                tree.extend(self._build_referral_tree(referrer_id, level + 1, max_level))
+            
+            return tree
+        except Exception as e:
+            logging.error(f"Error building referral tree: {e}")
+            return []
+
+    def process_referral_registration_bonuses(self, new_user_chat_id: str, referrer_chat_id: str) -> bool:
+        """Обрабатывает бонусы за регистрацию нового пользователя по реферальной ссылке клиента."""
+        if not self.client:
+            return False
+        
+        try:
+            # Проверяем, что это регистрация по реферальной ссылке клиента (не партнёра)
+            user_data = self.client.from_(USER_TABLE).select('referred_by_chat_id').eq('chat_id', new_user_chat_id).limit(1).execute()
+            if not user_data.data or user_data.data[0].get('referred_by_chat_id') != referrer_chat_id:
+                return False
+            
+            # Строим дерево рефералов (до 3 уровней)
+            referral_tree = self._build_referral_tree(new_user_chat_id, level=1, max_level=3)
+            
+            # Начисляем бонусы за регистрацию
+            config = self.REFERRAL_CONFIG
+            bonuses_awarded = []
+            
+            for ref in referral_tree:
+                level = ref['level']
+                referrer_id = ref['chat_id']
+                
+                # Получаем бонус за регистрацию для этого уровня
+                bonus_key = f'level_{level}'
+                bonus_points = config['registration_bonus'].get(bonus_key, 0)
+                
+                if bonus_points > 0:
+                    # Начисляем бонусы
+                    current_balance = self.get_client_balance(int(referrer_id))
+                    new_balance = current_balance + bonus_points
+                    
+                    # Обновляем баланс
+                    self.client.from_(USER_TABLE).update({BALANCE_COLUMN: new_balance}).eq('chat_id', referrer_id).execute()
+                    
+                    # Записываем в referral_rewards
+                    reward_data = {
+                        'referrer_chat_id': referrer_id,
+                        'referred_chat_id': new_user_chat_id,
+                        'reward_type': 'registration',
+                        'level': level,
+                        'points': bonus_points,
+                        'description': f'Бонус за регистрацию реферала уровня {level}'
+                    }
+                    reward_result = self.client.from_('referral_rewards').insert(reward_data).execute()
+                    reward_id = reward_result.data[0]['id'] if reward_result.data else None
+                    
+                    # Обновляем referral_tree
+                    self.client.from_('referral_tree').update({
+                        'total_earned_points': bonus_points,
+                        'total_transactions': 0,
+                        'is_active': True
+                    }).eq('referrer_chat_id', referrer_id).eq('referred_chat_id', new_user_chat_id).execute()
+                    
+                    # Добавляем метрику в активный период лидерборда
+                    active_period = self.get_active_leaderboard_period()
+                    if active_period and reward_id:
+                        self.add_leaderboard_metric(
+                            active_period['id'],
+                            referrer_id,
+                            'referral_registration',
+                            float(bonus_points),
+                            f'Бонус за регистрацию реферала уровня {level}',
+                            reward_id,
+                            'referral_rewards'
+                        )
+                    
+                    bonuses_awarded.append({
+                        'referrer': referrer_id,
+                        'level': level,
+                        'points': bonus_points
+                    })
+            
+            # Проверяем достижения
+            for ref in referral_tree:
+                self.check_and_award_achievements(ref['chat_id'])
+            
+            logging.info(f"Referral registration bonuses processed for {new_user_chat_id}: {bonuses_awarded}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error processing referral registration bonuses: {e}")
+            return False
+
+    def process_referral_transaction_bonuses(self, user_chat_id: str, earned_points: int, transaction_id: int = None) -> bool:
+        """Обрабатывает бонусы с транзакций для рефералов (многоуровневая система)."""
+        if not self.client or earned_points <= 0:
+            return False
+        
+        try:
+            # Строим дерево рефералов (до 3 уровней)
+            referral_tree = self._build_referral_tree(user_chat_id, level=1, max_level=3)
+            
+            if not referral_tree:
+                return True  # Нет рефералов, ничего делать не нужно
+            
+            config = self.REFERRAL_CONFIG
+            bonuses_awarded = []
+            
+            for ref in referral_tree:
+                level = ref['level']
+                referrer_id = ref['chat_id']
+                
+                # Получаем процент для этого уровня
+                percent_key = f'level_{level}'
+                percent = config['transaction_percent'].get(percent_key, 0.0)
+                
+                if percent > 0:
+                    # Рассчитываем бонус
+                    bonus_points = int(earned_points * percent)
+                    
+                    if bonus_points > 0:
+                        # Начисляем бонусы
+                        current_balance = self.get_client_balance(int(referrer_id))
+                        new_balance = current_balance + bonus_points
+                        
+                        # Обновляем баланс
+                        self.client.from_(USER_TABLE).update({BALANCE_COLUMN: new_balance}).eq('chat_id', referrer_id).execute()
+                        
+                        # Записываем в referral_rewards
+                        reward_data = {
+                            'referrer_chat_id': referrer_id,
+                            'referred_chat_id': user_chat_id,
+                            'reward_type': 'transaction',
+                            'level': level,
+                            'points': bonus_points,
+                            'transaction_id': transaction_id,
+                            'description': f'Бонус {int(percent * 100)}% с транзакции реферала уровня {level}'
+                        }
+                        reward_result = self.client.from_('referral_rewards').insert(reward_data).execute()
+                        reward_id = reward_result.data[0]['id'] if reward_result.data else None
+                        
+                        # Обновляем referral_tree
+                        self.client.from_('referral_tree').update({
+                            'total_earned_points': bonus_points,
+                            'total_transactions': 1,
+                            'last_transaction_at': datetime.datetime.now().isoformat(),
+                            'is_active': True
+                        }).eq('referrer_chat_id', referrer_id).eq('referred_chat_id', user_chat_id).execute()
+                        
+                        # Добавляем метрику в активный период лидерборда
+                        active_period = self.get_active_leaderboard_period()
+                        if active_period and reward_id:
+                            self.add_leaderboard_metric(
+                                active_period['id'],
+                                referrer_id,
+                                'referral_transaction',
+                                float(bonus_points),
+                                f'Бонус с транзакции реферала уровня {level}',
+                                reward_id,
+                                'referral_rewards'
+                            )
+                        
+                        bonuses_awarded.append({
+                            'referrer': referrer_id,
+                            'level': level,
+                            'points': bonus_points
+                        })
+            
+            if bonuses_awarded:
+                logging.info(f"Referral transaction bonuses processed for {user_chat_id}: {bonuses_awarded}")
+            
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error processing referral transaction bonuses: {e}")
+            return False
+
+    def register_client_via_client_referral(self, chat_id: str, referrer_code: str, phone: Optional[str] = None, name: Optional[str] = None) -> tuple[Optional[str], Optional[str]]:
+        """Регистрирует клиента по реферальной ссылке другого клиента."""
+        if not self.client:
+            return None, "DB is not initialized"
+        
+        try:
+            # Находим реферера по коду
+            referrer_data = self.client.from_(USER_TABLE).select('chat_id').eq('referral_code', referrer_code.upper()).limit(1).execute()
+            if not referrer_data.data:
+                return None, "Неверный реферальный код"
+            
+            referrer_chat_id = referrer_data.data[0]['chat_id']
+            
+            # Проверяем, не регистрируется ли пользователь сам себя
+            if str(chat_id) == str(referrer_chat_id):
+                return None, "Нельзя использовать свой собственный реферальный код"
+            
+            # Проверяем, не зарегистрирован ли уже пользователь
+            if self.client_exists(int(chat_id)):
+                return None, "Пользователь уже зарегистрирован"
+            
+            # Регистрируем пользователя
+            client_data = {
+                'chat_id': str(chat_id),
+                PHONE_COLUMN: phone,
+                'name': name,
+                'status': 'active',
+                BALANCE_COLUMN: self._WELCOME_BONUS,
+                'registered_via': 'client_referral',
+                'referred_by_chat_id': referrer_chat_id,
+                'reg_date': datetime.datetime.now().isoformat()
+            }
+            
+            self.client.from_(USER_TABLE).insert(client_data).execute()
+            
+            # Генерируем реферальный код для нового пользователя
+            self.get_or_create_referral_code(str(chat_id))
+            
+            # Создаём связи в referral_tree для всех уровней
+            self._create_referral_tree_links(str(chat_id), referrer_chat_id)
+            
+            # Начисляем приветственный бонус
+            transaction_data = {
+                'client_chat_id': str(chat_id),
+                'partner_chat_id': None,
+                'total_amount': 0,
+                'earned_points': self._WELCOME_BONUS,
+                'spent_points': 0,
+                'operation_type': 'enrollment_bonus',
+                'description': 'Приветственный бонус при регистрации',
+                'date_time': datetime.datetime.now().isoformat()
+            }
+            self.client.from_(TRANSACTION_TABLE).insert(transaction_data).execute()
+            
+            # Обрабатываем реферальные бонусы
+            self.process_referral_registration_bonuses(str(chat_id), referrer_chat_id)
+            
+            return f"✅ Регистрация успешна! Вы получили {self._WELCOME_BONUS} приветственных баллов.", None
+            
+        except APIError as e:
+            logging.error(f"Error registering client via referral: {e}")
+            return None, f"Ошибка БД: {e}"
+        except Exception as e:
+            logging.error(f"Error registering client via referral: {e}")
+            return None, f"Ошибка: {e}"
+
+    def get_referral_stats(self, chat_id: str) -> dict:
+        """Получает статистику рефералов для пользователя."""
+        if not self.client:
+            return {}
+        
+        try:
+            # Получаем данные пользователя
+            user_data = self.client.from_(USER_TABLE).select(
+                'referral_code, total_referrals, active_referrals, total_referral_earnings, referral_level'
+            ).eq('chat_id', chat_id).limit(1).execute()
+            
+            if not user_data.data:
+                return {}
+            
+            user = user_data.data[0]
+            
+            # Получаем список рефералов
+            referrals = self.client.from_('referral_tree').select(
+                'referred_chat_id, level, registered_at, is_active, total_earned_points, total_transactions'
+            ).eq('referrer_chat_id', chat_id).order('registered_at', desc=True).execute()
+            
+            # Получаем последние награды
+            recent_rewards = self.client.from_('referral_rewards').select(
+                'referred_chat_id, reward_type, points, created_at, description'
+            ).eq('referrer_chat_id', chat_id).order('created_at', desc=True).limit(10).execute()
+            
+            return {
+                'referral_code': user.get('referral_code'),
+                'total_referrals': user.get('total_referrals', 0),
+                'active_referrals': user.get('active_referrals', 0),
+                'total_earnings': user.get('total_referral_earnings', 0),
+                'referral_level': user.get('referral_level', 'bronze'),
+                'referrals_list': referrals.data if referrals.data else [],
+                'recent_rewards': recent_rewards.data if recent_rewards.data else []
+            }
+        except Exception as e:
+            logging.error(f"Error getting referral stats: {e}")
+            return {}
+
+    def check_and_award_achievements(self, chat_id: str) -> list:
+        """Проверяет и награждает достижениями за количество рефералов."""
+        if not self.client:
+            return []
+        
+        try:
+            # Получаем количество рефералов
+            user_data = self.client.from_(USER_TABLE).select('total_referrals').eq('chat_id', chat_id).limit(1).execute()
+            if not user_data.data:
+                return []
+            
+            total_referrals = user_data.data[0].get('total_referrals', 0)
+            
+            # Проверяем, какие достижения уже получены
+            existing_achievements = self.client.from_('referral_rewards').select('description').eq(
+                'referrer_chat_id', chat_id
+            ).eq('reward_type', 'achievement').execute()
+            
+            existing_descriptions = [a.get('description', '') for a in (existing_achievements.data or [])]
+            
+            # Проверяем достижения
+            config = self.REFERRAL_CONFIG
+            achievements = config.get('achievements', {})
+            awarded = []
+            
+            for achievement_key, bonus_points in achievements.items():
+                # Извлекаем число из ключа (например, '5_referrals' -> 5)
+                threshold = int(achievement_key.split('_')[0])
+                
+                if total_referrals >= threshold:
+                    achievement_desc = f'Достижение: {threshold} рефералов'
+                    
+                    # Проверяем, не получено ли уже это достижение
+                    if achievement_desc not in existing_descriptions:
+                        # Начисляем бонус
+                        current_balance = self.get_client_balance(int(chat_id))
+                        new_balance = current_balance + bonus_points
+                        
+                        self.client.from_(USER_TABLE).update({BALANCE_COLUMN: new_balance}).eq('chat_id', chat_id).execute()
+                        
+                        # Записываем достижение
+                        reward_data = {
+                            'referrer_chat_id': chat_id,
+                            'referred_chat_id': chat_id,  # Сам себе
+                            'reward_type': 'achievement',
+                            'level': 0,
+                            'points': bonus_points,
+                            'description': achievement_desc
+                        }
+                        self.client.from_('referral_rewards').insert(reward_data).execute()
+                        
+                        awarded.append({
+                            'achievement': achievement_key,
+                            'points': bonus_points,
+                            'description': achievement_desc
+                        })
+            
+            if awarded:
+                logging.info(f"Achievements awarded to {chat_id}: {awarded}")
+            
+            return awarded
+            
+        except Exception as e:
+            logging.error(f"Error checking achievements: {e}")
+            return []
 
     def get_background_image(self) -> str:
         """Получить путь к фоновому изображению."""
         return self.get_app_setting('background_image', '/bg/sakura.jpg')
+
+    # =====================================================
+    # СИСТЕМА ПРОМОУТЕРОВ И UGC
+    # =====================================================
+
+    def create_promoter_from_nps_10(self, client_chat_id: str) -> bool:
+        """Автоматически создаёт промоутера при NPS оценке 10."""
+        if not self.client:
+            return False
+        
+        try:
+            # Проверяем, не является ли уже промоутером
+            existing = self.client.from_('promoters').select('id').eq('client_chat_id', client_chat_id).limit(1).execute()
+            if existing.data:
+                return True  # Уже промоутер
+            
+            # Генерируем промо-код
+            promo_code_result = self.client.rpc('generate_promo_code', {'chat_id_param': client_chat_id}).execute()
+            promo_code = promo_code_result.data if promo_code_result.data else None
+            
+            if not promo_code:
+                # Fallback: генерируем вручную
+                import hashlib
+                import time
+                code_hash = hashlib.md5((client_chat_id + str(time.time())).encode()).hexdigest()[:6].upper()
+                promo_code = f"PROMO-{code_hash}"
+            
+            # Создаём промоутера
+            promoter_data = {
+                'client_chat_id': client_chat_id,
+                'promoter_level': 'novice',
+                'promo_code': promo_code,
+                'is_active': True,
+                'joined_at': datetime.datetime.now().isoformat()
+            }
+            
+            result = self.client.from_('promoters').insert(promoter_data).execute()
+            
+            # Обновляем пользователя
+            self.client.from_(USER_TABLE).update({
+                'is_promoter': True,
+                'promoter_since': datetime.datetime.now().isoformat()
+            }).eq('chat_id', client_chat_id).execute()
+            
+            logging.info(f"Промоутер создан для клиента {client_chat_id} с промо-кодом {promo_code}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Ошибка создания промоутера: {e}", exc_info=True)
+            return False
+
+    def get_promoter_info(self, client_chat_id: str) -> Optional[dict]:
+        """Получить информацию о промоутере."""
+        if not self.client:
+            return None
+        
+        try:
+            result = self.client.from_('promoters').select('*').eq('client_chat_id', client_chat_id).limit(1).execute()
+            if result.data:
+                return result.data[0]
+            return None
+        except Exception as e:
+            logging.error(f"Ошибка получения информации о промоутере: {e}")
+            return None
+
+    def add_ugc_content(self, promoter_chat_id: str, content_url: str, platform: str, promo_code: Optional[str] = None) -> tuple[bool, Optional[int]]:
+        """Добавить UGC контент."""
+        if not self.client:
+            return False, None
+        
+        try:
+            ugc_data = {
+                'promoter_chat_id': promoter_chat_id,
+                'content_url': content_url,
+                'platform': platform,
+                'promo_code': promo_code,
+                'status': 'pending',
+                'submitted_at': datetime.datetime.now().isoformat()
+            }
+            
+            result = self.client.from_('ugc_content').insert(ugc_data).execute()
+            
+            if result.data and len(result.data) > 0:
+                ugc_id = result.data[0]['id']
+                
+                # Обновляем общее количество публикаций (триггер обновит автоматически)
+                logging.info(f"UGC контент добавлен для промоутера {promoter_chat_id}, ID: {ugc_id}")
+                return True, ugc_id
+            
+            return False, None
+            
+        except Exception as e:
+            logging.error(f"Ошибка добавления UGC контента: {e}", exc_info=True)
+            return False, None
+
+    def approve_ugc_content(self, ugc_id: int, moderator_notes: Optional[str] = None, quality_score: Optional[int] = None, reward_points: int = 100) -> bool:
+        """Одобрить UGC контент и начислить баллы."""
+        if not self.client:
+            return False
+        
+        try:
+            # Получаем информацию о контенте
+            ugc_info = self.client.from_('ugc_content').select('promoter_chat_id').eq('id', ugc_id).limit(1).execute()
+            if not ugc_info.data:
+                return False
+            
+            promoter_chat_id = ugc_info.data[0]['promoter_chat_id']
+            
+            # Обновляем статус контента
+            update_data = {
+                'status': 'approved',
+                'approved_at': datetime.datetime.now().isoformat(),
+                'reward_points': reward_points
+            }
+            
+            if moderator_notes:
+                update_data['moderator_notes'] = moderator_notes
+            if quality_score is not None:
+                update_data['quality_score'] = quality_score
+            
+            self.client.from_('ugc_content').update(update_data).eq('id', ugc_id).execute()
+            
+            # Обновляем статистику промоутера
+            promoter_info = self.get_promoter_info(promoter_chat_id)
+            if promoter_info:
+                approved_count = promoter_info.get('approved_publications', 0) + 1
+                
+                # Определяем уровень промоутера
+                new_level = 'novice'
+                if approved_count >= 20:
+                    new_level = 'master'
+                elif approved_count >= 10:
+                    new_level = 'pro'
+                elif approved_count >= 5:
+                    new_level = 'active'
+                
+                self.client.from_('promoters').update({
+                    'approved_publications': approved_count,
+                    'total_earned_points': (promoter_info.get('total_earned_points', 0) or 0) + reward_points,
+                    'promoter_level': new_level,
+                    'last_publication_at': datetime.datetime.now().isoformat()
+                }).eq('client_chat_id', promoter_chat_id).execute()
+                
+                # Начисляем баллы на счёт пользователя
+                current_balance = self.get_client_balance(int(promoter_chat_id))
+                self.client.from_(USER_TABLE).update({
+                    BALANCE_COLUMN: current_balance + reward_points
+                }).eq('chat_id', promoter_chat_id).execute()
+                
+                # Записываем транзакцию
+                self.record_transaction(
+                    int(promoter_chat_id),
+                    0,  # SYSTEM
+                    reward_points,
+                    'ugc_bonus',
+                    f'Бонус за одобренный UGC контент #{ugc_id}'
+                )
+                
+                # Добавляем метрику в активный период лидерборда
+                active_period = self.get_active_leaderboard_period()
+                if active_period:
+                    self.add_leaderboard_metric(
+                        active_period['id'],
+                        promoter_chat_id,
+                        'ugc_publication',
+                        float(reward_points),
+                        f'Бонус за одобренный UGC контент #{ugc_id}',
+                        ugc_id,
+                        'ugc_content'
+                    )
+                
+                logging.info(f"UGC контент {ugc_id} одобрен, промоутеру {promoter_chat_id} начислено {reward_points} баллов")
+            
+            return True
+            
+        except Exception as e:
+            logging.error(f"Ошибка одобрения UGC контента: {e}", exc_info=True)
+            return False
+
+    def get_promo_materials(self, platform: Optional[str] = None) -> list[dict]:
+        """Получить промо-материалы."""
+        if not self.client:
+            return []
+        
+        try:
+            query = self.client.from_('promo_materials').select('*').eq('is_active', True)
+            
+            if platform:
+                query = query.or_(f'platform.eq.{platform},platform.eq.all')
+            
+            result = query.order('created_at', desc=True).execute()
+            return result.data if result.data else []
+            
+        except Exception as e:
+            logging.error(f"Ошибка получения промо-материалов: {e}")
+            return []
+
+    def get_ugc_content_for_promoter(self, promoter_chat_id: str, status: Optional[str] = None) -> list[dict]:
+        """Получить UGC контент промоутера."""
+        if not self.client:
+            return []
+        
+        try:
+            query = self.client.from_('ugc_content').select('*').eq('promoter_chat_id', promoter_chat_id)
+            
+            if status:
+                query = query.eq('status', status)
+            
+            result = query.order('submitted_at', desc=True).execute()
+            return result.data if result.data else []
+            
+        except Exception as e:
+            logging.error(f"Ошибка получения UGC контента: {e}")
+            return []
+
+    def get_all_pending_ugc_content(self) -> list[dict]:
+        """Получить весь UGC контент на модерации (для админ-бота)."""
+        if not self.client:
+            return []
+        
+        try:
+            result = self.client.from_('ugc_content').select('*').eq('status', 'pending').order('submitted_at', desc=True).execute()
+            return result.data if result.data else []
+        except Exception as e:
+            logging.error(f"Ошибка получения всех UGC контентов: {e}")
+            return []
+
+    # =====================================================
+    # СИСТЕМА ЛИДЕРБОРДА И ПРИЗОВ
+    # =====================================================
+
+    def create_leaderboard_period(self, period_type: str = 'monthly', target_date: Optional[datetime.date] = None) -> Optional[int]:
+        """Создать период лидерборда."""
+        if not self.client:
+            return None
+        
+        try:
+            if target_date is None:
+                target_date = datetime.date.today()
+            
+            # Вызываем функцию БД для создания периода
+            result = self.client.rpc('create_monthly_leaderboard_period', {'target_month': target_date.isoformat()}).execute()
+            
+            if result.data:
+                period_id = result.data
+                logging.info(f"Создан период лидерборда {period_id} для {target_date}")
+                return period_id
+            
+            return None
+            
+        except Exception as e:
+            logging.error(f"Ошибка создания периода лидерборда: {e}", exc_info=True)
+            return None
+
+    def get_active_leaderboard_period(self) -> Optional[dict]:
+        """Получить активный период лидерборда."""
+        if not self.client:
+            return None
+        
+        try:
+            result = self.client.from_('leaderboard_periods').select('*').eq('status', 'active').limit(1).execute()
+            if result.data:
+                return result.data[0]
+            return None
+        except Exception as e:
+            logging.error(f"Ошибка получения активного периода: {e}")
+            return None
+
+    def add_leaderboard_metric(self, period_id: int, client_chat_id: str, metric_type: str, metric_value: float, description: Optional[str] = None, related_id: Optional[int] = None, related_table: Optional[str] = None) -> bool:
+        """Добавить метрику для расчёта рейтинга лидерборда."""
+        if not self.client:
+            return False
+        
+        try:
+            metric_data = {
+                'period_id': period_id,
+                'client_chat_id': client_chat_id,
+                'metric_type': metric_type,
+                'metric_value': metric_value,
+                'description': description,
+                'created_at': datetime.datetime.now().isoformat()
+            }
+            
+            if related_id:
+                metric_data['related_id'] = related_id
+            if related_table:
+                metric_data['related_table'] = related_table
+            
+            self.client.from_('leaderboard_metrics').insert(metric_data).execute()
+            
+            # Обновляем рейтинг
+            self._update_leaderboard_ranking(period_id, client_chat_id)
+            
+            return True
+            
+        except Exception as e:
+            logging.error(f"Ошибка добавления метрики лидерборда: {e}", exc_info=True)
+            return False
+
+    def _update_leaderboard_ranking(self, period_id: int, client_chat_id: str):
+        """Обновить рейтинг участника лидерборда."""
+        if not self.client:
+            return
+        
+        try:
+            # Получаем все метрики для участника за период
+            metrics_result = self.client.from_('leaderboard_metrics').select('metric_type, metric_value').eq('period_id', period_id).eq('client_chat_id', client_chat_id).execute()
+            
+            if not metrics_result.data:
+                return
+            
+            # Группируем метрики по типам
+            referral_points = 0.0
+            ugc_points = 0.0
+            bonus_points = 0.0
+            
+            for metric in metrics_result.data:
+                metric_type = metric['metric_type']
+                metric_value = float(metric['metric_value'])
+                
+                if 'referral' in metric_type:
+                    referral_points += metric_value
+                elif 'ugc' in metric_type:
+                    ugc_points += metric_value
+                else:
+                    bonus_points += metric_value
+            
+            # Общий рейтинг: referral * 1.0 + ugc * 1.2 + bonus * 1.5
+            total_score = referral_points * 1.0 + ugc_points * 1.2 + bonus_points * 1.5
+            
+            # Проверяем, существует ли запись
+            existing = self.client.from_('leaderboard_rankings').select('id').eq('period_id', period_id).eq('client_chat_id', client_chat_id).limit(1).execute()
+            
+            ranking_data = {
+                'period_id': period_id,
+                'client_chat_id': client_chat_id,
+                'total_score': total_score,
+                'referral_points': referral_points,
+                'ugc_points': ugc_points,
+                'bonus_points': bonus_points,
+                'updated_at': datetime.datetime.now().isoformat()
+            }
+            
+            if existing.data:
+                # Обновляем существующую запись
+                self.client.from_('leaderboard_rankings').update(ranking_data).eq('id', existing.data[0]['id']).execute()
+            else:
+                # Создаём новую запись
+                ranking_data['created_at'] = datetime.datetime.now().isoformat()
+                self.client.from_('leaderboard_rankings').insert(ranking_data).execute()
+            
+            # Пересчитываем ранги
+            self.client.rpc('recalculate_leaderboard_ranks', {'period_id_param': period_id}).execute()
+            
+        except Exception as e:
+            logging.error(f"Ошибка обновления рейтинга лидерборда: {e}", exc_info=True)
+
+    def get_leaderboard_top(self, period_id: int, limit: int = 100) -> list[dict]:
+        """Получить топ участников лидерборда."""
+        if not self.client:
+            return []
+        
+        try:
+            result = self.client.from_('leaderboard_rankings').select('*, users:client_chat_id(name)').eq('period_id', period_id).order('total_score', desc=True).order('created_at', desc=False).limit(limit).execute()
+            
+            return result.data if result.data else []
+            
+        except Exception as e:
+            logging.error(f"Ошибка получения топа лидерборда: {e}")
+            return []
+
+    def get_leaderboard_rank_for_user(self, period_id: int, client_chat_id: str) -> Optional[dict]:
+        """Получить позицию пользователя в лидерборде."""
+        if not self.client:
+            return None
+        
+        try:
+            result = self.client.from_('leaderboard_rankings').select('*').eq('period_id', period_id).eq('client_chat_id', client_chat_id).limit(1).execute()
+            
+            if result.data:
+                return result.data[0]
+            return None
+            
+        except Exception as e:
+            logging.error(f"Ошибка получения позиции пользователя: {e}")
+            return None
+
+    def distribute_prizes(self, period_id: int) -> bool:
+        """Распределить призы по завершении периода."""
+        if not self.client:
+            return False
+        
+        try:
+            # Получаем период
+            period_result = self.client.from_('leaderboard_periods').select('*, prizes_config').eq('id', period_id).limit(1).execute()
+            if not period_result.data:
+                return False
+            
+            period = period_result.data[0]
+            prizes_config = period.get('prizes_config', {})
+            
+            # Получаем топ участников
+            top_users = self.get_leaderboard_top(period_id, limit=10)
+            
+            for rank, user_ranking in enumerate(top_users, start=1):
+                rank_key = str(rank)
+                prize_config = None
+                
+                # Ищем конфигурацию приза для этого ранга
+                if rank_key in prizes_config:
+                    prize_config = prizes_config[rank_key]
+                elif rank <= 3:
+                    # По умолчанию для топ-3
+                    if rank == 1:
+                        prize_config = {'type': 'physical', 'name': 'MacBook Pro', 'alternative_points': 100000, 'description': 'MacBook Pro 16'}
+                    elif rank == 2:
+                        prize_config = {'type': 'physical', 'name': 'iPhone', 'alternative_points': 80000, 'description': 'iPhone 15 Pro'}
+                    elif rank == 3:
+                        prize_config = {'type': 'physical', 'name': 'AirPods Pro', 'alternative_points': 30000, 'description': 'AirPods Pro 2'}
+                
+                if not prize_config:
+                    continue
+                
+                client_chat_id = user_ranking['client_chat_id']
+                prize_type = prize_config.get('type', 'points')
+                prize_name = prize_config.get('name', 'Приз')
+                prize_value = prize_config.get('alternative_points', 0) if prize_type == 'points' else prize_config.get('value', 0)
+                
+                # Создаём запись о распределении приза
+                distribution_data = {
+                    'period_id': period_id,
+                    'client_chat_id': client_chat_id,
+                    'rank': rank,
+                    'prize_type': prize_type,
+                    'prize_name': prize_name,
+                    'prize_description': prize_config.get('description', ''),
+                    'prize_value': prize_value,
+                    'status': 'pending',
+                    'created_at': datetime.datetime.now().isoformat()
+                }
+                
+                if prize_type == 'points':
+                    distribution_data['points_awarded'] = prize_value
+                
+                self.client.from_('prize_distributions').insert(distribution_data).execute()
+                
+                # Обновляем запись в рейтинге
+                self.client.from_('leaderboard_rankings').update({
+                    'prize_earned': prize_name,
+                    'prize_type': prize_type,
+                    'prize_distributed': False
+                }).eq('period_id', period_id).eq('client_chat_id', client_chat_id).execute()
+            
+            # Обновляем статус периода
+            self.client.from_('leaderboard_periods').update({
+                'status': 'rewards_distributed',
+                'rewards_distributed_at': datetime.datetime.now().isoformat()
+            }).eq('id', period_id).execute()
+            
+            # Отправляем уведомления участникам о возможности конвертации
+            self._notify_participants_about_conversion(period_id)
+            
+            logging.info(f"Призы распределены для периода {period_id}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Ошибка распределения призов: {e}", exc_info=True)
+            return False
+
+    def convert_leaderboard_points_to_loyalty(self, period_id: int, client_chat_id: str) -> tuple[bool, dict]:
+        """Конвертирует баллы лидерборда в обычные баллы системы лояльности.
+        
+        Returns:
+            tuple[bool, dict]: (success, result_data)
+            result_data содержит: success, error, loyalty_points, conversion_rate, leaderboard_points
+        """
+        if not self.client:
+            return False, {'error': 'Supabase client not initialized'}
+        
+        try:
+            # Вызываем функцию БД для конвертации
+            result = self.client.rpc(
+                'convert_leaderboard_points_to_loyalty_points',
+                {
+                    'period_id_param': period_id,
+                    'client_chat_id_param': client_chat_id
+                }
+            ).execute()
+            
+            if not result.data:
+                return False, {'error': 'Ошибка выполнения функции конвертации'}
+            
+            result_data = result.data if isinstance(result.data, dict) else result.data[0] if result.data else {}
+            
+            if not result_data.get('success'):
+                return False, result_data
+            
+            # Если конвертация успешна, начисляем баллы на счёт пользователя
+            loyalty_points = float(result_data.get('loyalty_points', 0))
+            
+            if loyalty_points > 0:
+                # Получаем текущий баланс
+                current_balance = self.get_client_balance(int(client_chat_id))
+                
+                # Обновляем баланс
+                self.client.from_(USER_TABLE).update({
+                    BALANCE_COLUMN: current_balance + loyalty_points
+                }).eq('chat_id', client_chat_id).execute()
+                
+                # Записываем транзакцию
+                period_info = self.client.from_('leaderboard_periods').select('period_name').eq('id', period_id).limit(1).execute()
+                period_name = period_info.data[0].get('period_name', 'Период') if period_info.data else 'Период'
+                
+                self.record_transaction(
+                    int(client_chat_id),
+                    0,  # SYSTEM
+                    loyalty_points,
+                    'leaderboard_conversion',
+                    f'Конвертация баллов лидерборда периода "{period_name}"'
+                )
+                
+                logging.info(f"Конвертировано {loyalty_points} баллов для клиента {client_chat_id} из периода {period_id}")
+            
+            return True, result_data
+            
+        except Exception as e:
+            logging.error(f"Ошибка конвертации баллов лидерборда: {e}", exc_info=True)
+            return False, {'error': str(e)}
+    
+    def _notify_participants_about_conversion(self, period_id: int) -> None:
+        """Отправляет уведомления участникам о возможности конвертации баллов."""
+        if not self.client:
+            return
+        
+        try:
+            # Получаем информацию о периоде
+            period_result = self.client.from_('leaderboard_periods').select(
+                'period_name, points_conversion_rate, points_conversion_enabled'
+            ).eq('id', period_id).limit(1).execute()
+            
+            if not period_result.data:
+                return
+            
+            period = period_result.data[0]
+            period_name = period.get('period_name', 'Период')
+            conversion_rate = float(period.get('points_conversion_rate', 10.0))
+            conversion_enabled = period.get('points_conversion_enabled', True)
+            
+            if not conversion_enabled:
+                return
+            
+            # Получаем всех участников, которые не получили призы
+            rankings_result = self.client.from_('leaderboard_rankings').select(
+                'client_chat_id, total_score, prize_type, prize_distributed'
+            ).eq('period_id', period_id).execute()
+            
+            if not rankings_result.data:
+                return
+            
+            # Импортируем client_bot для отправки уведомлений
+            try:
+                from client_handler import client_bot
+            except ImportError:
+                logging.warning("client_bot не доступен для отправки уведомлений")
+                return
+            
+            for ranking in rankings_result.data:
+                client_chat_id = ranking.get('client_chat_id')
+                total_score = float(ranking.get('total_score', 0))
+                
+                # Пропускаем участников без баллов
+                if total_score <= 0:
+                    continue
+                
+                # Проверяем, получил ли участник приз
+                has_prize = (ranking.get('prize_type') and 
+                            ranking.get('prize_type') != 'none' and 
+                            ranking.get('prize_distributed', False))
+                
+                # Уведомляем только тех, кто не получил приз
+                if not has_prize:
+                    loyalty_points = total_score * (conversion_rate / 100.0)
+                    
+                    try:
+                        client_bot.send_message(
+                            client_chat_id,
+                            f"🎉 **Период лидерборда завершён!**\n\n"
+                            f"📊 **Период:** {period_name}\n"
+                            f"🎯 **Ваши баллы:** {total_score:.2f}\n\n"
+                            f"💱 **Конвертация баллов**\n\n"
+                            f"Вы можете конвертировать свои баллы лидерборда в обычные баллы системы лояльности!\n\n"
+                            f"💰 **Вы получите:** {loyalty_points:.2f} баллов\n"
+                            f"📈 **Курс:** {conversion_rate}%\n\n"
+                            f"💡 **Как конвертировать:**\n"
+                            f"• Используйте команду /convert_points\n"
+                            f"• Или откройте меню спецвозможностей",
+                            parse_mode='Markdown'
+                        )
+                        logging.info(f"Уведомление о конвертации отправлено клиенту {client_chat_id}")
+                    except Exception as e:
+                        logging.error(f"Ошибка отправки уведомления клиенту {client_chat_id}: {e}")
+            
+        except Exception as e:
+            logging.error(f"Ошибка отправки уведомлений о конвертации: {e}", exc_info=True)
+    
+    def get_completed_periods_for_user(self, client_chat_id: str) -> list[dict]:
+        """Получить завершённые периоды лидерборда, где пользователь участвовал и может конвертировать баллы."""
+        if not self.client:
+            return []
+        
+        try:
+            # Получаем завершённые периоды, где пользователь участвовал
+            result = self.client.from_('leaderboard_rankings').select(
+                'period_id, total_score, points_converted, points_converted_amount, prize_type, prize_distributed, leaderboard_periods!inner(*)'
+            ).eq('client_chat_id', client_chat_id).eq('leaderboard_periods.status', 'rewards_distributed').execute()
+            
+            periods = []
+            for ranking in result.data:
+                period_info = ranking.get('leaderboard_periods', {})
+                
+                # Проверяем, может ли пользователь конвертировать баллы
+                has_prize = (ranking.get('prize_type') and 
+                            ranking.get('prize_type') != 'none' and 
+                            ranking.get('prize_distributed', False))
+                already_converted = ranking.get('points_converted', False)
+                conversion_enabled = period_info.get('points_conversion_enabled', True)
+                
+                can_convert = (not has_prize and 
+                              not already_converted and 
+                              conversion_enabled and 
+                              float(ranking.get('total_score', 0)) > 0)
+                
+                periods.append({
+                    'period_id': ranking.get('period_id'),
+                    'period_name': period_info.get('period_name', 'Период'),
+                    'total_score': float(ranking.get('total_score', 0)),
+                    'points_converted': already_converted,
+                    'points_converted_amount': float(ranking.get('points_converted_amount', 0)),
+                    'conversion_rate': float(period_info.get('points_conversion_rate', 10.0)),
+                    'can_convert': can_convert,
+                    'has_prize': has_prize
+                })
+            
+            return periods
+            
+        except Exception as e:
+            logging.error(f"Ошибка получения завершённых периодов: {e}")
+            return []
+
+    # =====================================================
+    # ИНТЕГРАЦИЯ: Автоматическая обработка NPS 10
+    # =====================================================
+
+    def record_nps_rating(self, client_chat_id: str, partner_chat_id: str, rating: int, master_name: Optional[str] = None) -> bool:
+        """Записывает оценку NPS клиента. При оценке 10 автоматически создаёт промоутера.
+        Если оценка уже существует, обновляет её (действует последняя оценка)."""
+        if not self.client:
+            logging.error(f"[NPS] Supabase client not initialized, cannot record rating for client {client_chat_id}")
+            return False
+        
+        try:
+            logging.info(f"[NPS] Начало записи оценки: client={client_chat_id}, partner={partner_chat_id}, rating={rating}")
+            
+            # Если partner_chat_id не указан или равен 'SYSTEM', пытаемся найти из последней транзакции
+            if not partner_chat_id or partner_chat_id == 'SYSTEM':
+                logging.info(f"[NPS] partner_chat_id не указан или 'SYSTEM', ищем из последней транзакции для клиента {client_chat_id}")
+                last_txn = self.client.from_(TRANSACTION_TABLE).select('partner_chat_id').eq('client_chat_id', client_chat_id).order('date_time', desc=True).limit(1).execute()
+                if last_txn.data and last_txn.data[0].get('partner_chat_id'):
+                    partner_chat_id = last_txn.data[0]['partner_chat_id']
+                    logging.info(f"[NPS] Найден partner_chat_id из транзакции: {partner_chat_id}")
+                else:
+                    logging.warning(f"[NPS] Не удалось найти partner_chat_id для клиента {client_chat_id}, используем 'SYSTEM'")
+                    partner_chat_id = 'SYSTEM'
+            
+            # Проверяем, есть ли уже оценка от этого клиента этому партнеру
+            existing_rating = self.client.from_('nps_ratings').select('id, rating, created_at').eq('client_chat_id', client_chat_id).eq('partner_chat_id', partner_chat_id).order('created_at', desc=True).limit(1).execute()
+            
+            current_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            
+            if existing_rating.data:
+                # Обновляем существующую оценку
+                old_rating = existing_rating.data[0].get('rating')
+                rating_id = existing_rating.data[0].get('id')
+                logging.info(f"[NPS] Найдена существующая оценка (ID={rating_id}, старый рейтинг={old_rating}), обновляем на {rating}")
+                
+                update_data = {
+                    "rating": rating,
+                    "master_name": master_name,
+                    "created_at": current_time,  # Обновляем время на текущее
+                }
+                self.client.from_('nps_ratings').update(update_data).eq('id', rating_id).execute()
+                logging.info(f"[NPS] Оценка обновлена: ID={rating_id}, новый рейтинг={rating}")
+            else:
+                # Создаём новую оценку
+                logging.info(f"[NPS] Существующей оценки нет, создаём новую")
+                data = {
+                    "client_chat_id": client_chat_id,
+                    "partner_chat_id": partner_chat_id,
+                    "rating": rating,
+                    "master_name": master_name,
+                    "created_at": current_time,
+                }
+                result = self.client.from_('nps_ratings').insert(data).execute()
+                if result.data:
+                    logging.info(f"[NPS] Новая оценка создана: ID={result.data[0].get('id')}, рейтинг={rating}")
+                else:
+                    logging.error(f"[NPS] Ошибка: не получен ID после создания оценки")
+            
+            # Если оценка 10, создаём промоутера
+            if rating == 10:
+                logging.info(f"[NPS] Оценка 10 получена, создаём промоутера для клиента {client_chat_id}")
+                promoter_created = self.create_promoter_from_nps_10(client_chat_id)
+                if promoter_created:
+                    logging.info(f"[NPS] Промоутер успешно создан для клиента {client_chat_id}")
+                else:
+                    logging.warning(f"[NPS] Не удалось создать промоутера для клиента {client_chat_id} (возможно, уже существует)")
+                
+                # Добавляем метрику в активный период лидерборда, если есть
+                active_period = self.get_active_leaderboard_period()
+                if active_period:
+                    logging.info(f"[NPS] Добавляем бонус за NPS 10 в лидерборд период {active_period['id']}")
+                    self.add_leaderboard_metric(
+                        active_period['id'],
+                        client_chat_id,
+                        'nps_10_bonus',
+                        50.0,  # Бонус за NPS 10
+                        'Бонус за оценку NPS 10'
+                    )
+                else:
+                    logging.info(f"[NPS] Активный период лидерборда не найден, бонус не добавлен")
+            
+            logging.info(f"[NPS] ✅ Оценка успешно записана: client={client_chat_id}, partner={partner_chat_id}, rating={rating}")
+            return True
+            
+        except APIError as e:
+            logging.error(f"[NPS] ❌ API Error recording NPS rating: client={client_chat_id}, partner={partner_chat_id}, rating={rating}, error={e}")
+            return False
+        except Exception as e:
+            logging.error(f"[NPS] ❌ Unknown error recording NPS rating: client={client_chat_id}, partner={partner_chat_id}, rating={rating}, error={e}", exc_info=True)
+            return False
+
+    # -----------------------------------------------------------------
+    # VII. МЕТОДЫ ДЛЯ РАБОТЫ С СООБЩЕНИЯМИ
+    # -----------------------------------------------------------------
+
+    def save_message(
+        self, 
+        client_chat_id: str, 
+        partner_chat_id: str, 
+        sender_type: str, 
+        message_text: str = None,
+        message_type: str = 'text',
+        attachment_url: str = None,
+        attachment_type: str = None,
+        service_id: str = None,  # UUID в виде строки
+        service_title: str = None
+    ) -> Optional[int]:
+        """Сохраняет сообщение в истории переписки между клиентом и партнёром.
+        
+        Args:
+            client_chat_id: Chat ID клиента
+            partner_chat_id: Chat ID партнёра
+            sender_type: Тип отправителя ('client' или 'partner')
+            message_text: Текст сообщения
+            message_type: Тип сообщения ('text', 'qr_code', 'image', 'file')
+            attachment_url: URL вложения (для QR-кодов, изображений, файлов)
+            attachment_type: Тип вложения ('qr_code', 'image', 'file')
+            service_id: ID услуги (если сообщение связано с услугой)
+            service_title: Название услуги на момент отправки
+        
+        Returns:
+            ID сохранённого сообщения или None в случае ошибки
+        """
+        if not self.client:
+            return None
+        
+        try:
+            data = {
+                "client_chat_id": str(client_chat_id),
+                "partner_chat_id": str(partner_chat_id),
+                "sender_type": sender_type,
+                "message_text": message_text,
+                "message_type": message_type,
+                "attachment_url": attachment_url,
+                "attachment_type": attachment_type,
+                "service_id": service_id,
+                "service_title": service_title,
+                "is_read": False
+            }
+            
+            # Удаляем None значения
+            data = {k: v for k, v in data.items() if v is not None}
+            
+            result = self.client.from_('messages').insert(data).execute()
+            if result.data and len(result.data) > 0:
+                message_id = result.data[0].get('id')
+                logging.info(f"Message saved: ID={message_id}, client={client_chat_id}, partner={partner_chat_id}, sender={sender_type}")
+                return message_id
+            return None
+        except Exception as e:
+            logging.error(f"Error saving message: {e}", exc_info=True)
+            return None
+
+    def get_conversation(
+        self, 
+        client_chat_id: str, 
+        partner_chat_id: str, 
+        limit: int = 50,
+        offset: int = 0
+    ) -> list[dict]:
+        """Получает историю переписки между клиентом и партнёром.
+        
+        Args:
+            client_chat_id: Chat ID клиента
+            partner_chat_id: Chat ID партнёра
+            limit: Максимальное количество сообщений
+            offset: Смещение для пагинации
+        
+        Returns:
+            Список сообщений, отсортированных по дате (старые первыми)
+        """
+        if not self.client:
+            return []
+        
+        try:
+            result = self.client.from_('messages')\
+                .select('*')\
+                .eq('client_chat_id', str(client_chat_id))\
+                .eq('partner_chat_id', str(partner_chat_id))\
+                .order('created_at', desc=False)\
+                .range(offset, offset + limit - 1)\
+                .execute()
+            
+            return result.data or []
+        except Exception as e:
+            logging.error(f"Error getting conversation: {e}", exc_info=True)
+            return []
+
+    def mark_message_as_read(self, message_id: int) -> bool:
+        """Отмечает сообщение как прочитанное.
+        
+        Args:
+            message_id: ID сообщения
+        
+        Returns:
+            True если успешно, False в случае ошибки
+        """
+        if not self.client:
+            return False
+        
+        try:
+            self.client.from_('messages')\
+                .update({'is_read': True})\
+                .eq('id', message_id)\
+                .execute()
+            return True
+        except Exception as e:
+            logging.error(f"Error marking message as read: {e}", exc_info=True)
+            return False
+
+    def mark_conversation_as_read(
+        self, 
+        client_chat_id: str, 
+        partner_chat_id: str, 
+        reader_type: str
+    ) -> bool:
+        """Отмечает все сообщения в переписке как прочитанные.
+        
+        Args:
+            client_chat_id: Chat ID клиента
+            partner_chat_id: Chat ID партнёра
+            reader_type: Тип читателя ('client' или 'partner')
+                        Отмечаются как прочитанные только сообщения от противоположной стороны
+        
+        Returns:
+            True если успешно, False в случае ошибки
+        """
+        if not self.client:
+            return False
+        
+        try:
+            # Определяем, какие сообщения нужно отметить как прочитанные
+            sender_type = 'partner' if reader_type == 'client' else 'client'
+            
+            self.client.from_('messages')\
+                .update({'is_read': True})\
+                .eq('client_chat_id', str(client_chat_id))\
+                .eq('partner_chat_id', str(partner_chat_id))\
+                .eq('sender_type', sender_type)\
+                .eq('is_read', False)\
+                .execute()
+            
+            return True
+        except Exception as e:
+            logging.error(f"Error marking conversation as read: {e}", exc_info=True)
+            return False
+
+    def get_unread_messages_count(
+        self, 
+        client_chat_id: str = None, 
+        partner_chat_id: str = None
+    ) -> int:
+        """Получает количество непрочитанных сообщений.
+        
+        Args:
+            client_chat_id: Chat ID клиента (если нужно для клиента)
+            partner_chat_id: Chat ID партнёра (если нужно для партнёра)
+        
+        Returns:
+            Количество непрочитанных сообщений
+        """
+        if not self.client:
+            return 0
+        
+        try:
+            query = self.client.from_('messages')\
+                .select('id', count='exact')\
+                .eq('is_read', False)
+            
+            if client_chat_id:
+                query = query.eq('client_chat_id', str(client_chat_id))\
+                            .eq('sender_type', 'partner')
+            
+            if partner_chat_id:
+                query = query.eq('partner_chat_id', str(partner_chat_id))\
+                            .eq('sender_type', 'client')
+            
+            result = query.execute()
+            return result.count if hasattr(result, 'count') else len(result.data or [])
+        except Exception as e:
+            logging.error(f"Error getting unread messages count: {e}", exc_info=True)
+            return 0
+
+    def get_partner_conversations(self, partner_chat_id: str) -> list[dict]:
+        """Получает список всех переписок партнёра с непрочитанными сообщениями.
+        
+        Args:
+            partner_chat_id: Chat ID партнёра
+        
+        Returns:
+            Список переписок с информацией о последнем сообщении и количестве непрочитанных
+        """
+        if not self.client:
+            return []
+        
+        try:
+            # Получаем все уникальные клиенты, с которыми есть переписка
+            result = self.client.from_('messages')\
+                .select('client_chat_id')\
+                .eq('partner_chat_id', str(partner_chat_id))\
+                .execute()
+            
+            if not result.data:
+                return []
+            
+            client_ids = list(set([msg.get('client_chat_id') for msg in result.data if msg.get('client_chat_id')]))
+            
+            conversations = []
+            for client_id in client_ids:
+                # Получаем последнее сообщение
+                last_msg_result = self.client.from_('messages')\
+                    .select('*')\
+                    .eq('client_chat_id', client_id)\
+                    .eq('partner_chat_id', str(partner_chat_id))\
+                    .order('created_at', desc=True)\
+                    .limit(1)\
+                    .execute()
+                
+                if last_msg_result.data:
+                    last_msg = last_msg_result.data[0]
+                    
+                    # Получаем количество непрочитанных сообщений от этого клиента
+                    unread_result = self.client.from_('messages')\
+                        .select('id', count='exact')\
+                        .eq('client_chat_id', client_id)\
+                        .eq('partner_chat_id', str(partner_chat_id))\
+                        .eq('sender_type', 'client')\
+                        .eq('is_read', False)\
+                        .execute()
+                    
+                    unread_count = unread_result.count if hasattr(unread_result, 'count') else len(unread_result.data or [])
+                    
+                    conversations.append({
+                        'client_chat_id': client_id,
+                        'last_message': last_msg,
+                        'unread_count': unread_count
+                    })
+            
+            return conversations
+        except Exception as e:
+            logging.error(f"Error getting partner conversations: {e}", exc_info=True)
+            return []

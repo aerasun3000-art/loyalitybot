@@ -120,6 +120,9 @@ async def handle_start_admin(message: types.Message):
         [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
         [InlineKeyboardButton(text="🛠 Услуги Партнёров", callback_data="admin_manage_services")],
         [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
+        [InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc")],
+        [InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters")],
+        [InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard")],
         [InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background")],
         [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
         [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
@@ -139,11 +142,31 @@ async def show_pending_partners(callback_query: types.CallbackQuery):
     """Показывает список заявок партнеров в статусе 'Pending'."""
     await callback_query.answer("Загрузка заявок...")
     
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⏳ Заявки на модерацию", callback_data="admin_partners_pending")],
+        [InlineKeyboardButton(text="🗑 Удалить партнера", callback_data="admin_partners_delete")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    
+    await callback_query.message.edit_text(
+        "🤝 **Управление Партнерами**\n\nВыберите действие:",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data == "admin_partners_pending")
+async def show_pending_partners_list(callback_query: types.CallbackQuery):
+    """Показывает список заявок партнеров в статусе 'Pending'."""
+    await callback_query.answer("Загрузка заявок...")
+    
     partners_df = db_manager.get_all_partners()
     pending_partners = partners_df[partners_df['status'].str.lower() == 'pending']
     
     if pending_partners.empty:
-        await callback_query.message.edit_text("✅ Новых заявок на партнерство нет.")
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_partners")]
+        ])
+        await callback_query.message.edit_text("✅ Новых заявок на партнерство нет.", reply_markup=keyboard)
         return
 
     # Отправляем сообщение для каждой заявки
@@ -170,12 +193,125 @@ async def show_pending_partners(callback_query: types.CallbackQuery):
             reply_markup=keyboard
         )
 
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_partners")]
+    ])
     await callback_query.message.edit_text(
-        f"⏳ Загружено {len(pending_partners)} заявок на модерацию."
+        f"⏳ Загружено {len(pending_partners)} заявок на модерацию.",
+        reply_markup=keyboard
     )
 
 
-@dp.callback_query(F.data.startswith("partner_"))
+@dp.callback_query(F.data == "admin_partners_delete")
+async def show_partners_for_deletion(callback_query: types.CallbackQuery):
+    """Показывает список всех партнеров для удаления."""
+    await callback_query.answer("Загрузка партнеров...")
+    
+    partners_df = db_manager.get_all_partners()
+    
+    if partners_df.empty:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_partners")]
+        ])
+        await callback_query.message.edit_text("📭 Партнеров нет.", reply_markup=keyboard)
+        return
+    
+    # Создаем кнопки для каждого партнера
+    buttons = []
+    for index, partner in partners_df.head(50).iterrows():  # Ограничиваем 50 партнерами
+        partner_chat_id = partner['chat_id']
+        name = partner.get('name', 'Без имени')
+        company = partner.get('company_name', 'Без компании')
+        status = partner.get('status', 'Unknown')
+        status_emoji = {'Approved': '✅', 'Pending': '⏳', 'Rejected': '❌'}.get(status, '❓')
+        
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"{status_emoji} {name} ({company[:30]})",
+                callback_data=f"partner_delete_select_{partner_chat_id}"
+            )
+        ])
+    
+    buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_partners")])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    await callback_query.message.edit_text(
+        "🗑 **Удаление партнера**\n\nВыберите партнера для удаления:",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data.startswith("partner_delete_select_"))
+async def confirm_partner_deletion(callback_query: types.CallbackQuery):
+    """Подтверждает удаление партнера."""
+    partner_chat_id = callback_query.data.replace("partner_delete_select_", "")
+    
+    # Получаем информацию о партнере
+    partners_df = db_manager.get_all_partners()
+    partner_info = partners_df[partners_df['chat_id'] == partner_chat_id]
+    
+    if partner_info.empty:
+        await callback_query.answer("Партнер не найден.", show_alert=True)
+        return
+    
+    partner = partner_info.iloc[0]
+    name = partner.get('name', 'Без имени')
+    company = partner.get('company_name', 'Без компании')
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Да, удалить", callback_data=f"partner_delete_confirm_{partner_chat_id}"),
+            InlineKeyboardButton(text="❌ Отмена", callback_data="admin_partners_delete")
+        ]
+    ])
+    
+    await callback_query.message.edit_text(
+        f"⚠️ **Подтверждение удаления**\n\n"
+        f"Вы уверены, что хотите удалить партнера?\n\n"
+        f"**ID:** {partner_chat_id}\n"
+        f"**Имя:** {name}\n"
+        f"**Компания:** {company}\n\n"
+        f"⚠️ Это действие удалит:\n"
+        f"• Профиль партнера\n"
+        f"• Все услуги партнера\n"
+        f"• Все акции партнера\n"
+        f"• Заявку партнера\n\n"
+        f"**Это действие нельзя отменить!**",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data.startswith("partner_delete_confirm_"))
+async def delete_partner_confirmed(callback_query: types.CallbackQuery):
+    """Удаляет партнера после подтверждения."""
+    partner_chat_id = callback_query.data.replace("partner_delete_confirm_", "")
+    
+    success = db_manager.delete_partner(partner_chat_id)
+    
+    if success:
+        await callback_query.answer("✅ Партнер удален")
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_partners")]
+        ])
+        await callback_query.message.edit_text(
+            f"✅ Партнер ID {partner_chat_id} успешно удален из базы данных.\n\n"
+            f"Удалены все связанные данные (услуги, акции, заявки).",
+            reply_markup=keyboard
+        )
+        logger.info(f"Admin {callback_query.from_user.id} deleted partner {partner_chat_id}")
+    else:
+        await callback_query.answer("❌ Ошибка удаления", show_alert=True)
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_partners")]
+        ])
+        await callback_query.message.edit_text(
+            f"❌ Ошибка при удалении партнера ID {partner_chat_id}. Проверьте логи.",
+            reply_markup=keyboard
+        )
+
+
+@dp.callback_query(F.data.startswith("partner_approve_") | F.data.startswith("partner_reject_"))
 async def handle_partner_approval(callback_query: types.CallbackQuery):
     """Обрабатывает одобрение или отклонение заявки партнера."""
     try:
@@ -1118,6 +1254,7 @@ async def show_background_menu(callback_query: types.CallbackQuery):
     # Доступные фоны
     backgrounds = [
         ("🌸 Сакура (по умолчанию)", "/bg/sakura.jpg"),
+        ("🌺 Белый цветок", "/bg/1whiteflower.jpg"),
         ("🎨 Фон 2", "/bg/fon2_files/02e59953309fdb690b5421c190a7524f.jpg"),
         ("🎨 Фон 3", "/bg/fon3_files/e6e8a21b0775730d94fac0aeeeb0b03f.jpg"),
         ("🎨 Фон 6", "/bg/fon6_files/2c793e92fdcc7213bbd46848a72f59aa.jpg"),
@@ -1256,13 +1393,438 @@ async def show_onepager(callback_query: types.CallbackQuery):
         )
 
 
+# --- Множество для трекинга уже уведомлённого UGC контента ---
+_notified_pending_ugc_ids: set[int] = set()
+
+# --- ПРОМОУТЕРЫ, UGC И ЛИДЕРБОРД ---
+
+@dp.callback_query(F.data == "admin_ugc")
+async def show_pending_ugc(callback_query: types.CallbackQuery):
+    """Показывает список UGC контента на модерации."""
+    await callback_query.answer("Загрузка UGC контента...")
+    
+    try:
+        # Получаем весь UGC контент на модерации
+        ugc_list = db_manager.get_all_pending_ugc_content()
+        
+        if not ugc_list:
+            await callback_query.message.edit_text("✅ UGC контента на модерации нет.")
+            return
+        
+        # Отправляем сообщение для каждого UGC контента
+        for ugc in ugc_list[:20]:  # Ограничиваем 20 элементами
+            ugc_id = ugc['id']
+            promoter_id = ugc['promoter_chat_id']
+            content_url = ugc['content_url']
+            platform = ugc['platform']
+            submitted_at = ugc.get('submitted_at', '')[:10] if ugc.get('submitted_at') else 'N/A'
+            
+            # Получаем информацию о промоутере
+            promoter_info = db_manager.get_promoter_info(promoter_id)
+            promo_code = promoter_info.get('promo_code', 'N/A') if promoter_info else 'N/A'
+            
+            message_text = (
+                f"**📸 UGC Контент на Модерации (ID: {ugc_id})**\n\n"
+                f"🎯 Промоутер: {promoter_id}\n"
+                f"🎁 Промо-код: `{promo_code}`\n"
+                f"📱 Платформа: {platform}\n"
+                f"🔗 Ссылка: {content_url}\n"
+                f"📅 Дата: {submitted_at}"
+            )
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="✅ Одобрить", callback_data=f"ugc_approve_{ugc_id}"),
+                    InlineKeyboardButton(text="❌ Отклонить", callback_data=f"ugc_reject_{ugc_id}")
+                ],
+                [InlineKeyboardButton(text="📊 Статистика промоутера", callback_data=f"promoter_info_{promoter_id}")]
+            ])
+            
+            await bot.send_message(
+                chat_id=callback_query.message.chat.id,
+                text=message_text,
+                reply_markup=keyboard
+            )
+        
+        await callback_query.message.edit_text(
+            f"⏳ Загружено {len(ugc_list)} UGC контентов на модерацию."
+        )
+        
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке UGC контента: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при загрузке UGC контента.")
+
+
+@dp.callback_query(F.data.startswith("ugc_approve_"))
+async def approve_ugc_content(callback_query: types.CallbackQuery):
+    """Одобряет UGC контент."""
+    try:
+        ugc_id = int(callback_query.data.replace("ugc_approve_", ""))
+        
+        success = db_manager.approve_ugc_content(ugc_id, reward_points=100)
+        
+        if success:
+            # Получаем информацию о контенте для уведомления
+            ugc_info = db_manager.client.from_('ugc_content').select('promoter_chat_id, content_url').eq('id', ugc_id).limit(1).execute()
+            if ugc_info.data:
+                promoter_id = ugc_info.data[0]['promoter_chat_id']
+                
+                await callback_query.message.edit_text(
+                    f"✅ **UGC контент одобрен!**\n\n"
+                    f"ID: {ugc_id}\n"
+                    f"Промоутеру начислено 100 баллов."
+                )
+                
+                # Уведомляем промоутера (через клиентский бот)
+                send_partner_notification(
+                    promoter_id,
+                    f"✅ Ваш UGC контент одобрен!\n\n"
+                    f"📸 Ссылка: {ugc_info.data[0].get('content_url', 'N/A')}\n"
+                    f"💰 Начислено: 100 баллов\n\n"
+                    f"Спасибо за качественный контент!"
+                )
+        else:
+            await callback_query.answer("❌ Ошибка при одобрении контента.", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при одобрении UGC: {e}")
+        await callback_query.answer("Произошла ошибка.", show_alert=True)
+    
+    await callback_query.answer()
+
+
+@dp.callback_query(F.data.startswith("ugc_reject_"))
+async def reject_ugc_content(callback_query: types.CallbackQuery):
+    """Отклоняет UGC контент."""
+    try:
+        ugc_id = int(callback_query.data.replace("ugc_reject_", ""))
+        
+        # Обновляем статус контента
+        db_manager.client.from_('ugc_content').update({
+            'status': 'rejected',
+            'moderator_notes': 'Отклонено администратором'
+        }).eq('id', ugc_id).execute()
+        
+        # Получаем информацию о контенте для уведомления
+        ugc_info = db_manager.client.from_('ugc_content').select('promoter_chat_id').eq('id', ugc_id).limit(1).execute()
+        if ugc_info.data:
+            promoter_id = ugc_info.data[0]['promoter_chat_id']
+            
+            await callback_query.message.edit_text(f"❌ **UGC контент отклонён.**\n\nID: {ugc_id}")
+            
+            # Уведомляем промоутера
+            send_partner_notification(
+                promoter_id,
+                f"❌ Ваш UGC контент был отклонён.\n\n"
+                f"Пожалуйста, проверьте требования к контенту и попробуйте снова."
+            )
+        
+    except Exception as e:
+        logger.error(f"Ошибка при отклонении UGC: {e}")
+        await callback_query.answer("Произошла ошибка.", show_alert=True)
+    
+    await callback_query.answer()
+
+
+@dp.callback_query(F.data == "admin_promoters")
+async def show_promoters(callback_query: types.CallbackQuery):
+    """Показывает список промоутеров."""
+    await callback_query.answer("Загрузка промоутеров...")
+    
+    try:
+        # Получаем статистику промоутеров
+        promoters_result = db_manager.client.from_('promoters').select('*').order('total_earned_points', desc=True).limit(50).execute()
+        
+        if not promoters_result.data:
+            await callback_query.message.edit_text("📊 Промоутеров пока нет.")
+            return
+        
+        message_text = "🎯 **Топ промоутеров:**\n\n"
+        
+        for idx, promoter in enumerate(promoters_result.data[:20], start=1):
+            chat_id = promoter['client_chat_id']
+            level = promoter.get('promoter_level', 'novice')
+            approved = promoter.get('approved_publications', 0)
+            points = promoter.get('total_earned_points', 0)
+            promo_code = promoter.get('promo_code', 'N/A')
+            
+            level_emoji = {'novice': '🌱', 'active': '⭐', 'pro': '🔥', 'master': '👑'}.get(level, '🌱')
+            
+            message_text += (
+                f"{idx}. {level_emoji} {chat_id}\n"
+                f"   Код: `{promo_code}` | Одобрено: {approved} | Баллов: {points}\n\n"
+            )
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+        ])
+        
+        await callback_query.message.edit_text(message_text, reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке промоутеров: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при загрузке данных.")
+
+
+@dp.callback_query(F.data.startswith("promoter_info_"))
+async def show_promoter_info(callback_query: types.CallbackQuery):
+    """Показывает подробную информацию о промоутере."""
+    try:
+        promoter_id = callback_query.data.replace("promoter_info_", "")
+        
+        promoter_info = db_manager.get_promoter_info(promoter_id)
+        if not promoter_info:
+            await callback_query.answer("Промоутер не найден.", show_alert=True)
+            return
+        
+        ugc_content = db_manager.get_ugc_content_for_promoter(promoter_id)
+        approved = len([c for c in ugc_content if c.get('status') == 'approved'])
+        pending = len([c for c in ugc_content if c.get('status') == 'pending'])
+        
+        level = promoter_info.get('promoter_level', 'novice')
+        level_emoji = {'novice': '🌱', 'active': '⭐', 'pro': '🔥', 'master': '👑'}.get(level, '🌱')
+        
+        message_text = (
+            f"🎯 **Информация о промоутере**\n\n"
+            f"👤 ID: {promoter_id}\n"
+            f"📊 Уровень: {level_emoji} {level}\n"
+            f"🎁 Промо-код: `{promoter_info.get('promo_code', 'N/A')}`\n"
+            f"📸 Публикаций:\n"
+            f"   • Всего: {promoter_info.get('total_publications', 0)}\n"
+            f"   • Одобрено: {approved}\n"
+            f"   • На модерации: {pending}\n"
+            f"💸 Заработано: {promoter_info.get('total_earned_points', 0)} баллов\n"
+            f"🏆 Призов выиграно: {promoter_info.get('prizes_won', 0)}\n"
+        )
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_ugc")]
+        ])
+        
+        await callback_query.message.edit_text(message_text, reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке информации о промоутере: {e}")
+        await callback_query.answer("Произошла ошибка.", show_alert=True)
+    
+    await callback_query.answer()
+
+
+@dp.callback_query(F.data == "admin_leaderboard")
+async def show_leaderboard_menu(callback_query: types.CallbackQuery):
+    """Показывает меню управления лидербордом."""
+    await callback_query.answer("Загрузка...")
+    
+    try:
+        # Получаем активный период
+        active_period = db_manager.get_active_leaderboard_period()
+        
+        message_text = "🏆 **Управление Лидербордом**\n\n"
+        
+        if active_period:
+            top_users = db_manager.get_leaderboard_top(active_period['id'], limit=10)
+            
+            message_text += (
+                f"📅 **Активный период:** {active_period.get('period_name', 'Текущий')}\n"
+                f"📊 Статус: {active_period.get('status', 'active')}\n"
+                f"📈 Участников в топе: {len(top_users)}\n\n"
+                f"🥇 **ТОП-5:**\n"
+            )
+            
+            medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
+            for idx, user in enumerate(top_users[:5], start=1):
+                rank_emoji = medals[idx - 1] if idx <= 5 else f"{idx}."
+                name = user.get('users', {}).get('name', 'Аноним') if isinstance(user.get('users'), dict) else user.get('client_chat_id', 'N/A')
+                score = float(user.get('total_score', 0))
+                message_text += f"{rank_emoji} {name}: {score:.2f} баллов\n"
+        else:
+            message_text += "⏳ Активного периода нет.\n\nСоздайте новый период для начала конкурса."
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📊 Полный лидерборд", callback_data="leaderboard_full")],
+            [InlineKeyboardButton(text="➕ Создать период", callback_data="leaderboard_create")],
+            [InlineKeyboardButton(text="🎁 Распределить призы", callback_data="leaderboard_distribute_prizes")],
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+        ])
+        
+        await callback_query.message.edit_text(message_text, reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке лидерборда: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при загрузке данных.")
+
+
+@dp.callback_query(F.data == "leaderboard_full")
+async def show_full_leaderboard(callback_query: types.CallbackQuery):
+    """Показывает полный лидерборд."""
+    await callback_query.answer("Загрузка...")
+    
+    try:
+        active_period = db_manager.get_active_leaderboard_period()
+        if not active_period:
+            await callback_query.answer("Нет активного периода.", show_alert=True)
+            return
+        
+        top_users = db_manager.get_leaderboard_top(active_period['id'], limit=100)
+        
+        message_text = f"🏆 **Лидерборд: {active_period.get('period_name', 'Текущий период')}**\n\n"
+        
+        medals = ['🥇', '🥈', '🥉']
+        for idx, user in enumerate(top_users[:30], start=1):  # Показываем топ-30
+            if idx <= 3:
+                rank_emoji = medals[idx - 1]
+            else:
+                rank_emoji = f"{idx}."
+            
+            name = user.get('users', {}).get('name', 'Аноним') if isinstance(user.get('users'), dict) else user.get('client_chat_id', 'N/A')
+            score = float(user.get('total_score', 0))
+            referral = float(user.get('referral_points', 0))
+            ugc = float(user.get('ugc_points', 0))
+            
+            message_text += (
+                f"{rank_emoji} **{name}**\n"
+                f"   💯 Всего: {score:.2f} | 📊 Рефералы: {referral:.2f} | 📸 UGC: {ugc:.2f}\n\n"
+            )
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_leaderboard")]
+        ])
+        
+        await callback_query.message.edit_text(message_text, reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке полного лидерборда: {e}")
+        await callback_query.answer("Произошла ошибка.", show_alert=True)
+    
+    await callback_query.answer()
+
+
+@dp.callback_query(F.data == "leaderboard_create")
+async def create_leaderboard_period(callback_query: types.CallbackQuery):
+    """Создаёт новый период лидерборда."""
+    await callback_query.answer("Создание периода...")
+    
+    try:
+        # Создаём месячный период для текущего месяца
+        import datetime
+        period_id = db_manager.create_leaderboard_period('monthly', datetime.date.today())
+        
+        if period_id:
+            await callback_query.message.edit_text(
+                f"✅ **Период лидерборда создан!**\n\n"
+                f"ID: {period_id}\n"
+                f"Тип: Месячный\n"
+                f"Период: {datetime.date.today().strftime('%B %Y')}"
+            )
+        else:
+            await callback_query.answer("❌ Ошибка при создании периода.", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при создании периода: {e}")
+        await callback_query.answer("Произошла ошибка.", show_alert=True)
+    
+    await callback_query.answer()
+
+
+@dp.callback_query(F.data == "leaderboard_distribute_prizes")
+async def distribute_prizes(callback_query: types.CallbackQuery):
+    """Распределяет призы по завершении периода."""
+    await callback_query.answer("Распределение призов...")
+    
+    try:
+        active_period = db_manager.get_active_leaderboard_period()
+        
+        if not active_period:
+            await callback_query.answer("Нет активного периода.", show_alert=True)
+            return
+        
+        # Проверяем, завершён ли период
+        if active_period.get('status') != 'completed':
+            await callback_query.answer(
+                "Период ещё не завершён. Завершите период перед распределением призов.",
+                show_alert=True
+            )
+            return
+        
+        success = db_manager.distribute_prizes(active_period['id'])
+        
+        if success:
+            await callback_query.message.edit_text(
+                f"✅ **Призы распределены!**\n\n"
+                f"Период: {active_period.get('period_name', 'N/A')}\n"
+                f"Призы назначены топ-10 участникам."
+            )
+        else:
+            await callback_query.answer("❌ Ошибка при распределении призов.", show_alert=True)
+        
+    except Exception as e:
+        logger.error(f"Ошибка при распределении призов: {e}")
+        await callback_query.answer("Произошла ошибка.", show_alert=True)
+    
+    await callback_query.answer()
+
+
+async def _notify_admins_about_ugc(ugc_row) -> None:
+    """Отправляет уведомление всем админам о новом UGC контенте."""
+    ugc_id = ugc_row['id']
+    promoter_id = ugc_row['promoter_chat_id']
+    content_url = ugc_row['content_url']
+    platform = ugc_row['platform']
+    
+    promoter_info = db_manager.get_promoter_info(promoter_id)
+    promo_code = promoter_info.get('promo_code', 'N/A') if promoter_info else 'N/A'
+    
+    message_text = (
+        f"**📸 Новый UGC Контент на Модерации (ID: {ugc_id})**\n"
+        f"🎯 Промоутер: {promoter_id}\n"
+        f"🎁 Промо-код: `{promo_code}`\n"
+        f"📱 Платформа: {platform}\n"
+        f"🔗 Ссылка: {content_url}"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Одобрить", callback_data=f"ugc_approve_{ugc_id}"),
+            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"ugc_reject_{ugc_id}")
+        ]
+    ])
+    
+    for admin_id in _get_admin_ids():
+        try:
+            await bot.send_message(chat_id=admin_id, text=message_text, reply_markup=keyboard)
+            logger.info(f"Уведомление о новом UGC {ugc_id} отправлено админу {admin_id}")
+        except Exception as e:
+            logger.error(f"Ошибка отправки уведомления админу {admin_id}: {e}")
+
+
+async def watch_new_ugc_submissions(poll_interval_sec: int = 30) -> None:
+    """Периодически опрашивает БД и отправляет уведомления админам о новом UGC контенте."""
+    global _notified_pending_ugc_ids
+    while True:
+        try:
+            # Получаем весь UGC контент на модерации
+            ugc_list = db_manager.get_all_pending_ugc_content()
+            
+            for ugc in ugc_list:
+                ugc_id = ugc['id']
+                if ugc_id not in _notified_pending_ugc_ids:
+                    await _notify_admins_about_ugc(ugc)
+                    _notified_pending_ugc_ids.add(ugc_id)
+                            
+        except Exception as e:
+            logger.error(f"Ошибка в watch_new_ugc_submissions: {e}")
+        
+        await asyncio.sleep(poll_interval_sec)
+
+
 # --- Запуск Бота ---
 
 async def main():
     # Запускаем фоновые вочеры
     asyncio.create_task(watch_new_partner_applications())
     asyncio.create_task(watch_new_service_submissions())
-    logger.info("=== Админ-бот запущен (с автоуведомлениями о партнёрах и услугах) ===")
+    asyncio.create_task(watch_new_ugc_submissions())
+    logger.info("=== Админ-бот запущен (с автоуведомлениями о партнёрах, услугах и UGC) ===")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
