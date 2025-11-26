@@ -13,7 +13,8 @@ import sentry_sdk
 
 # Предполагается, что SupabaseManager находится в отдельном файле (например, supabase_manager.py)
 from supabase_manager import SupabaseManager
-from dashboard_urls import get_admin_dashboard_url, get_onepager_url 
+from dashboard_urls import get_admin_dashboard_url, get_onepager_url
+from partner_revenue_share import PartnerRevenueShare 
 
 load_dotenv()
 
@@ -64,6 +65,14 @@ try:
 except Exception as e:
     logger.exception(f"Ошибка инициализации SupabaseManager: {e}")
     raise
+
+# Инициализация MLM Revenue Share системы
+try:
+    revenue_share = PartnerRevenueShare(db_manager)
+    logger.info("PartnerRevenueShare успешно инициализирован")
+except Exception as e:
+    logger.warning(f"Ошибка инициализации PartnerRevenueShare: {e}")
+    revenue_share = None
 # Множество для трекинга уже уведомлённых заявок партнёров
 _notified_pending_partner_ids: set[str] = set()
 # Множество для трекинга уже уведомлённых услуг
@@ -119,6 +128,7 @@ async def handle_start_admin(message: types.Message):
         [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
         [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
         [InlineKeyboardButton(text="🛠 Услуги Партнёров", callback_data="admin_manage_services")],
+        [InlineKeyboardButton(text="💎 MLM Revenue Share", callback_data="admin_mlm")],
         [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
         [InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc")],
         [InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters")],
@@ -1815,6 +1825,392 @@ async def watch_new_ugc_submissions(poll_interval_sec: int = 30) -> None:
             logger.error(f"Ошибка в watch_new_ugc_submissions: {e}")
         
         await asyncio.sleep(poll_interval_sec)
+
+
+# --- MLM Revenue Share Управление ---
+
+@dp.callback_query(F.data == "admin_mlm")
+async def show_mlm_menu(callback_query: types.CallbackQuery):
+    """Показывает меню управления MLM системой"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    await callback_query.answer("Загрузка MLM меню...")
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📊 MLM Статистика", callback_data="mlm_stats")],
+        [InlineKeyboardButton(text="💎 Установить PV", callback_data="mlm_set_pv")],
+        [InlineKeyboardButton(text="✅ Одобрить выплаты", callback_data="mlm_approve_payments")],
+        [InlineKeyboardButton(text="🌐 Структура сети", callback_data="mlm_network")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    
+    await callback_query.message.edit_text(
+        "💎 **MLM REVENUE SHARE УПРАВЛЕНИЕ**\n\n"
+        "Выберите действие:",
+        reply_markup=keyboard
+    )
+
+
+@dp.message(Command("mlm_stats"))
+async def handle_mlm_stats_command(message: types.Message):
+    """Команда /mlm_stats - показывает статистику MLM системы"""
+    if not is_admin(message.chat.id):
+        await message.answer("У вас нет прав администратора")
+        return
+    
+    if revenue_share is None:
+        await message.answer("❌ Revenue Share система временно недоступна.")
+        return
+    
+    await show_mlm_statistics(message)
+
+
+@dp.callback_query(F.data == "mlm_stats")
+async def show_mlm_statistics(callback_query: types.CallbackQuery = None, message: types.Message = None):
+    """Показывает статистику MLM системы"""
+    target = callback_query.message if callback_query else message
+    chat_id = callback_query.from_user.id if callback_query else message.chat.id
+    
+    try:
+        # Получаем статистику
+        partners = db_manager.client.table('partners').select(
+            'chat_id, name, partner_type, personal_income_monthly, '
+            'client_base_count, is_revenue_share_active, pv_percent, revenue_share_monthly'
+        ).neq('partner_type', 'regular').execute()
+        
+        if not partners.data:
+            text = "📊 **MLM СТАТИСТИКА**\n\nПартнеров в системе пока нет."
+            await target.edit_text(text) if callback_query else await target.answer(text)
+            return
+        
+        # Подсчитываем статистику
+        total_partners = len(partners.data)
+        active_revenue_share = sum(1 for p in partners.data if p.get('is_revenue_share_active'))
+        total_revenue_share = sum(float(p.get('revenue_share_monthly', 0)) for p in partners.data)
+        avg_pv = sum(float(p.get('pv_percent', 10)) for p in partners.data) / total_partners if total_partners > 0 else 0
+        
+        # Распределение по уровням PV
+        pv_levels = {
+            'novice': sum(1 for p in partners.data if float(p.get('pv_percent', 10)) == 3),
+            'active': sum(1 for p in partners.data if float(p.get('pv_percent', 10)) == 5),
+            'growing': sum(1 for p in partners.data if float(p.get('pv_percent', 10)) == 7),
+            'premium': sum(1 for p in partners.data if float(p.get('pv_percent', 10)) == 10)
+        }
+        
+        # Получаем размер сети
+        network = db_manager.client.table('partner_network').select('id').execute()
+        network_size = len(network.data) if network.data else 0
+        
+        text = f"""
+📊 **MLM СТАТИСТИКА**
+
+👥 **ПАРТНЕРЫ:**
+├─ Всего партнеров: {total_partners}
+├─ Активных Revenue Share: {active_revenue_share}
+├─ Размер сети: {network_size} связей
+└─ Средний PV: {avg_pv:.1f}%
+
+💰 **REVENUE SHARE:**
+├─ Общая сумма выплат: ${total_revenue_share:,.2f}/мес
+└─ Средняя выплата: ${total_revenue_share/active_revenue_share:,.2f}/мес (если активных > 0)
+
+📈 **РАСПРЕДЕЛЕНИЕ ПО УРОВНЯМ PV:**
+├─ Новичок (3%): {pv_levels['novice']}
+├─ Активный (5%): {pv_levels['active']}
+├─ Растущий (7%): {pv_levels['growing']}
+└─ Премиум (10%): {pv_levels['premium']}
+"""
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_mlm")]
+        ])
+        
+        if callback_query:
+            await callback_query.message.edit_text(text, reply_markup=keyboard)
+            await callback_query.answer()
+        else:
+            await target.answer(text, reply_markup=keyboard)
+            
+    except Exception as e:
+        logger.error(f"Ошибка получения MLM статистики: {e}")
+        error_text = "❌ Ошибка получения статистики MLM системы"
+        if callback_query:
+            await callback_query.message.edit_text(error_text)
+            await callback_query.answer(error_text)
+        else:
+            await target.answer(error_text)
+
+
+@dp.message(Command("set_pv"))
+async def handle_set_pv_command(message: types.Message):
+    """Команда /set_pv <partner_id> <pv_percent> - устанавливает PV для партнера"""
+    if not is_admin(message.chat.id):
+        await message.answer("У вас нет прав администратора")
+        return
+    
+    if revenue_share is None:
+        await message.answer("❌ Revenue Share система временно недоступна.")
+        return
+    
+    try:
+        parts = message.text.split()
+        if len(parts) < 3:
+            await message.answer(
+                "❌ Неверный формат команды.\n\n"
+                "Использование: `/set_pv <partner_chat_id> <pv_percent>`\n"
+                "Пример: `/set_pv 123456789 8.5`",
+                parse_mode="Markdown"
+            )
+            return
+        
+        partner_chat_id = parts[1]
+        pv_percent = float(parts[2])
+        
+        if not (0 <= pv_percent <= 100):
+            await message.answer("❌ PV должен быть от 0 до 100%")
+            return
+        
+        # Устанавливаем PV
+        success = revenue_share.set_partner_pv(
+            partner_chat_id=partner_chat_id,
+            pv_percent=pv_percent
+        )
+        
+        if success:
+            await message.answer(
+                f"✅ PV установлен для партнера `{partner_chat_id}`: {pv_percent}%",
+                parse_mode="Markdown"
+            )
+        else:
+            await message.answer("❌ Ошибка установки PV")
+            
+    except ValueError:
+        await message.answer("❌ Неверный формат PV. Используйте число (например: 8.5)")
+    except Exception as e:
+        logger.error(f"Ошибка установки PV: {e}")
+        await message.answer(f"❌ Ошибка: {e}")
+
+
+@dp.callback_query(F.data == "mlm_set_pv")
+async def show_set_pv_menu(callback_query: types.CallbackQuery):
+    """Показывает меню установки PV"""
+    await callback_query.answer("Используйте команду /set_pv <partner_id> <pv>")
+    await callback_query.message.edit_text(
+        "💎 **УСТАНОВКА PV**\n\n"
+        "Используйте команду:\n"
+        "`/set_pv <partner_chat_id> <pv_percent>`\n\n"
+        "Пример:\n"
+        "`/set_pv 123456789 8.5`\n\n"
+        "Для установки PV для всей отрасли используйте:\n"
+        "`/set_pv_industry <industry_type> <pv_percent>`",
+        parse_mode="Markdown"
+    )
+
+
+@dp.callback_query(F.data == "mlm_approve_payments")
+async def approve_revenue_share_payments(callback_query: types.CallbackQuery):
+    """Одобряет все pending выплаты Revenue Share"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    await callback_query.answer("Одобрение выплат...")
+    
+    try:
+        from datetime import date, timedelta
+        
+        # Получаем pending выплаты за текущий месяц
+        today = date.today()
+        period_start = today.replace(day=1)
+        period_end = today
+        
+        payments = db_manager.client.table('partner_revenue_share').select(
+            'id, partner_chat_id, final_amount'
+        ).eq('status', 'pending').gte(
+            'period_start', period_start.isoformat()
+        ).lte('period_end', period_end.isoformat()).execute()
+        
+        if not payments.data:
+            await callback_query.message.edit_text(
+                "✅ Нет pending выплат для одобрения за текущий месяц."
+            )
+            return
+        
+        approved_count = 0
+        total_amount = 0.0
+        
+        for payment in payments.data:
+            try:
+                db_manager.client.table('partner_revenue_share').update({
+                    'status': 'approved'
+                }).eq('id', payment['id']).execute()
+                
+                approved_count += 1
+                total_amount += float(payment.get('final_amount', 0))
+            except Exception as e:
+                logger.error(f"Ошибка одобрения выплаты {payment['id']}: {e}")
+        
+        text = f"""
+✅ **ВЫПЛАТЫ ОДОБРЕНЫ**
+
+📊 **РЕЗУЛЬТАТЫ:**
+├─ Одобрено выплат: {approved_count}
+└─ Общая сумма: ${total_amount:,.2f}
+
+💡 Выплаты переведены в статус 'approved'.
+Для фактической выплаты нужно обновить статус на 'paid'.
+"""
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_mlm")]
+        ])
+        
+        await callback_query.message.edit_text(text, reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"Ошибка одобрения выплат: {e}")
+        await callback_query.message.edit_text(f"❌ Ошибка: {e}")
+
+
+@dp.callback_query(F.data == "mlm_network")
+async def show_mlm_network(callback_query: types.CallbackQuery):
+    """Показывает структуру MLM сети"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    await callback_query.answer("Загрузка структуры сети...")
+    
+    try:
+        # Получаем статистику сети
+        network = db_manager.client.table('partner_network').select(
+            'referrer_chat_id, referred_chat_id, level'
+        ).execute()
+        
+        if not network.data:
+            await callback_query.message.edit_text(
+                "🌐 **РЕФЕРАЛЬНАЯ СЕТЬ**\n\n"
+                "В системе пока нет связей между партнерами."
+            )
+            return
+        
+        # Группируем по уровням
+        level_1 = [n for n in network.data if n.get('level') == 1]
+        level_2 = [n for n in network.data if n.get('level') == 2]
+        level_3 = [n for n in network.data if n.get('level') == 3]
+        
+        # Подсчитываем уникальных партнеров
+        unique_referrers = len(set(n.get('referrer_chat_id') for n in network.data))
+        unique_referred = len(set(n.get('referred_chat_id') for n in network.data))
+        
+        text = f"""
+🌐 **РЕФЕРАЛЬНАЯ СЕТЬ**
+
+📊 **СТАТИСТИКА:**
+├─ Уровень 1: {len(level_1)} связей
+├─ Уровень 2: {len(level_2)} связей
+├─ Уровень 3: {len(level_3)} связей
+├─ Всего связей: {len(network.data)}
+├─ Уникальных рефереров: {unique_referrers}
+└─ Уникальных приглашенных: {unique_referred}
+
+💡 Используйте команду `/mlm_partner <partner_id>` для просмотра сети конкретного партнера.
+"""
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_mlm")]
+        ])
+        
+        await callback_query.message.edit_text(text, reply_markup=keyboard)
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения структуры сети: {e}")
+        await callback_query.message.edit_text(f"❌ Ошибка: {e}")
+
+
+@dp.message(Command("mlm_partner"))
+async def handle_mlm_partner_command(message: types.Message):
+    """Команда /mlm_partner <partner_id> - показывает сеть конкретного партнера"""
+    if not is_admin(message.chat.id):
+        await message.answer("У вас нет прав администратора")
+        return
+    
+    try:
+        parts = message.text.split()
+        if len(parts) < 2:
+            await message.answer(
+                "❌ Неверный формат команды.\n\n"
+                "Использование: `/mlm_partner <partner_chat_id>`\n"
+                "Пример: `/mlm_partner 123456789`",
+                parse_mode="Markdown"
+            )
+            return
+        
+        partner_chat_id = parts[1]
+        
+        # Получаем сеть партнера
+        network = db_manager.client.table('partner_network').select(
+            'referred_chat_id, level, is_active'
+        ).eq('referrer_chat_id', partner_chat_id).execute()
+        
+        if not network.data:
+            await message.answer(
+                f"🌐 **СЕТЬ ПАРТНЕРА {partner_chat_id}**\n\n"
+                "У этого партнера пока нет партнеров в сети."
+            )
+            return
+        
+        # Группируем по уровням
+        level_1 = [n for n in network.data if n.get('level') == 1]
+        level_2 = [n for n in network.data if n.get('level') == 2]
+        level_3 = [n for n in network.data if n.get('level') == 3]
+        
+        text = f"""
+🌐 **СЕТЬ ПАРТНЕРА {partner_chat_id}**
+
+📊 **СТАТИСТИКА:**
+├─ Уровень 1: {len(level_1)} партнеров
+├─ Уровень 2: {len(level_2)} партнеров
+├─ Уровень 3: {len(level_3)} партнеров
+└─ Всего: {len(network.data)} партнеров
+"""
+        
+        await message.answer(text, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения сети партнера: {e}")
+        await message.answer(f"❌ Ошибка: {e}")
+
+
+@dp.callback_query(F.data == "back_to_main")
+async def back_to_main_menu(callback_query: types.CallbackQuery):
+    """Возврат в главное меню админа"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
+        [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
+        [InlineKeyboardButton(text="🛠 Услуги Партнёров", callback_data="admin_manage_services")],
+        [InlineKeyboardButton(text="💎 MLM Revenue Share", callback_data="admin_mlm")],
+        [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
+        [InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc")],
+        [InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters")],
+        [InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard")],
+        [InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background")],
+        [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
+        [InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers")]
+    ])
+    
+    await callback_query.message.edit_text(
+        "👋 **Админ-панель**\n\nВыберите раздел для управления системой лояльности:",
+        reply_markup=keyboard
+    )
+    await callback_query.answer()
 
 
 # --- Запуск Бота ---
