@@ -39,8 +39,14 @@ const PartnerApply = () => {
       const districtsForCity = getDistrictsByCity(formData.city)
       setDistricts(districtsForCity)
       
-      // Если выбран город с районом "All", автоматически ставим район "All"
-      if (districtsForCity.length > 0 && districtsForCity[0].value === 'All') {
+      // Для New York не устанавливаем автоматически "All" - пользователь должен выбрать район
+      if (formData.city === 'New York') {
+        // Для NY сбрасываем district, чтобы пользователь выбрал конкретный район
+        if (formData.district === 'All') {
+          setFormData(prev => ({ ...prev, district: '' }))
+        }
+      } else if (districtsForCity.length > 0 && districtsForCity[0].value === 'All') {
+        // Для других городов (кроме NY) автоматически ставим район "All"
         setFormData(prev => ({ ...prev, district: 'All' }))
       } else if (districtsForCity.length === 0) {
         // Если районов нет, сбрасываем district
@@ -105,17 +111,23 @@ const PartnerApply = () => {
       newErrors.city = t('partner_city_required')
     }
     
-    // Для всех партнерских городов district должен быть 'All'
-    // Если district не установлен, устанавливаем его автоматически
-    if (formData.city && !formData.district) {
+    // Для New York район обязателен и не может быть "All"
+    if (formData.city === 'New York') {
+      if (!formData.district || formData.district === 'All') {
+        newErrors.district = language === 'ru' 
+          ? 'Выберите конкретный район Нью-Йорка' 
+          : 'Please select a specific New York district'
+      }
+    } else if (formData.city && !formData.district) {
+      // Для других городов проверяем наличие района
       const districtsForCity = getDistrictsByCity(formData.city)
       if (districtsForCity.length > 0 && districtsForCity[0].value === 'All') {
+        // Автоматически устанавливаем "All" для городов с одним районом
         setFormData(prev => ({ ...prev, district: 'All' }))
-      } else {
+      } else if (districtsForCity.length > 0) {
+        // Если есть районы, но не выбран - ошибка
         newErrors.district = t('partner_district_required')
       }
-    } else     if (!formData.district) {
-      newErrors.district = t('partner_district_required')
     }
     
     // Username не обязателен, но если указан - проверяем формат (без @)
