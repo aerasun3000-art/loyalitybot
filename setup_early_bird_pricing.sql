@@ -1,7 +1,7 @@
 -- ============================================
 -- Настройка раннего предложения для партнеров NY
--- Первые 20 партнеров: $29/год
--- После 20 партнеров: $99/год
+-- Первые 20 партнеров: $29/месяц
+-- После 20 партнеров: $99/месяц
 -- Выполните этот скрипт в SQL Editor вашего проекта Supabase
 -- ============================================
 
@@ -58,18 +58,18 @@ BEGIN
     IF next_number <= 20 THEN
       NEW.is_early_bird := true;
       NEW.subscription_tier := 'early_bird';
-      NEW.annual_fee := 29.00;
-      NEW.monthly_fee := 29.00 / 12.0; -- Примерно $2.42/мес
+      NEW.monthly_fee := 29.00;
+      NEW.annual_fee := 29.00 * 12.0; -- $348/год
     ELSE
       NEW.is_early_bird := false;
       NEW.subscription_tier := 'premium';
-      NEW.annual_fee := 99.00;
-      NEW.monthly_fee := 99.00 / 12.0; -- $8.25/мес
+      NEW.monthly_fee := 99.00;
+      NEW.annual_fee := 99.00 * 12.0; -- $1,188/год
     END IF;
     
-    -- Устанавливаем даты подписки (годовая)
+    -- Устанавливаем даты подписки (месячная подписка)
     NEW.subscription_start_date := CURRENT_DATE;
-    NEW.subscription_end_date := CURRENT_DATE + INTERVAL '1 year';
+    NEW.subscription_end_date := CURRENT_DATE + INTERVAL '1 month';
   END IF;
   
   RETURN NEW;
@@ -104,11 +104,11 @@ BEGIN
       partner_number = next_num,
       is_early_bird = (next_num <= 20),
       subscription_tier = CASE WHEN next_num <= 20 THEN 'early_bird' ELSE 'premium' END,
-      annual_fee = CASE WHEN next_num <= 20 THEN 29.00 ELSE 99.00 END,
-      monthly_fee = CASE WHEN next_num <= 20 THEN 29.00 / 12.0 ELSE 99.00 / 12.0 END,
+      monthly_fee = CASE WHEN next_num <= 20 THEN 29.00 ELSE 99.00 END,
+      annual_fee = CASE WHEN next_num <= 20 THEN 29.00 * 12.0 ELSE 99.00 * 12.0 END,
       subscription_city = 'New York',
       subscription_start_date = COALESCE(partner_package_purchased_at::DATE, CURRENT_DATE),
-      subscription_end_date = COALESCE(partner_package_purchased_at::DATE, CURRENT_DATE) + INTERVAL '1 year'
+      subscription_end_date = COALESCE(partner_package_purchased_at::DATE, CURRENT_DATE) + INTERVAL '1 month'
     WHERE chat_id = partner_rec.chat_id;
     
     next_num := next_num + 1;
@@ -133,7 +133,7 @@ BEGIN
     CASE 
       WHEN COUNT(*) FILTER (WHERE is_early_bird = true) < 20 THEN 29.00
       ELSE 99.00
-    END as current_price
+    END as current_price_monthly
   FROM partners
   WHERE city = 'New York' AND partner_number IS NOT NULL;
 END;
@@ -157,8 +157,8 @@ SELECT
   subscription_start_date,
   subscription_end_date,
   CASE 
-    WHEN is_early_bird THEN '🎁 Early Bird ($29/год)'
-    ELSE '💎 Premium ($99/год)'
+    WHEN is_early_bird THEN '🎁 Early Bird ($29/месяц)'
+    ELSE '💎 Premium ($99/месяц)'
   END as pricing_status
 FROM partners
 WHERE city = 'New York' AND partner_number IS NOT NULL
@@ -169,8 +169,8 @@ SELECT
   20 - COUNT(*) FILTER (WHERE is_early_bird = true) as remaining_early_bird_slots,
   COUNT(*) FILTER (WHERE is_early_bird = true) as current_early_bird_count,
   CASE 
-    WHEN COUNT(*) FILTER (WHERE is_early_bird = true) < 20 THEN '✅ Early Bird доступен: $29/год'
-    ELSE '❌ Early Bird закончился: $99/год'
+    WHEN COUNT(*) FILTER (WHERE is_early_bird = true) < 20 THEN '✅ Early Bird доступен: $29/месяц'
+    ELSE '❌ Early Bird закончился: $99/месяц'
   END as status_message
 FROM partners
 WHERE city = 'New York' AND partner_number IS NOT NULL;
@@ -179,7 +179,7 @@ WHERE city = 'New York' AND partner_number IS NOT NULL;
 COMMENT ON COLUMN partners.partner_number IS 'Порядковый номер партнера (только для NY, первые 20 получают раннее предложение)';
 COMMENT ON COLUMN partners.subscription_tier IS 'Уровень подписки: early_bird ($29/год), premium ($99/год), regular';
 COMMENT ON COLUMN partners.is_early_bird IS 'Является ли партнер участником раннего предложения (первые 20)';
-COMMENT ON COLUMN partners.annual_fee IS 'Годовая стоимость подписки в долларах';
-COMMENT ON COLUMN partners.monthly_fee IS 'Месячная стоимость подписки (рассчитана из годовой)';
+COMMENT ON COLUMN partners.monthly_fee IS 'Месячная стоимость подписки в долларах';
+COMMENT ON COLUMN partners.annual_fee IS 'Годовая стоимость подписки (рассчитана из месячной: monthly_fee × 12)';
 COMMENT ON COLUMN partners.subscription_city IS 'Город, для которого действует подписка (пока только New York)';
 

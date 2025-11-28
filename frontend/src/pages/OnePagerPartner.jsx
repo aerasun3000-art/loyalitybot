@@ -11,8 +11,8 @@ const translations = {
     description: 'Become the exclusive partner for your service type in your district.',
     description2: 'No competition. Maximum revenue. Full control.',
     first20: 'FIRST 20 PARTNERS',
-    perYear: 'per year',
-    regular: 'Regular: $99/year',
+    perMonth: 'per month',
+    regular: 'Regular: $99/month',
     save: 'Save $70! 🎉',
     after20: 'AFTER 20 PARTNERS',
     standard: 'Standard pricing',
@@ -40,14 +40,14 @@ const translations = {
     step1Title: 'Choose Your Spot',
     step1Desc: 'Select your district and service type. If available, it\'s yours exclusively.',
     step2Title: 'Early Bird Pricing',
-    step2Desc: 'First 20 partners pay only $29/year. After that, it\'s $99/year.',
+    step2Desc: 'First 20 partners pay only $29/month. After that, it\'s $99/month.',
     step3Title: 'Get Exclusive Rights',
     step3Desc: 'You become the only partner for your service in your district. No competition.',
     step4Title: 'Grow Your Business',
     step4Desc: 'Build your client base, earn revenue share, and become a Master Partner.',
     whyJoin: '✨ Why Join Now?',
     earlyBirdDiscount: 'Early Bird Discount',
-    earlyBirdDiscountDesc: 'Save $70 per year if you\'re among the first 20 partners. Limited time offer!',
+    earlyBirdDiscountDesc: 'Save $70 per month if you\'re among the first 20 partners. Limited time offer!',
     exclusiveTerritory: 'Exclusive Territory',
     exclusiveTerritoryDesc: 'No competition in your district for your service type. You own the market.',
     analytics: 'Full Analytics Dashboard',
@@ -71,12 +71,12 @@ const translations = {
     onlyFirst20: '⏰ Only for first 20 partners in New York',
     standardPricing: 'Standard pricing after Early Bird slots are filled',
     allFeatures: '✅ All features included in both plans',
-    onlyPriceDiff: 'The only difference is the price. Early Bird saves you $70 per year!',
+    onlyPriceDiff: 'The only difference is the price. Early Bird saves you $70 per month!',
     finalTitle: 'Ready to Claim Your Exclusive Territory?',
-    finalDesc: 'Join the first 20 partners and save $70 per year',
+    finalDesc: 'Join the first 20 partners and save $70 per month',
     finalDesc2: 'Become the exclusive partner in your district',
     slotsLeft: '{count} Early Bird slots left!',
-    dontMiss: 'Don\'t miss your chance to save $70/year',
+    dontMiss: 'Don\'t miss your chance to save $70/month',
     applyNow: '🚀 Apply Now - Claim Your Spot',
     noHiddenFees: '✅ No hidden fees • ✅ Cancel anytime • ✅ Full refund if not approved',
   },
@@ -87,8 +87,8 @@ const translations = {
     description: 'Станьте эксклюзивным партнером для вашего вида услуг в вашем районе.',
     description2: 'Без конкуренции. Максимальный доход. Полный контроль.',
     first20: 'ПЕРВЫЕ 20 ПАРТНЕРОВ',
-    perYear: 'в год',
-    regular: 'Обычно: $99/год',
+    perMonth: 'в месяц',
+    regular: 'Обычно: $99/месяц',
     save: 'Экономия $70! 🎉',
     after20: 'ПОСЛЕ 20 ПАРТНЕРОВ',
     standard: 'Стандартная цена',
@@ -116,14 +116,14 @@ const translations = {
     step1Title: 'Выберите Ваше Место',
     step1Desc: 'Выберите район и вид услуг. Если доступно — оно ваше эксклюзивно.',
     step2Title: 'Раннее Предложение',
-    step2Desc: 'Первые 20 партнеров платят только $29/год. После этого — $99/год.',
+    step2Desc: 'Первые 20 партнеров платят только $29/месяц. После этого — $99/месяц.',
     step3Title: 'Получите Эксклюзивные Права',
     step3Desc: 'Вы становитесь единственным партнером для вашей услуги в вашем районе. Без конкуренции.',
     step4Title: 'Развивайте Свой Бизнес',
     step4Desc: 'Стройте клиентскую базу, зарабатывайте revenue share и становитесь Мастер-Партнером.',
     whyJoin: '✨ Почему Стоит Присоединиться Сейчас?',
     earlyBirdDiscount: 'Скидка Раннего Предложения',
-    earlyBirdDiscountDesc: 'Экономьте $70 в год, если вы среди первых 20 партнеров. Ограниченное предложение!',
+    earlyBirdDiscountDesc: 'Экономьте $70 в месяц, если вы среди первых 20 партнеров. Ограниченное предложение!',
     exclusiveTerritory: 'Эксклюзивная Территория',
     exclusiveTerritoryDesc: 'Нет конкуренции в вашем районе для вашего вида услуг. Вы владеете рынком.',
     analytics: 'Полный Аналитический Дашборд',
@@ -147,12 +147,12 @@ const translations = {
     onlyFirst20: '⏰ Только для первых 20 партнеров в Нью-Йорке',
     standardPricing: 'Стандартная цена после заполнения мест по раннему предложению',
     allFeatures: '✅ Все функции включены в оба тарифа',
-    onlyPriceDiff: 'Единственная разница — цена. Раннее предложение экономит вам $70 в год!',
+    onlyPriceDiff: 'Единственная разница — цена. Раннее предложение экономит вам $70 в месяц!',
     finalTitle: 'Готовы Забронировать Свою Эксклюзивную Территорию?',
-    finalDesc: 'Присоединяйтесь к первым 20 партнерам и экономьте $70 в год',
+    finalDesc: 'Присоединяйтесь к первым 20 партнерам и экономьте $70 в месяц',
     finalDesc2: 'Станьте эксклюзивным партнером в своем районе',
     slotsLeft: '⏰ Осталось {count} мест по раннему предложению!',
-    dontMiss: 'Не упустите возможность сэкономить $70/год',
+    dontMiss: 'Не упустите возможность сэкономить $70/месяц',
     applyNow: '🚀 Подать Заявку - Забронировать Место',
     noHiddenFees: '✅ Без скрытых платежей • ✅ Отмена в любое время • ✅ Полный возврат при отклонении',
   }
@@ -226,7 +226,7 @@ const OnePagerPartner = () => {
               <div className="bg-white rounded-2xl p-8 shadow-2xl border-4 border-red-400 transform scale-105">
                 <div className="text-sm text-red-600 font-bold mb-2">{t('first20')}</div>
                 <div className="text-6xl font-bold text-sakura-dark mb-2">$29</div>
-                <div className="text-xl text-gray-600 mb-4">{t('perYear')}</div>
+                <div className="text-xl text-gray-600 mb-4">{t('perMonth')}</div>
                 <div className="text-sm text-gray-500 line-through mb-2">{t('regular')}</div>
                 <div className="text-green-600 font-bold">{t('save')}</div>
               </div>
@@ -234,7 +234,7 @@ const OnePagerPartner = () => {
               <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-gray-300">
                 <div className="text-sm text-gray-600 font-bold mb-2">{t('after20')}</div>
                 <div className="text-6xl font-bold text-sakura-dark mb-2">$99</div>
-                <div className="text-xl text-gray-600 mb-4">{t('perYear')}</div>
+                <div className="text-xl text-gray-600 mb-4">{t('perMonth')}</div>
                 <div className="text-sm text-gray-500">{t('standard')}</div>
               </div>
             </div>
@@ -454,7 +454,7 @@ const OnePagerPartner = () => {
                   <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">{t('limited')}</span>
                 </div>
                 <div className="text-5xl font-bold text-sakura-dark mb-2">$29</div>
-                <div className="text-lg text-gray-600 mb-6">{t('perYear')}</div>
+                <div className="text-lg text-gray-600 mb-6">{t('perMonth')}</div>
                 <ul className="space-y-3">
                   <ConditionItem text={t('exclusiveRights')} />
                   <ConditionItem text={t('fullAccess')} />
@@ -476,7 +476,7 @@ const OnePagerPartner = () => {
                   <h3 className="text-2xl font-bold text-sakura-dark">{t('premiumPlan')}</h3>
                 </div>
                 <div className="text-5xl font-bold text-sakura-dark mb-2">$99</div>
-                <div className="text-lg text-gray-600 mb-6">{t('perYear')}</div>
+                <div className="text-lg text-gray-600 mb-6">{t('perMonth')}</div>
                 <ul className="space-y-3">
                   <ConditionItem text={t('exclusiveRights')} />
                   <ConditionItem text={t('fullAccess')} />
