@@ -21,33 +21,58 @@ if ('caches' in window) {
   })
 }
 
-// АГРЕССИВНАЯ очистка кэша для версии 6.0
+// Очистка кэша при обновлении версии (только один раз)
 (function checkAndClearCache() {
   try {
-    const appVersion = 'v13-new-project-fix'
-    const storedVersion = sessionStorage.getItem('app_version_v13')
+    const appVersion = 'v14-stable'
+    const storedVersion = sessionStorage.getItem('app_version')
+    const urlParams = new URLSearchParams(window.location.search)
+    const hasReloadParam = urlParams.has('_reload')
     
-    if (storedVersion !== appVersion) {
-      console.log('🔄 New app version v13-new-project-fix detected, clearing ALL cache...')
-      // АГРЕССИВНАЯ очистка всего кэша
+    // Если версия изменилась И мы еще не делали перезагрузку в этой сессии
+    if (storedVersion !== appVersion && !hasReloadParam) {
+      console.log('🔄 New app version detected, clearing cache...')
+      // Очистка кэша
       if ('caches' in window) {
         caches.keys().then(names => {
           names.forEach(name => caches.delete(name))
         })
       }
-      localStorage.clear()
-      sessionStorage.clear()
-      sessionStorage.setItem('app_version_v13', appVersion)
+      // Очищаем только старые данные, не все localStorage
+      try {
+        const keysToKeep = ['loyalitybot-language'] // Сохраняем язык
+        const newStorage = {}
+        keysToKeep.forEach(key => {
+          const value = localStorage.getItem(key)
+          if (value) newStorage[key] = value
+        })
+        localStorage.clear()
+        Object.keys(newStorage).forEach(key => {
+          localStorage.setItem(key, newStorage[key])
+        })
+      } catch (e) {
+        console.warn('Could not preserve localStorage:', e)
+      }
       
-      // Принудительная перезагрузка для Telegram Web App
+      sessionStorage.setItem('app_version', appVersion)
+      
+      // Перезагрузка только один раз, если это Telegram Web App
       if (window.Telegram?.WebApp) {
-        console.log('🔄 Reloading to apply v12-buttons-removed version...')
+        console.log('🔄 Reloading once to apply new version...')
         setTimeout(() => {
           const url = window.location.href.split('?')[0]
-          window.location.href = url + '?v=' + Date.now() + '&_reload=1&_v12=1&_buttons_removed=1&_nocache=' + Date.now()
-        }, 50)
+          window.location.href = url + '?v=' + Date.now() + '&_reload=1'
+        }, 100)
         return
       }
+    } else if (hasReloadParam) {
+      // Убираем параметр _reload из URL после перезагрузки
+      const url = new URL(window.location.href)
+      url.searchParams.delete('_reload')
+      url.searchParams.delete('_v12')
+      url.searchParams.delete('_buttons_removed')
+      url.searchParams.delete('_nocache')
+      window.history.replaceState({}, '', url.toString())
     }
   } catch (e) {
     console.warn('Could not clear cache:', e)

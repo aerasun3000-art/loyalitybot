@@ -1,8 +1,176 @@
 import { useState, useEffect } from 'react';
+import useLanguageStore from '../store/languageStore';
+import { hapticFeedback } from '../utils/telegram';
+
+// Переводы
+const translations = {
+  en: {
+    badge: '🎁 LIMITED TIME: Early Bird Offer for New York',
+    title: '🗽 Exclusive Partner Program',
+    subtitle: 'New York Only',
+    description: 'Become the exclusive partner for your service type in your district.',
+    description2: 'No competition. Maximum revenue. Full control.',
+    first20: 'FIRST 20 PARTNERS',
+    perYear: 'per year',
+    regular: 'Regular: $99/year',
+    save: 'Save $70! 🎉',
+    after20: 'AFTER 20 PARTNERS',
+    standard: 'Standard pricing',
+    slotsRemaining: 'Only {count} Early Bird slots remaining!',
+    partnersJoined: '{count} partners already joined',
+    claimSpot: '🚀 Claim Your Spot Now',
+    learnMore: 'Learn More ↓',
+    exclusivityTitle: '👑 What is Exclusive Partnership?',
+    exclusivityDesc: "In each of New York's 10 districts, for each of 12 service types, there can be only ONE partner.",
+    exclusivityDesc2: 'You become the monopoly in your niche and territory.',
+    territoryProtection: 'Territory Protection',
+    territoryProtectionDesc: 'No other partner can offer the same service type in your district. You own the market.',
+    maxRevenue: 'Maximum Revenue',
+    maxRevenueDesc: 'All customers looking for your service in your district will find only you. No competition means higher prices and more clients.',
+    revenueShare: 'Revenue Share',
+    revenueShareDesc: 'Earn from partners you refer. Build your network and get passive income from their success.',
+    masterPartner: 'Master Partner Status',
+    masterPartnerDesc: 'Become a Master Partner in your district and coordinate the development of your territory.',
+    districtsTitle: '🗺️ 10 Districts of New York',
+    servicesTitle: '💅 12 Service Types Available',
+    totalPositions: '120 total exclusive positions',
+    positionsDesc: '(10 districts × 12 services)',
+    eachPosition: 'Each position can have only ONE partner',
+    howItWorks: '🔄 How It Works',
+    step1Title: 'Choose Your Spot',
+    step1Desc: 'Select your district and service type. If available, it\'s yours exclusively.',
+    step2Title: 'Early Bird Pricing',
+    step2Desc: 'First 20 partners pay only $29/year. After that, it\'s $99/year.',
+    step3Title: 'Get Exclusive Rights',
+    step3Desc: 'You become the only partner for your service in your district. No competition.',
+    step4Title: 'Grow Your Business',
+    step4Desc: 'Build your client base, earn revenue share, and become a Master Partner.',
+    whyJoin: '✨ Why Join Now?',
+    earlyBirdDiscount: 'Early Bird Discount',
+    earlyBirdDiscountDesc: 'Save $70 per year if you\'re among the first 20 partners. Limited time offer!',
+    exclusiveTerritory: 'Exclusive Territory',
+    exclusiveTerritoryDesc: 'No competition in your district for your service type. You own the market.',
+    analytics: 'Full Analytics Dashboard',
+    analyticsDesc: 'Track your revenue, clients, and performance in real-time.',
+    revenueShareProgram: 'Revenue Share Program',
+    revenueShareProgramDesc: 'Earn passive income from partners you refer. Build your network.',
+    telegramBot: 'Telegram Bot Integration',
+    telegramBotDesc: 'Manage your loyalty program directly from Telegram. Easy and convenient.',
+    fastSetup: 'Fast Setup',
+    fastSetupDesc: 'Get started in 15 minutes. No complex integrations needed.',
+    pricingDetails: '💎 Pricing Details',
+    earlyBirdPlan: 'Early Bird',
+    limited: 'LIMITED',
+    premiumPlan: 'Premium',
+    exclusiveRights: 'Exclusive territory rights',
+    fullAccess: 'Full platform access',
+    revenueShareFeature: 'Revenue share program',
+    analyticsFeature: 'Analytics dashboard',
+    telegramFeature: 'Telegram bot integration',
+    support24: '24/7 support',
+    onlyFirst20: '⏰ Only for first 20 partners in New York',
+    standardPricing: 'Standard pricing after Early Bird slots are filled',
+    allFeatures: '✅ All features included in both plans',
+    onlyPriceDiff: 'The only difference is the price. Early Bird saves you $70 per year!',
+    finalTitle: 'Ready to Claim Your Exclusive Territory?',
+    finalDesc: 'Join the first 20 partners and save $70 per year',
+    finalDesc2: 'Become the exclusive partner in your district',
+    slotsLeft: '{count} Early Bird slots left!',
+    dontMiss: 'Don\'t miss your chance to save $70/year',
+    applyNow: '🚀 Apply Now - Claim Your Spot',
+    noHiddenFees: '✅ No hidden fees • ✅ Cancel anytime • ✅ Full refund if not approved',
+  },
+  ru: {
+    badge: '🎁 ОГРАНИЧЕННОЕ ВРЕМЯ: Раннее предложение для Нью-Йорка',
+    title: '🗽 Эксклюзивная Партнерская Программа',
+    subtitle: 'Только Нью-Йорк',
+    description: 'Станьте эксклюзивным партнером для вашего вида услуг в вашем районе.',
+    description2: 'Без конкуренции. Максимальный доход. Полный контроль.',
+    first20: 'ПЕРВЫЕ 20 ПАРТНЕРОВ',
+    perYear: 'в год',
+    regular: 'Обычно: $99/год',
+    save: 'Экономия $70! 🎉',
+    after20: 'ПОСЛЕ 20 ПАРТНЕРОВ',
+    standard: 'Стандартная цена',
+    slotsRemaining: '⏰ Осталось только {count} мест по раннему предложению!',
+    partnersJoined: '{count} партнеров уже присоединились',
+    claimSpot: '🚀 Забронировать место сейчас',
+    learnMore: 'Узнать больше ↓',
+    exclusivityTitle: '👑 Что такое Эксклюзивное Партнерство?',
+    exclusivityDesc: 'В каждом из 10 районов Нью-Йорка, для каждого из 12 видов услуг может быть только ОДИН партнер.',
+    exclusivityDesc2: 'Вы становитесь монополистом в своей нише и на своей территории.',
+    territoryProtection: 'Защита Территории',
+    territoryProtectionDesc: 'Никто другой не может предложить тот же вид услуг в вашем районе. Вы владеете рынком.',
+    maxRevenue: 'Максимальный Доход',
+    maxRevenueDesc: 'Все клиенты, ищущие вашу услугу в вашем районе, найдут только вас. Нет конкуренции — значит выше цены и больше клиентов.',
+    revenueShare: 'Revenue Share',
+    revenueShareDesc: 'Зарабатывайте от партнеров, которых вы пригласили. Стройте свою сеть и получайте пассивный доход от их успеха.',
+    masterPartner: 'Статус Мастер-Партнера',
+    masterPartnerDesc: 'Станьте Мастер-Партнером в своем районе и координируйте развитие своей территории.',
+    districtsTitle: '🗺️ 10 Районов Нью-Йорка',
+    servicesTitle: '💅 12 Видов Услуг Доступно',
+    totalPositions: '120 эксклюзивных позиций всего',
+    positionsDesc: '(10 районов × 12 услуг)',
+    eachPosition: 'Каждая позиция может иметь только ОДНОГО партнера',
+    howItWorks: '🔄 Как Это Работает',
+    step1Title: 'Выберите Ваше Место',
+    step1Desc: 'Выберите район и вид услуг. Если доступно — оно ваше эксклюзивно.',
+    step2Title: 'Раннее Предложение',
+    step2Desc: 'Первые 20 партнеров платят только $29/год. После этого — $99/год.',
+    step3Title: 'Получите Эксклюзивные Права',
+    step3Desc: 'Вы становитесь единственным партнером для вашей услуги в вашем районе. Без конкуренции.',
+    step4Title: 'Развивайте Свой Бизнес',
+    step4Desc: 'Стройте клиентскую базу, зарабатывайте revenue share и становитесь Мастер-Партнером.',
+    whyJoin: '✨ Почему Стоит Присоединиться Сейчас?',
+    earlyBirdDiscount: 'Скидка Раннего Предложения',
+    earlyBirdDiscountDesc: 'Экономьте $70 в год, если вы среди первых 20 партнеров. Ограниченное предложение!',
+    exclusiveTerritory: 'Эксклюзивная Территория',
+    exclusiveTerritoryDesc: 'Нет конкуренции в вашем районе для вашего вида услуг. Вы владеете рынком.',
+    analytics: 'Полный Аналитический Дашборд',
+    analyticsDesc: 'Отслеживайте доход, клиентов и показатели в реальном времени.',
+    revenueShareProgram: 'Программа Revenue Share',
+    revenueShareProgramDesc: 'Зарабатывайте пассивный доход от партнеров, которых вы пригласили. Стройте свою сеть.',
+    telegramBot: 'Интеграция с Telegram Ботом',
+    telegramBotDesc: 'Управляйте программой лояльности прямо из Telegram. Легко и удобно.',
+    fastSetup: 'Быстрая Настройка',
+    fastSetupDesc: 'Начните за 15 минут. Никаких сложных интеграций.',
+    pricingDetails: '💎 Детали Ценообразования',
+    earlyBirdPlan: 'Раннее Предложение',
+    limited: 'ОГРАНИЧЕНО',
+    premiumPlan: 'Премиум',
+    exclusiveRights: 'Эксклюзивные права на территорию',
+    fullAccess: 'Полный доступ к платформе',
+    revenueShareFeature: 'Программа revenue share',
+    analyticsFeature: 'Аналитический дашборд',
+    telegramFeature: 'Интеграция с Telegram ботом',
+    support24: 'Поддержка 24/7',
+    onlyFirst20: '⏰ Только для первых 20 партнеров в Нью-Йорке',
+    standardPricing: 'Стандартная цена после заполнения мест по раннему предложению',
+    allFeatures: '✅ Все функции включены в оба тарифа',
+    onlyPriceDiff: 'Единственная разница — цена. Раннее предложение экономит вам $70 в год!',
+    finalTitle: 'Готовы Забронировать Свою Эксклюзивную Территорию?',
+    finalDesc: 'Присоединяйтесь к первым 20 партнерам и экономьте $70 в год',
+    finalDesc2: 'Станьте эксклюзивным партнером в своем районе',
+    slotsLeft: '⏰ Осталось {count} мест по раннему предложению!',
+    dontMiss: 'Не упустите возможность сэкономить $70/год',
+    applyNow: '🚀 Подать Заявку - Забронировать Место',
+    noHiddenFees: '✅ Без скрытых платежей • ✅ Отмена в любое время • ✅ Полный возврат при отклонении',
+  }
+};
 
 const OnePagerPartner = () => {
+  const { language, toggleLanguage } = useLanguageStore();
   const [earlyBirdCount, setEarlyBirdCount] = useState(null);
   const [remainingSlots, setRemainingSlots] = useState(null);
+  
+  const t = (key, params = {}) => {
+    let text = translations[language]?.[key] || translations.en[key] || key;
+    // Заменяем параметры
+    Object.keys(params).forEach(param => {
+      text = text.replace(`{${param}}`, params[param]);
+    });
+    return text;
+  };
 
   useEffect(() => {
     // Здесь можно добавить API вызов для получения актуального количества
@@ -11,8 +179,24 @@ const OnePagerPartner = () => {
     setRemainingSlots(20);
   }, []);
 
+  const handleLanguageToggle = () => {
+    hapticFeedback('light');
+    toggleLanguage();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-sakura-light via-white to-sakura-cream">
+      {/* Переключатель языка */}
+      <div className="fixed top-4 right-4 z-50">
+        <button
+          onClick={handleLanguageToggle}
+          className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border-2 border-sakura-mid/30 hover:border-sakura-mid transition-colors"
+        >
+          <span className="text-xl">{language === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
+          <span className="font-bold text-sakura-dark">{language === 'ru' ? 'RU' : 'EN'}</span>
+        </button>
+      </div>
+
       {/* Герой-секция с ранним предложением */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-sakura-mid to-sakura-dark opacity-10"></div>
@@ -20,38 +204,38 @@ const OnePagerPartner = () => {
           <div className="text-center">
             {/* Бейдж раннего предложения */}
             <div className="inline-block mb-6 px-6 py-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-full font-bold text-lg animate-pulse">
-              🎁 LIMITED TIME: Early Bird Offer for New York
+              {t('badge')}
             </div>
             
             <h1 className="text-5xl md:text-7xl font-bold text-sakura-dark mb-6">
-              🗽 Exclusive Partner Program
+              {t('title')}
               <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-sakura-mid to-sakura-dark">
-                New York Only
+                {t('subtitle')}
               </span>
             </h1>
             
             <p className="text-2xl text-sakura-dark/80 mb-8 max-w-3xl mx-auto">
-              Become the <strong>exclusive</strong> partner for your service type in your district.
+              {t('description')}
               <br />
-              <span className="text-xl text-sakura-mid">No competition. Maximum revenue. Full control.</span>
+              <span className="text-xl text-sakura-mid">{t('description2')}</span>
             </p>
 
             {/* Цены */}
             <div className="flex gap-6 justify-center flex-wrap mb-8">
               <div className="bg-white rounded-2xl p-8 shadow-2xl border-4 border-red-400 transform scale-105">
-                <div className="text-sm text-red-600 font-bold mb-2">FIRST 20 PARTNERS</div>
+                <div className="text-sm text-red-600 font-bold mb-2">{t('first20')}</div>
                 <div className="text-6xl font-bold text-sakura-dark mb-2">$29</div>
-                <div className="text-xl text-gray-600 mb-4">per year</div>
-                <div className="text-sm text-gray-500 line-through mb-2">Regular: $99/year</div>
-                <div className="text-green-600 font-bold">Save $70! 🎉</div>
+                <div className="text-xl text-gray-600 mb-4">{t('perYear')}</div>
+                <div className="text-sm text-gray-500 line-through mb-2">{t('regular')}</div>
+                <div className="text-green-600 font-bold">{t('save')}</div>
               </div>
               
               <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-gray-300">
-                <div className="text-sm text-gray-600 font-bold mb-2">AFTER 20 PARTNERS</div>
+                <div className="text-sm text-gray-600 font-bold mb-2">{t('after20')}</div>
                 <div className="text-6xl font-bold text-sakura-dark mb-2">$99</div>
-                <div className="text-xl text-gray-600 mb-4">per year</div>
-                <div className="text-sm text-gray-500">Standard pricing</div>
+                <div className="text-xl text-gray-600 mb-4">{t('perYear')}</div>
+                <div className="text-sm text-gray-500">{t('standard')}</div>
               </div>
             </div>
 
@@ -59,10 +243,10 @@ const OnePagerPartner = () => {
             {remainingSlots !== null && remainingSlots > 0 && (
               <div className="bg-yellow-100 border-2 border-yellow-400 rounded-xl p-4 mb-8 inline-block">
                 <div className="text-2xl font-bold text-yellow-800">
-                  ⏰ Only {remainingSlots} Early Bird slots remaining!
+                  {t('slotsRemaining', { count: remainingSlots })}
                 </div>
                 <div className="text-lg text-yellow-700 mt-2">
-                  {earlyBirdCount || 0} partners already joined
+                  {t('partnersJoined', { count: earlyBirdCount || 0 })}
                 </div>
               </div>
             )}
@@ -72,13 +256,13 @@ const OnePagerPartner = () => {
                 href="/partner/apply" 
                 className="px-10 py-5 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold text-xl hover:shadow-2xl transition-all transform hover:scale-105"
               >
-                🚀 Claim Your Spot Now
+                {t('claimSpot')}
               </a>
               <a 
                 href="#how-it-works" 
                 className="px-10 py-5 bg-white text-sakura-dark rounded-xl font-bold text-xl border-2 border-sakura-mid hover:bg-sakura-light transition-colors"
               >
-                Learn More ↓
+                {t('learnMore')}
               </a>
             </div>
           </div>
@@ -89,41 +273,41 @@ const OnePagerPartner = () => {
       <div className="bg-white py-16" id="exclusivity">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl md:text-5xl font-bold text-center text-sakura-dark mb-4">
-            👑 What is Exclusive Partnership?
+            {t('exclusivityTitle')}
           </h2>
           <p className="text-xl text-center text-gray-600 mb-12 max-w-3xl mx-auto">
-            In each of New York's 10 districts, for each of 12 service types, there can be <strong>only ONE partner</strong>.
+            {t('exclusivityDesc')}
             <br />
-            <span className="text-lg text-sakura-mid">You become the monopoly in your niche and territory.</span>
+            <span className="text-lg text-sakura-mid">{t('exclusivityDesc2')}</span>
           </p>
           
           <div className="grid md:grid-cols-2 gap-8 mb-12">
             <ExclusivityCard
               icon="🎯"
-              title="Territory Protection"
-              description="No other partner can offer the same service type in your district. You own the market."
+              title={t('territoryProtection')}
+              description={t('territoryProtectionDesc')}
             />
             <ExclusivityCard
               icon="💰"
-              title="Maximum Revenue"
-              description="All customers looking for your service in your district will find only you. No competition means higher prices and more clients."
+              title={t('maxRevenue')}
+              description={t('maxRevenueDesc')}
             />
             <ExclusivityCard
               icon="📈"
-              title="Revenue Share"
-              description="Earn from partners you refer. Build your network and get passive income from their success."
+              title={t('revenueShare')}
+              description={t('revenueShareDesc')}
             />
             <ExclusivityCard
               icon="🏆"
-              title="Master Partner Status"
-              description="Become a Master Partner in your district and coordinate the development of your territory."
+              title={t('masterPartner')}
+              description={t('masterPartnerDesc')}
             />
           </div>
 
           {/* 10 районов */}
           <div className="bg-gradient-to-r from-sakura-light to-sakura-cream rounded-2xl p-8 mb-8">
             <h3 className="text-3xl font-bold text-center text-sakura-dark mb-6">
-              🗺️ 10 Districts of New York
+              {t('districtsTitle')}
             </h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
               {[
@@ -148,7 +332,7 @@ const OnePagerPartner = () => {
           {/* 12 видов услуг */}
           <div className="bg-gradient-to-r from-sakura-cream to-sakura-light rounded-2xl p-8">
             <h3 className="text-3xl font-bold text-center text-sakura-dark mb-6">
-              💅 12 Service Types Available
+              {t('servicesTitle')}
             </h3>
             <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
               {[
@@ -172,9 +356,9 @@ const OnePagerPartner = () => {
               ))}
             </div>
             <p className="text-center text-gray-600 mt-6">
-              <strong>120 total exclusive positions</strong> (10 districts × 12 services)
+              <strong>{t('totalPositions')}</strong> {t('positionsDesc')}
               <br />
-              <span className="text-sakura-mid">Each position can have only ONE partner</span>
+              <span className="text-sakura-mid">{t('eachPosition')}</span>
             </p>
           </div>
         </div>
@@ -184,29 +368,29 @@ const OnePagerPartner = () => {
       <div className="bg-gradient-to-br from-sakura-light to-white py-16" id="how-it-works">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl md:text-5xl font-bold text-center text-sakura-dark mb-12">
-            🔄 How It Works
+            {t('howItWorks')}
           </h2>
           
           <div className="grid md:grid-cols-4 gap-8">
             <StepCard
               number="1"
-              title="Choose Your Spot"
-              description="Select your district and service type. If available, it's yours exclusively."
+              title={t('step1Title')}
+              description={t('step1Desc')}
             />
             <StepCard
               number="2"
-              title="Early Bird Pricing"
-              description="First 20 partners pay only $29/year. After that, it's $99/year."
+              title={t('step2Title')}
+              description={t('step2Desc')}
             />
             <StepCard
               number="3"
-              title="Get Exclusive Rights"
-              description="You become the only partner for your service in your district. No competition."
+              title={t('step3Title')}
+              description={t('step3Desc')}
             />
             <StepCard
               number="4"
-              title="Grow Your Business"
-              description="Build your client base, earn revenue share, and become a Master Partner."
+              title={t('step4Title')}
+              description={t('step4Desc')}
             />
           </div>
         </div>
@@ -216,39 +400,39 @@ const OnePagerPartner = () => {
       <div className="bg-white py-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl md:text-5xl font-bold text-center text-sakura-dark mb-12">
-            ✨ Why Join Now?
+            {t('whyJoin')}
           </h2>
           
           <div className="grid md:grid-cols-3 gap-8">
             <BenefitCard
               icon="🎁"
-              title="Early Bird Discount"
-              description="Save $70 per year if you're among the first 20 partners. Limited time offer!"
+              title={t('earlyBirdDiscount')}
+              description={t('earlyBirdDiscountDesc')}
             />
             <BenefitCard
               icon="👑"
-              title="Exclusive Territory"
-              description="No competition in your district for your service type. You own the market."
+              title={t('exclusiveTerritory')}
+              description={t('exclusiveTerritoryDesc')}
             />
             <BenefitCard
               icon="📊"
-              title="Full Analytics Dashboard"
-              description="Track your revenue, clients, and performance in real-time."
+              title={t('analytics')}
+              description={t('analyticsDesc')}
             />
             <BenefitCard
               icon="🤝"
-              title="Revenue Share Program"
-              description="Earn passive income from partners you refer. Build your network."
+              title={t('revenueShareProgram')}
+              description={t('revenueShareProgramDesc')}
             />
             <BenefitCard
               icon="💬"
-              title="Telegram Bot Integration"
-              description="Manage your loyalty program directly from Telegram. Easy and convenient."
+              title={t('telegramBot')}
+              description={t('telegramBotDesc')}
             />
             <BenefitCard
               icon="🚀"
-              title="Fast Setup"
-              description="Get started in 15 minutes. No complex integrations needed."
+              title={t('fastSetup')}
+              description={t('fastSetupDesc')}
             />
           </div>
         </div>
@@ -258,7 +442,7 @@ const OnePagerPartner = () => {
       <div className="bg-gradient-to-r from-sakura-mid/10 to-sakura-dark/10 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-center text-sakura-dark mb-12">
-            💎 Pricing Details
+            {t('pricingDetails')}
           </h2>
           
           <div className="bg-white rounded-2xl p-8 shadow-2xl">
@@ -266,22 +450,22 @@ const OnePagerPartner = () => {
               <div className="border-r border-gray-200 pr-8">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-2xl">🎁</span>
-                  <h3 className="text-2xl font-bold text-sakura-dark">Early Bird</h3>
-                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">LIMITED</span>
+                  <h3 className="text-2xl font-bold text-sakura-dark">{t('earlyBirdPlan')}</h3>
+                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">{t('limited')}</span>
                 </div>
                 <div className="text-5xl font-bold text-sakura-dark mb-2">$29</div>
-                <div className="text-lg text-gray-600 mb-6">per year</div>
+                <div className="text-lg text-gray-600 mb-6">{t('perYear')}</div>
                 <ul className="space-y-3">
-                  <ConditionItem text="Exclusive territory rights" />
-                  <ConditionItem text="Full platform access" />
-                  <ConditionItem text="Revenue share program" />
-                  <ConditionItem text="Analytics dashboard" />
-                  <ConditionItem text="Telegram bot integration" />
-                  <ConditionItem text="24/7 support" />
+                  <ConditionItem text={t('exclusiveRights')} />
+                  <ConditionItem text={t('fullAccess')} />
+                  <ConditionItem text={t('revenueShareFeature')} />
+                  <ConditionItem text={t('analyticsFeature')} />
+                  <ConditionItem text={t('telegramFeature')} />
+                  <ConditionItem text={t('support24')} />
                 </ul>
                 <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                   <div className="text-sm font-bold text-yellow-800">
-                    ⏰ Only for first 20 partners in New York
+                    {t('onlyFirst20')}
                   </div>
                 </div>
               </div>
@@ -289,21 +473,21 @@ const OnePagerPartner = () => {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-2xl">💎</span>
-                  <h3 className="text-2xl font-bold text-sakura-dark">Premium</h3>
+                  <h3 className="text-2xl font-bold text-sakura-dark">{t('premiumPlan')}</h3>
                 </div>
                 <div className="text-5xl font-bold text-sakura-dark mb-2">$99</div>
-                <div className="text-lg text-gray-600 mb-6">per year</div>
+                <div className="text-lg text-gray-600 mb-6">{t('perYear')}</div>
                 <ul className="space-y-3">
-                  <ConditionItem text="Exclusive territory rights" />
-                  <ConditionItem text="Full platform access" />
-                  <ConditionItem text="Revenue share program" />
-                  <ConditionItem text="Analytics dashboard" />
-                  <ConditionItem text="Telegram bot integration" />
-                  <ConditionItem text="24/7 support" />
+                  <ConditionItem text={t('exclusiveRights')} />
+                  <ConditionItem text={t('fullAccess')} />
+                  <ConditionItem text={t('revenueShareFeature')} />
+                  <ConditionItem text={t('analyticsFeature')} />
+                  <ConditionItem text={t('telegramFeature')} />
+                  <ConditionItem text={t('support24')} />
                 </ul>
                 <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="text-sm text-gray-600">
-                    Standard pricing after Early Bird slots are filled
+                    {t('standardPricing')}
                   </div>
                 </div>
               </div>
@@ -312,10 +496,10 @@ const OnePagerPartner = () => {
             <div className="mt-8 pt-8 border-t border-gray-200">
               <div className="text-center">
                 <div className="text-lg font-bold text-sakura-dark mb-2">
-                  ✅ All features included in both plans
+                  {t('allFeatures')}
                 </div>
                 <div className="text-gray-600">
-                  The only difference is the price. Early Bird saves you $70 per year!
+                  {t('onlyPriceDiff')}
                 </div>
               </div>
             </div>
@@ -327,21 +511,21 @@ const OnePagerPartner = () => {
       <div className="bg-gradient-to-r from-sakura-mid to-sakura-dark py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-5xl font-bold text-white mb-6">
-            Ready to Claim Your Exclusive Territory?
+            {t('finalTitle')}
           </h2>
           <p className="text-2xl text-white/90 mb-8">
-            Join the first 20 partners and save $70 per year
+            {t('finalDesc')}
             <br />
-            <span className="text-xl">Become the exclusive partner in your district</span>
+            <span className="text-xl">{t('finalDesc2')}</span>
           </p>
           
           {remainingSlots !== null && remainingSlots > 0 && (
             <div className="bg-white/20 backdrop-blur-sm rounded-xl p-6 mb-8 inline-block">
               <div className="text-3xl font-bold text-white mb-2">
-                ⏰ {remainingSlots} Early Bird slots left!
+                {t('slotsLeft', { count: remainingSlots })}
               </div>
               <div className="text-lg text-white/90">
-                Don't miss your chance to save $70/year
+                {t('dontMiss')}
               </div>
             </div>
           )}
@@ -350,11 +534,11 @@ const OnePagerPartner = () => {
             href="/partner/apply" 
             className="inline-block px-12 py-6 bg-white text-sakura-dark rounded-xl font-bold text-2xl hover:shadow-2xl transition-all transform hover:scale-105"
           >
-            🚀 Apply Now - Claim Your Spot
+            {t('applyNow')}
           </a>
           
           <div className="mt-8 text-white/80 text-lg">
-            ✅ No hidden fees • ✅ Cancel anytime • ✅ Full refund if not approved
+            {t('noHiddenFees')}
           </div>
         </div>
       </div>
