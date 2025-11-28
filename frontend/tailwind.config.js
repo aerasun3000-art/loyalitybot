@@ -59,6 +59,8 @@ export default {
         'sakura-mid': '#4B2138',
         'sakura-deep': '#1B0C1A',
         'sakura-dark': '#2D222F',
+        'sakura-light': '#FEF5F3',
+        'sakura-cream': '#FFF8F5',
       },
     },
   },

@@ -122,7 +122,19 @@ export const PARTNER_CITIES = [
   {
     name: 'New York',
     label: 'New York',
-    districts: ['All']
+    districts: [
+      'All',
+      'Manhattan Downtown',
+      'Manhattan Midtown',
+      'Manhattan Upper East',
+      'Manhattan Upper West',
+      'Brooklyn Downtown',
+      'Brooklyn North',
+      'Brooklyn South + S.I.',
+      'Queens West + Bronx South',
+      'Queens East',
+      'Brooklyn Central'
+    ]
   },
   {
     name: 'Los Angeles',
