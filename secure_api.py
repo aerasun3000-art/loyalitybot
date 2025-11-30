@@ -496,6 +496,99 @@ def send_qr_to_partner_via_telegram(
         return {"success": False, "error": error_msg}
 
 
+@app.get(
+    "/api/district-availability",
+    tags=["clients"],
+    summary="Получить карту доступности районов",
+    description="Возвращает карту доступности всех позиций (район × сфера услуг) для указанного города",
+    response_description="Карта доступности позиций"
+)
+@limiter.limit("30/minute")
+def get_district_availability(request: Request, city: str = "New York"):
+    """
+    Получает карту доступности всех позиций для указанного города.
+    
+    Параметры:
+    - **city**: Город (по умолчанию "New York")
+    
+    Возвращает словарь, где:
+    - Ключ: название района
+    - Значение: словарь с ключом business_type и значением статуса ('available', 'taken', 'pending')
+    
+    Пример ответа:
+    ```json
+    {
+        "Manhattan Downtown": {
+            "nail_care": "taken",
+            "hair_salon": "available",
+            "massage": "pending"
+        },
+        "Brooklyn Downtown": {
+            ...
+        }
+    }
+    ```
+    """
+    try:
+        # Определяем все районы и услуги
+        districts = [
+            'Manhattan Downtown',
+            'Manhattan Midtown',
+            'Manhattan Upper East',
+            'Manhattan Upper West',
+            'Brooklyn Downtown',
+            'Brooklyn North',
+            'Brooklyn South + S.I.',
+            'Queens West + Bronx South',
+            'Queens East',
+            'Brooklyn Central'
+        ]
+        
+        services = [
+            'nail_care',
+            'brow_design',
+            'hair_salon',
+            'hair_removal',
+            'facial_aesthetics',
+            'lash_services',
+            'massage_therapy',
+            'makeup_pmu',
+            'body_wellness',
+            'nutrition_coaching',
+            'mindfulness_coaching',
+            'image_consulting'
+        ]
+        
+        # Получаем занятые позиции из базы
+        occupied = manager.get_occupied_positions(city)
+        
+        # Формируем карту доступности
+        availability = {}
+        
+        for district in districts:
+            availability[district] = {}
+            for service in services:
+                key = f"{district}_{service}"
+                
+                if key in occupied:
+                    partner_status = occupied[key].get('status', 'Pending')
+                    # Маппинг статусов
+                    if partner_status == 'Approved':
+                        availability[district][service] = 'taken'
+                    elif partner_status in ['Pending', 'Rejected']:
+                        availability[district][service] = 'pending'
+                    else:
+                        availability[district][service] = 'available'
+                else:
+                    availability[district][service] = 'available'
+        
+        return availability
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения карты доступности для {city}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка получения данных: {str(e)}")
+
+
 @app.post(
     "/send-qr-to-partner",
     tags=["transactions"],

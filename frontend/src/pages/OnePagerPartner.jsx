@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useLanguageStore from '../store/languageStore';
 import { hapticFeedback } from '../utils/telegram';
+import { supabase } from '../services/supabase';
 
 // Переводы
 const translations = {
@@ -96,6 +98,17 @@ const translations = {
     retentionIncrease: 'Return rate with program',
     basedOnResearch: 'Based on research: loyalty programs increase customer return by 20-40%',
     additionalProfitHint: 'This is additional profit every month!',
+    availabilityMap: '🗺️ Availability Map',
+    availabilityMapDesc: 'See which positions are available in real-time',
+    available: 'Available',
+    taken: 'Taken',
+    pending: 'Pending',
+    clickToApply: 'Click to apply',
+    positionAvailable: 'Position Available',
+    positionTaken: 'Position Taken',
+    positionPending: 'Under Review',
+    showAvailability: 'Show Availability Map',
+    hideAvailability: 'Hide Availability Map',
   },
   ru: {
     badge: '🎁 ОГРАНИЧЕННОЕ ВРЕМЯ: Раннее предложение для Нью-Йорка',
@@ -189,6 +202,17 @@ const translations = {
     retentionIncrease: 'Процент возврата с программой',
     basedOnResearch: 'По данным исследований: программы лояльности увеличивают возврат клиентов на 20-40%',
     additionalProfitHint: 'Это дополнительная прибыль каждый месяц!',
+    availabilityMap: '🗺️ Карта Доступности',
+    availabilityMapDesc: 'Увидьте, какие позиции доступны в реальном времени',
+    available: 'Свободно',
+    taken: 'Занято',
+    pending: 'На рассмотрении',
+    clickToApply: 'Нажмите, чтобы подать заявку',
+    positionAvailable: 'Позиция Свободна',
+    positionTaken: 'Позиция Занята',
+    positionPending: 'На Рассмотрении',
+    showAvailability: 'Показать Карту Доступности',
+    hideAvailability: 'Скрыть Карту Доступности',
   }
 };
 
@@ -398,6 +422,25 @@ const OnePagerPartner = () => {
         </div>
       </div>
 
+      {/* Карта доступности - простая визуализация */}
+      <div className="bg-white py-16" id="availability">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SimpleAvailabilityHeatmap t={t} language={language} />
+        </div>
+      </div>
+
+      {/* Ссылка на полную карту */}
+      <div className="bg-gradient-to-r from-sakura-mid/10 to-sakura-dark/10 py-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <a
+            href="/availability-map"
+            className="inline-block px-8 py-4 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105"
+          >
+            🗺️ {language === 'ru' ? 'Открыть Полную Карту Доступности' : 'Open Full Availability Map'}
+          </a>
+        </div>
+      </div>
+
       {/* Как это работает */}
       <div className="bg-gradient-to-br from-sakura-light to-white py-16" id="how-it-works">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -583,6 +626,261 @@ const OnePagerPartner = () => {
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Компонент простой визуализации доступности
+const SimpleAvailabilityHeatmap = ({ t, language }) => {
+  const navigate = useNavigate();
+  const [availability, setAvailability] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [showMap, setShowMap] = useState(false);
+
+  const DISTRICTS = [
+    'Manhattan Downtown',
+    'Manhattan Midtown',
+    'Manhattan Upper East',
+    'Manhattan Upper West',
+    'Brooklyn Downtown',
+    'Brooklyn North',
+    'Brooklyn South + S.I.',
+    'Queens West + Bronx South',
+    'Queens East',
+    'Brooklyn Central'
+  ];
+
+  const SERVICES = [
+    { id: 'nail_care', emoji: '💅', name: 'Nail Care' },
+    { id: 'brow_design', emoji: '👁️', name: 'Brow Design' },
+    { id: 'hair_salon', emoji: '💇‍♀️', name: 'Hair Salon' },
+    { id: 'hair_removal', emoji: '⚡', name: 'Hair Removal' },
+    { id: 'facial_aesthetics', emoji: '✨', name: 'Facial Aesthetics' },
+    { id: 'lash_services', emoji: '👀', name: 'Lash Services' },
+    { id: 'massage_therapy', emoji: '💆‍♀️', name: 'Massage Therapy' },
+    { id: 'makeup_pmu', emoji: '💄', name: 'Make-up & PMU' },
+    { id: 'body_wellness', emoji: '🌸', name: 'Body Wellness' },
+    { id: 'nutrition_coaching', emoji: '🍎', name: 'Nutrition Coaching' },
+    { id: 'mindfulness_coaching', emoji: '🧠', name: 'Mindfulness & Coaching' },
+    { id: 'image_consulting', emoji: '👗', name: 'Image Consulting' }
+  ];
+
+  useEffect(() => {
+    if (showMap) {
+      fetchAvailability();
+    }
+  }, [showMap]);
+
+  const fetchAvailability = async () => {
+    try {
+      setLoading(true);
+      
+      // Запрос к Supabase напрямую через REST API
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/partners?select=district,business_type,status&city=eq.New York&district=not.is.null&business_type=not.is.null`,
+        {
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch availability');
+      }
+
+      const partners = await response.json();
+      
+      // Формируем карту доступности
+      const availMap = {};
+      DISTRICTS.forEach(district => {
+        availMap[district] = {};
+        SERVICES.forEach(service => {
+          const partner = partners.find(
+            p => p.district === district && p.business_type === service.id
+          );
+          
+          if (partner) {
+            if (partner.status === 'Approved') {
+              availMap[district][service.id] = 'taken';
+            } else {
+              availMap[district][service.id] = 'pending';
+            }
+          } else {
+            availMap[district][service.id] = 'available';
+          }
+        });
+      });
+
+      setAvailability(availMap);
+    } catch (error) {
+      console.error('Error fetching availability:', error);
+      // В случае ошибки показываем все как available
+      const availMap = {};
+      DISTRICTS.forEach(district => {
+        availMap[district] = {};
+        SERVICES.forEach(service => {
+          availMap[district][service.id] = 'available';
+        });
+      });
+      setAvailability(availMap);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'taken':
+        return 'bg-red-100 border-red-400';
+      case 'pending':
+        return 'bg-yellow-100 border-yellow-400';
+      case 'available':
+        return 'bg-green-100 border-green-400';
+      default:
+        return 'bg-gray-100 border-gray-400';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'taken':
+        return '✗';
+      case 'pending':
+        return '⏳';
+      case 'available':
+        return '✓';
+      default:
+        return '';
+    }
+  };
+
+  const handleCellClick = (district, service) => {
+    const status = availability[district]?.[service.id];
+    if (status === 'available') {
+      window.location.href = `/partner/apply?district=${encodeURIComponent(district)}&service=${encodeURIComponent(service.id)}`;
+    }
+  };
+
+  return (
+    <div className="text-center">
+      <h2 className="text-4xl md:text-5xl font-bold text-sakura-dark mb-4">
+        {t('availabilityMap')}
+      </h2>
+      <p className="text-lg text-gray-600 mb-6">
+        {t('availabilityMapDesc')}
+      </p>
+
+      {!showMap ? (
+        <button
+          onClick={() => setShowMap(true)}
+          className="px-8 py-4 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105"
+        >
+          {t('showAvailability')}
+        </button>
+      ) : (
+        <>
+          <button
+            onClick={() => setShowMap(false)}
+            className="mb-6 px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+          >
+            {t('hideAvailability')}
+          </button>
+
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-sakura-dark"></div>
+              <p className="mt-4 text-gray-600">{language === 'ru' ? 'Загрузка...' : 'Loading...'}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto mt-6">
+              <div className="inline-block min-w-full">
+                {/* Таблица доступности */}
+                <div className="inline-block border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="min-w-full">
+                    <thead>
+                      <tr>
+                        <th className="bg-gray-50 p-3 text-left font-bold text-sm text-sakura-dark border-b">Район</th>
+                        {SERVICES.map(service => (
+                          <th
+                            key={service.id}
+                            className="bg-gray-50 p-2 text-center font-medium text-xs text-sakura-dark border-b"
+                            title={service.name}
+                          >
+                            <div className="text-xl mb-1">{service.emoji}</div>
+                            <div className="hidden md:block text-xs">{service.name.split(' ')[0]}</div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DISTRICTS.map(district => (
+                        <tr key={district} className="hover:bg-gray-50">
+                          <td className="p-3 font-bold text-sm text-sakura-dark border-b">
+                            <div className="truncate max-w-[150px]">{district}</div>
+                          </td>
+                          {SERVICES.map(service => {
+                            const status = availability[district]?.[service.id] || 'available';
+                            const isClickable = status === 'available';
+                            
+                            return (
+                              <td
+                                key={service.id}
+                                className={`
+                                  p-2 border-b
+                                  ${getStatusColor(status)}
+                                  ${isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}
+                                `}
+                                onClick={() => isClickable && handleCellClick(district, service)}
+                                title={`${district} - ${service.name}: ${status}`}
+                              >
+                                <div className="h-10 w-10 rounded-lg flex items-center justify-center mx-auto">
+                                  <span className="text-xl">{getStatusIcon(status)}</span>
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Легенда */}
+          <div className="mt-8 flex flex-wrap gap-6 justify-center text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-green-100 border-2 border-green-400 rounded"></div>
+              <span>{t('available')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-yellow-100 border-2 border-yellow-400 rounded"></div>
+              <span>{t('pending')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-red-100 border-2 border-red-400 rounded"></div>
+              <span>{t('taken')}</span>
+            </div>
+          </div>
+
+          <p className="mt-4 text-gray-500 text-sm">
+            {t('clickToApply')}
+          </p>
+
+          {/* Ссылка на полную карту */}
+          <div className="mt-6">
+            <button
+              onClick={() => navigate('/availability-map')}
+              className="inline-block px-6 py-3 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-lg font-bold hover:shadow-lg transition-all transform hover:scale-105"
+            >
+              🗺️ {language === 'ru' ? 'Открыть Полную Карту' : 'Open Full Map'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -1105,7 +1105,11 @@ class SupabaseManager:
         #     return cached
 
         now = datetime.datetime.now(datetime.timezone.utc)
-        period_start = now - datetime.timedelta(days=period_days)
+        # Если period_days <= 0, считаем, что нужен "весь период" — берём очень раннюю дату
+        if period_days and period_days > 0:
+            period_start = now - datetime.timedelta(days=period_days)
+        else:
+            period_start = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
         
         stats = {
             # Базовые метрики
@@ -1832,6 +1836,61 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error fetching distinct districts for {city}: {e}")
             return []
+
+    def get_occupied_positions(self, city: str = 'New York') -> dict:
+        """Возвращает словарь занятых позиций по районам и сферам услуг.
+        
+        Returns:
+            dict: {
+                'district_business_type': {
+                    'district': str,
+                    'business_type': str,
+                    'status': str,  # 'Approved', 'Pending', etc.
+                    'chat_id': str,
+                    'name': str
+                }
+            }
+        """
+        if not self.client:
+            return {}
+        
+        try:
+            # Получаем всех партнеров для указанного города
+            # Фильтруем только тех, у кого есть district и business_type
+            query = self.client.from_('partners').select(
+                'district, business_type, status, chat_id, name'
+            ).eq('city', city)
+            
+            # Исключаем пустые значения
+            resp = query.execute()
+            
+            occupied = {}
+            
+            for partner in resp.data or []:
+                district = partner.get('district')
+                business_type = partner.get('business_type')
+                
+                # Проверяем, что оба поля заполнены и не равны 'All'
+                if (district and 
+                    business_type and 
+                    district != 'All' and 
+                    district.strip() != '' and 
+                    business_type.strip() != ''):
+                    
+                    key = f"{district}_{business_type}"
+                    occupied[key] = {
+                        'district': district,
+                        'business_type': business_type,
+                        'status': partner.get('status', 'Pending'),
+                        'chat_id': partner.get('chat_id'),
+                        'name': partner.get('name', '')
+                    }
+            
+            return occupied
+            
+        except Exception as e:
+            logging.error(f"Error fetching occupied positions for {city}: {e}")
+            return {}
 
     def add_promotion(self, promo_data: dict) -> bool:
         """Добавляет новую акцию с валидацией и нормализацией полей.

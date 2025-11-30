@@ -22,6 +22,7 @@ import AdminAnalytics from './pages/AdminAnalytics'
 import OnePagerPartner from './pages/OnePagerPartner'
 import OnePagerClient from './pages/OnePagerClient'
 import OnePagerInvestor from './pages/OnePagerInvestor'
+import AvailabilityMap from './pages/AvailabilityMap'
 import TestPage from './pages/TestPage'
 import Activity from './pages/Activity'
 import Community from './pages/Community'
@@ -40,6 +41,7 @@ const PUBLIC_ROUTES = [
   '/partner/analytics',
   '/admin/analytics',
   '/partner/apply',
+  '/availability-map',
   '/privacy',
   '/terms',
   '/test'
@@ -102,6 +104,7 @@ function AppContent() {
           <Route path="/onepager/partner" element={<OnePagerPartner />} />
           <Route path="/onepager/client" element={<OnePagerClient />} />
           <Route path="/onepager/investor" element={<OnePagerInvestor />} />
+          <Route path="/availability-map" element={<AvailabilityMap />} />
           <Route path="/test" element={<TestPage />} />
           <Route path="/palette" element={<PalettePreview />} />
           <Route path="*" element={<Navigate to="/" replace />} />
