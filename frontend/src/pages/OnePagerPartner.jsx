@@ -79,6 +79,23 @@ const translations = {
     dontMiss: 'Don\'t miss your chance to save $70/month',
     applyNow: '🚀 Apply Now - Claim Your Spot',
     noHiddenFees: '✅ No hidden fees • ✅ Cancel anytime • ✅ Full refund if not approved',
+    roiCalculator: '💰 ROI Calculator',
+    roiCalculatorDesc: 'Calculate how much you can earn with our loyalty program',
+    monthlyClients: 'Monthly clients',
+    averageCheck: 'Average check',
+    currentRetention: 'Current return rate',
+    percent: '%',
+    yourResults: 'Your Results',
+    additionalClients: 'Additional clients per month',
+    additionalRevenue: 'Additional revenue per month',
+    programCost: 'Program cost',
+    monthlyCost: 'per month',
+    netProfit: 'Net profit per month',
+    roi: 'ROI',
+    calculate: 'Calculate',
+    retentionIncrease: 'Return rate with program',
+    basedOnResearch: 'Based on research: loyalty programs increase customer return by 20-40%',
+    additionalProfitHint: 'This is additional profit every month!',
   },
   ru: {
     badge: '🎁 ОГРАНИЧЕННОЕ ВРЕМЯ: Раннее предложение для Нью-Йорка',
@@ -155,6 +172,23 @@ const translations = {
     dontMiss: 'Не упустите возможность сэкономить $70/месяц',
     applyNow: '🚀 Подать Заявку - Забронировать Место',
     noHiddenFees: '✅ Без скрытых платежей • ✅ Отмена в любое время • ✅ Полный возврат при отклонении',
+    roiCalculator: '💰 Калькулятор Выгоды',
+    roiCalculatorDesc: 'Рассчитайте, сколько вы можете заработать с нашей программой лояльности',
+    monthlyClients: 'Клиентов в месяц',
+    averageCheck: 'Средний чек',
+    currentRetention: 'Текущий % возврата клиентов',
+    percent: '%',
+    yourResults: 'Ваша Выгода',
+    additionalClients: 'Дополнительных клиентов в месяц',
+    additionalRevenue: 'Дополнительная выручка в месяц',
+    programCost: 'Стоимость программы',
+    monthlyCost: 'в месяц',
+    netProfit: 'Чистая прибыль в месяц',
+    roi: 'ROI',
+    calculate: 'Рассчитать',
+    retentionIncrease: 'Процент возврата с программой',
+    basedOnResearch: 'По данным исследований: программы лояльности увеличивают возврат клиентов на 20-40%',
+    additionalProfitHint: 'Это дополнительная прибыль каждый месяц!',
   }
 };
 
@@ -438,6 +472,13 @@ const OnePagerPartner = () => {
         </div>
       </div>
 
+      {/* ROI Калькулятор */}
+      <div className="bg-gradient-to-br from-sakura-light to-white py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ROICalculator t={t} language={language} />
+        </div>
+      </div>
+
       {/* Цены детально */}
       <div className="bg-gradient-to-r from-sakura-mid/10 to-sakura-dark/10 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -540,6 +581,209 @@ const OnePagerPartner = () => {
           <div className="mt-8 text-white/80 text-lg">
             {t('noHiddenFees')}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Компонент ROI Калькулятора
+const ROICalculator = ({ t, language }) => {
+  const [monthlyClients, setMonthlyClients] = useState(50);
+  const [averageCheck, setAverageCheck] = useState(100);
+  const [currentRetention, setCurrentRetention] = useState(30);
+
+  const calculateROI = () => {
+    // Программа лояльности увеличивает возврат клиентов на 20-40%
+    // Используем консервативную оценку в 25%
+    const retentionIncrease = 25;
+    const newRetention = Math.min(currentRetention + retentionIncrease, 100);
+    
+    // Текущие повторные клиенты
+    const currentRepeatClients = monthlyClients * (currentRetention / 100);
+    
+    // Новые повторные клиенты с программой
+    const newRepeatClients = monthlyClients * (newRetention / 100);
+    
+    // Дополнительные повторные клиенты
+    const additionalRepeatClients = newRepeatClients - currentRepeatClients;
+    
+    // Дополнительная выручка (дополнительные клиенты × средний чек)
+    const additionalRevenue = additionalRepeatClients * averageCheck;
+    
+    // Стоимость программы (Early Bird)
+    const monthlyCost = 29;
+    
+    // Чистая прибыль
+    const netProfit = additionalRevenue - monthlyCost;
+    
+    // ROI в процентах
+    const roi = monthlyCost > 0 ? ((netProfit / monthlyCost) * 100) : 0;
+    
+    return {
+      newRetention: Math.round(newRetention),
+      currentRepeatClients: Math.round(currentRepeatClients),
+      newRepeatClients: Math.round(newRepeatClients),
+      additionalClients: Math.round(additionalRepeatClients),
+      additionalRevenue: Math.round(additionalRevenue),
+      monthlyCost,
+      netProfit: Math.round(netProfit),
+      roi: Math.round(roi)
+    };
+  };
+
+  const roi = calculateROI();
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-8 shadow-2xl border-2 border-sakura-mid/20">
+      <div className="text-center mb-8">
+        <h2 className="text-4xl md:text-5xl font-bold text-sakura-dark mb-4">
+          {t('roiCalculator')}
+        </h2>
+        <p className="text-lg text-gray-600">
+          {t('roiCalculatorDesc')}
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-8">
+        {/* Левая часть - Ввод данных */}
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-bold text-sakura-dark mb-2">
+              {t('monthlyClients')}
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min="1"
+                max="10000"
+                value={monthlyClients}
+                onChange={(e) => setMonthlyClients(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full border-2 border-sakura-mid/30 rounded-xl px-4 py-3 text-lg focus:border-sakura-mid focus:outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-sakura-dark mb-2">
+              {t('averageCheck')} ($)
+            </label>
+            <div className="relative">
+              <span className="absolute left-4 top-3 text-gray-500">$</span>
+              <input
+                type="number"
+                min="1"
+                max="10000"
+                value={averageCheck}
+                onChange={(e) => setAverageCheck(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full border-2 border-sakura-mid/30 rounded-xl px-4 py-3 pl-8 text-lg focus:border-sakura-mid focus:outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-sakura-dark mb-2">
+              {t('currentRetention')} ({t('percent')})
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={currentRetention}
+                onChange={(e) => setCurrentRetention(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                className="w-full border-2 border-sakura-mid/30 rounded-xl px-4 py-3 text-lg focus:border-sakura-mid focus:outline-none transition-colors"
+              />
+              <span className="absolute right-4 top-3 text-gray-500">%</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {t('basedOnResearch')}
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-gray-200">
+            <div className="text-sm text-gray-600 mb-2">
+              <strong>{t('retentionIncrease')}:</strong> {roi.newRetention}%
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-sakura-mid to-sakura-dark h-full transition-all duration-300"
+                style={{ width: `${roi.newRetention}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Правая часть - Результаты */}
+        <div className="bg-gradient-to-br from-sakura-light to-sakura-cream rounded-xl p-6 space-y-4">
+          <h3 className="text-2xl font-bold text-sakura-dark mb-4">
+            {t('yourResults')}
+          </h3>
+
+          <div className="space-y-3">
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-sm text-gray-600 mb-1">
+                {t('additionalClients')}
+              </div>
+              <div className="text-2xl font-bold text-sakura-dark">
+                +{roi.additionalClients}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-sm text-gray-600 mb-1">
+                {t('additionalRevenue')}
+              </div>
+              <div className="text-2xl font-bold text-green-600">
+                +{formatCurrency(roi.additionalRevenue)}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-sm text-gray-600 mb-1">
+                {t('programCost')} ({t('monthlyCost')})
+              </div>
+              <div className="text-2xl font-bold text-sakura-dark">
+                {formatCurrency(roi.monthlyCost)}
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-300">
+              <div className="text-sm text-green-700 mb-1 font-bold">
+                {t('netProfit')}
+              </div>
+              <div className="text-3xl font-bold text-green-600">
+                {formatCurrency(roi.netProfit)}
+              </div>
+              <div className="text-sm text-green-600 mt-2">
+                {t('roi')}: {roi.roi > 0 ? '+' : ''}{roi.roi}%
+              </div>
+            </div>
+          </div>
+
+          {roi.netProfit > 0 && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                💡 {t('additionalProfitHint')}
+              </p>
+            </div>
+          )}
+
+          <a 
+            href="/partner/apply" 
+            className="block w-full mt-6 px-6 py-4 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold text-center hover:shadow-xl transition-all transform hover:scale-105"
+          >
+            {t('applyNow')}
+          </a>
         </div>
       </div>
     </div>
