@@ -686,3 +686,172 @@ function testSupabaseConnection() {
     return false;
   }
 }
+
+// ============================================
+// INSTAGRAM OUTREACH SYNC
+// ============================================
+
+/**
+ * Синхронизирует контакты из таблицы instagram_outreach в отдельный лист
+ */
+function syncInstagramOutreach() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetName = 'Instagram Outreach';
+  let sheet = ss.getSheetByName(sheetName);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    
+    // Создаем заголовки
+    const headers = [
+      'ID',
+      'Instagram Handle',
+      'Имя',
+      'Район',
+      'Тип бизнеса',
+      'Город',
+      'Статус',
+      'Приоритет',
+      'Сообщений отправлено',
+      'Дата первого контакта',
+      'Дата последнего follow-up',
+      'Дата ответа',
+      'Время ответа (часы)',
+      'Источник',
+      'Заметки',
+      'Создано',
+      'Обновлено'
+    ];
+    
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    
+    // Форматирование заголовков
+    const headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#4285f4');
+    headerRange.setFontColor('#ffffff');
+    
+    // Замораживаем первую строку
+    sheet.setFrozenRows(1);
+  }
+  
+  try {
+    logInfo('Начало синхронизации Instagram Outreach...');
+    
+    // Получаем контакты из Supabase
+    const contacts = fetchInstagramOutreachFromSupabase();
+    
+    if (!contacts || contacts.length === 0) {
+      logInfo('Нет контактов для синхронизации');
+      return;
+    }
+    
+    logInfo(`Получено ${contacts.length} контактов из instagram_outreach`);
+    
+    // Получаем существующие данные
+    const existingData = getExistingOutreachDataFromSheet(sheet);
+    
+    let addedCount = 0;
+    let updatedCount = 0;
+    
+    // Обновляем или добавляем контакты
+    contacts.forEach(contact => {
+      const result = syncOutreachContactToSheet(sheet, contact, existingData);
+      if (result === 'ADDED') {
+        addedCount++;
+      } else if (result === 'UPDATED') {
+        updatedCount++;
+      }
+    });
+    
+    logInfo(`Синхронизация завершена. Добавлено: ${addedCount}, Обновлено: ${updatedCount}`);
+    
+  } catch (e) {
+    logError('Ошибка синхронизации Instagram Outreach: ' + e.toString());
+    if (CONFIG.NOTIFICATIONS.ON_ERROR) {
+      sendNotification(`❌ Ошибка синхронизации Instagram Outreach: ${e.toString()}`);
+    }
+  }
+}
+
+/**
+ * Получает контакты из таблицы instagram_outreach
+ */
+function fetchInstagramOutreachFromSupabase() {
+  const url = `${CONFIG.SUPABASE.URL}/rest/v1/instagram_outreach?select=*&order=created_at.desc`;
+  
+  const response = UrlFetchApp.fetch(url, {
+    headers: {
+      'apikey': CONFIG.SUPABASE.ANON_KEY,
+      'Authorization': `Bearer ${CONFIG.SUPABASE.ANON_KEY}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  if (response.getResponseCode() !== 200) {
+    throw new Error(`HTTP ${response.getResponseCode()}: ${response.getContentText()}`);
+  }
+  
+  return JSON.parse(response.getContentText());
+}
+
+/**
+ * Получает существующие данные из листа Instagram Outreach
+ */
+function getExistingOutreachDataFromSheet(sheet) {
+  const data = sheet.getDataRange().getValues();
+  const existing = {
+    ids: new Set(),
+    rowMap: new Map()
+  };
+  
+  // Пропускаем заголовок
+  for (let i = 1; i < data.length; i++) {
+    const id = data[i][0]; // ID в колонке A
+    if (id) {
+      existing.ids.add(id);
+      existing.rowMap.set(id, i + 1);
+    }
+  }
+  
+  return existing;
+}
+
+/**
+ * Синхронизирует контакт outreach в Google Sheets
+ */
+function syncOutreachContactToSheet(sheet, contact, existingData) {
+  const contactId = contact.id;
+  const rowIndex = existingData.rowMap.get(contactId);
+  
+  const rowData = [
+    contactId,                                    // A - ID
+    contact.instagram_handle || '',              // B - Instagram Handle
+    contact.name || '',                          // C - Имя
+    contact.district || '',                      // D - Район
+    contact.business_type || '',                 // E - Тип бизнеса
+    contact.city || 'New York',                  // F - Город
+    contact.outreach_status || 'NOT_CONTACTED',  // G - Статус
+    contact.priority || 'MEDIUM',                // H - Приоритет
+    contact.messages_sent || 0,                  // I - Сообщений отправлено
+    contact.first_contact_date || '',            // J - Дата первого контакта
+    contact.last_follow_up_date || '',           // K - Дата последнего follow-up
+    contact.reply_date || '',                    // L - Дата ответа
+    contact.response_time_hours || '',           // M - Время ответа (часы)
+    contact.source || '',                        // N - Источник
+    contact.notes || '',                         // O - Заметки
+    contact.created_at || new Date(),            // P - Создано
+    contact.updated_at || new Date()             // Q - Обновлено
+  ];
+  
+  if (rowIndex > 0) {
+    // Обновляем существующую строку
+    const range = sheet.getRange(rowIndex, 1, 1, rowData.length);
+    range.setValues([rowData]);
+    return 'UPDATED';
+  } else {
+    // Добавляем новую строку
+    sheet.appendRow(rowData);
+    return 'ADDED';
+  }
+}

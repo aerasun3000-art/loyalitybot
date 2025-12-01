@@ -14,7 +14,8 @@ import sentry_sdk
 # Предполагается, что SupabaseManager находится в отдельном файле (например, supabase_manager.py)
 from supabase_manager import SupabaseManager
 from dashboard_urls import get_admin_dashboard_url, get_onepager_url
-from partner_revenue_share import PartnerRevenueShare 
+from partner_revenue_share import PartnerRevenueShare
+from instagram_outreach_manager import InstagramOutreachManager 
 
 load_dotenv()
 
@@ -133,6 +134,7 @@ async def handle_start_admin(message: types.Message):
         [InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc")],
         [InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters")],
         [InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard")],
+        [InlineKeyboardButton(text="📱 Instagram Outreach", callback_data="admin_outreach")],
         [InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background")],
         [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
         [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
@@ -2200,6 +2202,7 @@ async def back_to_main_menu(callback_query: types.CallbackQuery):
         [InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc")],
         [InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters")],
         [InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard")],
+        [InlineKeyboardButton(text="📱 Instagram Outreach", callback_data="admin_outreach")],
         [InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background")],
         [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
         [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
@@ -2212,6 +2215,415 @@ async def back_to_main_menu(callback_query: types.CallbackQuery):
     )
     await callback_query.answer()
 
+
+# --- Instagram Outreach Handlers ---
+
+# Инициализация Instagram Outreach Manager
+try:
+    outreach_manager = InstagramOutreachManager(
+        db_manager,
+        default_link=get_onepager_url('partner') if hasattr(get_onepager_url, '__call__') else None
+    )
+    logger.info("InstagramOutreachManager успешно инициализирован")
+except Exception as e:
+    logger.warning(f"Ошибка инициализации InstagramOutreachManager: {e}")
+    outreach_manager = None
+
+# FSM States для outreach
+class OutreachAdd(StatesGroup):
+    waiting_for_instagram = State()
+    waiting_for_name = State()
+    waiting_for_district = State()
+    waiting_for_business_type = State()
+
+class OutreachUpdate(StatesGroup):
+    waiting_for_instagram = State()
+    waiting_for_status = State()
+
+@dp.callback_query(F.data == "admin_outreach")
+async def show_outreach_menu(callback_query: types.CallbackQuery):
+    """Главное меню Instagram Outreach"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    if not outreach_manager:
+        await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
+        return
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Добавить контакт", callback_data="outreach_add")],
+        [InlineKeyboardButton(text="📋 Очередь контактов", callback_data="outreach_queue")],
+        [InlineKeyboardButton(text="⏰ Follow-up напоминания", callback_data="outreach_followups")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="outreach_stats")],
+        [InlineKeyboardButton(text="🧪 A/B Тестирование", callback_data="outreach_ab_results")],
+        [InlineKeyboardButton(text="🔍 Найти контакт", callback_data="outreach_search")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    
+    await callback_query.message.edit_text(
+        "📱 **Instagram Outreach**\n\nУправление процессом поиска партнеров через Instagram:",
+        reply_markup=keyboard
+    )
+    await callback_query.answer()
+
+@dp.callback_query(F.data == "outreach_add")
+async def start_add_outreach_contact(callback_query: types.CallbackQuery, state: FSMContext):
+    """Начало процесса добавления нового контакта"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    await state.set_state(OutreachAdd.waiting_for_instagram)
+    await callback_query.message.edit_text(
+        "➕ **Добавить новый контакт в Outreach**\n\n"
+        "Введите Instagram handle (без @):\n"
+        "Например: `nailart_brooklyn`"
+    )
+    await callback_query.answer()
+
+@dp.message(OutreachAdd.waiting_for_instagram)
+async def process_outreach_instagram(message: types.Message, state: FSMContext):
+    """Обработка Instagram handle"""
+    instagram_handle = message.text.strip().lstrip('@')
+    
+    if not instagram_handle:
+        await message.answer("Пожалуйста, введите корректный Instagram handle")
+        return
+    
+    await state.update_data(instagram_handle=instagram_handle)
+    await state.set_state(OutreachAdd.waiting_for_name)
+    await message.answer(
+        f"Instagram handle: `{instagram_handle}`\n\n"
+        "Введите имя партнера (или нажмите /skip для пропуска):"
+    )
+
+@dp.message(Command("skip"), OutreachAdd.waiting_for_name)
+async def skip_outreach_name(message: types.Message, state: FSMContext):
+    """Пропустить ввод имени"""
+    await state.update_data(name=None)
+    await state.set_state(OutreachAdd.waiting_for_district)
+    await message.answer(
+        "Имя пропущено.\n\n"
+        "Введите район (например: Brooklyn, Manhattan, Queens):"
+    )
+
+@dp.message(OutreachAdd.waiting_for_name)
+async def process_outreach_name(message: types.Message, state: FSMContext):
+    """Обработка имени"""
+    await state.update_data(name=message.text.strip())
+    await state.set_state(OutreachAdd.waiting_for_district)
+    await message.answer(
+        f"Имя: {message.text.strip()}\n\n"
+        "Введите район (например: Brooklyn, Manhattan, Queens):"
+    )
+
+@dp.message(OutreachAdd.waiting_for_district)
+async def process_outreach_district(message: types.Message, state: FSMContext):
+    """Обработка района"""
+    await state.update_data(district=message.text.strip())
+    await state.set_state(OutreachAdd.waiting_for_business_type)
+    await message.answer(
+        f"Район: {message.text.strip()}\n\n"
+        "Введите тип бизнеса (например: nail_care, hair_styling, makeup):"
+    )
+
+@dp.message(OutreachAdd.waiting_for_business_type)
+async def process_outreach_business_type(message: types.Message, state: FSMContext):
+    """Обработка типа бизнеса и сохранение контакта"""
+    business_type = message.text.strip()
+    data = await state.get_data()
+    
+    try:
+        contact = outreach_manager.add_to_outreach(
+            instagram_handle=data['instagram_handle'],
+            name=data.get('name'),
+            district=data.get('district'),
+            business_type=business_type,
+            created_by=str(message.from_user.id)
+        )
+        
+        await message.answer(
+            f"✅ **Контакт добавлен!**\n\n"
+            f"📱 Instagram: `{contact['instagram_handle']}`\n"
+            f"👤 Имя: {contact.get('name', 'не указано')}\n"
+            f"📍 Район: {contact.get('district', 'не указано')}\n"
+            f"💼 Тип бизнеса: {contact.get('business_type', 'не указано')}\n"
+            f"📊 Статус: {contact.get('outreach_status', 'NOT_CONTACTED')}\n\n"
+            f"Используйте /outreach_message {contact['instagram_handle']} для генерации сообщения"
+        )
+        
+        await state.clear()
+        
+    except ValueError as e:
+        await message.answer(f"❌ Ошибка: {str(e)}")
+    except Exception as e:
+        logger.exception(f"Error adding outreach contact: {e}")
+        await message.answer(f"❌ Произошла ошибка при добавлении контакта: {str(e)}")
+
+@dp.callback_query(F.data == "outreach_queue")
+async def show_outreach_queue(callback_query: types.CallbackQuery):
+    """Показывает очередь контактов для outreach"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    if not outreach_manager:
+        await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
+        return
+    
+    queue = outreach_manager.get_queue(limit=10)
+    
+    if not queue:
+        await callback_query.message.edit_text(
+            "📋 **Очередь контактов**\n\n"
+            "Очередь пуста. Все контакты обработаны или нет новых контактов для outreach."
+        )
+        await callback_query.answer()
+        return
+    
+    text = "📋 **Очередь контактов для Outreach**\n\n"
+    
+    for i, contact in enumerate(queue[:10], 1):
+        priority_emoji = {
+            'URGENT': '🔴',
+            'HIGH': '🟠',
+            'MEDIUM': '🟡',
+            'LOW': '🟢'
+        }.get(contact.get('priority', 'MEDIUM'), '⚪')
+        
+        text += f"{i}. {priority_emoji} `{contact['instagram_handle']}`"
+        if contact.get('name'):
+            text += f" - {contact['name']}"
+        if contact.get('district'):
+            text += f" ({contact['district']})"
+        text += "\n"
+    
+    text += "\nИспользуйте /outreach_message @handle для генерации сообщения"
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Обновить", callback_data="outreach_queue")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")]
+    ])
+    
+    await callback_query.message.edit_text(text, reply_markup=keyboard)
+    await callback_query.answer()
+
+@dp.message(Command("outreach_message"))
+async def generate_outreach_message(message: types.Message):
+    """Генерирует персональное сообщение для контакта"""
+    if not is_admin(message.from_user.id):
+        await message.answer("У вас нет прав администратора")
+        return
+    
+    if not outreach_manager:
+        await message.answer("Instagram Outreach Manager не инициализирован")
+        return
+    
+    args = message.text.split()[1:] if len(message.text.split()) > 1 else []
+    
+    if not args:
+        await message.answer(
+            "Использование: /outreach_message @instagram_handle [template_name]\n\n"
+            "Доступные шаблоны:\n"
+            "- first_contact_short (по умолчанию)\n"
+            "- first_contact_detailed\n"
+            "- follow_up_1\n"
+            "- follow_up_2"
+        )
+        return
+    
+    instagram_handle = args[0].lstrip('@')
+    template_name = args[1] if len(args) > 1 else 'first_contact_short'
+    
+    try:
+        logger.info(f"Generating message for {instagram_handle} with template {template_name}")
+        preview = outreach_manager.generate_message(instagram_handle, template_name)
+        
+        if not preview:
+            await message.answer(f"❌ Не удалось сгенерировать сообщение для `{instagram_handle}`")
+            return
+        
+        if 'error' in preview:
+            await message.answer(f"❌ {preview['error']}")
+            return
+        
+        text = f"📝 **Сообщение для `{instagram_handle}`**\n\n"
+        text += f"Шаблон: {preview['template_display_name']}\n"
+        text += f"Длина: {preview['character_count']} символов, {preview['word_count']} слов\n\n"
+        text += "```\n"
+        text += preview['message']
+        text += "\n```"
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📋 Копировать сообщение", callback_data=f"outreach_copy_{instagram_handle}")],
+            [InlineKeyboardButton(text="✅ Отметить как отправленное", callback_data=f"outreach_mark_sent_{instagram_handle}")],
+            [InlineKeyboardButton(text="🔄 Другой шаблон", callback_data=f"outreach_other_template_{instagram_handle}")]
+        ])
+        
+        await message.answer(text, reply_markup=keyboard, parse_mode='Markdown')
+        
+    except ValueError as e:
+        error_msg = str(e)
+        logger.warning(f"ValueError generating message: {error_msg}")
+        await message.answer(f"❌ {error_msg}")
+    except Exception as e:
+        error_msg = str(e)
+        logger.exception(f"Error generating message: {error_msg}")
+        await message.answer(f"❌ Произошла ошибка при генерации сообщения:\n`{error_msg}`\n\nУбедитесь, что:\n1. Контакт добавлен в систему\n2. Таблица instagram_outreach создана в Supabase", parse_mode='Markdown')
+
+@dp.callback_query(F.data.startswith("outreach_mark_sent_"))
+async def mark_outreach_sent(callback_query: types.CallbackQuery):
+    """Отмечает контакт как отправленный"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    instagram_handle = callback_query.data.replace("outreach_mark_sent_", "")
+    
+    if not outreach_manager:
+        await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
+        return
+    
+    success = outreach_manager.update_status(instagram_handle, outreach_manager.STATUS_SENT)
+    
+    if success:
+        await callback_query.answer("✅ Статус обновлен: SENT")
+        await callback_query.message.edit_text(
+            callback_query.message.text + "\n\n✅ **Статус обновлен: SENT**"
+        )
+    else:
+        await callback_query.answer("❌ Ошибка обновления статуса", show_alert=True)
+
+@dp.callback_query(F.data == "outreach_stats")
+async def show_outreach_stats(callback_query: types.CallbackQuery):
+    """Показывает статистику outreach"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    if not outreach_manager:
+        await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
+        return
+    
+    stats = outreach_manager.get_stats()
+    
+    if not stats:
+        await callback_query.message.edit_text("❌ Не удалось получить статистику")
+        await callback_query.answer()
+        return
+    
+    text = "📊 **Статистика Instagram Outreach**\n\n"
+    text += f"Всего контактов: {stats.get('total', 0)}\n"
+    text += f"Всего сообщений отправлено: {stats.get('total_messages_sent', 0)}\n"
+    text += f"Среднее сообщений на контакт: {stats.get('avg_messages_sent', 0)}\n"
+    text += f"Среднее время ответа: {stats.get('avg_response_time_hours', 0)} часов\n\n"
+    text += "**По статусам:**\n"
+    
+    status_names = {
+        'NOT_CONTACTED': 'Не обработаны',
+        'QUEUED': 'В очереди',
+        'SENT': 'Отправлено',
+        'REPLIED': 'Ответили',
+        'INTERESTED': 'Заинтересованы',
+        'CALL_SCHEDULED': 'Созвон запланирован',
+        'CLOSED': 'Закрыто'
+    }
+    
+    by_status = stats.get('by_status', {})
+    for status, count in sorted(by_status.items()):
+        status_display = status_names.get(status, status)
+        text += f"• {status_display}: {count}\n"
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Обновить", callback_data="outreach_stats")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")]
+    ])
+    
+    await callback_query.message.edit_text(text, reply_markup=keyboard)
+    await callback_query.answer()
+
+@dp.callback_query(F.data == "outreach_ab_results")
+async def show_ab_test_results(callback_query: types.CallbackQuery):
+    """Показывает результаты A/B тестирования"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    if not outreach_manager:
+        await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
+        return
+    
+    try:
+        from ab_test_manager import ABTestManager
+        
+        ab_manager = ABTestManager(db_manager)
+        results = ab_manager.get_ab_test_results('first_contact', min_samples=5)
+        
+        if not results or not results.get('variants'):
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔄 Обновить", callback_data="outreach_ab_results")],
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")]
+            ])
+            
+            await callback_query.message.edit_text(
+                "🧪 **A/B Тестирование**\n\n"
+                "Пока недостаточно данных для анализа.\n"
+                f"Всего отправлено: {results.get('total_samples', 0)} сообщений\n\n"
+                "Для статистически значимых результатов нужно:\n"
+                "• Минимум 5 сообщений каждого варианта\n"
+                "• Рекомендуется 20+ сообщений каждого варианта",
+                reply_markup=keyboard
+            )
+            await callback_query.answer()
+            return
+        
+        text = "🧪 **Результаты A/B Тестирования**\n\n"
+        text += f"Группа шаблонов: `first_contact`\n"
+        text += f"Всего сообщений: {results.get('total_samples', 0)}\n\n"
+        text += "─" * 30 + "\n\n"
+        
+        variants = results['variants']
+        for variant in sorted(variants.keys()):
+            stats = variants[variant]
+            
+            # Определяем эмодзи для варианта
+            variant_emoji = '📌' if variant == results.get('winner') else '📝'
+            
+            text += f"{variant_emoji} **Вариант {variant}**\n"
+            text += f"Отправлено: {stats['sent']}\n"
+            text += f"Открыто: {stats.get('opened', 0)} ({stats.get('open_rate', 0):.1f}%)\n"
+            text += f"Ответов: {stats.get('replied', 0)} ({stats.get('reply_rate', 0):.1f}%)\n"
+            text += f"Заинтересовались: {stats.get('interested', 0)} ({stats.get('interest_rate', 0):.1f}%)\n"
+            text += f"Закрыто сделок: {stats.get('closed', 0)} ({stats.get('conversion_rate', 0):.1f}%)\n"
+            
+            if stats.get('avg_response_time'):
+                text += f"Среднее время ответа: {stats['avg_response_time']:.1f} ч\n"
+            
+            text += "\n"
+        
+        if results.get('winner'):
+            text += "─" * 30 + "\n"
+            text += f"🏆 **Победитель: Вариант {results['winner']}**\n"
+            text += f"Конверсия: {results.get('winner_conversion_rate', 0):.1f}%\n\n"
+            text += "💡 Рекомендуется использовать этот вариант для новых контактов."
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Обновить", callback_data="outreach_ab_results")],
+            [InlineKeyboardButton(text="📊 Общая статистика", callback_data="outreach_stats")],
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")]
+        ])
+        
+        await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+        await callback_query.answer()
+        
+    except Exception as e:
+        logger.exception(f"Error showing AB test results: {e}")
+        await callback_query.message.edit_text(
+            f"❌ Ошибка при получении результатов A/B тестирования:\n`{str(e)}`",
+            parse_mode='Markdown'
+        )
+        await callback_query.answer()
 
 # --- Запуск Бота ---
 
