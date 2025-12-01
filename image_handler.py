@@ -4,7 +4,10 @@ import os
 import uuid
 import requests
 from io import BytesIO
-from PIL import Image
+try:
+    from PIL import Image
+except Exception:
+    Image = None
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -33,6 +36,8 @@ class ImageHandler:
         Валидация изображения
         Returns: (is_valid, error_message)
         """
+        if Image is None:
+            return False, "Обработка изображений временно недоступна в этой среде."
         try:
             # Проверка размера
             size_mb = len(image_data) / (1024 * 1024)
@@ -57,6 +62,8 @@ class ImageHandler:
         - Конвертация в JPEG для уменьшения размера
         - Сжатие с quality=85
         """
+        if Image is None:
+            return image_data
         try:
             img = Image.open(BytesIO(image_data))
             

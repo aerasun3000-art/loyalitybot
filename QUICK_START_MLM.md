@@ -122,3 +122,8 @@ from supabase import create_client
 **Дата:** Ноябрь 2025  
 **Версия:** 1.0
 
+
+
+
+
+

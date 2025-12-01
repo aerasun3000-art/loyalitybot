@@ -113,7 +113,7 @@ curl -X POST http://127.0.0.1:8003/api/sentry-webhook \
 ### 2. Проверка Telegram
 
 - Откройте Telegram
-- Найдите бота (токен: `8167568746:AAFQJ4ovbbvvDPBzuDjsC33KRirLgQ6MNBM`)
+- Найдите бота (используйте токен из переменной окружения `SENTRY_ALERT_TELEGRAM_TOKEN`)
 - Проверьте что приходят уведомления
 
 ### 3. Проверка логов
@@ -153,16 +153,16 @@ tail -f logs/secure_api.log
    grep SENTRY_ALERT .env
    ```
    Должны быть:
-   - `SENTRY_ALERT_TELEGRAM_TOKEN=8167568746:AAFQJ4ovbbvvDPBzuDjsC33KRirLgQ6MNBM`
-   - `SENTRY_ALERT_CHAT_ID=406631153`
+   - `SENTRY_ALERT_TELEGRAM_TOKEN=YOUR_BOT_TOKEN_HERE`
+   - `SENTRY_ALERT_CHAT_ID=YOUR_CHAT_ID_HERE`
 
 2. **Проверьте что бот запущен:**
    - Бот должен быть запущен и отвечать на команды
 
 3. **Протестируйте отправку вручную:**
    ```bash
-   curl -X POST "https://api.telegram.org/bot8167568746:AAFQJ4ovbbvvDPBzuDjsC33KRirLgQ6MNBM/sendMessage" \
-     -d "chat_id=406631153&text=Test message"
+   curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN_HERE/sendMessage" \
+     -d "chat_id=YOUR_CHAT_ID_HERE&text=Test message"
    ```
 
 ### Ошибка 401 (Invalid signature)

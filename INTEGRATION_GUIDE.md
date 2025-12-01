@@ -151,3 +151,8 @@ stats = revenue_share.process_revenue_share_for_period(
 **Дата создания:** Ноябрь 2025  
 **Версия:** 1.0
 
+
+
+
+
+

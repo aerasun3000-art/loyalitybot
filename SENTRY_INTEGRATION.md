@@ -33,7 +33,7 @@ sentry-sdk[fastapi]>=2.0.0
 
 ```bash
 # Sentry DSN для мониторинга ошибок
-SENTRY_DSN=https://bcb0ae7907d2c03b4be2507334a93db9@o4510368013877248.ingest.us.sentry.io/4510368037470208
+SENTRY_DSN=YOUR_SENTRY_DSN_HERE
 
 # Окружение (production, staging, development)
 SENTRY_ENVIRONMENT=production
@@ -57,7 +57,7 @@ pip install -r requirements.txt
 Скопируйте из `env.example.txt` или добавьте вручную:
 
 ```bash
-echo "SENTRY_DSN=https://bcb0ae7907d2c03b4be2507334a93db9@o4510368013877248.ingest.us.sentry.io/4510368037470208" >> .env
+echo "SENTRY_DSN=YOUR_SENTRY_DSN_HERE" >> .env
 echo "SENTRY_ENVIRONMENT=production" >> .env
 ```
 

@@ -22,7 +22,7 @@ npm install
 Создайте файл `frontend/.env`:
 
 ```env
-VITE_SENTRY_DSN=https://e56e38258c00163c53cd92c4d772680e@o4510368013877248.ingest.us.sentry.io/4510368109297664
+VITE_SENTRY_DSN=YOUR_SENTRY_DSN_HERE
 VITE_SENTRY_ENVIRONMENT=production
 VITE_APP_VERSION=1.0.0
 ```

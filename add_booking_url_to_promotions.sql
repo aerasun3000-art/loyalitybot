@@ -13,3 +13,8 @@ COMMENT ON COLUMN promotions.booking_url IS 'Ссылка на систему б
 -- Создаем индекс для быстрого поиска акций с booking_url
 CREATE INDEX IF NOT EXISTS idx_promotions_booking_url ON promotions(booking_url) WHERE booking_url IS NOT NULL;
 
+
+
+
+
+

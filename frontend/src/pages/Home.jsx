@@ -419,7 +419,7 @@ const Home = () => {
                 <div
                   key={item.id}
                   onClick={() => handleNewsClick(item.id)}
-                  className="group flex-shrink-0 w-64 bg-gradient-to-br from-white/30 to-sakura-surface/28 backdrop-blur-sm rounded-xl overflow-hidden border border-sakura-border/40 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer snap-start active:scale-[0.985]"
+                  className="group flex-shrink-0 w-64 bg-white/90 backdrop-blur-sm rounded-xl overflow-hidden border border-sakura-border/40 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer snap-start active:scale-[0.985]"
                 >
                   {item.image_url ? (
                     <div className="h-24 relative overflow-hidden">
@@ -430,7 +430,7 @@ const Home = () => {
                         decoding="async"
                         className="w-full h-full object-cover opacity-65 transition-transform duration-500 group-hover:scale-105"
                       />
-                      <div className="absolute top-2 right-2 bg-gradient-to-br from-white/40 to-sakura-surface/38 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
+                      <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
                         <span className="text-xs font-semibold text-jewelry-brown-dark">
                           {formatDate(item.created_at)}
                         </span>
@@ -443,7 +443,7 @@ const Home = () => {
                         <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                         <path d="M8 10H16M8 14H16M8 6H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                       </svg>
-                      <div className="absolute top-2 right-2 bg-gradient-to-br from-white/40 to-sakura-surface/38 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
+                      <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-sm px-2 py-1 rounded-lg border border-sakura-border/50">
                         <span className="text-xs font-semibold text-jewelry-brown-dark">
                           {formatDate(item.created_at)}
                         </span>

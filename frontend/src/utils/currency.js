@@ -188,3 +188,8 @@ export const formatCurrencySimple = (value, city = null, currency = null) => {
   return formatCurrency(value, city, finalCurrency)
 }
 
+
+
+
+
+

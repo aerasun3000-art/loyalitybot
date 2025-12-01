@@ -210,3 +210,8 @@ if income_from_transaction < min_commission:
 **Дата создания:** Ноябрь 2025  
 **Версия:** 1.0
 
+
+
+
+
+

@@ -161,3 +161,5 @@ def get_default_variant(template_group: str) -> str:
     """
     return DEFAULT_VARIANTS.get(template_group, 'A')
 
+
+

@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "idyllic-script-465201-h4",
+  "private_key_id": "c8c3b897f6700702a01aa2f58f7678b232af4c99",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3kxow4osNy+d/\nLbY8Po99j4ih9vMEv96arFdKo8dqAXlKTtX1tffOORna69pvAKckdAJWOrCVKXDH\niybKKBuvUXSi4TorABKypn9WGLdzHNILZwVKbiZHlm01wWdZvg7o32AK3tnXWs+3\nkXiE9nFpvh3ZHHh7dC8nhdnaTaySVpP1GJvukxKa5Bs12oUYYYXoGPRbAxiQomFX\nFtMbeLlSl46FujrEUl1/iUA6cD5eKNbfvstaiiwIbwEKZ/s/C4WksmT76IO2CxDG\n2jp7Ul0bIdNm1fZpHg1Xfsuq++h4IUX+yYXjl3uNQgm+xEhfIaZEfyr2qHQmAg7H\n6+3QCgbNAgMBAAECggEAPt26FO6oFy/yldumMmhsRGAgtvK2k7RPe+G0PSPsWTGr\nA1cPL8fC1tU4NQAbPHNZSgMOf9A2g8Z+0F8niAiHPpljG5qNDIfIX3TkW6w4Oswu\nZGhB6BTjuBVcThHvHk0XlwlUPzTFHlqDkwZW4xXwjfllCGKXIhQOR/cvPXLnO++k\nDFVkmFO7bosxC6tCvVFR0hOMwhec81D6URKQF/XdQfkRUqnkKPjZu0EZ7g2sRyLa\nnM2LGtjuDAgbarxWMMN8CNsdw6W8Nn0xwUu3nTYvASRWRjFMQxBMvOt4DZYslEGm\nlkDppXDMggmcsWxOEVqGYEWEY4oJySYb+FPWbrrKwwKBgQDwx25sqve64la4LITL\nyd87PwnKKLIRLKLpizW/XUXIYV3GqcWS0uNSHZTS6cEufjZJvfrO1WTTzI2V9PKH\no+6fAODXet/mImy+U0aseFbI2wkTEKnf229eCMLbejM+frPuaw5jFiH3cgPgKTpk\nZ8+mOvCJcFG60KG31cj1rU/a0wKBgQDDLewOuYotwl25X41whvEI9elWWtnHq2FP\niuXwqBOjtKAZP0B4hzYbY+4VO6epQlUAw0AMpPJTL9+fU7fE9JJK28nEOSxXj7xR\ndBn1JjmlCXNI99QySiw54yncuwbuAjrx0k0JX6Zqe9epZfw7+HRGGQ9IOpzEX26q\nLGt+eVhT3wKBgBwaGrBCMBG20wpB3+ntEMnYbKsUntvUSttZLRe9qiReANTsAaxG\nQtPVsgX/1FU509o9eyVi0JbLvAaxhREBuBsEvjlIFRPGFs0L6Sa+ENr2fZOlET6Y\nXOIrwZpeI9b6cMO16QL1lVdNDli+Vxta5mhvXp2b514XdZiAMilCZhyTAoGBAKrd\nn+MAIOyQVHZ9JRhWudprVZuoqzC2Ytk8srHsokzVSrbvfaRGUmLGJ95kvBFcJYgm\nZgLrv8x9g5o6sw10QkHQiaEDoEMDbQwtxK+tiBdn34oIk7Z24qLGsJYxEQ752tpq\njdBf8RMVWaZNxvRFPJ1FQPCthyIOnZXSj0RIPMAnAoGBAMFlgJmkNr7tVXx0tecA\nfdZFU6FRJ/015Eclojq50lmAWAqeiTsxKhZKWFKJiWpdGEY6P41vxTdCrixbIUky\n9Ml1UEgo59zJRRm3Fi1+umQ52cxPiargW1Dc3LctxFVRgVRvHxNhwYJWJsdVeaSL\nwR/HGEeK1Usb9YbcV+noMpao\n-----END PRIVATE KEY-----\n",
+  "client_email": "calendar-service@idyllic-script-465201-h4.iam.gserviceaccount.com",
+  "client_id": "107735582250390922937",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/calendar-service%40idyllic-script-465201-h4.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

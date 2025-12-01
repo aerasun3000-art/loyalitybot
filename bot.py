@@ -8,8 +8,17 @@ import html
 import requests
 from io import BytesIO
 import io
-import qrcode
-from PIL import Image
+try:
+    import qrcode
+    QR_IMAGE_AVAILABLE = True
+except Exception:
+    qrcode = None
+    QR_IMAGE_AVAILABLE = False
+
+try:
+    from PIL import Image
+except Exception:
+    Image = None
 from dotenv import load_dotenv
 from logger_config import get_bot_logger, log_exception
 
@@ -242,7 +251,14 @@ def handle_partner_categories(message):
 # ------------------------------------
 # ОБРАБОТЧИК CALLBACK ДЛЯ ПОДМЕНЮ
 # ------------------------------------
-@bot.callback_query_handler(func=lambda call: call.data.startswith('menu_'))
+@bot.callback_query_handler(
+    func=lambda call: call.data.startswith('menu_') or call.data in (
+        'partner_main_menu',
+        'revenue_share_info',
+        'revenue_pv',
+        'revenue_network',
+    )
+)
 def handle_menu_callbacks(call):
     """Обработчик callback для кнопок подменю."""
     chat_id = call.message.chat.id
@@ -392,7 +408,14 @@ def handle_menu_callbacks(call):
 # ------------------------------------
 
 def generate_qr_code(data: str) -> io.BytesIO:
-    """Генерирует QR-код с данными и возвращает BytesIO объект."""
+    """Генерирует QR-код с данными и возвращает BytesIO объект.
+    
+    На некоторых конфигурациях macOS (arm64) Pillow может быть недоступен.
+    В этом случае функция возбуждает исключение, а вызывающий код
+    должен обработать ошибку и показать сообщение пользователю.
+    """
+    if not QR_IMAGE_AVAILABLE or qrcode is None or Image is None:
+        raise RuntimeError("QR-коды недоступны в этой среде (Pillow/qrcode не инициализированы).")
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -1591,7 +1614,9 @@ def handle_stats_callbacks(call):
         'stats_7': 7,
         'stats_30': 30,
         'stats_90': 90,
-        'stats_all': 365  # год для "всё время"
+        # Для "всё время" используем специальное значение,
+        # которое в supabase_manager интерпретируется как "вся история"
+        'stats_all': -1
     }
     
     period_days = period_map.get(call.data, 30)

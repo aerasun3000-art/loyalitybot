@@ -270,3 +270,5 @@ grep -i error admin_bot_output.log | tail -10
 
 *Последнее обновление: Декабрь 2025*
 
+
+

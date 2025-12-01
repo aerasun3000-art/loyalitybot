@@ -15,17 +15,17 @@
 
 ### 1. SUPABASE_URL
 - **Key:** `SUPABASE_URL`
-- **Value:** `https://gynpvfchojnyoirosysj.supabase.co`
+- **Value:** `https://YOUR_PROJECT_ID.supabase.co` (найдите в Supabase Dashboard → Settings → API)
 - Нажмите **"Save"**
 
 ### 2. SUPABASE_KEY
 - **Key:** `SUPABASE_KEY`
-- **Value:** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5bnB2ZmNob2pueW9pcm9zeXNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2NTExMzksImV4cCI6MjA3NjIyNzEzOX0.Lw-DG19z7ZNoiu1k0jLO8A7SmylhHPfA596qg0a88qk`
+- **Value:** `YOUR_SUPABASE_ANON_KEY_HERE` (найдите в Supabase Dashboard → Settings → API → anon/public key)
 - Нажмите **"Save"**
 
 ### 3. SENTRY_DSN
 - **Key:** `SENTRY_DSN`
-- **Value:** `https://e56e38258c00163c53cd92c4d772680e@o4510368013877248.ingest.us.sentry.io/4510368109297664`
+- **Value:** `YOUR_SENTRY_DSN_HERE` (найдите в Sentry Dashboard → Settings → Projects → Client Keys (DSN))
 - Нажмите **"Save"**
 
 ### 4. SENTRY_ENVIRONMENT
@@ -35,17 +35,17 @@
 
 ### 5. SENTRY_ALERT_TELEGRAM_TOKEN
 - **Key:** `SENTRY_ALERT_TELEGRAM_TOKEN`
-- **Value:** `8167568746:AAFQJ4ovbbvvDPBzuDjsC33KRirLgQ6MNBM`
+- **Value:** `YOUR_BOT_TOKEN_HERE` (получите у @BotFather в Telegram)
 - Нажмите **"Save"**
 
 ### 6. SENTRY_ALERT_CHAT_ID
 - **Key:** `SENTRY_ALERT_CHAT_ID`
-- **Value:** `406631153`
+- **Value:** `YOUR_CHAT_ID_HERE` (получите у @userinfobot в Telegram)
 - Нажмите **"Save"**
 
 ### 7. SENTRY_WEBHOOK_SECRET
 - **Key:** `SENTRY_WEBHOOK_SECRET`
-- **Value:** `991d8cc952f1d3334a5184409c75193a2a56651c9d4935da4918f6c7b0f3c47a`
+- **Value:** `YOUR_SENTRY_WEBHOOK_SECRET_HERE` (настройте в Sentry Dashboard → Settings → Integrations → Webhooks)
 - Нажмите **"Save"**
 
 ### 8. APP_VERSION (опционально)

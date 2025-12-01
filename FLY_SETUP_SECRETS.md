@@ -35,7 +35,7 @@ flyctl secrets set \
   SUPABASE_KEY="ваш_supabase_key" \
   SENTRY_DSN="ваш_sentry_dsn" \
   SENTRY_ENVIRONMENT="production" \
-  SENTRY_ALERT_TELEGRAM_TOKEN="ваш_telegram_token" \
+  SENTRY_ALERT_TELEGRAM_TOKEN="8309705244:AAHCTtgphMpjqYDxk0iYJWF7P-K-P1dnmfo" \
   SENTRY_ALERT_CHAT_ID="ваш_chat_id" \
   SENTRY_WEBHOOK_SECRET="ваш_webhook_secret" \
   APP_VERSION="1.0.0" \

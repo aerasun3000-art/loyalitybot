@@ -9,6 +9,14 @@ from datetime import datetime, timedelta
 from message_generator import MessageGenerator
 from outreach_templates import get_all_templates
 
+# Опциональный импорт calendar_manager
+try:
+    from calendar_manager import CalendarManager
+    CALENDAR_AVAILABLE = True
+except ImportError:
+    CALENDAR_AVAILABLE = False
+    CalendarManager = None
+
 
 class InstagramOutreachManager:
     """Управляет процессом Instagram outreach к потенциальным партнерам"""
@@ -45,6 +53,16 @@ class InstagramOutreachManager:
             default_link=default_link or os.getenv('ONEPAGER_PARTNER_URL', 'https://your-domain.com/onepager/partner'),
             supabase_manager=supabase_manager  # Передаем для A/B тестирования
         )
+        
+        # Инициализация Calendar Manager (опционально)
+        self.calendar_manager = None
+        if CALENDAR_AVAILABLE:
+            try:
+                self.calendar_manager = CalendarManager()
+                if not self.calendar_manager.is_available():
+                    self.calendar_manager = None
+            except Exception:
+                self.calendar_manager = None
     
     def add_to_outreach(
         self,
@@ -417,4 +435,133 @@ class InstagramOutreachManager:
             return True
         except Exception:
             return False
+    
+    def schedule_call(
+        self,
+        instagram_handle: str,
+        scheduled_time: datetime,
+        duration_minutes: int = 30,
+        meeting_link: Optional[str] = None,
+        partner_email: Optional[str] = None,
+        meeting_type: str = 'video_call'
+    ) -> Dict[str, Any]:
+        """
+        Планирует созвон с партнером и создает событие в календаре
+        
+        Args:
+            instagram_handle: Instagram handle партнера
+            scheduled_time: Время созвона (datetime объект)
+            duration_minutes: Длительность в минутах
+            meeting_link: Ссылка на видеозвонок (опционально)
+            partner_email: Email партнера для приглашения (опционально)
+            meeting_type: Тип встречи (call, video_call, in_person, other)
+        
+        Returns:
+            dict: Результат планирования с event_id и другими данными
+        
+        Raises:
+            ValueError: Если контакт не найден или календарь недоступен
+        """
+        instagram_handle = instagram_handle.lstrip('@')
+        
+        # Получаем данные контакта
+        contact = self.get_by_instagram_handle(instagram_handle)
+        if not contact:
+            raise ValueError(f"Контакт с Instagram handle '{instagram_handle}' не найден")
+        
+        # Создаем событие в календаре (если доступен)
+        calendar_event_id = None
+        calendar_html_link = None
+        
+        if self.calendar_manager and self.calendar_manager.is_available():
+            try:
+                calendar_result = self.calendar_manager.create_meeting_for_partner(
+                    instagram_handle=instagram_handle,
+                    partner_name=contact.get('name', instagram_handle),
+                    scheduled_time=scheduled_time,
+                    district=contact.get('district'),
+                    business_type=contact.get('business_type'),
+                    duration_minutes=duration_minutes,
+                    meeting_link=meeting_link,
+                    partner_email=partner_email
+                )
+                
+                if calendar_result:
+                    calendar_event_id = calendar_result.get('event_id')
+                    calendar_html_link = calendar_result.get('html_link')
+                    # Если calendar создал ссылку на встречу, используем её
+                    if not meeting_link and calendar_result.get('meeting_link'):
+                        meeting_link = calendar_result.get('meeting_link')
+            except Exception as e:
+                # Логируем ошибку, но продолжаем обновление статуса
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Не удалось создать событие в календаре: {e}")
+        
+        # Обновляем статус и данные в базе данных
+        update_data = {
+            'outreach_status': self.STATUS_CALL_SCHEDULED,
+            'call_scheduled_date': scheduled_time.isoformat(),
+            'meeting_duration': duration_minutes,
+            'meeting_type': meeting_type,
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        if calendar_event_id:
+            update_data['calendar_event_id'] = calendar_event_id
+            update_data['calendar_synced_at'] = datetime.utcnow().isoformat()
+        
+        if meeting_link:
+            update_data['meeting_link'] = meeting_link
+        
+        # Выполняем обновление
+        if not self.sm.client:
+            raise RuntimeError("Supabase клиент не инициализирован")
+        
+        try:
+            result = self.sm.client.from_('instagram_outreach')\
+                .update(update_data)\
+                .eq('instagram_handle', instagram_handle)\
+                .execute()
+            
+            if result.data:
+                return {
+                    'success': True,
+                    'calendar_event_id': calendar_event_id,
+                    'calendar_html_link': calendar_html_link,
+                    'meeting_link': meeting_link,
+                    'scheduled_time': scheduled_time.isoformat(),
+                    'duration_minutes': duration_minutes
+                }
+            else:
+                raise RuntimeError("Не удалось обновить запись в базе данных")
+        except Exception as e:
+            raise RuntimeError(f"Ошибка при планировании созвона: {str(e)}")
+    
+    def get_upcoming_calls(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Получает список предстоящих созвонов
+        
+        Args:
+            limit: Количество записей
+        
+        Returns:
+            list: Список предстоящих созвонов
+        """
+        if not self.sm.client:
+            return []
+        
+        try:
+            now = datetime.utcnow().isoformat()
+            result = self.sm.client.from_('instagram_outreach')\
+                .select('*')\
+                .eq('outreach_status', self.STATUS_CALL_SCHEDULED)\
+                .not_.is_('call_scheduled_date', 'null')\
+                .gte('call_scheduled_date', now)\
+                .order('call_scheduled_date', desc=False)\
+                .limit(limit)\
+                .execute()
+            return result.data if result.data else []
+        except Exception:
+            return []
 

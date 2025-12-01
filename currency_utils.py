@@ -150,3 +150,8 @@ def format_currency(value, city=None, currency=None):
     
     return f"{symbol}{formatted_value}"
 
+
+
+
+
+

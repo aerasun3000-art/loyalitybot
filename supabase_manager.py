@@ -4104,3 +4104,109 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error getting partner conversations: {e}", exc_info=True)
             return []
+
+    # ============================================
+    # INSTAGRAM OUTREACH METHODS
+    # ============================================
+    
+    def get_instagram_outreach_by_handle(self, instagram_handle: str) -> Optional[dict]:
+        """
+        Получает контакт outreach по Instagram handle
+        
+        Args:
+            instagram_handle: Instagram handle (без @)
+        
+        Returns:
+            dict или None: Данные контакта или None
+        """
+        if not self.client:
+            return None
+        
+        instagram_handle = instagram_handle.lstrip('@')
+        
+        try:
+            result = self.client.from_('instagram_outreach')\
+                .select('*')\
+                .eq('instagram_handle', instagram_handle)\
+                .maybe_single()\
+                .execute()
+            return result.data if result.data else None
+        except Exception as e:
+            logging.error(f"Error getting Instagram outreach contact: {e}")
+            return None
+    
+    def get_instagram_outreach_queue(self, limit: int = 10) -> list:
+        """
+        Получает очередь контактов для outreach
+        
+        Args:
+            limit: Количество контактов
+        
+        Returns:
+            list: Список контактов
+        """
+        if not self.client:
+            return []
+        
+        try:
+            result = self.client.from_('instagram_outreach')\
+                .select('*')\
+                .eq('outreach_status', 'NOT_CONTACTED')\
+                .order('priority', desc=False)\
+                .order('created_at', desc=False)\
+                .limit(limit)\
+                .execute()
+            return result.data if result.data else []
+        except Exception as e:
+            logging.error(f"Error getting Instagram outreach queue: {e}")
+            return []
+    
+    def get_instagram_outreach_stats(self) -> dict:
+        """
+        Получает статистику Instagram outreach
+        
+        Returns:
+            dict: Статистика по статусам
+        """
+        if not self.client:
+            return {}
+        
+        try:
+            result = self.client.from_('instagram_outreach')\
+                .select('outreach_status, messages_sent, response_time_hours')\
+                .execute()
+            
+            contacts = result.data if result.data else []
+            
+            stats = {
+                'total': len(contacts),
+                'by_status': {},
+                'avg_messages_sent': 0,
+                'avg_response_time_hours': 0
+            }
+            
+            total_messages = 0
+            total_response_times = []
+            
+            for contact in contacts:
+                status = contact.get('outreach_status', 'UNKNOWN')
+                stats['by_status'][status] = stats['by_status'].get(status, 0) + 1
+                
+                messages = contact.get('messages_sent', 0)
+                if messages:
+                    total_messages += messages
+                
+                response_time = contact.get('response_time_hours')
+                if response_time:
+                    total_response_times.append(response_time)
+            
+            if stats['total'] > 0:
+                stats['avg_messages_sent'] = round(total_messages / stats['total'], 2)
+            
+            if total_response_times:
+                stats['avg_response_time_hours'] = round(sum(total_response_times) / len(total_response_times), 2)
+            
+            return stats
+        except Exception as e:
+            logging.error(f"Error getting Instagram outreach stats: {e}")
+            return {}
