@@ -2240,6 +2240,16 @@ class OutreachUpdate(StatesGroup):
     waiting_for_instagram = State()
     waiting_for_status = State()
 
+class CallScheduling(StatesGroup):
+    waiting_for_time = State()
+    waiting_for_duration = State()
+    waiting_for_meeting_link = State()
+
+
+class TemplateEditing(StatesGroup):
+    """FSM для редактирования текстов шаблонов ответов."""
+    waiting_for_new_text = State()
+
 @dp.callback_query(F.data == "admin_outreach")
 async def show_outreach_menu(callback_query: types.CallbackQuery):
     """Главное меню Instagram Outreach"""
@@ -2254,6 +2264,7 @@ async def show_outreach_menu(callback_query: types.CallbackQuery):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="➕ Добавить контакт", callback_data="outreach_add")],
         [InlineKeyboardButton(text="📋 Очередь контактов", callback_data="outreach_queue")],
+        [InlineKeyboardButton(text="📅 Предстоящие созвоны", callback_data="outreach_upcoming_calls")],
         [InlineKeyboardButton(text="⏰ Follow-up напоминания", callback_data="outreach_followups")],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="outreach_stats")],
         [InlineKeyboardButton(text="🧪 A/B Тестирование", callback_data="outreach_ab_results")],
@@ -2384,6 +2395,7 @@ async def show_outreach_queue(callback_query: types.CallbackQuery):
     
     text = "📋 **Очередь контактов для Outreach**\n\n"
     
+    keyboard_rows = []
     for i, contact in enumerate(queue[:10], 1):
         priority_emoji = {
             'URGENT': '🔴',
@@ -2392,19 +2404,26 @@ async def show_outreach_queue(callback_query: types.CallbackQuery):
             'LOW': '🟢'
         }.get(contact.get('priority', 'MEDIUM'), '⚪')
         
-        text += f"{i}. {priority_emoji} `{contact['instagram_handle']}`"
+        handle = contact['instagram_handle']
+        text += f"{i}. {priority_emoji} `{handle}`"
         if contact.get('name'):
             text += f" - {contact['name']}"
         if contact.get('district'):
             text += f" ({contact['district']})"
         text += "\n"
+        
+        # Добавляем кнопку для просмотра контакта
+        keyboard_rows.append([InlineKeyboardButton(
+            text=f"👁️ {handle}",
+            callback_data=f"show_contact_{handle}"
+        )])
     
-    text += "\nИспользуйте /outreach_message @handle для генерации сообщения"
+    text += "\nНажмите на контакт для просмотра деталей и быстрых действий"
     
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔄 Обновить", callback_data="outreach_queue")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")]
-    ])
+    keyboard_rows.append([InlineKeyboardButton(text="🔄 Обновить", callback_data="outreach_queue")])
+    keyboard_rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
     
     await callback_query.message.edit_text(text, reply_markup=keyboard)
     await callback_query.answer()
@@ -2624,6 +2643,946 @@ async def show_ab_test_results(callback_query: types.CallbackQuery):
             parse_mode='Markdown'
         )
         await callback_query.answer()
+
+# --- Quick Actions & Response Templates ---
+
+@dp.callback_query(F.data == "outreach_search")
+async def search_outreach_contact(callback_query: types.CallbackQuery, state: FSMContext):
+    """Поиск контакта по Instagram handle"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    await state.set_state(OutreachUpdate.waiting_for_instagram)
+    await callback_query.message.edit_text(
+        "🔍 **Поиск контакта**\n\n"
+        "Введите Instagram handle (без @):\n"
+        "Например: `nailart_brooklyn`"
+    )
+    await callback_query.answer()
+
+@dp.message(OutreachUpdate.waiting_for_instagram)
+async def show_contact_details(message: types.Message, state: FSMContext):
+    """Показывает детали контакта с быстрыми действиями"""
+    if not is_admin(message.from_user.id):
+        await message.answer("У вас нет прав администратора")
+        return
+    
+    instagram_handle = message.text.strip().lstrip('@')
+    
+    if not outreach_manager:
+        await message.answer("Instagram Outreach Manager не инициализирован")
+        await state.clear()
+        return
+    
+    contact = outreach_manager.get_by_instagram_handle(instagram_handle)
+    
+    if not contact:
+        await message.answer(
+            f"❌ Контакт `{instagram_handle}` не найден.\n\n"
+            "Попробуйте еще раз или добавьте контакт через меню.",
+            parse_mode='Markdown'
+        )
+        await state.clear()
+        return
+    
+    # Формируем информацию о контакте
+    status_names = {
+        'NOT_CONTACTED': 'Не обработаны',
+        'QUEUED': 'В очереди',
+        'SENT': 'Отправлено',
+        'REPLIED': 'Ответили',
+        'INTERESTED': 'Заинтересованы',
+        'CALL_SCHEDULED': 'Созвон запланирован',
+        'FOLLOW_UP_1': 'Follow-up 1',
+        'FOLLOW_UP_2': 'Follow-up 2',
+        'NOT_INTERESTED': 'Не заинтересованы',
+        'GHOSTED': 'Исчезли',
+        'CLOSED': 'Закрыто'
+    }
+    
+    text = f"👤 **Контакт: @{contact['instagram_handle']}**\n\n"
+    text += f"📛 Имя: {contact.get('name', 'не указано')}\n"
+    text += f"📍 Район: {contact.get('district', 'не указано')}\n"
+    text += f"💼 Тип бизнеса: {contact.get('business_type', 'не указано')}\n"
+    text += f"📊 Статус: {status_names.get(contact.get('outreach_status'), contact.get('outreach_status', 'UNKNOWN'))}\n"
+    text += f"⭐ Приоритет: {contact.get('priority', 'MEDIUM')}\n"
+    
+    if contact.get('first_contact_date'):
+        text += f"📅 Первый контакт: {contact['first_contact_date'][:10]}\n"
+    if contact.get('call_scheduled_date'):
+        text += f"📞 Созвон: {contact['call_scheduled_date'][:10]}\n"
+    if contact.get('notes'):
+        text += f"\n📝 Заметки: {contact['notes']}\n"
+    
+    # Быстрые действия - обновление статусов
+    current_status = contact.get('outreach_status', 'NOT_CONTACTED')
+    status_buttons = []
+    
+    if current_status == 'SENT':
+        status_buttons.append(InlineKeyboardButton(text="✅ Ответил", callback_data=f"quick_status_{instagram_handle}_REPLIED"))
+        status_buttons.append(InlineKeyboardButton(text="💡 Заинтересован", callback_data=f"quick_status_{instagram_handle}_INTERESTED"))
+    elif current_status == 'REPLIED':
+        status_buttons.append(InlineKeyboardButton(text="💡 Заинтересован", callback_data=f"quick_status_{instagram_handle}_INTERESTED"))
+        status_buttons.append(InlineKeyboardButton(text="❌ Не заинтересован", callback_data=f"quick_status_{instagram_handle}_NOT_INTERESTED"))
+    elif current_status == 'INTERESTED':
+        status_buttons.append(InlineKeyboardButton(text="📞 Запланировать созвон", callback_data=f"schedule_call_{instagram_handle}"))
+        status_buttons.append(InlineKeyboardButton(text="✅ Закрыть", callback_data=f"quick_status_{instagram_handle}_CLOSED"))
+    elif current_status == 'CALL_SCHEDULED':
+        status_buttons.append(InlineKeyboardButton(text="✅ Закрыть", callback_data=f"quick_status_{instagram_handle}_CLOSED"))
+    
+    keyboard_rows = []
+    if status_buttons:
+        keyboard_rows.append(status_buttons)
+    
+    # Шаблоны ответов
+    keyboard_rows.append([InlineKeyboardButton(text="📝 Шаблоны ответов", callback_data=f"response_templates_{instagram_handle}")])
+    
+    # Другие действия
+    keyboard_rows.append([
+        InlineKeyboardButton(text="📝 Генерировать сообщение", callback_data=f"outreach_message_btn_{instagram_handle}"),
+        InlineKeyboardButton(text="📅 Предстоящие созвоны", callback_data="outreach_upcoming_calls")
+    ])
+    keyboard_rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+    
+    await message.answer(text, reply_markup=keyboard, parse_mode='Markdown')
+    await state.clear()
+
+@dp.callback_query(F.data.startswith("quick_status_"))
+async def quick_update_status(callback_query: types.CallbackQuery):
+    """Быстрое обновление статуса контакта"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    # Парсим данные: quick_status_handle_STATUS
+    parts = callback_query.data.replace("quick_status_", "").split("_", 1)
+    if len(parts) != 2:
+        await callback_query.answer("Ошибка формата", show_alert=True)
+        return
+    
+    instagram_handle = parts[0]
+    new_status = parts[1]
+    
+    if not outreach_manager:
+        await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
+        return
+    
+    status_names = {
+        'REPLIED': 'Ответил',
+        'INTERESTED': 'Заинтересованы',
+        'NOT_INTERESTED': 'Не заинтересованы',
+        'CLOSED': 'Закрыто'
+    }
+    
+    success = outreach_manager.update_status(instagram_handle, new_status)
+    
+    if success:
+        status_display = status_names.get(new_status, new_status)
+        await callback_query.answer(f"✅ Статус обновлен: {status_display}")
+        
+        # Обновляем сообщение
+        contact = outreach_manager.get_by_instagram_handle(instagram_handle)
+        if contact:
+            status_names_full = {
+                'NOT_CONTACTED': 'Не обработаны',
+                'QUEUED': 'В очереди',
+                'SENT': 'Отправлено',
+                'REPLIED': 'Ответили',
+                'INTERESTED': 'Заинтересованы',
+                'CALL_SCHEDULED': 'Созвон запланирован',
+                'CLOSED': 'Закрыто'
+            }
+            
+            text = f"👤 **Контакт: @{instagram_handle}**\n\n"
+            text += f"📛 Имя: {contact.get('name', 'не указано')}\n"
+            text += f"📍 Район: {contact.get('district', 'не указано')}\n"
+            text += f"💼 Тип бизнеса: {contact.get('business_type', 'не указано')}\n"
+            text += f"📊 Статус: {status_names_full.get(contact.get('outreach_status'), contact.get('outreach_status', 'UNKNOWN'))}\n"
+            text += f"⭐ Приоритет: {contact.get('priority', 'MEDIUM')}\n"
+            text += f"\n✅ **Статус обновлен!**\n"
+            
+            # Обновляем кнопки в зависимости от нового статуса
+            current_status = contact.get('outreach_status', 'NOT_CONTACTED')
+            status_buttons = []
+            
+            if current_status == 'SENT':
+                status_buttons.append(InlineKeyboardButton(text="✅ Ответил", callback_data=f"quick_status_{instagram_handle}_REPLIED"))
+                status_buttons.append(InlineKeyboardButton(text="💡 Заинтересован", callback_data=f"quick_status_{instagram_handle}_INTERESTED"))
+            elif current_status == 'REPLIED':
+                status_buttons.append(InlineKeyboardButton(text="💡 Заинтересован", callback_data=f"quick_status_{instagram_handle}_INTERESTED"))
+                status_buttons.append(InlineKeyboardButton(text="❌ Не заинтересован", callback_data=f"quick_status_{instagram_handle}_NOT_INTERESTED"))
+            elif current_status == 'INTERESTED':
+                status_buttons.append(InlineKeyboardButton(text="📞 Запланировать созвон", callback_data=f"schedule_call_{instagram_handle}"))
+                status_buttons.append(InlineKeyboardButton(text="✅ Закрыть", callback_data=f"quick_status_{instagram_handle}_CLOSED"))
+            
+            keyboard_rows = []
+            if status_buttons:
+                keyboard_rows.append(status_buttons)
+            keyboard_rows.append([InlineKeyboardButton(text="📝 Шаблоны ответов", callback_data=f"response_templates_{instagram_handle}")])
+            keyboard_rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")])
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+            await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+    else:
+        await callback_query.answer("❌ Ошибка обновления статуса", show_alert=True)
+
+@dp.callback_query(F.data.startswith("response_templates_"))
+async def show_response_templates(callback_query: types.CallbackQuery):
+    """Показывает шаблоны ответов для контакта"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    instagram_handle = callback_query.data.replace("response_templates_", "")
+    
+    try:
+        from response_templates import get_all_templates
+        
+        templates = get_all_templates()
+        
+        text = f"📝 **Шаблоны ответов для @{instagram_handle}**\n\n"
+        text += "Выберите шаблон:\n\n"
+        
+        keyboard_rows = []
+        row = []
+        
+        for key, template in templates.items():
+            emoji_map = {
+                'greeting': '👋',
+                'program_details': '📋',
+                'pricing': '💰',
+                'benefits': '✨',
+                'integration': '🔧',
+                'objection_price': '💭',
+                'objection_time': '⏰',
+                'objection_competitors': '👍',
+                'call_to_action': '🎉',
+                'follow_up': '📞',
+                'thank_you': '🙏'
+            }
+            emoji = emoji_map.get(key, '📝')
+            
+            use_button = InlineKeyboardButton(
+                text=f"{emoji} {template['name']}",
+                callback_data=f"template_use_{instagram_handle}_{key}"
+            )
+            edit_button = InlineKeyboardButton(
+                text="✏️",
+                callback_data=f"template_edit_{instagram_handle}_{key}"
+            )
+            row.append(use_button)
+            row.append(edit_button)
+            if len(row) == 4:
+                keyboard_rows.append(row)
+                row = []
+        
+        if row:
+            keyboard_rows.append(row)
+        
+        keyboard_rows.append([InlineKeyboardButton(text="◀️ Назад к контакту", callback_data=f"show_contact_{instagram_handle}")])
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+        await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+        await callback_query.answer()
+        
+    except ImportError:
+        await callback_query.answer("Модуль response_templates не найден", show_alert=True)
+    except Exception as e:
+        logger.exception(f"Error showing templates: {e}")
+        await callback_query.answer("Ошибка при загрузке шаблонов", show_alert=True)
+
+@dp.callback_query(F.data.startswith("template_use_"))
+async def use_response_template(callback_query: types.CallbackQuery):
+    """Использует выбранный шаблон ответа"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    # Парсим: template_use_handle_key
+    parts = callback_query.data.replace("template_use_", "").split("_", 1)
+    if len(parts) != 2:
+        await callback_query.answer("Ошибка формата", show_alert=True)
+        return
+    
+    instagram_handle = parts[0]
+    template_key = parts[1]
+    
+    try:
+        # Получаем данные контакта для переменных
+        contact = outreach_manager.get_by_instagram_handle(instagram_handle) if outreach_manager else None
+        
+        variables = {}
+        if contact:
+            # Можно добавить переменные из контакта (пока используем константы/заглушки)
+            variables = {
+                'commission': '5',  # Можно брать из настроек
+                'min_amount': '10',
+                'entry_fee': '0',
+                'partner_count': '50+'  # Можно брать из статистики
+            }
+
+        # Рендерим шаблон с учётом возможного оверрайда из Supabase
+        template = await render_response_template(template_key, variables)
+        
+        if not template:
+            await callback_query.answer("Шаблон не найден", show_alert=True)
+            return
+        
+        text = f"📝 **Шаблон: {template['name']}**\n\n"
+        text += "```\n"
+        text += template['message']
+        text += "\n```\n\n"
+        if template.get('use_case'):
+            text += f"💡 **Использование:** {template.get('use_case', '')}\n"
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📋 Копировать", callback_data=f"template_copy_{instagram_handle}_{template_key}")],
+            [InlineKeyboardButton(text="◀️ Назад к шаблонам", callback_data=f"response_templates_{instagram_handle}")]
+        ])
+        
+        await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+        await callback_query.answer()
+        
+    except ImportError:
+        await callback_query.answer("Модуль response_templates не найден", show_alert=True)
+    except Exception as e:
+        logger.exception(f"Error using template: {e}")
+        await callback_query.answer("Ошибка при использовании шаблона", show_alert=True)
+
+@dp.callback_query(F.data.startswith("outreach_message_btn_"))
+async def generate_message_from_button(callback_query: types.CallbackQuery):
+    """Генерирует сообщение из кнопки"""
+    instagram_handle = callback_query.data.replace("outreach_message_btn_", "")
+    
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    if not outreach_manager:
+        await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
+        return
+    
+    try:
+        preview = outreach_manager.generate_message(instagram_handle, 'first_contact_short')
+        
+        if not preview or 'error' in preview:
+            await callback_query.answer("Ошибка генерации сообщения", show_alert=True)
+            return
+        
+        text = f"📝 **Сообщение для `{instagram_handle}`**\n\n"
+        text += f"Шаблон: {preview['template_display_name']}\n"
+        text += f"Длина: {preview['character_count']} символов, {preview['word_count']} слов\n\n"
+        text += "```\n"
+        text += preview['message']
+        text += "\n```"
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📋 Копировать сообщение", callback_data=f"outreach_copy_{instagram_handle}")],
+            [InlineKeyboardButton(text="✅ Отметить как отправленное", callback_data=f"outreach_mark_sent_{instagram_handle}")],
+            [InlineKeyboardButton(text="◀️ Назад к контакту", callback_data=f"show_contact_{instagram_handle}")]
+        ])
+        
+        await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+        await callback_query.answer()
+        
+    except Exception as e:
+        logger.exception(f"Error generating message: {e}")
+        await callback_query.answer(f"Ошибка: {str(e)}", show_alert=True)
+
+
+async def render_response_template(template_key: str, variables: dict | None = None) -> dict | None:
+    """
+    Рендерит шаблон ответа с учётом возможного оверрайда в Supabase.
+    
+    Возвращает словарь:
+    - name: имя шаблона
+    - message: готовый текст сообщения
+    - use_case: описание использования (если есть)
+    """
+    try:
+        from response_templates import RESPONSE_TEMPLATES
+    except ImportError:
+        return None
+
+    base = RESPONSE_TEMPLATES.get(template_key)
+    if not base:
+        return None
+
+    # Пытаемся получить оверрайд из Supabase
+    override_text = None
+    try:
+        if db_manager and db_manager.client:
+            result = db_manager.client.from_('instagram_response_templates') \
+                .select('template_text') \
+                .eq('template_key', template_key) \
+                .limit(1) \
+                .execute()
+            if result.data:
+                override_text = result.data[0].get('template_text')
+    except Exception as e:
+        logger.warning(f"Не удалось получить оверрайд шаблона {template_key}: {e}")
+
+    template_text = override_text or base.get('template', '')
+
+    # Подставляем переменные, если они есть
+    variables = variables or {}
+    for var in base.get('variables', []):
+        value = variables.get(var, f'{{{var}}}')
+        template_text = template_text.replace(f'{{{var}}}', str(value))
+
+    return {
+        'name': base.get('name', template_key),
+        'message': template_text,
+        'use_case': base.get('use_case', '')
+    }
+
+
+@dp.callback_query(F.data.startswith("template_edit_"))
+async def edit_response_template(callback_query: types.CallbackQuery, state: FSMContext):
+    """Запускает процесс редактирования выбранного шаблона ответа."""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+
+    # Формат: template_edit_{instagram_handle}_{template_key}
+    raw = callback_query.data.replace("template_edit_", "")
+    parts = raw.split("_", 1)
+    if len(parts) != 2:
+        await callback_query.answer("Ошибка формата", show_alert=True)
+        return
+
+    instagram_handle, template_key = parts
+
+    # Получаем текущий текст шаблона (с учётом оверрайда)
+    current = await render_response_template(template_key, {})
+    if not current:
+        await callback_query.answer("Шаблон не найден", show_alert=True)
+        return
+
+    text = f"✏️ **Редактирование шаблона** `{template_key}`\n\n"
+    text += "Текущий текст:\n"
+    text += "```\n"
+    text += current['message']
+    text += "\n```\n\n"
+    text += "Отправьте новый текст сообщения *одним сообщением*.\n\n"
+    text += "Подсказки:\n"
+    text += "- Можно использовать плейсхолдеры: `{commission}`, `{min_amount}`, `{entry_fee}`, `{partner_count}` (для соответствующих шаблонов)\n"
+    text += "- Чтобы отменить — отправьте `/cancel`.\n"
+
+    await state.set_state(TemplateEditing.waiting_for_new_text)
+    await state.update_data(instagram_handle=instagram_handle, template_key=template_key)
+
+    await callback_query.message.edit_text(text, parse_mode='Markdown')
+    await callback_query.answer()
+
+
+@dp.message(TemplateEditing.waiting_for_new_text)
+async def process_new_template_text(message: types.Message, state: FSMContext):
+    """Получает новый текст шаблона и сохраняет его в Supabase."""
+    if not is_admin(message.from_user.id):
+        await message.answer("У вас нет прав администратора")
+        return
+
+    if message.text.strip().lower() in ("/cancel", "отмена"):
+        await state.clear()
+        await message.answer("❌ Редактирование шаблона отменено.")
+        return
+
+    data = await state.get_data()
+    template_key = data.get('template_key')
+    instagram_handle = data.get('instagram_handle')
+
+    new_text = message.text
+
+    # Сохраняем оверрайд в Supabase
+    try:
+        if not db_manager or not db_manager.client:
+            await message.answer("❌ Supabase недоступен, не удалось сохранить изменения.")
+            return
+
+        upsert_data = {
+            'template_key': template_key,
+            'template_text': new_text,
+            'updated_by': str(message.from_user.id)
+        }
+
+        db_manager.client.from_('instagram_response_templates') \
+            .upsert(upsert_data, on_conflict='template_key') \
+            .execute()
+
+        await message.answer(
+            "✅ Шаблон обновлён.\n\nНовая версия:\n"
+            "```\n" + new_text + "\n```",
+            parse_mode='Markdown'
+        )
+
+        # Возвращаемся к списку шаблонов для контакта
+        await state.clear()
+        # эмулируем нажатие кнопки "Шаблоны ответов"
+        fake_callback = types.CallbackQuery(
+            id="0",
+            from_user=message.from_user,
+            chat_instance="",
+            message=message,
+            data=f"response_templates_{instagram_handle}"
+        )
+        await show_response_templates(fake_callback)
+
+    except Exception as e:
+        logger.exception(f"Error saving template override: {e}")
+        await message.answer("❌ Ошибка при сохранении шаблона. Попробуйте позже.")
+        await state.clear()
+
+@dp.callback_query(F.data.startswith("show_contact_"))
+async def show_contact_from_button(callback_query: types.CallbackQuery):
+    """Показывает детали контакта из кнопки"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    instagram_handle = callback_query.data.replace("show_contact_", "")
+    
+    if not outreach_manager:
+        await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
+        return
+    
+    contact = outreach_manager.get_by_instagram_handle(instagram_handle)
+    
+    if not contact:
+        await callback_query.answer(f"Контакт {instagram_handle} не найден", show_alert=True)
+        return
+    
+    # Формируем информацию о контакте
+    status_names = {
+        'NOT_CONTACTED': 'Не обработаны',
+        'QUEUED': 'В очереди',
+        'SENT': 'Отправлено',
+        'REPLIED': 'Ответили',
+        'INTERESTED': 'Заинтересованы',
+        'CALL_SCHEDULED': 'Созвон запланирован',
+        'FOLLOW_UP_1': 'Follow-up 1',
+        'FOLLOW_UP_2': 'Follow-up 2',
+        'NOT_INTERESTED': 'Не заинтересованы',
+        'GHOSTED': 'Исчезли',
+        'CLOSED': 'Закрыто'
+    }
+    
+    text = f"👤 **Контакт: @{contact['instagram_handle']}**\n\n"
+    text += f"📛 Имя: {contact.get('name', 'не указано')}\n"
+    text += f"📍 Район: {contact.get('district', 'не указано')}\n"
+    text += f"💼 Тип бизнеса: {contact.get('business_type', 'не указано')}\n"
+    text += f"📊 Статус: {status_names.get(contact.get('outreach_status'), contact.get('outreach_status', 'UNKNOWN'))}\n"
+    text += f"⭐ Приоритет: {contact.get('priority', 'MEDIUM')}\n"
+    
+    if contact.get('first_contact_date'):
+        text += f"📅 Первый контакт: {contact['first_contact_date'][:10]}\n"
+    if contact.get('call_scheduled_date'):
+        text += f"📞 Созвон: {contact['call_scheduled_date'][:10]}\n"
+    if contact.get('notes'):
+        text += f"\n📝 Заметки: {contact['notes']}\n"
+    
+    # Быстрые действия
+    current_status = contact.get('outreach_status', 'NOT_CONTACTED')
+    status_buttons = []
+    
+    if current_status == 'SENT':
+        status_buttons.append(InlineKeyboardButton(text="✅ Ответил", callback_data=f"quick_status_{instagram_handle}_REPLIED"))
+        status_buttons.append(InlineKeyboardButton(text="💡 Заинтересован", callback_data=f"quick_status_{instagram_handle}_INTERESTED"))
+    elif current_status == 'REPLIED':
+        status_buttons.append(InlineKeyboardButton(text="💡 Заинтересован", callback_data=f"quick_status_{instagram_handle}_INTERESTED"))
+        status_buttons.append(InlineKeyboardButton(text="❌ Не заинтересован", callback_data=f"quick_status_{instagram_handle}_NOT_INTERESTED"))
+    elif current_status == 'INTERESTED':
+        status_buttons.append(InlineKeyboardButton(text="📞 Запланировать созвон", callback_data=f"schedule_call_{instagram_handle}"))
+        status_buttons.append(InlineKeyboardButton(text="✅ Закрыть", callback_data=f"quick_status_{instagram_handle}_CLOSED"))
+    elif current_status == 'CALL_SCHEDULED':
+        status_buttons.append(InlineKeyboardButton(text="✅ Закрыть", callback_data=f"quick_status_{instagram_handle}_CLOSED"))
+    
+    keyboard_rows = []
+    if status_buttons:
+        keyboard_rows.append(status_buttons)
+    
+    keyboard_rows.append([InlineKeyboardButton(text="📝 Шаблоны ответов", callback_data=f"response_templates_{instagram_handle}")])
+    keyboard_rows.append([
+        InlineKeyboardButton(text="📝 Генерировать сообщение", callback_data=f"outreach_message_btn_{instagram_handle}"),
+        InlineKeyboardButton(text="📅 Предстоящие созвоны", callback_data="outreach_upcoming_calls")
+    ])
+    keyboard_rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+    await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+    await callback_query.answer()
+
+@dp.callback_query(F.data == "outreach_followups")
+async def show_followups(callback_query: types.CallbackQuery):
+    """Показывает контакты, требующие follow-up"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    if not outreach_manager:
+        await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
+        return
+    
+    follow_ups = outreach_manager.get_follow_ups()
+    
+    if not follow_ups:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Обновить", callback_data="outreach_followups")],
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")]
+        ])
+        
+        await callback_query.message.edit_text(
+            "⏰ **Follow-up напоминания**\n\n"
+            "Нет контактов, требующих follow-up.",
+            reply_markup=keyboard
+        )
+        await callback_query.answer()
+        return
+    
+    text = "⏰ **Контакты, требующие follow-up**\n\n"
+    
+    for i, contact in enumerate(follow_ups[:10], 1):
+        text += f"{i}. 📱 @{contact.get('instagram_handle', 'unknown')}\n"
+        text += f"   👤 {contact.get('name', 'не указано')}\n"
+        text += f"   📊 Статус: {contact.get('outreach_status', 'UNKNOWN')}\n"
+        if contact.get('first_contact_date'):
+            text += f"   📅 Первый контакт: {contact['first_contact_date'][:10]}\n"
+        text += "\n"
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Обновить", callback_data="outreach_followups")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")]
+    ])
+    
+    await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+    await callback_query.answer()
+
+# --- Calendar Integration Handlers ---
+
+@dp.callback_query(F.data == "outreach_upcoming_calls")
+async def show_upcoming_calls(callback_query: types.CallbackQuery):
+    """Показывает предстоящие созвоны"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    if not outreach_manager:
+        await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
+        return
+    
+    upcoming = outreach_manager.get_upcoming_calls(limit=10)
+    
+    if not upcoming:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Обновить", callback_data="outreach_upcoming_calls")],
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")]
+        ])
+        
+        await callback_query.message.edit_text(
+            "📅 **Предстоящие созвоны**\n\n"
+            "Нет запланированных созвонов.",
+            reply_markup=keyboard
+        )
+        await callback_query.answer()
+        return
+    
+    from datetime import datetime
+    text = "📅 **Предстоящие созвоны**\n\n"
+    
+    for i, call in enumerate(upcoming[:10], 1):
+        call_date = call.get('call_scheduled_date')
+        if call_date:
+            try:
+                if isinstance(call_date, str):
+                    dt = datetime.fromisoformat(call_date.replace('Z', '+00:00'))
+                else:
+                    dt = call_date
+                formatted_date = dt.strftime('%d.%m.%Y %H:%M')
+                
+                text += f"{i}. 📞 {call.get('name', call.get('instagram_handle', 'Unknown'))}\n"
+                text += f"   🕐 {formatted_date}\n"
+                if call.get('meeting_link'):
+                    text += f"   🔗 [Ссылка на встречу]({call.get('meeting_link')})\n"
+                text += f"   📱 @{call.get('instagram_handle', '')}\n\n"
+            except Exception as e:
+                logger.warning(f"Error formatting call date: {e}")
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔄 Обновить", callback_data="outreach_upcoming_calls")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_outreach")]
+    ])
+    
+    await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown', disable_web_page_preview=True)
+    await callback_query.answer()
+
+@dp.callback_query(F.data.startswith("schedule_call_"))
+async def start_schedule_call(callback_query: types.CallbackQuery, state: FSMContext):
+    """Начинает процесс планирования созвона"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    instagram_handle = callback_query.data.replace("schedule_call_", "")
+    
+    # Сохраняем handle в состоянии
+    await state.update_data(instagram_handle=instagram_handle)
+    await state.set_state(CallScheduling.waiting_for_time)
+    
+    # Показываем быстрые опции (время для Нью-Йорка)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="📅 Завтра 10:00 NY", callback_data="quick_time_tomorrow_10"),
+            InlineKeyboardButton(text="📅 Завтра 14:00 NY", callback_data="quick_time_tomorrow_14")
+        ],
+        [
+            InlineKeyboardButton(text="📅 Завтра 15:00 NY", callback_data="quick_time_tomorrow_15"),
+            InlineKeyboardButton(text="📅 Через 3 дня 14:00 NY", callback_data="quick_time_3days_14")
+        ],
+        [InlineKeyboardButton(text="✏️ Ввести вручную", callback_data="manual_time")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_schedule")]
+    ])
+    
+    await callback_query.message.edit_text(
+        f"📅 **Планирование созвона с @{instagram_handle}**\n\n"
+        "⏰ **Важно:** Указывайте время для Нью-Йорка (NY)\n"
+        "Разница: Нячанг опережает NY на 11-12 часов\n\n"
+        "Выберите время или введите вручную:\n"
+        "Формат: `DD.MM.YYYY HH:MM` (время для Нью-Йорка)\n"
+        "Пример: `25.12.2024 14:00` (14:00 в Нью-Йорке)",
+        reply_markup=keyboard,
+        parse_mode='Markdown'
+    )
+    await callback_query.answer()
+
+@dp.callback_query(F.data.startswith("quick_time_"))
+async def quick_schedule_time(callback_query: types.CallbackQuery, state: FSMContext):
+    """Быстрое планирование с предустановленным временем"""
+    from datetime import datetime, timedelta
+    
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    data = await state.get_data()
+    instagram_handle = data.get('instagram_handle')
+    
+    if not instagram_handle:
+        await callback_query.answer("Ошибка: handle не найден", show_alert=True)
+        return
+    
+    # Парсим опцию (время указывается для Нью-Йорка)
+    option = callback_query.data.replace("quick_time_", "")
+    
+    # Используем timezone для Нью-Йорка
+    from datetime import timezone, timedelta
+    import pytz
+    
+    ny_tz = pytz.timezone('America/New_York')
+    now_ny = datetime.now(ny_tz)
+    
+    if option == "tomorrow_10":
+        scheduled_time_ny = (now_ny + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0)
+    elif option == "tomorrow_14":
+        scheduled_time_ny = (now_ny + timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0)
+    elif option == "tomorrow_15":
+        scheduled_time_ny = (now_ny + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0)
+    elif option == "3days_14":
+        scheduled_time_ny = (now_ny + timedelta(days=3)).replace(hour=14, minute=0, second=0, microsecond=0)
+    else:
+        await callback_query.answer("Неизвестная опция", show_alert=True)
+        return
+    
+    # Конвертируем в UTC для хранения в базе
+    scheduled_time = scheduled_time_ny.astimezone(timezone.utc).replace(tzinfo=None)
+    
+    # Планируем созвон
+    try:
+        result = outreach_manager.schedule_call(
+            instagram_handle=instagram_handle,
+            scheduled_time=scheduled_time,
+            duration_minutes=30
+        )
+        
+        if result and result.get('success'):
+            calendar_link = result.get('calendar_html_link', '')
+            meeting_link = result.get('meeting_link', '')
+            
+            # Показываем время в обоих часовых поясах
+            import pytz
+            ny_tz = pytz.timezone('America/New_York')
+            nha_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+            
+            # scheduled_time_ny уже определен выше, используем его
+            scheduled_time_nha = scheduled_time_ny.astimezone(nha_tz)
+            
+            text = f"✅ **Созвон запланирован!**\n\n"
+            text += f"📱 Партнер: @{instagram_handle}\n"
+            text += f"🕐 Время в Нью-Йорке: {scheduled_time_ny.strftime('%d.%m.%Y %H:%M')} (NY)\n"
+            text += f"🕐 Время в Нячанге: {scheduled_time_nha.strftime('%d.%m.%Y %H:%M')} (NHA)\n"
+            text += f"⏱ Длительность: 30 минут\n"
+            
+            if meeting_link:
+                text += f"🔗 [Ссылка на встречу]({meeting_link})\n"
+            
+            if calendar_link:
+                text += f"📅 [Открыть в календаре]({calendar_link})\n"
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад в Outreach", callback_data="admin_outreach")]
+            ])
+            
+            await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown', disable_web_page_preview=True)
+            await state.clear()
+        else:
+            await callback_query.answer("Ошибка при планировании созвона", show_alert=True)
+    except Exception as e:
+        logger.exception(f"Error scheduling call: {e}")
+        await callback_query.answer(f"Ошибка: {str(e)}", show_alert=True)
+    
+    await callback_query.answer()
+
+@dp.callback_query(F.data == "manual_time")
+async def manual_time_input(callback_query: types.CallbackQuery, state: FSMContext):
+    """Запрашивает ручной ввод времени"""
+    await callback_query.message.edit_text(
+        "✏️ **Введите дату и время созвона**\n\n"
+        "⏰ **Важно:** Указывайте время для Нью-Йорка (NY)\n"
+        "Разница: Нячанг опережает NY на 11-12 часов\n\n"
+        "Формат: `DD.MM.YYYY HH:MM` (время для Нью-Йорка)\n"
+        "Пример: `25.12.2024 14:00` (14:00 в Нью-Йорке)\n\n"
+        "Или используйте команду /cancel для отмены"
+    )
+    await callback_query.answer()
+
+@dp.message(CallScheduling.waiting_for_time)
+async def process_call_time(message: types.Message, state: FSMContext):
+    """Обрабатывает введенное время созвона (время для Нью-Йорка)"""
+    from datetime import datetime, timezone
+    import pytz
+    
+    time_str = message.text.strip()
+    
+    try:
+        # Парсим дату и время (предполагаем, что это время для Нью-Йорка)
+        scheduled_time_naive = datetime.strptime(time_str, '%d.%m.%Y %H:%M')
+        
+        # Применяем timezone Нью-Йорка
+        ny_tz = pytz.timezone('America/New_York')
+        scheduled_time_ny = ny_tz.localize(scheduled_time_naive)
+        
+        # Конвертируем в UTC для хранения
+        scheduled_time = scheduled_time_ny.astimezone(timezone.utc).replace(tzinfo=None)
+        
+        # Проверяем, что время в будущем (в Нью-Йорке)
+        now_ny = datetime.now(ny_tz)
+        if scheduled_time_naive < now_ny.replace(tzinfo=None):
+            await message.answer("❌ Время должно быть в будущем (для Нью-Йорка)! Попробуйте еще раз:")
+            return
+        
+        # Сохраняем время
+        await state.update_data(scheduled_time=scheduled_time.isoformat())
+        await state.set_state(CallScheduling.waiting_for_duration)
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="30 мин", callback_data="duration_30"),
+                InlineKeyboardButton(text="45 мин", callback_data="duration_45"),
+                InlineKeyboardButton(text="60 мин", callback_data="duration_60")
+            ],
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_schedule")]
+        ])
+        
+        await message.answer(
+            f"✅ Время: {scheduled_time.strftime('%d.%m.%Y %H:%M')}\n\n"
+            "Выберите длительность созвона:",
+            reply_markup=keyboard
+        )
+    except ValueError:
+        await message.answer(
+            "❌ Неверный формат времени!\n\n"
+            "Используйте формат: `DD.MM.YYYY HH:MM`\n"
+            "Пример: `25.12.2024 14:00`",
+            parse_mode='Markdown'
+        )
+
+@dp.callback_query(F.data.startswith("duration_"))
+async def process_call_duration(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обрабатывает выбранную длительность"""
+    from datetime import datetime
+    
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    duration = int(callback_query.data.replace("duration_", ""))
+    data = await state.get_data()
+    
+    instagram_handle = data.get('instagram_handle')
+    scheduled_time_str = data.get('scheduled_time')
+    
+    if not instagram_handle or not scheduled_time_str:
+        await callback_query.answer("Ошибка: данные не найдены", show_alert=True)
+        return
+    
+    try:
+        scheduled_time = datetime.fromisoformat(scheduled_time_str)
+        
+        # Планируем созвон
+        result = outreach_manager.schedule_call(
+            instagram_handle=instagram_handle,
+            scheduled_time=scheduled_time,
+            duration_minutes=duration
+        )
+        
+        if result and result.get('success'):
+            calendar_link = result.get('calendar_html_link', '')
+            meeting_link = result.get('meeting_link', '')
+            
+            # Показываем время в обоих часовых поясах
+            import pytz
+            ny_tz = pytz.timezone('America/New_York')
+            nha_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+            
+            # Конвертируем scheduled_time обратно в NY timezone
+            scheduled_time_utc = pytz.utc.localize(scheduled_time)
+            scheduled_time_ny = scheduled_time_utc.astimezone(ny_tz)
+            scheduled_time_nha = scheduled_time_utc.astimezone(nha_tz)
+            
+            text = f"✅ **Созвон запланирован!**\n\n"
+            text += f"📱 Партнер: @{instagram_handle}\n"
+            text += f"🕐 Время в Нью-Йорке: {scheduled_time_ny.strftime('%d.%m.%Y %H:%M')} (NY)\n"
+            text += f"🕐 Время в Нячанге: {scheduled_time_nha.strftime('%d.%m.%Y %H:%M')} (NHA)\n"
+            text += f"⏱ Длительность: {duration} минут\n"
+            
+            if meeting_link:
+                text += f"🔗 [Ссылка на встречу]({meeting_link})\n"
+            
+            if calendar_link:
+                text += f"📅 [Открыть в календаре]({calendar_link})\n"
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад в Outreach", callback_data="admin_outreach")]
+            ])
+            
+            await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown', disable_web_page_preview=True)
+            await state.clear()
+        else:
+            await callback_query.answer("Ошибка при планировании созвона", show_alert=True)
+    except Exception as e:
+        logger.exception(f"Error scheduling call: {e}")
+        await callback_query.answer(f"Ошибка: {str(e)}", show_alert=True)
+    
+    await callback_query.answer()
+
+@dp.callback_query(F.data == "cancel_schedule")
+async def cancel_schedule(callback_query: types.CallbackQuery, state: FSMContext):
+    """Отменяет планирование созвона"""
+    await state.clear()
+    await callback_query.message.edit_text("❌ Планирование отменено")
+    await callback_query.answer()
 
 # --- Запуск Бота ---
 
