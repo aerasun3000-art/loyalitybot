@@ -843,10 +843,22 @@ async def show_news_management(callback_query: types.CallbackQuery):
 @dp.callback_query(F.data == "back_to_main")
 async def back_to_main_menu(callback_query: types.CallbackQuery):
     """Возврат в главное меню."""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
         [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
+        [InlineKeyboardButton(text="🛠 Услуги Партнёров", callback_data="admin_manage_services")],
+        [InlineKeyboardButton(text="💎 MLM Revenue Share", callback_data="admin_mlm")],
         [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
+        [InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc")],
+        [InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters")],
+        [InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard")],
+        [InlineKeyboardButton(text="📱 Instagram Outreach", callback_data="admin_outreach")],
+        [InlineKeyboardButton(text="➕ Добавить контакт (Outreach)", callback_data="outreach_add")],
+        [InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background")],
         [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
         [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
         [InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers")]
@@ -856,6 +868,7 @@ async def back_to_main_menu(callback_query: types.CallbackQuery):
         "👋 **Админ-панель**\n\nВыберите раздел для управления системой лояльности:",
         reply_markup=keyboard
     )
+    await callback_query.answer()
 
 
 @dp.callback_query(F.data == "news_create")
@@ -2186,36 +2199,6 @@ async def handle_mlm_partner_command(message: types.Message):
         await message.answer(f"❌ Ошибка: {e}")
 
 
-@dp.callback_query(F.data == "back_to_main")
-async def back_to_main_menu(callback_query: types.CallbackQuery):
-    """Возврат в главное меню админа"""
-    if not is_admin(callback_query.from_user.id):
-        await callback_query.answer("У вас нет прав администратора")
-        return
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
-        [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
-        [InlineKeyboardButton(text="🛠 Услуги Партнёров", callback_data="admin_manage_services")],
-        [InlineKeyboardButton(text="💎 MLM Revenue Share", callback_data="admin_mlm")],
-        [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
-        [InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc")],
-        [InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters")],
-        [InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard")],
-        [InlineKeyboardButton(text="📱 Instagram Outreach", callback_data="admin_outreach")],
-        [InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background")],
-        [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
-        [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
-        [InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers")]
-    ])
-    
-    await callback_query.message.edit_text(
-        "👋 **Админ-панель**\n\nВыберите раздел для управления системой лояльности:",
-        reply_markup=keyboard
-    )
-    await callback_query.answer()
-
-
 # --- Instagram Outreach Handlers ---
 
 # Инициализация Instagram Outreach Manager
@@ -2309,14 +2292,59 @@ async def process_outreach_instagram(message: types.Message, state: FSMContext):
         "Введите имя партнера (или нажмите /skip для пропуска):"
     )
 
+# Списки для выбора
+DISTRICTS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island']
+
+BUSINESS_TYPE_EMOJIS = {
+    'nail_care': '💅',
+    'brow_design': '👁️',
+    'hair_salon': '💇‍♀️',
+    'hair_removal': '⚡',
+    'facial_aesthetics': '✨',
+    'lash_services': '👀',
+    'massage_therapy': '💆‍♀️',
+    'makeup_pmu': '💄',
+    'body_wellness': '🌸',
+    'nutrition_coaching': '🍎',
+    'mindfulness_coaching': '🧠',
+    'image_consulting': '👗'
+}
+
+BUSINESS_TYPE_NAMES = {
+    'nail_care': 'Ногтевой сервис',
+    'brow_design': 'Коррекция бровей',
+    'hair_salon': 'Парикмахерские услуги',
+    'hair_removal': 'Депиляция',
+    'facial_aesthetics': 'Косметология',
+    'lash_services': 'Наращивание ресниц',
+    'massage_therapy': 'Массаж',
+    'makeup_pmu': 'Визаж и перманент',
+    'body_wellness': 'Телесная терапия',
+    'nutrition_coaching': 'Нутрициология',
+    'mindfulness_coaching': 'Ментальное здоровье',
+    'image_consulting': 'Стиль'
+}
+
 @dp.message(Command("skip"), OutreachAdd.waiting_for_name)
 async def skip_outreach_name(message: types.Message, state: FSMContext):
     """Пропустить ввод имени"""
     await state.update_data(name=None)
     await state.set_state(OutreachAdd.waiting_for_district)
+    
+    # Создаем кнопки для выбора района
+    keyboard_rows = []
+    for district in DISTRICTS:
+        keyboard_rows.append([InlineKeyboardButton(
+            text=f"📍 {district}",
+            callback_data=f"outreach_select_district_{district}"
+        )])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+    
     await message.answer(
         "Имя пропущено.\n\n"
-        "Введите район (например: Brooklyn, Manhattan, Queens):"
+        "📍 Выберите район:",
+        reply_markup=keyboard
     )
 
 @dp.message(OutreachAdd.waiting_for_name)
@@ -2324,25 +2352,56 @@ async def process_outreach_name(message: types.Message, state: FSMContext):
     """Обработка имени"""
     await state.update_data(name=message.text.strip())
     await state.set_state(OutreachAdd.waiting_for_district)
+    
+    # Создаем кнопки для выбора района
+    keyboard_rows = []
+    for district in DISTRICTS:
+        keyboard_rows.append([InlineKeyboardButton(
+            text=f"📍 {district}",
+            callback_data=f"outreach_select_district_{district}"
+        )])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+    
     await message.answer(
         f"Имя: {message.text.strip()}\n\n"
-        "Введите район (например: Brooklyn, Manhattan, Queens):"
+        "📍 Выберите район:",
+        reply_markup=keyboard
     )
 
-@dp.message(OutreachAdd.waiting_for_district)
-async def process_outreach_district(message: types.Message, state: FSMContext):
-    """Обработка района"""
-    await state.update_data(district=message.text.strip())
+@dp.callback_query(F.data.startswith("outreach_select_district_"))
+async def process_outreach_district_selection(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработка выбора района через кнопку"""
+    district = callback_query.data.replace("outreach_select_district_", "")
+    await state.update_data(district=district)
     await state.set_state(OutreachAdd.waiting_for_business_type)
-    await message.answer(
-        f"Район: {message.text.strip()}\n\n"
-        "Введите тип бизнеса (например: nail_care, hair_styling, makeup):"
+    
+    # Получаем список категорий услуг
+    business_types = db_manager.get_service_categories_list() if db_manager else []
+    
+    # Создаем кнопки для выбора вида услуг
+    keyboard_rows = []
+    for business_type in business_types:
+        emoji = BUSINESS_TYPE_EMOJIS.get(business_type, '💼')
+        name = BUSINESS_TYPE_NAMES.get(business_type, business_type)
+        keyboard_rows.append([InlineKeyboardButton(
+            text=f"{emoji} {name}",
+            callback_data=f"outreach_select_business_type_{business_type}"
+        )])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+    
+    await callback_query.message.edit_text(
+        f"📍 Район: {district}\n\n"
+        "💼 Выберите вид услуг:",
+        reply_markup=keyboard
     )
+    await callback_query.answer()
 
-@dp.message(OutreachAdd.waiting_for_business_type)
-async def process_outreach_business_type(message: types.Message, state: FSMContext):
-    """Обработка типа бизнеса и сохранение контакта"""
-    business_type = message.text.strip()
+@dp.callback_query(F.data.startswith("outreach_select_business_type_"))
+async def process_outreach_business_type_selection(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработка выбора вида услуг и сохранение контакта"""
+    business_type = callback_query.data.replace("outreach_select_business_type_", "")
     data = await state.get_data()
     
     try:
@@ -2351,26 +2410,31 @@ async def process_outreach_business_type(message: types.Message, state: FSMConte
             name=data.get('name'),
             district=data.get('district'),
             business_type=business_type,
-            created_by=str(message.from_user.id)
+            created_by=str(callback_query.from_user.id)
         )
         
-        await message.answer(
+        business_type_name = BUSINESS_TYPE_NAMES.get(business_type, business_type)
+        
+        await callback_query.message.edit_text(
             f"✅ **Контакт добавлен!**\n\n"
             f"📱 Instagram: `{contact['instagram_handle']}`\n"
             f"👤 Имя: {contact.get('name', 'не указано')}\n"
             f"📍 Район: {contact.get('district', 'не указано')}\n"
-            f"💼 Тип бизнеса: {contact.get('business_type', 'не указано')}\n"
+            f"💼 Тип бизнеса: {business_type_name}\n"
             f"📊 Статус: {contact.get('outreach_status', 'NOT_CONTACTED')}\n\n"
             f"Используйте /outreach_message {contact['instagram_handle']} для генерации сообщения"
         )
         
         await state.clear()
+        await callback_query.answer("Контакт успешно добавлен!")
         
     except ValueError as e:
-        await message.answer(f"❌ Ошибка: {str(e)}")
+        await callback_query.message.edit_text(f"❌ Ошибка: {str(e)}")
+        await callback_query.answer("Ошибка при добавлении контакта", show_alert=True)
     except Exception as e:
         logger.exception(f"Error adding outreach contact: {e}")
-        await message.answer(f"❌ Произошла ошибка при добавлении контакта: {str(e)}")
+        await callback_query.message.edit_text(f"❌ Произошла ошибка при добавлении контакта: {str(e)}")
+        await callback_query.answer("Ошибка при добавлении контакта", show_alert=True)
 
 @dp.callback_query(F.data == "outreach_queue")
 async def show_outreach_queue(callback_query: types.CallbackQuery):
