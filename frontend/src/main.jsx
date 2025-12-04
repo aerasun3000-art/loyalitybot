@@ -60,8 +60,10 @@ if ('caches' in window) {
       if (window.Telegram?.WebApp) {
         console.log('🔄 Reloading once to apply new version...')
         setTimeout(() => {
-          const url = window.location.href.split('?')[0]
-          window.location.href = url + '?v=' + Date.now() + '&_reload=1'
+          const [baseUrl, queryString] = window.location.href.split('?')
+          const extraParams = `_reload=1&v=${Date.now()}`
+          const newQuery = queryString ? `${queryString}&${extraParams}` : extraParams
+          window.location.href = `${baseUrl}?${newQuery}`
         }, 100)
         return
       }
