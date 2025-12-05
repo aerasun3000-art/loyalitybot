@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics } from '../services/supabase'
+import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo } from '../services/supabase'
 import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
 import { getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
+import { useTranslation } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 import LocationSelector from '../components/LocationSelector'
 import QRCode from 'qrcode'
@@ -22,6 +24,8 @@ const Services = () => {
   const districtParam = searchParams.get('district')
   const categoryParam = searchParams.get('category')
   const chatId = getChatId()
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
   
   const [loading, setLoading] = useState(true)
   const [services, setServices] = useState([])
@@ -42,6 +46,7 @@ const Services = () => {
   const [categoryFilter, setCategoryFilter] = useState(categoryParam || null)
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false)
   const [partnersMetrics, setPartnersMetrics] = useState({})
+  const [referralPartnerInfo, setReferralPartnerInfo] = useState(null)
 
   const resolveCategory = useCallback((code) => {
     if (!code) return null
@@ -86,6 +91,11 @@ const Services = () => {
   const loadData = async () => {
     try {
       setLoading(true)
+      
+      // Получаем информацию о партнере, который добавил клиента через приветственный бонус
+      const partnerInfo = await getReferralPartnerInfo(chatId)
+      setReferralPartnerInfo(partnerInfo)
+      
       const [servicesData, balanceData, ratedPartners] = await Promise.all([
         getFilteredServices(cityParam || null, null),
         getClientBalance(chatId),
@@ -133,7 +143,7 @@ const Services = () => {
     services.forEach(service => {
       const rawCategoryCode = service.partner?.business_type || service.category || 'other'
       const partnerId = service.partner_chat_id || 'unknown'
-      const companyName = service.partner?.company_name || service.partner?.name || 'Неизвестная компания'
+      const companyName = service.partner?.company_name || service.partner?.name || t('partner_not_connected')
       const category = resolveCategory(rawCategoryCode) || {
         code: rawCategoryCode,
         name: 'Услуга',
@@ -276,6 +286,33 @@ const Services = () => {
     return group.partner?.district === selectedDistrict
   }
 
+  // Функция для проверки, является ли партнер конкурентом
+  const isCompetitor = useCallback((service) => {
+    // Если у клиента нет партнера, который его добавил, не скрываем никого
+    if (!referralPartnerInfo) {
+      return false
+    }
+
+    const servicePartnerId = service.partner_chat_id || service.partnerId
+    const serviceCategory = service.partner?.business_type || service.category || service.categoryCode
+    
+    // Если это сам партнер, который добавил клиента - НЕ конкурент (показываем)
+    if (servicePartnerId === referralPartnerInfo.chatId) {
+      return false
+    }
+
+    if (!serviceCategory || !referralPartnerInfo.businessType) {
+      return false
+    }
+
+    // Нормализуем категории для сравнения
+    const referralCategory = normalizeCategoryCode(referralPartnerInfo.businessType)
+    const serviceCategoryNormalized = normalizeCategoryCode(serviceCategory)
+
+    // Если категории совпадают - это конкурент (скрываем)
+    return referralCategory === serviceCategoryNormalized
+  }, [referralPartnerInfo, normalizeCategoryCode])
+
   useEffect(() => {
     if (categoryFilter && !categoryOptions.find(option => option.code === categoryFilter)) {
       setCategoryFilter(null)
@@ -290,6 +327,12 @@ const Services = () => {
       services.forEach(service => {
         const rawCode = service.partner?.business_type || service.category
         if (!rawCode) return
+
+        // Скрываем конкурентов (партнеров с той же категорией услуг, что и партнер, который добавил клиента)
+        // НО показываем услуги самого партнера, который добавил клиента
+        if (isCompetitor(service)) {
+          return
+        }
 
         if (!doesServiceMatchCurrentFilter(service)) {
           return
@@ -326,7 +369,11 @@ const Services = () => {
       )
     }
 
-    let groups = getGroupedServices().filter(group => group.categoryCode === categoryFilter)
+    let groups = getGroupedServices()
+      .filter(group => group.categoryCode === categoryFilter)
+      // Скрываем конкурентов (партнеров с той же категорией услуг)
+      // НО показываем услуги самого партнера, который добавил клиента
+      .filter(group => !isCompetitor({ partner: group.partner, partner_chat_id: group.partnerId, category: group.categoryCode }))
 
     if (filter === 'my_district') {
       groups = groups.filter(matchesDistrict)
@@ -795,9 +842,9 @@ const Services = () => {
               <div>
                 <p className="text-sm text-sakura-dark/60 mb-1 uppercase tracking-wide">Услуга</p>
                 <h2 className="text-xl font-bold">{selectedService.title}</h2>
-                {selectedService.partner?.company_name && (
-                  <p className="text-sm text-sakura-dark/70 mt-1">{selectedService.partner.company_name}</p>
-                )}
+                <p className="text-sm text-sakura-dark/70 mt-1">
+                  {selectedService.partner?.company_name || selectedService.partner?.name || t('partner_not_connected')}
+                </p>
               </div>
               {selectedService.description && (
                 <p className="text-sm text-sakura-dark/80 bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-3">

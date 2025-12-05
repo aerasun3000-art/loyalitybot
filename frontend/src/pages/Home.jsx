@@ -685,7 +685,7 @@ const Home = () => {
                         </div>
                       )}
                       <p className="text-sm text-sakura-mid mb-3">
-                        {promo.partner?.company_name || promo.partner?.name}
+                        {promo.partner?.company_name || promo.partner?.name || t('partner_not_connected')}
                       </p>
                       <div className="flex items-center justify-between flex-wrap gap-3">
                         <div className="flex items-center gap-1 text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">

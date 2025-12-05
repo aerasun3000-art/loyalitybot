@@ -94,7 +94,7 @@ const History = () => {
   const getTransactionTitle = (transaction) => {
     switch (transaction.operation_type) {
       case 'accrual':
-        return `Покупка у ${transaction.partner?.company_name || transaction.partner?.name || 'партнёра'}`
+        return `Покупка у ${transaction.partner?.company_name || transaction.partner?.name || 'партнёра, который пока не подключен к системе'}`
       case 'enrollment_bonus':
         return 'Бонус за регистрацию'
       case 'redemption':

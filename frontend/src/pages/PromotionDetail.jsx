@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getPromotionById } from '../services/supabase'
 import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
+import { useTranslation } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 import QRCode from 'qrcode'
 
 const PromotionDetail = () => {
   const navigate = useNavigate()
   const { id } = useParams()
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
   const [promotion, setPromotion] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -143,7 +147,7 @@ const PromotionDetail = () => {
           </svg>
         </button>
         <span className="text-sakura-dark font-semibold">
-          {promotion.partner?.company_name || promotion.partner?.name || 'Акции'}
+          {promotion.partner?.company_name || promotion.partner?.name || t('partner_not_connected')}
         </span>
       </div>
 
@@ -154,9 +158,9 @@ const PromotionDetail = () => {
             <div>
               <p className="text-sm text-sakura-dark/60 mb-1 uppercase tracking-wide">Акция</p>
               <h2 className="text-xl font-bold">{promotion.title}</h2>
-              {promotion.partner?.company_name && (
-                <p className="text-sm text-sakura-dark/70 mt-1">{promotion.partner.company_name}</p>
-              )}
+              <p className="text-sm text-sakura-dark/70 mt-1">
+                {promotion.partner?.company_name || promotion.partner?.name || t('partner_not_connected')}
+              </p>
             </div>
 
             {/* Изображение акции */}

@@ -181,6 +181,7 @@ const translations = {
     partner_redirecting: 'Перенаправление в партнерский бот...',
     partner_footer_text: 'После одобрения заявки вы получите доступ к партнерской панели',
     partner_error: 'Произошла ошибка при отправке заявки. Попробуйте еще раз.',
+    partner_not_connected: 'Данный партнер пока не подключен к системе',
     
     // Loyalty Progress
     loyalty_level_newbie: 'Новичок',
@@ -441,6 +442,7 @@ const translations = {
     partner_redirecting: 'Redirecting to partner bot...',
     partner_footer_text: 'After approval, you will get access to the partner panel',
     partner_error: 'An error occurred while submitting the application. Please try again.',
+    partner_not_connected: 'This partner is not yet connected to the system',
     
     // Loyalty Progress
     loyalty_level_newbie: 'Newbie',
