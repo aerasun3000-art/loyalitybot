@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLanguageStore from '../store/languageStore';
 import { hapticFeedback } from '../utils/telegram';
@@ -225,14 +225,14 @@ const OnePagerPartner = () => {
   const [earlyBirdCount, setEarlyBirdCount] = useState(null);
   const [remainingSlots, setRemainingSlots] = useState(null);
   
-  const t = (key, params = {}) => {
+  const t = useCallback((key, params = {}) => {
     let text = translations[language]?.[key] || translations.en[key] || key;
     // Заменяем параметры
     Object.keys(params).forEach(param => {
       text = text.replace(`{${param}}`, params[param]);
     });
     return text;
-  };
+  }, [language]);
 
   useEffect(() => {
     // Здесь можно добавить API вызов для получения актуального количества
@@ -655,48 +655,44 @@ const OnePagerPartner = () => {
   );
 };
 
+// Константы вынесены за пределы компонента для предотвращения пересоздания
+const DISTRICTS = [
+  'Manhattan Downtown',
+  'Manhattan Midtown',
+  'Manhattan Upper East',
+  'Manhattan Upper West',
+  'Brooklyn Downtown',
+  'Brooklyn North',
+  'Brooklyn South + S.I.',
+  'Queens West + Bronx South',
+  'Queens East',
+  'Brooklyn Central'
+];
+
+const SERVICES = [
+  { id: 'nail_care', emoji: '💅', name: 'Nail Care' },
+  { id: 'brow_design', emoji: '👁️', name: 'Brow Design' },
+  { id: 'hair_salon', emoji: '💇‍♀️', name: 'Hair Salon' },
+  { id: 'hair_removal', emoji: '⚡', name: 'Hair Removal' },
+  { id: 'facial_aesthetics', emoji: '✨', name: 'Facial Aesthetics' },
+  { id: 'lash_services', emoji: '👀', name: 'Lash Services' },
+  { id: 'massage_therapy', emoji: '💆‍♀️', name: 'Massage Therapy' },
+  { id: 'makeup_pmu', emoji: '💄', name: 'Make-up & PMU' },
+  { id: 'body_wellness', emoji: '🌸', name: 'Body Wellness' },
+  { id: 'nutrition_coaching', emoji: '🍎', name: 'Nutrition Coaching' },
+  { id: 'mindfulness_coaching', emoji: '🧠', name: 'Mindfulness & Coaching' },
+  { id: 'image_consulting', emoji: '👗', name: 'Image Consulting' }
+];
+
 // Компонент простой визуализации доступности
 const SimpleAvailabilityHeatmap = ({ t, language }) => {
   const navigate = useNavigate();
   const [availability, setAvailability] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
 
-  const DISTRICTS = [
-    'Manhattan Downtown',
-    'Manhattan Midtown',
-    'Manhattan Upper East',
-    'Manhattan Upper West',
-    'Brooklyn Downtown',
-    'Brooklyn North',
-    'Brooklyn South + S.I.',
-    'Queens West + Bronx South',
-    'Queens East',
-    'Brooklyn Central'
-  ];
-
-  const SERVICES = [
-    { id: 'nail_care', emoji: '💅', name: 'Nail Care' },
-    { id: 'brow_design', emoji: '👁️', name: 'Brow Design' },
-    { id: 'hair_salon', emoji: '💇‍♀️', name: 'Hair Salon' },
-    { id: 'hair_removal', emoji: '⚡', name: 'Hair Removal' },
-    { id: 'facial_aesthetics', emoji: '✨', name: 'Facial Aesthetics' },
-    { id: 'lash_services', emoji: '👀', name: 'Lash Services' },
-    { id: 'massage_therapy', emoji: '💆‍♀️', name: 'Massage Therapy' },
-    { id: 'makeup_pmu', emoji: '💄', name: 'Make-up & PMU' },
-    { id: 'body_wellness', emoji: '🌸', name: 'Body Wellness' },
-    { id: 'nutrition_coaching', emoji: '🍎', name: 'Nutrition Coaching' },
-    { id: 'mindfulness_coaching', emoji: '🧠', name: 'Mindfulness & Coaching' },
-    { id: 'image_consulting', emoji: '👗', name: 'Image Consulting' }
-  ];
-
-  useEffect(() => {
-    if (showMap) {
-      fetchAvailability();
-    }
-  }, [showMap]);
-
-  const fetchAvailability = async () => {
+  const fetchAvailability = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -750,10 +746,17 @@ const SimpleAvailabilityHeatmap = ({ t, language }) => {
         });
       });
       setAvailability(availMap);
+      setHasFetched(true);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (showMap && !hasFetched && !loading) {
+      fetchAvailability();
+    }
+  }, [showMap, hasFetched, loading, fetchAvailability]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -916,7 +919,7 @@ const ROICalculator = ({ t, language }) => {
   const [averageCheck, setAverageCheck] = useState(100);
   const [currentRetention, setCurrentRetention] = useState(30);
 
-  const calculateROI = () => {
+  const roi = useMemo(() => {
     // Программа лояльности увеличивает возврат клиентов на 20-40%
     // Используем консервативную оценку в 25%
     const retentionIncrease = 25;

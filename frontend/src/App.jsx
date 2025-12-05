@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AppRoot } from '@telegram-apps/telegram-ui'
 import { getTelegramWebApp, getChatId, getColorScheme } from './utils/telegram'
@@ -52,18 +52,13 @@ const PUBLIC_ROUTES = [
 // Компонент для условного отображения навигации
 function AppContent() {
   const location = useLocation()
-  console.log('AppContent: location =', location.pathname)
-  
   const chatId = getChatId()
-  console.log('AppContent: chatId =', chatId)
   
   // Проверяем, является ли текущий маршрут публичным
   const isPublicRoute = PUBLIC_ROUTES.some(route => location.pathname.startsWith(route))
-  console.log('AppContent: isPublicRoute =', isPublicRoute, 'for path', location.pathname)
   
   // Для приватных маршрутов требуем авторизацию
   // if (!isPublicRoute && !chatId) {
-  //   console.log('AppContent: Showing auth error - private route without chatId')
   //   return (
   //     <div className="flex items-center justify-center min-h-screen p-4">
   //       <div className="text-center">
@@ -75,8 +70,6 @@ function AppContent() {
   //     </div>
   //   )
   // }
-
-  console.log('AppContent: Rendering main content')
   
   return (
     <div className="flex flex-col min-h-screen">
@@ -121,40 +114,49 @@ function AppContent() {
 }
 
 function App() {
-  console.log('App: Starting...')
   const tg = getTelegramWebApp()
   const colorScheme = getColorScheme()
-  console.log('App: tg =', tg, 'colorScheme =', colorScheme)
+  const initialized = useRef(false)
 
   useEffect(() => {
-    console.log('App: useEffect triggered')
+    // Инициализация выполняется только один раз
+    if (initialized.current) {
+      return
+    }
+    
+    initialized.current = true
+    
     // Инициализация Telegram Web App
     if (tg) {
-      console.log('App: Initializing Telegram WebApp')
       tg.ready()
       tg.expand()
       
-      // Отключаем случайное закрытие приложения свайпом
-      try {
-        // Показываем подтверждение перед закрытием
-        if (tg.enableClosingConfirmation && typeof tg.enableClosingConfirmation === 'function') {
-          tg.enableClosingConfirmation()
+      // Проверяем версию API перед вызовом неподдерживаемых функций
+      const version = tg.version || '6.0'
+      const majorVersion = parseInt(version.split('.')[0])
+      
+      // Эти функции поддерживаются только в версиях < 6.0
+      if (majorVersion < 6) {
+        try {
+          // Показываем подтверждение перед закрытием
+          if (tg.enableClosingConfirmation && typeof tg.enableClosingConfirmation === 'function') {
+            tg.enableClosingConfirmation()
+          }
+          // Отключаем вертикальные свайпы
+          if (tg.disableVerticalSwipes && typeof tg.disableVerticalSwipes === 'function') {
+            tg.disableVerticalSwipes()
+          }
+        } catch (error) {
+          // Игнорируем ошибки для неподдерживаемых функций
         }
-        // Отключаем вертикальные свайпы (может не работать в новых версиях)
-        if (tg.disableVerticalSwipes && typeof tg.disableVerticalSwipes === 'function') {
-          tg.disableVerticalSwipes()
-        }
-      } catch (error) {
-        console.warn('Could not disable swipe-to-close:', error)
       }
       
       // Устанавливаем цветовую схему
-      document.documentElement.className = colorScheme
+      document.documentElement.className = colorScheme || 'light'
     } else {
-      console.log('App: No Telegram WebApp, using default theme')
       document.documentElement.className = colorScheme || 'light'
     }
-  }, [tg, colorScheme])
+  }, []) // Пустой массив зависимостей - выполняется только один раз
 
   return (
     <ErrorBoundary>
