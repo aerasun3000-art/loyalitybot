@@ -7,8 +7,15 @@ import { initSentry } from './sentry'
 // Инициализация Sentry для отслеживания ошибок
 initSentry()
 
-// Принудительная очистка кэша для Telegram Web App
-if ('caches' in window) {
+// Очистка кэша только при необходимости (не на публичных страницах)
+const isPublicPage = window.location.pathname.startsWith('/onepager/') || 
+                     window.location.pathname.startsWith('/partner/income-presentation') ||
+                     window.location.pathname.startsWith('/partner/apply') ||
+                     window.location.pathname.startsWith('/availability-map') ||
+                     window.location.pathname.startsWith('/privacy') ||
+                     window.location.pathname.startsWith('/terms')
+
+if (!isPublicPage && 'caches' in window) {
   caches.keys().then(function(names) {
     names.forEach(function(name) {
       caches.delete(name)
@@ -16,35 +23,43 @@ if ('caches' in window) {
   })
 }
 
-// АГРЕССИВНАЯ очистка кэша для версии 6.0
+// Очистка кэша только один раз при первой загрузке (только для Telegram Web App)
 (function checkAndClearCache() {
   try {
-    const appVersion = 'v8-bot-intermediary-final'
-    const storedVersion = sessionStorage.getItem('app_version_v8')
+    // Пропускаем очистку кэша для публичных страниц
+    if (isPublicPage) {
+      return
+    }
     
-    if (storedVersion !== appVersion) {
-      console.log('🔄 New app version v8-bot-intermediary-final detected, clearing ALL cache...')
-      // Очищаем всё
+    const appVersion = 'v9-fix-infinite-reload'
+    const storedVersion = sessionStorage.getItem('app_version')
+    
+    // Очищаем кэш только если версия изменилась И это первая загрузка (нет параметра _reload)
+    if (storedVersion !== appVersion && !window.location.search.includes('_reload')) {
+      // Очищаем кэш
       if ('caches' in window) {
         caches.keys().then(names => {
           names.forEach(name => caches.delete(name))
         })
       }
-      localStorage.clear()
-      sessionStorage.clear()
-      sessionStorage.setItem('app_version_v8', appVersion)
+      sessionStorage.setItem('app_version', appVersion)
       
-      // Принудительная перезагрузка для Telegram Web App
+      // Перезагрузка только для Telegram Web App и только один раз
       if (window.Telegram?.WebApp) {
-        console.log('🔄 Reloading to apply v4 version...')
         setTimeout(() => {
-          window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now() + '&_reload=1'
-        }, 50)
+          const url = new URL(window.location.href)
+          url.searchParams.set('_reload', '1')
+          url.searchParams.set('v', Date.now().toString())
+          window.location.href = url.toString()
+        }, 100)
         return
       }
+    } else if (storedVersion !== appVersion) {
+      // Обновляем версию без перезагрузки
+      sessionStorage.setItem('app_version', appVersion)
     }
   } catch (e) {
-    console.warn('Could not clear cache:', e)
+    // Игнорируем ошибки
   }
 })()
 

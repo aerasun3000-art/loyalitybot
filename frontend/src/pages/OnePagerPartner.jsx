@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLanguageStore from '../store/languageStore';
 import { hapticFeedback } from '../utils/telegram';
@@ -222,8 +222,8 @@ const translations = {
 
 const OnePagerPartner = () => {
   const { language, toggleLanguage } = useLanguageStore();
-  const [earlyBirdCount, setEarlyBirdCount] = useState(null);
-  const [remainingSlots, setRemainingSlots] = useState(null);
+  const [earlyBirdCount, setEarlyBirdCount] = useState(0);
+  const [remainingSlots, setRemainingSlots] = useState(20);
   
   const t = useCallback((key, params = {}) => {
     let text = translations[language]?.[key] || translations.en[key] || key;
@@ -233,13 +233,6 @@ const OnePagerPartner = () => {
     });
     return text;
   }, [language]);
-
-  useEffect(() => {
-    // Здесь можно добавить API вызов для получения актуального количества
-    // Пока используем заглушку
-    setEarlyBirdCount(0);
-    setRemainingSlots(20);
-  }, []);
 
   const handleLanguageToggle = () => {
     hapticFeedback('light');
@@ -685,7 +678,7 @@ const SERVICES = [
 ];
 
 // Компонент простой визуализации доступности
-const SimpleAvailabilityHeatmap = ({ t, language }) => {
+const SimpleAvailabilityHeatmap = memo(({ t, language }) => {
   const navigate = useNavigate();
   const [availability, setAvailability] = useState({});
   const [loading, setLoading] = useState(false);
@@ -756,7 +749,9 @@ const SimpleAvailabilityHeatmap = ({ t, language }) => {
     if (showMap && !hasFetched && !loading) {
       fetchAvailability();
     }
-  }, [showMap, hasFetched, loading, fetchAvailability]);
+    // fetchAvailability мемоизирован и не меняется, поэтому не включаем в зависимости
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMap, hasFetched, loading]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -911,10 +906,10 @@ const SimpleAvailabilityHeatmap = ({ t, language }) => {
       )}
     </div>
   );
-};
+});
 
 // Компонент ROI Калькулятора
-const ROICalculator = ({ t, language }) => {
+const ROICalculator = memo(({ t, language }) => {
   const [monthlyClients, setMonthlyClients] = useState(50);
   const [averageCheck, setAverageCheck] = useState(100);
   const [currentRetention, setCurrentRetention] = useState(30);
@@ -1112,7 +1107,7 @@ const ROICalculator = ({ t, language }) => {
       </div>
     </div>
   );
-};
+});
 
 // Вспомогательные компоненты
 const BenefitCard = ({ icon, title, description }) => (
