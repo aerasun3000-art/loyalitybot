@@ -944,7 +944,7 @@ const ROICalculator = ({ t, language }) => {
     const netProfit = additionalRevenue - monthlyCost;
     
     // ROI в процентах
-    const roi = monthlyCost > 0 ? ((netProfit / monthlyCost) * 100) : 0;
+    const roiPercent = monthlyCost > 0 ? ((netProfit / monthlyCost) * 100) : 0;
     
     return {
       newRetention: Math.round(newRetention),
@@ -954,11 +954,9 @@ const ROICalculator = ({ t, language }) => {
       additionalRevenue: Math.round(additionalRevenue),
       monthlyCost,
       netProfit: Math.round(netProfit),
-      roi: Math.round(roi)
+      roi: Math.round(roiPercent)
     };
-  };
-
-  const roi = calculateROI();
+  }, [monthlyClients, averageCheck, currentRetention]);
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
