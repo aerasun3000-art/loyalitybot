@@ -31,6 +31,8 @@ const translations = {
     maxRevenueDesc: 'All customers looking for your service in your district will find only you. No competition means higher prices and more clients.',
     revenueShare: 'Revenue Share',
     revenueShareDesc: 'Earn from partners you refer. Build your network and get passive income from their success.',
+    incomePresentation: '💰 Model Your Income',
+    incomePresentationDesc: 'See a real example of partner income calculation with charts and detailed breakdown',
     masterPartner: 'Master Partner Status',
     masterPartnerDesc: 'Become a Master Partner in your district and coordinate the development of your territory.',
     districtsTitle: '🗺️ 10 Districts of New York',
@@ -135,6 +137,8 @@ const translations = {
     maxRevenueDesc: 'Все клиенты, ищущие вашу услугу в вашем районе, найдут только вас. Нет конкуренции — значит выше цены и больше клиентов.',
     revenueShare: 'Revenue Share',
     revenueShareDesc: 'Зарабатывайте от партнеров, которых вы пригласили. Стройте свою сеть и получайте пассивный доход от их успеха.',
+    incomePresentation: '💰 Смоделировать Доходы',
+    incomePresentationDesc: 'Посмотрите реальный пример расчета доходов партнера-психолога с графиками и детальной разбивкой',
     masterPartner: 'Статус Мастер-Партнера',
     masterPartnerDesc: 'Станьте Мастер-Партнером в своем районе и координируйте развитие своей территории.',
     districtsTitle: '🗺️ 10 Районов Нью-Йорка',
@@ -511,6 +515,27 @@ const OnePagerPartner = () => {
               title={t('fastSetup')}
               description={t('fastSetupDesc')}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Income Presentation Link */}
+      <div className="bg-gradient-to-r from-sakura-mid/20 to-sakura-dark/20 py-12">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-sakura-mid/30">
+            <div className="text-5xl mb-4">💰</div>
+            <h2 className="text-3xl font-bold text-sakura-dark mb-4">
+              {t('incomePresentation')}
+            </h2>
+            <p className="text-lg text-gray-600 mb-6">
+              {t('incomePresentationDesc')}
+            </p>
+            <a
+              href="/partner/income-presentation"
+              className="inline-block px-8 py-4 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105"
+            >
+              {t('incomePresentation')} →
+            </a>
           </div>
         </div>
       </div>

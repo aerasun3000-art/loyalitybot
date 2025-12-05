@@ -22,6 +22,7 @@ import AdminAnalytics from './pages/AdminAnalytics'
 import OnePagerPartner from './pages/OnePagerPartner'
 import OnePagerClient from './pages/OnePagerClient'
 import OnePagerInvestor from './pages/OnePagerInvestor'
+import PartnerIncomePresentation from './pages/PartnerIncomePresentation'
 import AvailabilityMap from './pages/AvailabilityMap'
 import TestPage from './pages/TestPage'
 import Activity from './pages/Activity'
@@ -38,6 +39,7 @@ const PUBLIC_ROUTES = [
   '/onepager/partner',
   '/onepager/client',
   '/onepager/investor',
+  '/partner/income-presentation',
   '/partner/analytics',
   '/admin/analytics',
   '/partner/apply',
@@ -104,6 +106,7 @@ function AppContent() {
           <Route path="/onepager/partner" element={<OnePagerPartner />} />
           <Route path="/onepager/client" element={<OnePagerClient />} />
           <Route path="/onepager/investor" element={<OnePagerInvestor />} />
+          <Route path="/partner/income-presentation" element={<PartnerIncomePresentation />} />
           <Route path="/availability-map" element={<AvailabilityMap />} />
           <Route path="/test" element={<TestPage />} />
           <Route path="/palette" element={<PalettePreview />} />
