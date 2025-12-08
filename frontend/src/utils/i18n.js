@@ -546,5 +546,45 @@ export const useTranslation = (lang = 'ru') => {
   }
 }
 
+/**
+ * Автоматический перевод динамического контента (новости, акции, описания услуг)
+ * Использует AI перевод через backend API
+ * 
+ * @param {string} text - Текст для перевода
+ * @param {string} lang - Целевой язык
+ * @param {string} sourceLang - Исходный язык (по умолчанию 'ru')
+ * @returns {Promise<string>} - Переведенный текст
+ */
+export const translateDynamicContent = async (
+  text,
+  lang = 'ru',
+  sourceLang = 'ru'
+) => {
+  // Если язык русский или текст пустой, возвращаем оригинал
+  if (lang === 'ru' || lang === sourceLang || !text || !text.trim()) {
+    return text
+  }
+
+  // Динамически импортируем функцию перевода
+  try {
+    const { translateText } = await import('./translate.js')
+    return await translateText(text, lang, sourceLang)
+  } catch (error) {
+    console.error('Error importing translate utility:', error)
+    return text
+  }
+}
+
+/**
+ * Хук для использования переводов с поддержкой автоматического перевода динамического контента
+ */
+export const useTranslationWithAI = (lang = 'ru') => {
+  return {
+    t: (key, replacements) => t(key, lang, replacements),
+    translateDynamic: (text, sourceLang = 'ru') => translateDynamicContent(text, lang, sourceLang),
+    lang
+  }
+}
+
 export default translations
 
