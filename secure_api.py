@@ -15,6 +15,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from supabase_manager import SupabaseManager
+from ai_helper import translate_text_ai
 
 load_dotenv()
 
@@ -94,6 +95,10 @@ app = FastAPI(
             "name": "webhooks",
             "description": "Webhook endpoints для внешних интеграций"
         },
+        {
+            "name": "translation",
+            "description": "AI-перевод текста"
+        },
     ]
 )
 
@@ -126,6 +131,21 @@ class TransactionResponse(BaseModel):
     queued: bool | None = None
     new_balance: int | None = None
     points: int | None = None
+    error: str | None = None
+
+
+class TranslationRequest(BaseModel):
+    text: str = Field(..., description="Текст для перевода")
+    target_lang: str = Field(default='en', description="Целевой язык (ru, en, es, fr, de, и т.д.)")
+    source_lang: str = Field(default='ru', description="Исходный язык (ru, en, es, fr, de, и т.д.)")
+
+
+class TranslationResponse(BaseModel):
+    success: bool
+    translated_text: str | None = None
+    original_text: str | None = None
+    source_lang: str | None = None
+    target_lang: str | None = None
     error: str | None = None
 
 
@@ -691,4 +711,139 @@ async def send_qr_to_partner(
     except Exception as e:
         logger.error(f"Ошибка обработки запроса отправки QR: {e}")
         raise HTTPException(status_code=500, detail=f"Внутренняя ошибка: {str(e)}")
+
+
+# ============================================
+# AI ПЕРЕВОД ТЕКСТА
+# ============================================
+
+@app.post(
+    "/api/translate",
+    response_model=TranslationResponse,
+    tags=["translation"],
+    summary="Перевести текст с помощью AI",
+    description="Переводит текст с одного языка на другой используя OpenAI",
+    response_description="Результат перевода",
+    responses={
+        200: {
+            "description": "Текст успешно переведен",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "translated_text": "Hello, world!",
+                        "original_text": "Привет, мир!",
+                        "source_lang": "ru",
+                        "target_lang": "en"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Ошибка перевода",
+            "content": {
+                "application/json": {
+                    "example": {"success": False, "error": "Текст не может быть пустым"}
+                }
+            }
+        },
+        429: {
+            "description": "Слишком много запросов",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Rate limit exceeded"}
+                }
+            }
+        }
+    }
+)
+@limiter.limit("30/minute")
+async def translate_text(request: Request, payload: TranslationRequest):
+    """
+    Перевод текста с помощью AI (OpenAI).
+    
+    Rate Limit: 30 запросов/минуту
+    
+    Параметры:
+    - **text**: Текст для перевода (обязательно)
+    - **target_lang**: Целевой язык (по умолчанию 'en')
+      - Поддерживаемые: ru, en, es, fr, de, it, pt, zh, ja, ko
+    - **source_lang**: Исходный язык (по умолчанию 'ru')
+      - Поддерживаемые: ru, en, es, fr, de, it, pt, zh, ja, ko
+    
+    Возвращает:
+    - **success**: Успешность операции
+    - **translated_text**: Переведенный текст
+    - **original_text**: Оригинальный текст
+    - **source_lang**: Исходный язык
+    - **target_lang**: Целевой язык
+    - **error**: Сообщение об ошибке (если success=false)
+    
+    Примеры:
+    
+    Перевод с русского на английский:
+    ```json
+    {
+        "text": "Привет, мир!",
+        "target_lang": "en",
+        "source_lang": "ru"
+    }
+    ```
+    
+    Перевод с английского на русский:
+    ```json
+    {
+        "text": "Hello, world!",
+        "target_lang": "ru",
+        "source_lang": "en"
+    }
+    ```
+    """
+    try:
+        # Валидация
+        if not payload.text or not payload.text.strip():
+            raise HTTPException(
+                status_code=400, 
+                detail="Текст для перевода не может быть пустым"
+            )
+        
+        # Если языки одинаковые, возвращаем оригинал
+        if payload.source_lang == payload.target_lang:
+            return TranslationResponse(
+                success=True,
+                translated_text=payload.text,
+                original_text=payload.text,
+                source_lang=payload.source_lang,
+                target_lang=payload.target_lang
+            )
+        
+        # Выполняем перевод
+        translated = await translate_text_ai(
+            text=payload.text,
+            target_lang=payload.target_lang,
+            source_lang=payload.source_lang
+        )
+        
+        if not translated:
+            raise HTTPException(
+                status_code=500,
+                detail="Не удалось выполнить перевод. Попробуйте позже."
+            )
+        
+        return TranslationResponse(
+            success=True,
+            translated_text=translated,
+            original_text=payload.text,
+            source_lang=payload.source_lang,
+            target_lang=payload.target_lang
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка перевода текста: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Внутренняя ошибка при переводе: {str(e)}"
+        )
 

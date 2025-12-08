@@ -3,7 +3,8 @@ pandas
 streamlit
 supabase
 python-dotenv
-gigachat>=0.1.20
+openai>=1.0.0
+# gigachat>=0.1.20  # Закомментировано - перешли на OpenAI
 qrcode[pil]
 pyzbar
 fastapi
