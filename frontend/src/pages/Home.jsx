@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
 import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage } from '../services/supabase'
 import { getServiceIcon, getMainPageCategories, getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
-import { useTranslation } from '../utils/i18n'
+import { useTranslation, translateDynamicContent } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 import LoyaltyProgress from '../components/LoyaltyProgress'
@@ -36,6 +36,9 @@ const Home = () => {
   const [promotions, setPromotions] = useState([])
   const [services, setServices] = useState([])
   const [news, setNews] = useState([])
+  const [translatedNews, setTranslatedNews] = useState([])
+  const [translatedPromotions, setTranslatedPromotions] = useState([])
+  const [translating, setTranslating] = useState(false)
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
   const [selectedServiceCategory, setSelectedServiceCategory] = useState(null)
   const [popularCategories, setPopularCategories] = useState([])
@@ -45,6 +48,96 @@ const Home = () => {
     loadData()
     loadBackgroundImage()
   }, [chatId])
+
+  // Автоматический перевод новостей при изменении языка
+  useEffect(() => {
+    if (news.length === 0 || language === 'ru') {
+      setTranslatedNews(news)
+      return
+    }
+
+    const checkApiAndTranslate = async () => {
+      const apiUrl = import.meta.env.VITE_API_URL
+      if (!apiUrl) {
+        console.warn('⚠️ VITE_API_URL не установлен. Переводы отключены. Показываем оригинальный текст.')
+        setTranslatedNews(news)
+        return
+      }
+
+      setTranslating(true)
+      try {
+        const translated = await Promise.all(
+          news.map(async (item) => {
+            try {
+              return {
+                ...item,
+                title: await translateDynamicContent(item.title, language, 'ru'),
+                preview_text: item.preview_text
+                  ? await translateDynamicContent(item.preview_text, language, 'ru')
+                  : null,
+              }
+            } catch (error) {
+              console.warn(`Translation failed for news ${item.id}:`, error)
+              return item
+            }
+          })
+        )
+        setTranslatedNews(translated)
+      } catch (error) {
+        console.error('Error translating news:', error)
+        setTranslatedNews(news)
+      } finally {
+        setTranslating(false)
+      }
+    }
+
+    checkApiAndTranslate()
+  }, [news, language])
+
+  // Автоматический перевод акций при изменении языка
+  useEffect(() => {
+    if (promotions.length === 0 || language === 'ru') {
+      setTranslatedPromotions(promotions)
+      return
+    }
+
+    const checkApiAndTranslate = async () => {
+      const apiUrl = import.meta.env.VITE_API_URL
+      if (!apiUrl) {
+        console.warn('⚠️ VITE_API_URL не установлен. Переводы отключены. Показываем оригинальный текст.')
+        setTranslatedPromotions(promotions)
+        return
+      }
+
+      setTranslating(true)
+      try {
+        const translated = await Promise.all(
+          promotions.map(async (item) => {
+            try {
+              return {
+                ...item,
+                title: await translateDynamicContent(item.title, language, 'ru'),
+                description: item.description
+                  ? await translateDynamicContent(item.description, language, 'ru')
+                  : null,
+              }
+            } catch (error) {
+              console.warn(`Translation failed for promotion ${item.id}:`, error)
+              return item
+            }
+          })
+        )
+        setTranslatedPromotions(translated)
+      } catch (error) {
+        console.error('Error translating promotions:', error)
+        setTranslatedPromotions(promotions)
+      } finally {
+        setTranslating(false)
+      }
+    }
+
+    checkApiAndTranslate()
+  }, [promotions, language])
 
   const loadBackgroundImage = async () => {
     try {
@@ -392,7 +485,7 @@ const Home = () => {
             </svg>
             {t('news_latest')}
           </h2>
-          {news.length > 0 && (
+          {translatedNews.length > 0 && (
             <button
               onClick={() => navigate('/news')}
               className="bg-sakura-accent/15 text-sakura-deep font-semibold text-sm px-3 py-1 rounded-lg border border-sakura-accent/30 hover:bg-sakura-accent/25 transition-colors drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]"
@@ -400,12 +493,18 @@ const Home = () => {
               {t('home_see_all')} →
             </button>
           )}
+          {translating && (
+            <div className="flex items-center gap-2 text-xs text-sakura-mid">
+              <Loader size="sm" />
+              <span>{t('translating') || 'Перевод...'}</span>
+            </div>
+          )}
         </div>
         
         {/* Карусель новостей */}
         <div className="overflow-x-auto flex gap-3 pb-4 scrollbar-hide mb-6 snap-x snap-mandatory">
-          {news.length > 0 ? (
-            news.map((item, index) => {
+          {translatedNews.length > 0 ? (
+            translatedNews.map((item, index) => {
               const gradients = [
                 'from-jewelry-pink-dark to-jewelry-rose',
                 'from-jewelry-rose to-jewelry-pink-light',
@@ -611,7 +710,7 @@ const Home = () => {
           </div>
 
           <div className="overflow-x-auto flex gap-4 pb-2 scrollbar-hide snap-x snap-mandatory">
-            {promotions.slice(0, 3).map((promo, index) => {
+            {translatedPromotions.slice(0, 3).map((promo, index) => {
               // Градиенты для разнообразия
               const imageGradients = [
                 'from-jewelry-pink-dark via-jewelry-rose to-jewelry-pink-light',
