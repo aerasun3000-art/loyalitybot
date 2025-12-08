@@ -26,7 +26,7 @@ flyctl auth login
 cd /Users/ghbi/Downloads/loyalitybot
 
 # Создайте новое приложение специально для API
-flyctl launch --name loyalitybot-api --no-deploy
+flyctl launch --name loyalitybot-api --region ams --no-deploy
 ```
 
 Fly.io спросит:
@@ -35,6 +35,11 @@ Fly.io спросит:
 - **Redis**: No (не нужно)
 
 **Важно:** Используйте `--no-deploy`, чтобы сначала настроить переменные окружения.
+
+После создания приложения скопируйте конфигурацию:
+```bash
+cp fly.api.toml fly.toml
+```
 
 ### Шаг 4: Обновите fly.toml для API
 

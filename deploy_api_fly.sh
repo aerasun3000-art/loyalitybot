@@ -38,8 +38,12 @@ if flyctl apps list | grep -q "$APP_NAME"; then
     fi
 else
     echo "📦 Создаю новое приложение $APP_NAME..."
-    flyctl launch --name "$APP_NAME" --region ams --no-deploy --copy-config fly.api.toml
+    flyctl launch --name "$APP_NAME" --region ams --no-deploy
     echo "✅ Приложение создано"
+    echo ""
+    echo "📝 Копирую конфигурацию для API..."
+    cp fly.api.toml fly.toml
+    echo "✅ Конфигурация скопирована"
     echo ""
 fi
 
