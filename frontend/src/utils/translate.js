@@ -1,10 +1,33 @@
 /**
  * Утилита для автоматического перевода текста с помощью AI
- * Использует GigaChat через backend API
+ * Использует OpenAI через backend API
  */
 
 // URL API сервера (можно настроить через переменные окружения)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+// Для продакшена установите VITE_API_URL в настройках Vercel/Netlify
+const getApiBaseUrl = () => {
+  // Приоритет 1: переменная окружения
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  
+  // Приоритет 2: localhost для разработки
+  if (typeof window !== 'undefined' && window.location.origin.includes('localhost')) {
+    return 'http://localhost:8001'
+  }
+  
+  // Приоритет 3: попытка определить по текущему домену
+  // Если фронтенд на Vercel, бэкенд может быть на Render/Railway
+  // Установите VITE_API_URL в настройках Vercel!
+  console.warn('⚠️ VITE_API_URL не установлен! Установите переменную окружения в Vercel.')
+  console.warn('⚠️ Используется fallback. Переводы могут не работать.')
+  
+  // Fallback: попробуем использовать тот же домен (если API на том же домене)
+  // Или вернем пустую строку, чтобы показать ошибку
+  return ''
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 // Кэш переводов для оптимизации (хранится в памяти)
 const translationCache = new Map()
@@ -50,8 +73,17 @@ export const translateText = async (
     }
   }
 
+  // Проверяем, что API_BASE_URL установлен
+  if (!API_BASE_URL) {
+    console.error('❌ API_BASE_URL не установлен! Установите VITE_API_URL в настройках Vercel.')
+    return text // Возвращаем оригинал при ошибке конфигурации
+  }
+
   try {
-    const response = await fetch(`${API_BASE_URL}/api/translate`, {
+    const url = `${API_BASE_URL}/api/translate`
+    console.log('🌐 Translation request:', { url, text: text.substring(0, 50) + '...', targetLang, sourceLang })
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -65,7 +97,9 @@ export const translateText = async (
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.detail || `Translation failed: ${response.statusText}`)
+      const errorMsg = errorData.detail || `Translation failed: ${response.statusText}`
+      console.error('❌ Translation API error:', { status: response.status, error: errorMsg, url })
+      throw new Error(errorMsg)
     }
 
     const data = await response.json()
