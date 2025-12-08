@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getPublishedNews } from '../services/supabase'
 import { hapticFeedback } from '../utils/telegram'
-import { useTranslation } from '../utils/i18n'
+import { useTranslation, translateDynamicContent } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 
@@ -22,7 +22,9 @@ const News = () => {
   const { language } = useLanguageStore()
   const { t } = useTranslation(language)
   const [news, setNews] = useState([])
+  const [translatedNews, setTranslatedNews] = useState([])
   const [loading, setLoading] = useState(true)
+  const [translating, setTranslating] = useState(false)
   const [activeSlide, setActiveSlide] = useState(0)
 
   useEffect(() => {
@@ -40,6 +42,37 @@ const News = () => {
       setActiveSlide(0)
     }
   }, [news.length, activeSlide])
+
+  // Автоматический перевод новостей при изменении языка
+  useEffect(() => {
+    if (news.length === 0 || language === 'ru') {
+      setTranslatedNews(news)
+      return
+    }
+
+    const translateNews = async () => {
+      setTranslating(true)
+      try {
+        const translated = await Promise.all(
+          news.map(async (item) => ({
+            ...item,
+            title: await translateDynamicContent(item.title, language, 'ru'),
+            preview_text: item.preview_text
+              ? await translateDynamicContent(item.preview_text, language, 'ru')
+              : null,
+          }))
+        )
+        setTranslatedNews(translated)
+      } catch (error) {
+        console.error('Error translating news:', error)
+        setTranslatedNews(news) // Fallback на оригинал при ошибке
+      } finally {
+        setTranslating(false)
+      }
+    }
+
+    translateNews()
+  }, [news, language])
 
   const loadNews = async () => {
     try {
@@ -88,13 +121,15 @@ const News = () => {
     return date.toLocaleDateString(locale, options)
   }
 
-  const featuredNews = news.slice(0, Math.min(news.length, 5))
+  // Используем переведенные новости, если доступны
+  const displayNews = translatedNews.length > 0 ? translatedNews : news
+  const featuredNews = displayNews.slice(0, Math.min(displayNews.length, 5))
   const featuredIds = new Set(featuredNews.map(item => item.id))
-  const remainingNews = news.filter(item => !featuredIds.has(item.id))
-  const gridNews = remainingNews.length > 0 ? remainingNews : news.slice(0, 4)
+  const remainingNews = displayNews.filter(item => !featuredIds.has(item.id))
+  const gridNews = remainingNews.length > 0 ? remainingNews : displayNews.slice(0, 4)
   const gridSectionTitle = language === 'ru' ? 'Все новости' : 'All news'
 
-  if (loading) {
+  if (loading || translating) {
     return <Loader />
   }
 
@@ -135,7 +170,7 @@ const News = () => {
       </div>
 
       <div className="relative z-10 px-4 py-6 space-y-6">
-        {news.length === 0 ? (
+        {displayNews.length === 0 ? (
           <div className="bg-sakura-surface/10 backdrop-blur-xl rounded-3xl p-8 text-center border border-sakura-border/40 shadow-xl">
             <span className="text-6xl leading-none mx-auto mb-4 block">🌸</span>
             <h3 className="text-xl font-bold mb-2">{t('news_no_items')}</h3>

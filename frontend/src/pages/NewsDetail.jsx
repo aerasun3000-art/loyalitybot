@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getNewsById, incrementNewsViews } from '../services/supabase'
 import { hapticFeedback } from '../utils/telegram'
-import { useTranslation } from '../utils/i18n'
+import { useTranslation, translateDynamicContent } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 // import LuxuryIcon from '../components/LuxuryIcons'
 import Loader from '../components/Loader'
@@ -13,11 +13,43 @@ const NewsDetail = () => {
   const { language } = useLanguageStore()
   const { t } = useTranslation(language)
   const [news, setNews] = useState(null)
+  const [translatedNews, setTranslatedNews] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [translating, setTranslating] = useState(false)
 
   useEffect(() => {
     loadNewsDetail()
   }, [id])
+
+  // Автоматический перевод новости при изменении языка
+  useEffect(() => {
+    if (!news || language === 'ru') {
+      setTranslatedNews(news)
+      return
+    }
+
+    const translateNews = async () => {
+      setTranslating(true)
+      try {
+        const translated = {
+          ...news,
+          title: await translateDynamicContent(news.title, language, 'ru'),
+          preview_text: news.preview_text
+            ? await translateDynamicContent(news.preview_text, language, 'ru')
+            : null,
+          content: await translateDynamicContent(news.content, language, 'ru'),
+        }
+        setTranslatedNews(translated)
+      } catch (error) {
+        console.error('Error translating news:', error)
+        setTranslatedNews(news) // Fallback на оригинал при ошибке
+      } finally {
+        setTranslating(false)
+      }
+    }
+
+    translateNews()
+  }, [news, language])
 
   const loadNewsDetail = async () => {
     try {
@@ -65,11 +97,14 @@ const NewsDetail = () => {
     }
   }
 
-  if (loading) {
+  if (loading || translating) {
     return <Loader />
   }
 
-  if (!news) {
+  // Используем переведенную новость, если доступна
+  const displayNews = translatedNews || news
+
+  if (!displayNews) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -133,11 +168,11 @@ const NewsDetail = () => {
       </div>
 
       {/* Изображение */}
-      {news.image_url && (
+      {displayNews.image_url && (
         <div className="relative">
           <img
-            src={news.image_url}
-            alt={news.title}
+            src={displayNews.image_url}
+            alt={displayNews.title}
             className="w-full h-64 object-cover"
           />
         </div>
@@ -147,7 +182,7 @@ const NewsDetail = () => {
       <div className="px-4 py-6">
         {/* Заголовок */}
         <h1 className="text-3xl font-bold text-gray-900 mb-4 leading-tight">
-          {news.title}
+          {displayNews.title}
         </h1>
 
         {/* Мета-информация */}
@@ -164,10 +199,10 @@ const NewsDetail = () => {
               <circle cx="8" cy="8" r="7" />
               <path d="M8 4v4l3 2" />
             </svg>
-            <span>{formatDate(news.created_at)}</span>
+            <span>{formatDate(displayNews.created_at)}</span>
           </div>
           
-          {news.views_count > 0 && (
+          {displayNews.views_count > 0 && (
             <div className="flex items-center gap-1">
               <svg
                 width="16"
@@ -180,7 +215,7 @@ const NewsDetail = () => {
                 <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" />
                 <circle cx="8" cy="8" r="2" />
               </svg>
-              <span>{news.views_count} {t('news_views')}</span>
+              <span>{displayNews.views_count} {t('news_views')}</span>
             </div>
           )}
         </div>
@@ -188,7 +223,7 @@ const NewsDetail = () => {
         {/* Основной текст */}
         <div className="prose prose-pink max-w-none">
           <div className="text-gray-700 leading-relaxed whitespace-pre-wrap text-base">
-            {news.content}
+            {displayNews.content}
           </div>
         </div>
 
@@ -205,21 +240,21 @@ const NewsDetail = () => {
             <div className="flex justify-between">
               <span>{t('news_published')}:</span>
               <span className="font-semibold text-gray-800">
-                {formatDate(news.created_at)}
+                {formatDate(displayNews.created_at)}
               </span>
             </div>
-            {news.updated_at && news.updated_at !== news.created_at && (
+            {displayNews.updated_at && displayNews.updated_at !== displayNews.created_at && (
               <div className="flex justify-between">
                 <span>{language === 'ru' ? 'Обновлено' : 'Updated'}:</span>
                 <span className="font-semibold text-gray-800">
-                  {formatDate(news.updated_at)}
+                  {formatDate(displayNews.updated_at)}
                 </span>
               </div>
             )}
             <div className="flex justify-between">
               <span>{t('news_views')}:</span>
               <span className="font-semibold text-gray-800">
-                {news.views_count || 0}
+                {displayNews.views_count || 0}
               </span>
             </div>
           </div>
