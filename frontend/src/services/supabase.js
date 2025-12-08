@@ -305,6 +305,47 @@ export const getClientRatedPartners = async (clientChatId) => {
 }
 
 /**
+ * Получить информацию о партнере, который добавил клиента (через приветственный бонус)
+ */
+export const getReferralPartnerInfo = async (clientChatId) => {
+  if (!clientChatId) return null
+
+  try {
+    // Получаем referral_source (partner_chat_id) из таблицы users
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('referral_source')
+      .eq('chat_id', clientChatId)
+      .single()
+
+    if (userError || !user || !user.referral_source) {
+      return null
+    }
+
+    const partnerChatId = user.referral_source
+
+    // Получаем информацию о партнере
+    const { data: partner, error: partnerError } = await supabase
+      .from('partners')
+      .select('business_type, chat_id')
+      .eq('chat_id', partnerChatId)
+      .single()
+
+    if (partnerError || !partner) {
+      return null
+    }
+
+    return {
+      chatId: partner.chat_id,
+      businessType: partner.business_type || null
+    }
+  } catch (error) {
+    console.error('Error getting referral partner info:', error)
+    return null
+  }
+}
+
+/**
  * Получить метрики партнёров (NPS, средняя оценка, количество отзывов)
  * @param {string[]} partnerIds - Массив ID партнёров
  * @returns {Promise<Object>} Объект с метриками для каждого партнёра
