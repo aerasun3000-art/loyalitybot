@@ -50,17 +50,34 @@ const News = () => {
       return
     }
 
-    const translateNews = async () => {
+    // Проверяем, доступен ли API для переводов
+    const checkApiAndTranslate = async () => {
+      // Если API URL не установлен, используем оригинальный текст
+      const apiUrl = import.meta.env.VITE_API_URL
+      if (!apiUrl) {
+        console.warn('⚠️ VITE_API_URL не установлен. Переводы отключены. Показываем оригинальный текст.')
+        setTranslatedNews(news)
+        return
+      }
+
       setTranslating(true)
       try {
         const translated = await Promise.all(
-          news.map(async (item) => ({
-            ...item,
-            title: await translateDynamicContent(item.title, language, 'ru'),
-            preview_text: item.preview_text
-              ? await translateDynamicContent(item.preview_text, language, 'ru')
-              : null,
-          }))
+          news.map(async (item) => {
+            try {
+              return {
+                ...item,
+                title: await translateDynamicContent(item.title, language, 'ru'),
+                preview_text: item.preview_text
+                  ? await translateDynamicContent(item.preview_text, language, 'ru')
+                  : null,
+              }
+            } catch (error) {
+              // Если перевод одного элемента не удался, используем оригинал
+              console.warn(`Translation failed for news ${item.id}:`, error)
+              return item
+            }
+          })
         )
         setTranslatedNews(translated)
       } catch (error) {
@@ -71,7 +88,7 @@ const News = () => {
       }
     }
 
-    translateNews()
+    checkApiAndTranslate()
   }, [news, language])
 
   const loadNews = async () => {

@@ -28,7 +28,16 @@ const NewsDetail = () => {
       return
     }
 
-    const translateNews = async () => {
+    // Проверяем, доступен ли API для переводов
+    const checkApiAndTranslate = async () => {
+      // Если API URL не установлен, используем оригинальный текст
+      const apiUrl = import.meta.env.VITE_API_URL
+      if (!apiUrl) {
+        console.warn('⚠️ VITE_API_URL не установлен. Переводы отключены. Показываем оригинальный текст.')
+        setTranslatedNews(news)
+        return
+      }
+
       setTranslating(true)
       try {
         const translated = {
@@ -48,7 +57,7 @@ const NewsDetail = () => {
       }
     }
 
-    translateNews()
+    checkApiAndTranslate()
   }, [news, language])
 
   const loadNewsDetail = async () => {
