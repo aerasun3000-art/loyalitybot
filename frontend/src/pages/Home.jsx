@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
 import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage } from '../services/supabase'
 import { getServiceIcon, getMainPageCategories, getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
-import { useTranslation, translateDynamicContent } from '../utils/i18n'
+import { useTranslation, translateDynamicContent, declinePoints } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 import LoyaltyProgress from '../components/LoyaltyProgress'
@@ -454,7 +454,10 @@ const Home = () => {
                 {pointsToNextReward !== null && (
                   <span className="text-xs text-sakura-dark/60">
                     {pointsToNextReward > 0
-                      ? t('home_points_to_next_reward', { points: pointsToNextReward })
+                      ? t('home_points_to_next_reward', { 
+                          points: pointsToNextReward, 
+                          pointsWord: language === 'ru' ? declinePoints(pointsToNextReward) : 'points'
+                        })
                       : t('home_points_ready')}
                   </span>
                 )}

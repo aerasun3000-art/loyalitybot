@@ -10,6 +10,7 @@ initSentry()
 // Очистка кэша только при необходимости (не на публичных страницах)
 const isPublicPage = window.location.pathname.startsWith('/onepager/') || 
                      window.location.pathname.startsWith('/partner/income-presentation') ||
+                     window.location.pathname.startsWith('/partner/beauty-presentation') ||
                      window.location.pathname.startsWith('/partner/apply') ||
                      window.location.pathname.startsWith('/availability-map') ||
                      window.location.pathname.startsWith('/privacy') ||

@@ -240,7 +240,11 @@ const OnePagerPartner = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sakura-light via-white to-sakura-cream">
+    <div className="min-h-screen bg-sakura-dark/5 relative overflow-hidden">
+      {/* Фоновое изображение (если есть) или мягкий градиент */}
+      <div className="absolute inset-0 bg-gradient-to-br from-sakura-light via-white to-sakura-cream opacity-90 z-0"></div>
+      {/* Контент поверх */}
+      <div className="relative z-10">
       {/* Переключатель языка */}
       <div className="fixed top-4 right-4 z-50">
         <button
@@ -258,7 +262,7 @@ const OnePagerPartner = () => {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative">
           <div className="text-center">
             {/* Бейдж раннего предложения */}
-            <div className="inline-block mb-6 px-6 py-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-full font-bold text-lg animate-pulse">
+            <div className="inline-block mb-6 px-6 py-2 bg-sakura-mid/10 text-sakura-dark border border-sakura-mid/30 rounded-full font-bold text-lg animate-pulse">
               {t('badge')}
             </div>
             
@@ -278,17 +282,20 @@ const OnePagerPartner = () => {
 
             {/* Цены */}
             <div className="flex gap-6 justify-center flex-wrap mb-8">
-              <div className="bg-white rounded-2xl p-8 shadow-2xl border-4 border-red-400 transform scale-105">
-                <div className="text-sm text-red-600 font-bold mb-2">{t('first20')}</div>
-                <div className="text-6xl font-bold text-sakura-dark mb-2">$29</div>
+              <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-8 shadow-xl border border-white/50 transform scale-105 relative overflow-hidden">
+                {/* Эффект свечения */}
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gradient-to-br from-sakura-mid to-sakura-light opacity-20 blur-2xl rounded-full"></div>
+                
+                <div className="text-sm text-sakura-dark font-bold mb-2 uppercase tracking-wider">{t('first20')}</div>
+                <div className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sakura-mid to-sakura-dark mb-2">$29</div>
                 <div className="text-xl text-gray-600 mb-4">{t('perMonth')}</div>
                 <div className="text-sm text-gray-500 line-through mb-2">{t('regular')}</div>
                 <div className="text-green-600 font-bold">{t('save')}</div>
               </div>
               
-              <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-gray-300">
+              <div className="bg-white/40 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/30">
                 <div className="text-sm text-gray-600 font-bold mb-2">{t('after20')}</div>
-                <div className="text-6xl font-bold text-sakura-dark mb-2">$99</div>
+                <div className="text-6xl font-bold text-sakura-dark/80 mb-2">$99</div>
                 <div className="text-xl text-gray-600 mb-4">{t('perMonth')}</div>
                 <div className="text-sm text-gray-500">{t('standard')}</div>
               </div>
@@ -296,7 +303,7 @@ const OnePagerPartner = () => {
 
             {/* Счетчик оставшихся мест */}
             {remainingSlots !== null && remainingSlots > 0 && (
-              <div className="bg-yellow-100 border-2 border-yellow-400 rounded-xl p-4 mb-8 inline-block">
+              <div className="bg-yellow-100/80 backdrop-blur-sm border border-yellow-400/50 rounded-xl p-4 mb-8 inline-block shadow-sm">
                 <div className="text-2xl font-bold text-yellow-800">
                   {t('slotsRemaining', { count: remainingSlots })}
                 </div>
@@ -325,8 +332,8 @@ const OnePagerPartner = () => {
       </div>
 
       {/* Что такое эксклюзивность */}
-      <div className="bg-white py-16" id="exclusivity">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="py-16 relative" id="exclusivity">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <h2 className="text-4xl md:text-5xl font-bold text-center text-sakura-dark mb-4">
             {t('exclusivityTitle')}
           </h2>
@@ -343,7 +350,7 @@ const OnePagerPartner = () => {
               description={t('territoryProtectionDesc')}
             />
             <ExclusivityCard
-              icon="💰"
+              icon="💸" 
               title={t('maxRevenue')}
               description={t('maxRevenueDesc')}
             />
@@ -360,7 +367,7 @@ const OnePagerPartner = () => {
           </div>
 
           {/* 10 районов */}
-          <div className="bg-gradient-to-r from-sakura-light to-sakura-cream rounded-2xl p-8 mb-8">
+          <div className="bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl p-8 mb-8 shadow-lg">
             <h3 className="text-3xl font-bold text-center text-sakura-dark mb-6">
               {t('districtsTitle')}
             </h3>
@@ -385,7 +392,7 @@ const OnePagerPartner = () => {
           </div>
 
           {/* 12 видов услуг */}
-          <div className="bg-gradient-to-r from-sakura-cream to-sakura-light rounded-2xl p-8">
+          <div className="bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl p-8 shadow-lg">
             <h3 className="text-3xl font-bold text-center text-sakura-dark mb-6">
               {t('servicesTitle')}
             </h3>
@@ -420,8 +427,8 @@ const OnePagerPartner = () => {
       </div>
 
       {/* Карта доступности - простая визуализация */}
-      <div className="bg-white py-16" id="availability">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="py-16 relative" id="availability">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <SimpleAvailabilityHeatmap t={t} language={language} />
         </div>
       </div>
@@ -513,10 +520,10 @@ const OnePagerPartner = () => {
       </div>
 
       {/* Income Presentation Link */}
-      <div className="bg-gradient-to-r from-sakura-mid/20 to-sakura-dark/20 py-12">
+      <div className="bg-gradient-to-r from-sakura-mid/5 to-sakura-dark/5 py-12 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-sakura-mid/30">
-            <div className="text-5xl mb-4">💰</div>
+          <div className="bg-white/60 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/50">
+            <div className="text-5xl mb-4">💸</div>
             <h2 className="text-3xl font-bold text-sakura-dark mb-4">
               {t('incomePresentation')}
             </h2>
@@ -541,13 +548,13 @@ const OnePagerPartner = () => {
       </div>
 
       {/* Цены детально */}
-      <div className="bg-gradient-to-r from-sakura-mid/10 to-sakura-dark/10 py-16">
+      <div className="bg-sakura-mid/5 py-16 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-center text-sakura-dark mb-12">
             {t('pricingDetails')}
           </h2>
           
-          <div className="bg-white rounded-2xl p-8 shadow-2xl">
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/50">
             <div className="grid md:grid-cols-2 gap-8">
               <div className="border-r border-gray-200 pr-8">
                 <div className="flex items-center gap-2 mb-4">
@@ -643,6 +650,7 @@ const OnePagerPartner = () => {
             {t('noHiddenFees')}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -1111,7 +1119,7 @@ const ROICalculator = memo(({ t, language }) => {
 
 // Вспомогательные компоненты
 const BenefitCard = ({ icon, title, description }) => (
-  <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow border border-sakura-light">
+  <div className="bg-white/60 backdrop-blur-lg rounded-xl p-6 shadow-sm hover:shadow-lg transition-all border border-white/50 hover:border-sakura-mid/30">
     <div className="text-5xl mb-4">{icon}</div>
     <h3 className="text-xl font-bold text-sakura-dark mb-2">
       {title}
@@ -1137,7 +1145,7 @@ const StepCard = ({ number, title, description }) => (
 );
 
 const ExclusivityCard = ({ icon, title, description }) => (
-  <div className="bg-gradient-to-br from-sakura-light to-white rounded-xl p-6 shadow-sm border border-sakura-mid/20">
+  <div className="bg-white/50 backdrop-blur-md rounded-xl p-6 shadow-sm border border-white/60 hover:shadow-md transition-all">
     <div className="text-4xl mb-3">{icon}</div>
     <h3 className="text-xl font-bold text-sakura-dark mb-2">
       {title}

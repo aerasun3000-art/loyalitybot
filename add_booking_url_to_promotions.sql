@@ -18,3 +18,8 @@ CREATE INDEX IF NOT EXISTS idx_promotions_booking_url ON promotions(booking_url)
 
 
 
+
+
+
+
+

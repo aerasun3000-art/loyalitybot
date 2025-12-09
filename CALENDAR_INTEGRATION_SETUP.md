@@ -122,7 +122,9 @@ pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
 ### 4.3. Настройка переменных окружения
 
-Откройте файл `.env` и добавьте:
+Откройте файл `.
+
+` и добавьте:
 
 ```env
 # Google Calendar Integration
@@ -285,6 +287,11 @@ nohup python3 admin_bot.py > admin_bot_output.log 2>&1 &
 ---
 
 *Последнее обновление: Декабрь 2025*
+
+
+
+
+
 
 
 

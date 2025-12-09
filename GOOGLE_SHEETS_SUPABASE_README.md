@@ -266,3 +266,8 @@ SYNC_DIRECTIONS: {
 Теперь ваши данные синхронизируются автоматически между Google Sheets и Supabase!
 
 
+
+
+
+
+

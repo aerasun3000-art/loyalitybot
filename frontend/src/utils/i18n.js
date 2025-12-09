@@ -18,7 +18,7 @@ const translations = {
     home_greeting: 'Привет',
     home_balance_text: 'Используйте баллы для получения услуг и скидок!',
     home_points: 'баллов',
-    home_points_to_next_reward: 'До следующего вознаграждения осталось {points} баллов',
+    home_points_to_next_reward: 'До следующего вознаграждения осталось {points} {pointsWord}',
     home_points_ready: 'Баллов достаточно для обмена — выберите услугу!',
     home_services: 'Услуги',
     home_see_all: 'Все',
@@ -524,6 +524,30 @@ const translations = {
     back: 'Back',
     required_field: '*',
   }
+}
+
+// Функция для склонения слова "балл" в зависимости от числа
+export const declinePoints = (count) => {
+  const lastDigit = count % 10
+  const lastTwoDigits = count % 100
+  
+  // Исключения для 11-14
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return 'баллов'
+  }
+  
+  // 1 балл
+  if (lastDigit === 1) {
+    return 'балл'
+  }
+  
+  // 2, 3, 4 балла
+  if (lastDigit >= 2 && lastDigit <= 4) {
+    return 'балла'
+  }
+  
+  // 5, 6, 7, 8, 9, 0 баллов
+  return 'баллов'
 }
 
 // Получить перевод по ключу

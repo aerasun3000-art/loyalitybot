@@ -200,8 +200,8 @@ const PartnerApply = () => {
 
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-400 to-pink-500 flex items-center justify-center p-4">
-        <div className="max-w-md w-full">
+      <div className="min-h-screen bg-gradient-to-br from-sakura-light via-white to-sakura-cream flex items-center justify-center p-4">
+        <div className="max-w-md w-full relative z-10">
           {/* Кнопка возврата */}
           <div className="mb-4">
             <button
@@ -209,7 +209,7 @@ const PartnerApply = () => {
                 hapticFeedback('light')
                 navigate('/')
               }}
-              className="p-2 rounded-full border-2 border-white/30 bg-white/20 text-white hover:bg-white/30 transition-colors backdrop-blur-sm"
+              className="p-2 rounded-full border border-sakura-mid/20 bg-white/40 text-sakura-dark hover:bg-white/60 transition-colors backdrop-blur-md"
               aria-label={language === 'ru' ? 'Вернуться на главную' : 'Back to home'}
             >
               <svg
@@ -225,14 +225,14 @@ const PartnerApply = () => {
             </button>
           </div>
 
-          <div className="bg-white rounded-3xl p-8 text-center card-shadow">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-white/70 backdrop-blur-xl rounded-3xl p-8 text-center shadow-2xl border border-white/50">
+            <div className="w-20 h-20 bg-sakura-surface/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-sakura-mid/20">
+              <svg className="w-12 h-12 text-sakura-mid" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
               </svg>
             </div>
             
-            <h1 className="text-2xl font-bold text-gray-800 mb-3">
+            <h1 className="text-2xl font-bold text-sakura-dark mb-3">
               {t('partner_success_title')} 🎉
             </h1>
             
@@ -240,15 +240,15 @@ const PartnerApply = () => {
               {t('partner_success_text')}
             </p>
             
-            <div className="bg-pink-50 rounded-xl p-4 mb-6">
+            <div className="bg-sakura-light/30 rounded-xl p-4 mb-6 border border-sakura-mid/10">
               <p className="text-sm text-gray-700">
                 <strong>{t('partner_your_location')}:</strong><br/>
                 {isOnlineService(formData.city, formData.district) ? (
-                  <span className="text-pink-600 font-semibold">
+                  <span className="text-sakura-mid font-semibold">
                     🌍 {formData.city === 'Все' || formData.city === 'Online' ? (formData.city === 'Online' ? 'Online' : t('partner_work_everywhere')) : `${formData.city} (${formData.district === 'All' ? 'All districts' : t('partner_all_districts')})`}
                   </span>
                 ) : (
-                  <span className="text-pink-600 font-semibold">
+                  <span className="text-sakura-mid font-semibold">
                     📍 {formData.city}, {formData.district}
                   </span>
                 )}
@@ -265,7 +265,7 @@ const PartnerApply = () => {
                 hapticFeedback('light')
                 navigate('/')
               }}
-              className="w-full py-3 px-6 rounded-xl font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-500 hover:shadow-lg active:scale-95 transition-all"
+              className="w-full py-3 px-6 rounded-xl font-semibold text-white bg-gradient-to-r from-sakura-mid to-sakura-dark hover:shadow-lg active:scale-95 transition-all"
             >
               {language === 'ru' ? 'Вернуться на главную' : 'Back to Home'}
             </button>
@@ -276,8 +276,8 @@ const PartnerApply = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-400 via-purple-400 to-pink-500 py-6 px-4">
-      <div className="max-w-md mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-sakura-light via-white to-sakura-cream py-6 px-4">
+      <div className="max-w-md mx-auto relative z-10">
         {/* Кнопка возврата */}
         <div className="mb-4">
           <button
@@ -285,7 +285,7 @@ const PartnerApply = () => {
               hapticFeedback('light')
               navigate('/')
             }}
-            className="p-2 rounded-full border-2 border-white/30 bg-white/20 text-white hover:bg-white/30 transition-colors backdrop-blur-sm"
+            className="p-2 rounded-full border border-sakura-mid/20 bg-white/40 text-sakura-dark hover:bg-white/60 transition-colors backdrop-blur-md"
             aria-label={language === 'ru' ? 'Вернуться на главную' : 'Back to home'}
           >
             <svg
@@ -303,16 +303,16 @@ const PartnerApply = () => {
 
         {/* Заголовок */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
+          <h1 className="text-3xl font-bold text-sakura-dark mb-2">
             {t('partner_apply_title')} 🤝
           </h1>
-          <p className="text-white/90">
+          <p className="text-sakura-dark/70">
             {t('partner_apply_subtitle')}
           </p>
         </div>
 
         {/* Форма */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-6 card-shadow">
+        <form onSubmit={handleSubmit} className="bg-white/70 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/50">
           {/* Имя */}
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">
@@ -323,9 +323,9 @@ const PartnerApply = () => {
               name="name"
               value={formData.name}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
-                errors.name ? 'border-red-500' : 'border-gray-200'
-              } focus:border-pink-500 focus:outline-none transition-colors`}
+              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                errors.name ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+              } focus:outline-none transition-all placeholder-sakura-dark/40`}
               style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
               placeholder={language === 'ru' ? 'Иван Иванов' : 'John Doe'}
             />
@@ -344,9 +344,9 @@ const PartnerApply = () => {
               name="phone"
               value={formData.phone}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
-                errors.phone ? 'border-red-500' : 'border-gray-200'
-              } focus:border-pink-500 focus:outline-none transition-colors`}
+              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                errors.phone ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+              } focus:outline-none transition-all placeholder-sakura-dark/40`}
               style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
               placeholder={t('partner_phone_placeholder')}
             />
@@ -365,9 +365,9 @@ const PartnerApply = () => {
               name="companyName"
               value={formData.companyName}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
-                errors.companyName ? 'border-red-500' : 'border-gray-200'
-              } focus:border-pink-500 focus:outline-none transition-colors`}
+              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                errors.companyName ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+              } focus:outline-none transition-all placeholder-sakura-dark/40`}
               style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
               placeholder={t('partner_company_placeholder')}
             />
@@ -385,9 +385,9 @@ const PartnerApply = () => {
               name="businessType"
               value={formData.businessType}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
-                errors.businessType ? 'border-red-500' : 'border-gray-200'
-              } focus:border-pink-500 focus:outline-none transition-colors bg-white`}
+              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                errors.businessType ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+              } focus:outline-none transition-all`}
               style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
             >
               <option value="">{language === 'ru' ? 'Выберите категорию услуг' : 'Select service category'}</option>
@@ -411,9 +411,9 @@ const PartnerApply = () => {
               name="city"
               value={formData.city}
               onChange={handleCityChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
-                errors.city ? 'border-red-500' : 'border-gray-200'
-              } focus:border-pink-500 focus:outline-none transition-colors bg-white`}
+              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                errors.city ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+              } focus:outline-none transition-all`}
               style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
             >
               <option value="">{t('partner_city_placeholder')}</option>
@@ -443,9 +443,9 @@ const PartnerApply = () => {
                 name="username"
                 value={formData.username}
                 onChange={handleInputChange}
-                className={`w-full pl-8 pr-4 py-3 rounded-xl border-2 text-gray-900 ${
-                  errors.username ? 'border-red-500' : 'border-gray-200'
-                } focus:border-pink-500 focus:outline-none transition-colors`}
+                className={`w-full pl-8 pr-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                  errors.username ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+                } focus:outline-none transition-all placeholder-sakura-dark/40`}
                 style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
                 placeholder={language === 'ru' ? 'vera_yoga03 или @vera_yoga03' : 'vera_yoga03 or @vera_yoga03'}
               />
@@ -475,9 +475,9 @@ const PartnerApply = () => {
               name="bookingUrl"
               value={formData.bookingUrl}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
-                errors.bookingUrl ? 'border-red-500' : 'border-gray-200'
-              } focus:border-pink-500 focus:outline-none transition-colors`}
+              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                errors.bookingUrl ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+              } focus:outline-none transition-all placeholder-sakura-dark/40`}
               style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
               placeholder={language === 'ru' ? 'https://example.com/booking' : 'https://example.com/booking'}
             />
@@ -503,9 +503,9 @@ const PartnerApply = () => {
                 name="district"
                 value={formData.district}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 rounded-xl border-2 text-gray-900 ${
-                  errors.district ? 'border-red-500' : 'border-gray-200'
-                } focus:border-pink-500 focus:outline-none transition-colors bg-white`}
+                className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                  errors.district ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+                } focus:outline-none transition-all`}
                 style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
               >
                 <option value="">{t('partner_district_placeholder')}</option>
@@ -519,7 +519,7 @@ const PartnerApply = () => {
                 <p className="text-red-500 text-sm mt-1">{errors.district}</p>
               )}
               {formData.district === 'All' && (
-                <p className="text-pink-600 text-sm mt-2 flex items-center gap-1">
+                <p className="text-sakura-mid text-sm mt-2 flex items-center gap-1">
                   <span>💡</span>
                   <span>{t('partner_all_districts_hint')}</span>
                 </p>
@@ -528,8 +528,8 @@ const PartnerApply = () => {
           )}
 
           {/* Инфо */}
-          <div className="bg-blue-50 rounded-xl p-4 mb-6">
-            <p className="text-sm text-blue-800">
+          <div className="bg-sakura-mid/10 rounded-xl p-4 mb-6 border border-sakura-mid/20">
+            <p className="text-sm text-sakura-dark">
               <strong>ℹ️ {language === 'ru' ? 'Обратите внимание' : 'Note'}:</strong><br/>
               {t('partner_location_info')}
             </p>
@@ -546,10 +546,10 @@ const PartnerApply = () => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-4 rounded-xl font-bold text-white transition-all ${
+            className={`w-full py-4 rounded-xl font-bold text-white transition-all shadow-lg shadow-sakura-mid/30 ${
               loading
                 ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-pink-500 to-purple-500 hover:shadow-lg active:scale-95'
+                : 'bg-gradient-to-r from-sakura-mid to-sakura-dark hover:scale-[1.02] active:scale-[0.98]'
             }`}
           >
             {loading ? (
@@ -563,12 +563,12 @@ const PartnerApply = () => {
           </button>
         </form>
 
-        {/* Дополнительная информация */}
-        <div className="mt-6 text-center">
-          <p className="text-white/80 text-sm">
-            {t('partner_footer_text')}
-          </p>
-        </div>
+          {/* Дополнительная информация */}
+          <div className="mt-6 text-center">
+            <p className="text-sakura-dark/60 text-sm">
+              {t('partner_footer_text')}
+            </p>
+          </div>
       </div>
     </div>
   )

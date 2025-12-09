@@ -36,7 +36,8 @@ if sentry_dsn:
 
 sys.path.append(os.path.dirname(__file__))
 from supabase_manager import SupabaseManager
-from ai_helper import get_ai_support_answer
+# ОТКЛЮЧЕНО: GigaChat AI помощник
+# from ai_helper import get_ai_support_answer
 from rate_limiter import rate_limiter, check_rate_limit
 
 # Инициализация логгера
@@ -1552,92 +1553,94 @@ def callback_convert_period(call):
         log_exception(logger, e, f"Ошибка обработки callback convert_period для {chat_id}")
         client_bot.answer_callback_query(call.id, "Произошла ошибка", show_alert=True)
 
-@client_bot.message_handler(commands=['ask', 'спросить'])
-def handle_ask_command(message):
-    """Обработчик команды /ask - запрос к AI помощнику"""
-    chat_id = str(message.chat.id)
-    
-    # Rate limiting: 5 команд в минуту
-    allowed, error = check_rate_limit(chat_id, 'command')
-    if not allowed:
-        client_bot.send_message(chat_id, f"⏸️ {error}")
-        logger.warning(f"Rate limit exceeded for {chat_id}: ask command")
-        return
-    
-    logger.info(f"Клиент {chat_id} использовал команду /ask")
-    
-    client_bot.send_message(
-        chat_id,
-        "🤖 **AI Помощник**\n\n"
-        "Задайте свой вопрос о программе лояльности, и я постараюсь помочь!\n\n"
-        "Например:\n"
-        "• Как накопить баллы?\n"
-        "• Где найти партнеров?\n"
-        "• Как обменять баллы?\n\n"
-        "Или начните вопрос с символа **?**",
-        parse_mode='Markdown'
-    )
+# ОТКЛЮЧЕНО: GigaChat AI помощник
+# @client_bot.message_handler(commands=['ask', 'спросить'])
+# def handle_ask_command(message):
+#     """Обработчик команды /ask - запрос к AI помощнику"""
+#     chat_id = str(message.chat.id)
+#     
+#     # Rate limiting: 5 команд в минуту
+#     allowed, error = check_rate_limit(chat_id, 'command')
+#     if not allowed:
+#         client_bot.send_message(chat_id, f"⏸️ {error}")
+#         logger.warning(f"Rate limit exceeded for {chat_id}: ask command")
+#         return
+#     
+#     logger.info(f"Клиент {chat_id} использовал команду /ask")
+#     
+#     client_bot.send_message(
+#         chat_id,
+#         "🤖 **AI Помощник**\n\n"
+#         "Задайте свой вопрос о программе лояльности, и я постараюсь помочь!\n\n"
+#         "Например:\n"
+#         "• Как накопить баллы?\n"
+#         "• Где найти партнеров?\n"
+#         "• Как обменять баллы?\n\n"
+#         "Или начните вопрос с символа **?**",
+#         parse_mode='Markdown'
+#     )
 
 
-@client_bot.message_handler(func=lambda message: message.text and message.text.startswith('?'))
-def handle_ai_question(message):
-    """Обработчик вопросов, начинающихся с ?"""
-    chat_id = str(message.chat.id)
-    
-    # Rate limiting: 10 сообщений в минуту
-    allowed, error = check_rate_limit(chat_id, 'message')
-    if not allowed:
-        client_bot.send_message(chat_id, f"⏸️ {error}")
-        logger.warning(f"Rate limit exceeded for {chat_id}: AI question")
-        return
-    
-    question = message.text[1:].strip()  # Убираем "?" из начала
-    
-    if not question:
-        client_bot.send_message(chat_id, "Пожалуйста, укажите ваш вопрос после символа ?")
-        return
-    
-    logger.info(f"AI вопрос от клиента {chat_id}: {question}")
-    
-    # Показываем, что бот "думает"
-    thinking_msg = client_bot.send_message(chat_id, "🤔 Думаю...")
-    
-    try:
-        # Получаем ответ от AI (синхронная обертка для async функции)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        answer = loop.run_until_complete(get_ai_support_answer(question))
-        loop.close()
-        
-        # Удаляем сообщение "Думаю..."
-        try:
-            client_bot.delete_message(chat_id, thinking_msg.message_id)
-        except:
-            pass
-        
-        # Отправляем ответ
-        client_bot.send_message(
-            chat_id,
-            f"🤖 **AI Помощник:**\n\n{answer}\n\n"
-            f"_Если нужна дополнительная помощь, напишите 'поддержка'_",
-            parse_mode='Markdown'
-        )
-        
-        logger.info(f"AI ответ отправлен клиенту {chat_id}")
-        
-    except Exception as e:
-        log_exception(logger, e, f"Ошибка получения AI ответа для клиента {chat_id}")
-        
-        try:
-            client_bot.delete_message(chat_id, thinking_msg.message_id)
-        except:
-            pass
-        
-        client_bot.send_message(
-            chat_id,
-            "😔 Извините, сейчас я не могу ответить на ваш вопрос.\n\n"
-            "Попробуйте позже или напишите 'поддержка' для связи с оператором."
-        )
+# ОТКЛЮЧЕНО: GigaChat AI помощник - конфликтовал с другими обработчиками
+# @client_bot.message_handler(func=lambda message: message.text and message.text.startswith('?'))
+# def handle_ai_question(message):
+#     """Обработчик вопросов, начинающихся с ?"""
+#     chat_id = str(message.chat.id)
+#     
+#     # Rate limiting: 10 сообщений в минуту
+#     allowed, error = check_rate_limit(chat_id, 'message')
+#     if not allowed:
+#         client_bot.send_message(chat_id, f"⏸️ {error}")
+#         logger.warning(f"Rate limit exceeded for {chat_id}: AI question")
+#         return
+#     
+#     question = message.text[1:].strip()  # Убираем "?" из начала
+#     
+#     if not question:
+#         client_bot.send_message(chat_id, "Пожалуйста, укажите ваш вопрос после символа ?")
+#         return
+#     
+#     logger.info(f"AI вопрос от клиента {chat_id}: {question}")
+#     
+#     # Показываем, что бот "думает"
+#     thinking_msg = client_bot.send_message(chat_id, "🤔 Думаю...")
+#     
+#     try:
+#         # Получаем ответ от AI (синхронная обертка для async функции)
+#         loop = asyncio.new_event_loop()
+#         asyncio.set_event_loop(loop)
+#         answer = loop.run_until_complete(get_ai_support_answer(question))
+#         loop.close()
+#         
+#         # Удаляем сообщение "Думаю..."
+#         try:
+#             client_bot.delete_message(chat_id, thinking_msg.message_id)
+#         except:
+#             pass
+#         
+#         # Отправляем ответ
+#         client_bot.send_message(
+#             chat_id,
+#             f"🤖 **AI Помощник:**\n\n{answer}\n\n"
+#             f"_Если нужна дополнительная помощь, напишите 'поддержка'_",
+#             parse_mode='Markdown'
+#         )
+#         
+#         logger.info(f"AI ответ отправлен клиенту {chat_id}")
+#         
+#     except Exception as e:
+#         log_exception(logger, e, f"Ошибка получения AI ответа для клиента {chat_id}")
+#         
+#         try:
+#             client_bot.delete_message(chat_id, thinking_msg.message_id)
+#         except:
+#             pass
+#         
+#         client_bot.send_message(
+#             chat_id,
+#             "😔 Извините, сейчас я не могу ответить на ваш вопрос.\n\n"
+#             "Попробуйте позже или напишите 'поддержка' для связи с оператором."
+#         )
 
 
 @client_bot.message_handler(func=lambda message: message.text and message.text.lower() == 'поддержка')

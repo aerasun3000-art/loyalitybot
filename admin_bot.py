@@ -126,19 +126,37 @@ async def handle_start_admin(message: types.Message):
         return
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
-        [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
-        [InlineKeyboardButton(text="🛠 Услуги Партнёров", callback_data="admin_manage_services")],
-        [InlineKeyboardButton(text="💎 MLM Revenue Share", callback_data="admin_mlm")],
-        [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
-        [InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc")],
-        [InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters")],
-        [InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard")],
-        [InlineKeyboardButton(text="📱 Instagram Outreach", callback_data="admin_outreach")],
-        [InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background")],
-        [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
-        [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
-        [InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers")]
+        # Outreach и быстрые действия
+        [
+            InlineKeyboardButton(text="➕ Добавить контакт (Outreach)", callback_data="outreach_add"),
+            InlineKeyboardButton(text="📱 Instagram Outreach", callback_data="admin_outreach"),
+        ],
+        # Партнёры и услуги
+        [
+            InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners"),
+            InlineKeyboardButton(text="🛠 Услуги Партнёров", callback_data="admin_manage_services"),
+        ],
+        [
+            InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services"),
+            InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news"),
+        ],
+        # Контент и промо
+        [
+            InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc"),
+            InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters"),
+        ],
+        # Аналитика и MLM
+        [
+            InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats"),
+            InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard"),
+            InlineKeyboardButton(text="💎 MLM Revenue Share", callback_data="admin_mlm"),
+        ],
+        # Специальные разделы
+        [
+            InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard"),
+            InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers"),
+            InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background"),
+        ],
     ])
     
     await message.answer(
@@ -846,22 +864,39 @@ async def back_to_main_menu(callback_query: types.CallbackQuery):
     if not is_admin(callback_query.from_user.id):
         await callback_query.answer("У вас нет прав администратора")
         return
-    
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners")],
-        [InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services")],
-        [InlineKeyboardButton(text="🛠 Услуги Партнёров", callback_data="admin_manage_services")],
-        [InlineKeyboardButton(text="💎 MLM Revenue Share", callback_data="admin_mlm")],
-        [InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news")],
-        [InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc")],
-        [InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters")],
-        [InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard")],
-        [InlineKeyboardButton(text="📱 Instagram Outreach", callback_data="admin_outreach")],
-        [InlineKeyboardButton(text="➕ Добавить контакт (Outreach)", callback_data="outreach_add")],
-        [InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background")],
-        [InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats")],
-        [InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard")],
-        [InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers")]
+        # Outreach и быстрые действия
+        [
+            InlineKeyboardButton(text="➕ Добавить контакт (Outreach)", callback_data="outreach_add"),
+            InlineKeyboardButton(text="📱 Instagram Outreach", callback_data="admin_outreach"),
+        ],
+        # Партнёры и услуги
+        [
+            InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners"),
+            InlineKeyboardButton(text="🛠 Услуги Партнёров", callback_data="admin_manage_services"),
+        ],
+        [
+            InlineKeyboardButton(text="✨ Модерация Услуг", callback_data="admin_services"),
+            InlineKeyboardButton(text="📰 Управление Новостями", callback_data="admin_news"),
+        ],
+        # Контент и промо
+        [
+            InlineKeyboardButton(text="📸 Модерация UGC", callback_data="admin_ugc"),
+            InlineKeyboardButton(text="🎯 Промоутеры", callback_data="admin_promoters"),
+        ],
+        # Аналитика и MLM
+        [
+            InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats"),
+            InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard"),
+            InlineKeyboardButton(text="💎 MLM Revenue Share", callback_data="admin_mlm"),
+        ],
+        # Специальные разделы
+        [
+            InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard"),
+            InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers"),
+            InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background"),
+        ],
     ])
     
     await callback_query.message.edit_text(

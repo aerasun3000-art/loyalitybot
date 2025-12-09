@@ -259,3 +259,8 @@ def search_templates(query: str) -> list:
     
     return results
 
+
+
+
+
+
