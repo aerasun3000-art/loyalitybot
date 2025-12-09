@@ -563,8 +563,18 @@ const PartnerApply = () => {
           </button>
         </form>
 
+        {/* Ссылка на презентацию */}
+        <div className="mt-6 text-center">
+           <button
+             onClick={() => navigate('/partner/beauty-presentation')}
+             className="text-sakura-mid hover:text-sakura-dark underline text-sm font-medium transition-colors"
+           >
+             {language === 'ru' ? '✨ Посмотреть презентацию для Beauty' : '✨ View Beauty Presentation'}
+           </button>
+        </div>
+
           {/* Дополнительная информация */}
-          <div className="mt-6 text-center">
+          <div className="mt-4 text-center">
             <p className="text-sakura-dark/60 text-sm">
               {t('partner_footer_text')}
             </p>
