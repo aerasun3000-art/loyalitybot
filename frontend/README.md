@@ -155,7 +155,34 @@ const promotions = await getActivePromotions()
 
 // Получить услуги
 const services = await getApprovedServices()
+
+// Обменять баллы на услугу
+const result = await redeemService(chatId, serviceId)
+// result: { success: bool, new_balance: int, points_spent: int, service: object, error?: string }
 ```
+
+### Обмен баллов (`src/services/supabase.js`)
+
+```javascript
+// Обменять баллы на услугу
+const result = await redeemService(chatId, serviceId)
+
+if (result.success) {
+  console.log(`Обменено ${result.points_spent} баллов`)
+  console.log(`Новый баланс: ${result.new_balance}`)
+} else {
+  console.error('Ошибка:', result.error)
+}
+```
+
+**Как это работает:**
+1. Клиент выбирает услугу на странице `/services`
+2. Нажимает кнопку "💸 Обменять X баллов"
+3. Система проверяет баланс и списывает баллы
+4. Создается транзакция типа `redemption` в БД
+5. Баланс обновляется в реальном времени
+
+📖 **Подробное руководство:** См. `POINTS_REDEMPTION_GUIDE.md` в корне проекта
 
 ### Telegram Web App (`src/utils/telegram.js`)
 
@@ -228,7 +255,6 @@ bot.send_message(chat_id, "Добро пожаловать!", reply_markup=marku
 
 ## 🐛 Известные проблемы
 
-- [ ] TODO: Реализовать реальный обмен баллов (API endpoint)
 - [ ] TODO: Добавить уведомления внутри приложения
 - [ ] TODO: Форма регистрации для новых клиентов
 

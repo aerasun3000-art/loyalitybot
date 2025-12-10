@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getPromotionById } from '../services/supabase'
+import { getPromotionById, getClientBalance, redeemPromotion } from '../services/supabase'
 import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
@@ -18,6 +18,10 @@ const PromotionDetail = () => {
   const [isQrLoading, setIsQrLoading] = useState(false)
   const [qrImage, setQrImage] = useState('')
   const [qrError, setQrError] = useState(null)
+  const [balance, setBalance] = useState(0)
+  const [pointsToSpend, setPointsToSpend] = useState(0)
+  const [isRedeeming, setIsRedeeming] = useState(false)
+  const [redeemData, setRedeemData] = useState(null)
   const chatId = getChatId()
 
   useEffect(() => {
@@ -37,8 +41,17 @@ const PromotionDetail = () => {
 
     try {
       setLoading(true)
-      // ID акции - это UUID (строка), передаем его как есть
-      const promoData = await getPromotionById(id)
+      // ID акции - это число, конвертируем
+      const promoId = parseInt(id)
+      if (isNaN(promoId)) {
+        navigate('/promotions')
+        return
+      }
+      
+      const [promoData, balanceData] = await Promise.all([
+        getPromotionById(promoId),
+        chatId ? getClientBalance(chatId) : Promise.resolve({ balance: 0 })
+      ])
       
       if (!promoData) {
         console.log('No promotion data, redirecting to /promotions')
@@ -47,6 +60,13 @@ const PromotionDetail = () => {
       }
       
       setPromotion(promoData)
+      setBalance(balanceData?.balance || 0)
+      
+      // Устанавливаем максимальное количество баллов по умолчанию
+      if (promoData.max_points_payment && promoData.points_to_dollar_rate) {
+        const maxPoints = Math.floor(promoData.max_points_payment / promoData.points_to_dollar_rate)
+        setPointsToSpend(Math.min(maxPoints, balanceData?.balance || 0))
+      }
     } catch (error) {
       console.error('Error loading promotion detail:', error)
       navigate('/promotions')
@@ -82,15 +102,72 @@ const PromotionDetail = () => {
       setIsQrLoading(true)
       setQrError(null)
 
-      // QR код содержит только chat_id
+      // QR код содержит только chat_id (для обычной активации без оплаты баллами)
       const qrPayload = chatId
       const dataUrl = await QRCode.toDataURL(qrPayload, { margin: 1, scale: 6 })
       setQrImage(dataUrl)
+      setRedeemData(null) // Сбрасываем данные об оплате баллами
     } catch (error) {
       console.error('Error generating promotion QR:', error)
       setQrError('Не удалось сгенерировать QR-код. Попробуйте позже.')
     } finally {
       setIsQrLoading(false)
+    }
+  }
+
+  const handlePayWithPoints = async () => {
+    if (!chatId) {
+      showAlert('Авторизуйтесь через Telegram, чтобы оплатить баллами.')
+      return
+    }
+
+    if (!promotion || !promotion.max_points_payment) {
+      showAlert('Эта акция не поддерживает оплату баллами.')
+      return
+    }
+
+    if (pointsToSpend <= 0) {
+      showAlert('Введите количество баллов для оплаты.')
+      return
+    }
+
+    if (pointsToSpend > balance) {
+      showAlert(`Недостаточно баллов. Доступно: ${balance}`)
+      return
+    }
+
+    try {
+      setIsRedeeming(true)
+      setQrError(null)
+      setQrImage('')
+
+      const promoId = parseInt(id)
+      const result = await redeemPromotion(chatId, promoId, pointsToSpend)
+
+      if (result.success) {
+        setRedeemData(result)
+        
+        // Генерируем QR-код с данными об акции и оплате баллами
+        const qrPayload = result.qr_data
+        const dataUrl = await QRCode.toDataURL(qrPayload, { margin: 1, scale: 6 })
+        setQrImage(dataUrl)
+        
+        // Обновляем баланс
+        setBalance(result.current_balance)
+        
+        hapticFeedback('success')
+      } else {
+        setQrError(result.error || 'Ошибка при подготовке оплаты баллами')
+        hapticFeedback('error')
+        showAlert(result.error || 'Ошибка при подготовке оплаты баллами')
+      }
+    } catch (error) {
+      console.error('Error redeeming promotion:', error)
+      setQrError('Ошибка сети. Проверьте подключение к интернету.')
+      hapticFeedback('error')
+      showAlert('Ошибка сети. Проверьте подключение к интернету.')
+    } finally {
+      setIsRedeeming(false)
     }
   }
 
@@ -108,6 +185,26 @@ const PromotionDetail = () => {
 
     // Открываем ссылку в новой вкладке
     window.open(bookingUrl, '_blank')
+    hapticFeedback('medium')
+  }
+
+  const handleShowLocation = () => {
+    if (!promotion) return
+
+    const mapsLink = promotion.partner?.google_maps_link
+    const city = promotion.partner?.city
+    const district = promotion.partner?.district
+    
+    if (mapsLink) {
+      window.open(mapsLink, '_blank')
+    } else if (city || district) {
+      // Fallback to search query if no direct link
+      const query = encodeURIComponent(`${promotion.partner?.company_name || ''} ${city || ''} ${district || ''}`.trim())
+      window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank')
+    } else {
+       showAlert(language === 'ru' ? 'Локация не указана' : 'Location not specified')
+       return
+    }
     hapticFeedback('medium')
   }
 
@@ -183,13 +280,88 @@ const PromotionDetail = () => {
             {/* Информация о стоимости/скидке */}
             <div className="flex items-center gap-3 bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-3">
               <span className="text-2xl">🎁</span>
-              <div>
+              <div className="flex-1">
                 <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">Скидка / Стоимость</p>
                 <p className="text-lg font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                  {promotion.discount_value || (promotion.required_points > 0 ? `${promotion.required_points} баллов` : 'Бесплатно')}
+                  {promotion.discount_value || (promotion.service_price ? `$${promotion.service_price}` : (promotion.required_points > 0 ? `${promotion.required_points} баллов` : 'Бесплатно'))}
                 </p>
               </div>
             </div>
+
+            {/* Оплата баллами (если доступна) */}
+            {promotion.max_points_payment && promotion.max_points_payment > 0 && (
+              <div className="bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">💸</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-sakura-dark">
+                      {language === 'ru' ? 'Оплата баллами' : 'Pay with points'}
+                    </p>
+                    <p className="text-xs text-sakura-dark/60">
+                      {language === 'ru' 
+                        ? `Можно оплатить до $${promotion.max_points_payment} баллами`
+                        : `You can pay up to $${promotion.max_points_payment} with points`}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-sakura-dark/80">
+                      {language === 'ru' ? 'Количество баллов:' : 'Points amount:'}
+                    </label>
+                    <span className="text-sm text-sakura-dark/60">
+                      {language === 'ru' ? 'Баланс:' : 'Balance:'} <strong className={balance >= pointsToSpend ? 'text-green-600' : 'text-red-500'}>{balance}</strong>
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max={Math.min(balance, Math.floor(promotion.max_points_payment / (promotion.points_to_dollar_rate || 1)))}
+                    value={pointsToSpend}
+                    onChange={(e) => {
+                      const value = Math.max(0, Math.min(parseInt(e.target.value) || 0, balance, Math.floor(promotion.max_points_payment / (promotion.points_to_dollar_rate || 1))))
+                      setPointsToSpend(value)
+                    }}
+                    className="w-full px-4 py-2 rounded-xl border-2 border-sakura-border/40 bg-white/50 text-sakura-dark focus:border-sakura-mid focus:outline-none"
+                    placeholder="0"
+                  />
+                  {pointsToSpend > 0 && (
+                    <p className="text-xs text-sakura-dark/60">
+                      {language === 'ru' 
+                        ? `= $${(pointsToSpend * (promotion.points_to_dollar_rate || 1)).toFixed(2)}`
+                        : `= $${(pointsToSpend * (promotion.points_to_dollar_rate || 1)).toFixed(2)}`}
+                      {promotion.service_price && (
+                        <span className="ml-2">
+                          {language === 'ru' 
+                            ? `, доплата: $${(promotion.service_price - pointsToSpend * (promotion.points_to_dollar_rate || 1)).toFixed(2)}`
+                            : `, cash payment: $${(promotion.service_price - pointsToSpend * (promotion.points_to_dollar_rate || 1)).toFixed(2)}`}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+                
+                <button
+                  onClick={handlePayWithPoints}
+                  disabled={isRedeeming || pointsToSpend <= 0 || pointsToSpend > balance || !chatId}
+                  className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-mid to-sakura-dark text-white font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isRedeeming ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      {language === 'ru' ? 'Подготавливаем...' : 'Preparing...'}
+                    </span>
+                  ) : (
+                    <span>
+                      {language === 'ru' 
+                        ? `💸 Оплатить ${pointsToSpend} баллов`
+                        : `💸 Pay ${pointsToSpend} points`}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Дополнительная информация */}
             {promotion.required_points > 0 && (
@@ -231,6 +403,13 @@ const PromotionDetail = () => {
               </button>
 
               <button
+                onClick={handleShowLocation}
+                className="w-full py-3 rounded-full bg-white text-sakura-dark font-semibold shadow-md border border-sakura-border hover:bg-sakura-surface transition-colors"
+              >
+                {language === 'ru' ? '📍 Показать на карте' : '📍 Show on Map'}
+              </button>
+
+              <button
                 onClick={handleBookTime}
                 disabled={!promotion.booking_url && !promotion.partner?.booking_url}
                 className="w-full py-3 rounded-full bg-sakura-deep text-white font-semibold shadow-md hover:bg-sakura-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -249,10 +428,39 @@ const PromotionDetail = () => {
             {/* QR код */}
             {qrImage && (
               <div className="flex flex-col items-center gap-3 bg-white/90 border border-sakura-border/40 rounded-3xl p-4 mb-8 pb-8">
-                <img src={qrImage} alt="QR для активации" className="w-48 h-48 object-contain" />
-                <p className="text-xs text-sakura-dark/70 text-center px-2">
-                  Покажите этот QR специалисту чтобы начислить или списать баллы
-                </p>
+                <img src={qrImage} alt="QR для оплаты" className="w-48 h-48 object-contain" />
+                {redeemData ? (
+                  <>
+                    <div className="text-center space-y-1">
+                      <p className="text-sm font-semibold text-sakura-dark">
+                        {language === 'ru' ? 'Оплата баллами' : 'Pay with points'}
+                      </p>
+                      <p className="text-xs text-sakura-dark/70">
+                        {language === 'ru' 
+                          ? `Списать ${redeemData.points_to_spend} баллов ($${redeemData.points_value_usd?.toFixed(2)})`
+                          : `Spend ${redeemData.points_to_spend} points ($${redeemData.points_value_usd?.toFixed(2)})`}
+                      </p>
+                      {redeemData.cash_payment > 0 && (
+                        <p className="text-xs text-sakura-dark/70 font-semibold">
+                          {language === 'ru' 
+                            ? `Доплата наличными: $${redeemData.cash_payment.toFixed(2)}`
+                            : `Cash payment: $${redeemData.cash_payment.toFixed(2)}`}
+                        </p>
+                      )}
+                    </div>
+                    <p className="text-xs text-sakura-dark/60 text-center px-2 mt-2">
+                      {language === 'ru' 
+                        ? 'Покажите QR-код мастеру. Мастер списывает баллы и начисляет новые за покупку.'
+                        : 'Show QR code to master. Master will deduct points and award new points for purchase.'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-sakura-dark/70 text-center px-2">
+                    {language === 'ru' 
+                      ? 'Покажите этот QR специалисту чтобы начислить или списать баллы'
+                      : 'Show this QR to specialist to add or deduct points'}
+                  </p>
+                )}
                 {chatId && (
                   <p className="text-xs text-sakura-dark/50 text-center px-2 font-mono">
                     ID: {chatId}

@@ -2,7 +2,7 @@
 # Использование: flyctl deploy --config fly.client.toml --app loyalitybot-client
 
 app = "loyalitybot-client"
-primary_region = "ams"  # Амстердам
+primary_region = "ewr"  # New Jersey (близко к NY)
 
 [build]
   dockerfile = "Dockerfile"
@@ -10,6 +10,9 @@ primary_region = "ams"  # Амстердам
 [env]
   PYTHONUNBUFFERED = "1"
   LOG_LEVEL = "INFO"
+  # Оптимизация Python для меньшего использования памяти
+  PYTHONDONTWRITEBYTECODE = "1"
+  PYTHONHASHSEED = "0"
 
 [processes]
   app = "python client_handler.py"
@@ -17,5 +20,4 @@ primary_region = "ams"  # Амстердам
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory_mb = 256
-
+  memory_mb = 512  # Оптимально для стабильной работы

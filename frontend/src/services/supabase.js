@@ -90,7 +90,7 @@ export const getActivePromotions = async () => {
     .from('promotions')
     .select(`
       *,
-      partners(name, company_name, booking_url)
+      partners(name, company_name, booking_url, google_maps_link)
     `)
     .eq('is_active', true)
     .gte('end_date', today)
@@ -116,7 +116,7 @@ export const getPromotionById = async (id) => {
     .from('promotions')
     .select(`
       *,
-      partners(name, company_name, booking_url)
+      partners(name, company_name, booking_url, google_maps_link)
     `)
     .eq('id', id)
     .single()
@@ -168,7 +168,7 @@ export const getApprovedServices = async () => {
   // Получаем данные партнёров отдельным запросом
   const { data: partners, error: partnersError } = await supabase
     .from('partners')
-    .select('chat_id, name, company_name, city, district, business_type, username, contact_link')
+    .select('chat_id, name, company_name, city, district, business_type, username, contact_link, google_maps_link')
     .in('chat_id', partnerIds)
   
   if (partnersError) {
@@ -230,7 +230,7 @@ export const getFilteredServices = async (city = null, district = null, category
   if (partnerIds.length > 0) {
     const { data: partners, error: partnersError } = await supabase
       .from('partners')
-      .select('chat_id, name, company_name, city, district, business_type, username, contact_link, booking_url')
+      .select('chat_id, name, company_name, city, district, business_type, username, contact_link, booking_url, google_maps_link')
       .in('chat_id', partnerIds)
     
     if (!partnersError && partners) {
@@ -360,7 +360,7 @@ export const getPartnerInfo = async (partnerChatId) => {
   
   const { data, error } = await supabase
     .from('partners')
-    .select('chat_id, name, company_name, city, district')
+    .select('chat_id, name, company_name, city, district, google_maps_link')
     .eq('chat_id', partnerChatId)
     .maybeSingle()
   
@@ -1378,6 +1378,121 @@ export const getOrCreateReferralCode = async (chatId) => {
   } catch (error) {
     console.error('Error in getOrCreateReferralCode:', error)
     return null
+  }
+}
+
+/**
+ * Получить базовый URL API
+ */
+const getApiBaseUrl = () => {
+  // Приоритет 1: переменная окружения
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  
+  // Приоритет 2: localhost для разработки
+  if (typeof window !== 'undefined' && window.location.origin.includes('localhost')) {
+    return 'http://localhost:8001'
+  }
+  
+  // Fallback: пустая строка
+  console.warn('⚠️ VITE_API_URL не установлен! Установите переменную окружения.')
+  return ''
+}
+
+/**
+ * Обменять баллы на услугу (старый метод, оставлен для совместимости)
+ * @param {string} clientChatId - Chat ID клиента
+ * @param {string} serviceId - UUID услуги
+ * @returns {Promise<{success: boolean, new_balance?: number, points_spent?: number, service?: object, error?: string}>}
+ */
+export const redeemService = async (clientChatId, serviceId) => {
+  const apiBaseUrl = getApiBaseUrl()
+  
+  if (!apiBaseUrl) {
+    return {
+      success: false,
+      error: 'API URL не настроен. Пожалуйста, свяжитесь с поддержкой.'
+    }
+  }
+  
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/redeem`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        client_chat_id: clientChatId,
+        service_id: serviceId
+      })
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Ошибка сервера' }))
+      return {
+        success: false,
+        error: errorData.detail || errorData.error || 'Ошибка при обмене баллов'
+      }
+    }
+    
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Error redeeming service:', error)
+    return {
+      success: false,
+      error: 'Ошибка сети. Проверьте подключение к интернету.'
+    }
+  }
+}
+
+/**
+ * Подготовить обмен баллов на акцию (частичная оплата)
+ * @param {string} clientChatId - Chat ID клиента
+ * @param {number} promotionId - ID акции
+ * @param {number} pointsToSpend - Количество баллов для оплаты
+ * @returns {Promise<{success: boolean, current_balance?: number, points_to_spend?: number, points_value_usd?: number, service_price?: number, cash_payment?: number, promotion?: object, qr_data?: string, error?: string}>}
+ */
+export const redeemPromotion = async (clientChatId, promotionId, pointsToSpend) => {
+  const apiBaseUrl = getApiBaseUrl()
+  
+  if (!apiBaseUrl) {
+    return {
+      success: false,
+      error: 'API URL не настроен. Пожалуйста, свяжитесь с поддержкой.'
+    }
+  }
+  
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/redeem-promotion`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        client_chat_id: clientChatId,
+        promotion_id: promotionId,
+        points_to_spend: pointsToSpend
+      })
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: 'Ошибка сервера' }))
+      return {
+        success: false,
+        error: errorData.detail || errorData.error || 'Ошибка при подготовке обмена баллов'
+      }
+    }
+    
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Error redeeming promotion:', error)
+    return {
+      success: false,
+      error: 'Ошибка сети. Проверьте подключение к интернету.'
+    }
   }
 }
 

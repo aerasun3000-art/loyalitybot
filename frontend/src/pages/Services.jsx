@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo } from '../services/supabase'
+import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, redeemService } from '../services/supabase'
 import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
 import { getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
@@ -39,6 +39,9 @@ const Services = () => {
   const [isQrLoading, setIsQrLoading] = useState(false)
   const [qrImage, setQrImage] = useState('')
   const [qrError, setQrError] = useState(null)
+  const [isRedeeming, setIsRedeeming] = useState(false)
+  const [redeemError, setRedeemError] = useState(null)
+  const [redeemSuccess, setRedeemSuccess] = useState(false)
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
   const [selectedCity, setSelectedCity] = useState(cityParam || '')
   const [selectedDistrict, setSelectedDistrict] = useState(districtParam || '')
@@ -447,6 +450,74 @@ const Services = () => {
     setSelectedService(null)
     setQrImage('')
     setQrError(null)
+    setRedeemError(null)
+    setRedeemSuccess(false)
+  }
+
+  const handleRedeemPoints = async () => {
+    if (!chatId) {
+      showAlert('Авторизуйтесь через Telegram, чтобы обменять баллы.')
+      return
+    }
+
+    if (!selectedService) {
+      return
+    }
+
+    // Проверяем баланс
+    if (balance < selectedService.price_points) {
+      showAlert(`Недостаточно баллов. Требуется: ${selectedService.price_points}, доступно: ${balance}`)
+      return
+    }
+
+    // Подтверждение
+    const confirmed = window.confirm(
+      language === 'ru'
+        ? `Обменять ${selectedService.price_points} баллов на услугу "${selectedService.title}"?`
+        : `Exchange ${selectedService.price_points} points for service "${selectedService.title}"?`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setIsRedeeming(true)
+      setRedeemError(null)
+      setRedeemSuccess(false)
+
+      const result = await redeemService(chatId, selectedService.id)
+
+      if (result.success) {
+        setRedeemSuccess(true)
+        hapticFeedback('success')
+        
+        // Обновляем баланс
+        const newBalance = result.new_balance || balance - result.points_spent
+        setBalance(newBalance)
+        
+        // Обновляем данные
+        await loadData()
+        
+        // Показываем успешное сообщение
+        showAlert(
+          language === 'ru'
+            ? `✅ Успешно! Обменено ${result.points_spent} баллов. Новый баланс: ${newBalance}`
+            : `✅ Success! Exchanged ${result.points_spent} points. New balance: ${newBalance}`
+        )
+      } else {
+        setRedeemError(result.error || 'Ошибка при обмене баллов')
+        hapticFeedback('error')
+        showAlert(result.error || 'Ошибка при обмене баллов')
+      }
+    } catch (error) {
+      console.error('Error redeeming points:', error)
+      setRedeemError('Ошибка сети. Проверьте подключение к интернету.')
+      hapticFeedback('error')
+      showAlert('Ошибка сети. Проверьте подключение к интернету.')
+    } finally {
+      setIsRedeeming(false)
+    }
   }
 
   const handleGetCashback = async () => {
@@ -489,6 +560,26 @@ const Services = () => {
 
     // Открываем ссылку в новой вкладке
     window.open(bookingUrl, '_blank')
+    hapticFeedback('medium')
+  }
+
+  const handleShowLocation = () => {
+    if (!selectedService) return
+
+    const mapsLink = selectedService.partner?.google_maps_link
+    const city = selectedService.partner?.city
+    const district = selectedService.partner?.district
+    
+    if (mapsLink) {
+      window.open(mapsLink, '_blank')
+    } else if (city || district) {
+      // Fallback to search query if no direct link
+      const query = encodeURIComponent(`${selectedService.partner?.company_name || ''} ${city || ''} ${district || ''}`.trim())
+      window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank')
+    } else {
+       showAlert(language === 'ru' ? 'Локация не указана' : 'Location not specified')
+       return
+    }
     hapticFeedback('medium')
   }
 
@@ -853,19 +944,73 @@ const Services = () => {
               )}
               <div className="flex items-center gap-3 bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-3">
                 <span className="text-2xl">💸</span>
-                <div>
-                  <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">Ориентировочная стоимость</p>
-                  <p className="text-lg font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">{selectedService.price_points}</p>
+                <div className="flex-1">
+                  <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">
+                    {language === 'ru' ? 'Стоимость в баллах' : 'Cost in points'}
+                  </p>
+                  <p className="text-lg font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+                    {selectedService.price_points}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">
+                    {language === 'ru' ? 'Ваш баланс' : 'Your balance'}
+                  </p>
+                  <p className={`text-lg font-semibold ${
+                    balance >= selectedService.price_points ? 'text-green-600' : 'text-red-500'
+                  }`}>
+                    {balance}
+                  </p>
                 </div>
               </div>
 
+              {redeemSuccess && (
+                <div className="bg-green-100/80 border-2 border-green-400 rounded-2xl p-4 mb-4">
+                  <p className="text-green-800 font-semibold text-center">
+                    {language === 'ru' ? '✅ Баллы успешно обменены!' : '✅ Points successfully redeemed!'}
+                  </p>
+                </div>
+              )}
+
+              {redeemError && (
+                <div className="bg-red-100/80 border-2 border-red-400 rounded-2xl p-4 mb-4">
+                  <p className="text-red-800 text-sm text-center">{redeemError}</p>
+                </div>
+              )}
+
               <div className="space-y-3">
+                <button
+                  onClick={handleRedeemPoints}
+                  disabled={isRedeeming || balance < selectedService.price_points || !chatId}
+                  className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-mid to-sakura-dark text-white font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isRedeeming ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      {language === 'ru' ? 'Обмениваем...' : 'Redeeming...'}
+                    </span>
+                  ) : (
+                    <span>
+                      {language === 'ru' 
+                        ? `💸 Обменять ${selectedService.price_points} баллов`
+                        : `💸 Redeem ${selectedService.price_points} points`}
+                    </span>
+                  )}
+                </button>
+
                 <button
                   onClick={handleGetCashback}
                   disabled={isQrLoading}
                   className="w-full py-3 rounded-full bg-sakura-accent text-white font-semibold shadow-md hover:bg-sakura-accent/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {isQrLoading ? 'Генерируем QR...' : 'Получить кэшбэк в баллах'}
+                  {isQrLoading ? 'Генерируем QR...' : (language === 'ru' ? 'Получить кэшбэк в баллах' : 'Get cashback points')}
+                </button>
+
+                <button
+                  onClick={handleShowLocation}
+                  className="w-full py-3 rounded-full bg-white text-sakura-dark font-semibold shadow-md border border-sakura-border hover:bg-sakura-surface transition-colors"
+                >
+                  {language === 'ru' ? '📍 Показать на карте' : '📍 Show on Map'}
                 </button>
 
                 <button
@@ -873,7 +1018,7 @@ const Services = () => {
                   disabled={!selectedService.booking_url && !selectedService.partner?.booking_url}
                   className="w-full py-3 rounded-full bg-sakura-deep text-white font-semibold shadow-md hover:bg-sakura-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Забронировать время
+                  {language === 'ru' ? 'Забронировать время' : 'Book time'}
                 </button>
               </div>
 

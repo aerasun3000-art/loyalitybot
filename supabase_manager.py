@@ -2074,6 +2074,247 @@ class SupabaseManager:
             logging.error(f"Error getting service by id: {e}")
             return None
 
+    def get_service_by_uuid(self, service_id: str) -> Optional[dict]:
+        """Получает услугу по UUID (без проверки партнера, для обмена баллов)."""
+        if not self.client: return None
+        try:
+            response = self.client.from_('services').select('*').eq('id', service_id).execute()
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logging.error(f"Error getting service by UUID: {e}")
+            return None
+
+    def get_promotion_by_id(self, promotion_id: int) -> Optional[dict]:
+        """Получает акцию по ID."""
+        if not self.client: return None
+        try:
+            response = self.client.from_('promotions').select('*').eq('id', promotion_id).execute()
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logging.error(f"Error getting promotion by id: {e}")
+            return None
+
+    def execute_promotion_transaction(self, client_chat_id: str, partner_chat_id: str, promotion_id: int, 
+                                     points_to_spend: int, cash_payment: float) -> dict:
+        """
+        Выполняет транзакцию по акции: списывает баллы и начисляет новые за покупку.
+        
+        Args:
+            client_chat_id: Chat ID клиента
+            partner_chat_id: Chat ID партнера
+            promotion_id: ID акции
+            points_to_spend: Количество баллов для списания
+            cash_payment: Сумма доплаты наличными (для начисления кэшбэка)
+                          Кэшбэк начисляется ТОЛЬКО от этой суммы, НЕ от суммы оплаты баллами
+            
+        Returns:
+            dict: {
+                'success': bool,
+                'points_spent': int,
+                'points_earned': int,
+                'new_balance': int,
+                'error': str (если success=False)
+            }
+        """
+        if not self.client:
+            return {"success": False, "error": "DB is not initialized.", "points_spent": 0, "points_earned": 0, "new_balance": 0}
+        
+        try:
+            # Получаем текущий баланс
+            current_balance = self.get_client_balance(int(client_chat_id))
+            
+            # Проверяем баланс перед списанием
+            if current_balance < points_to_spend:
+                return {
+                    "success": False,
+                    "error": f"Недостаточно баллов. Требуется: {points_to_spend}, доступно: {current_balance}",
+                    "points_spent": 0,
+                    "points_earned": 0,
+                    "new_balance": current_balance
+                }
+            
+            # 1. Списываем баллы
+            spend_result = self.execute_transaction(
+                int(client_chat_id),
+                int(partner_chat_id),
+                'spend',
+                float(points_to_spend),
+                allow_queue=True
+            )
+            
+            if not spend_result.get("success"):
+                return {
+                    "success": False,
+                    "error": spend_result.get("error", "Ошибка при списании баллов"),
+                    "points_spent": 0,
+                    "points_earned": 0,
+                    "new_balance": current_balance
+                }
+            
+            # 2. Начисляем новые баллы за покупку (только от доплаты наличными)
+            # Если cash_payment = 0 (полная оплата баллами), кэшбэк не начисляется
+            if cash_payment > 0:
+                accrual_result = self.execute_transaction(
+                    int(client_chat_id),
+                    int(partner_chat_id),
+                    'accrual',
+                    float(cash_payment),  # Правильно - только от доплаты наличными
+                    allow_queue=True
+                )
+                
+                if not accrual_result.get("success"):
+                    # Если начисление не удалось, логируем ошибку, но списание уже выполнено
+                    logging.error(f"Failed to accrue points after spending: {accrual_result.get('error')}")
+                    return {
+                        "success": True,  # Списание выполнено успешно
+                        "points_spent": points_to_spend,
+                        "points_earned": 0,
+                        "new_balance": spend_result.get("new_balance", current_balance - points_to_spend),
+                        "warning": f"Баллы списаны, но начисление не выполнено: {accrual_result.get('error')}"
+                    }
+            else:
+                # Полная оплата баллами - кэшбэк не начисляется
+                accrual_result = {
+                    "success": True,
+                    "points": 0,
+                    "new_balance": spend_result.get("new_balance", current_balance - points_to_spend)
+                }
+            
+            # Возвращаем успешный результат
+            return {
+                "success": True,
+                "points_spent": points_to_spend,
+                "points_earned": accrual_result.get("points", 0),
+                "new_balance": accrual_result.get("new_balance", current_balance - points_to_spend + accrual_result.get("points", 0))
+            }
+            
+        except Exception as e:
+            logging.error(f"Error executing promotion transaction: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": f"Ошибка при выполнении транзакции: {str(e)}",
+                "points_spent": 0,
+                "points_earned": 0,
+                "new_balance": 0
+            }
+
+    def redeem_points_for_promotion(self, client_chat_id: str, promotion_id: int, points_to_spend: int) -> dict:
+        """
+        Подготавливает обмен баллов для акции (частичная оплата).
+        Баллы НЕ списываются сразу - создается QR-код для мастера.
+        
+        Args:
+            client_chat_id: Chat ID клиента
+            promotion_id: ID акции
+            points_to_spend: Количество баллов для оплаты
+            
+        Returns:
+            dict: {
+                'success': bool,
+                'current_balance': int,
+                'points_to_spend': int,
+                'promotion': dict,
+                'qr_data': str,  # Данные для QR-кода
+                'error': str (если success=False)
+            }
+        """
+        if not self.client:
+            return {"success": False, "error": "DB is not initialized.", "current_balance": 0, "points_to_spend": 0}
+        
+        try:
+            # Получаем акцию
+            promotion = self.get_promotion_by_id(promotion_id)
+            if not promotion:
+                return {"success": False, "error": "Акция не найдена.", "current_balance": 0, "points_to_spend": 0}
+            
+            # Проверяем, что акция активна
+            if not promotion.get('is_active', True):
+                return {"success": False, "error": "Акция неактивна.", "current_balance": 0, "points_to_spend": 0}
+            
+            # Проверяем даты акции
+            from datetime import datetime, date
+            today = date.today()
+            start_date = promotion.get('start_date')
+            end_date = promotion.get('end_date')
+            
+            if start_date:
+                start = datetime.strptime(start_date, '%Y-%m-%d').date() if isinstance(start_date, str) else start_date
+                if today < start:
+                    return {"success": False, "error": "Акция еще не началась.", "current_balance": 0, "points_to_spend": 0}
+            
+            if end_date:
+                end = datetime.strptime(end_date, '%Y-%m-%d').date() if isinstance(end_date, str) else end_date
+                if today > end:
+                    return {"success": False, "error": "Акция уже закончилась.", "current_balance": 0, "points_to_spend": 0}
+            
+            # Проверяем возможность оплаты баллами
+            max_points_payment = promotion.get('max_points_payment')
+            if not max_points_payment or max_points_payment <= 0:
+                return {"success": False, "error": "Эта акция не поддерживает оплату баллами.", "current_balance": 0, "points_to_spend": 0}
+            
+            # Получаем курс обмена (по умолчанию 1 балл = 1 доллар)
+            points_rate = float(promotion.get('points_to_dollar_rate', 1.0))
+            
+            # Конвертируем баллы в доллары
+            points_value_usd = points_to_spend * points_rate
+            
+            # Проверяем, не превышает ли сумма максимальную оплату баллами
+            if points_value_usd > max_points_payment:
+                return {
+                    "success": False,
+                    "error": f"Максимальная оплата баллами: ${max_points_payment:.2f}. Вы пытаетесь оплатить ${points_value_usd:.2f}.",
+                    "current_balance": 0,
+                    "points_to_spend": 0
+                }
+            
+            # Получаем partner_chat_id
+            partner_chat_id = promotion.get('partner_chat_id')
+            if not partner_chat_id:
+                return {"success": False, "error": "Акция не привязана к партнеру.", "current_balance": 0, "points_to_spend": 0}
+            
+            # Проверяем баланс клиента
+            current_balance = self.get_client_balance(int(client_chat_id))
+            if current_balance < points_to_spend:
+                return {
+                    "success": False,
+                    "error": f"Недостаточно баллов. Требуется: {points_to_spend}, доступно: {current_balance}",
+                    "current_balance": current_balance,
+                    "points_to_spend": 0
+                }
+            
+            # Получаем стоимость услуги
+            service_price = promotion.get('service_price', 0)
+            
+            # Формируем данные для QR-кода
+            # Формат: PROMOTION:promotion_id:client_chat_id:points_to_spend:points_value_usd
+            qr_data = f"PROMOTION:{promotion_id}:{client_chat_id}:{points_to_spend}:{points_value_usd:.2f}"
+            
+            # Возвращаем успешный результат (баллы НЕ списываются - мастер списывает при сканировании)
+            return {
+                "success": True,
+                "current_balance": current_balance,
+                "points_to_spend": points_to_spend,
+                "points_value_usd": points_value_usd,
+                "service_price": service_price,
+                "cash_payment": service_price - points_value_usd,  # Сколько нужно доплатить наличными
+                "promotion": {
+                    "id": promotion.get("id"),
+                    "title": promotion.get("title"),
+                    "description": promotion.get("description"),
+                    "partner_chat_id": partner_chat_id
+                },
+                "qr_data": qr_data
+            }
+            
+        except Exception as e:
+            logging.error(f"Error preparing promotion redemption: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": f"Ошибка при подготовке обмена баллов: {str(e)}",
+                "current_balance": 0,
+                "points_to_spend": 0
+            }
+
     # -----------------------------------------------------------------
     # VI. МЕТОДЫ ДЛЯ РАБОТЫ С НОВОСТЯМИ
     # -----------------------------------------------------------------

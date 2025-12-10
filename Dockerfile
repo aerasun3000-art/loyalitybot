@@ -1,17 +1,26 @@
 FROM python:3.11-slim
 
-# Установка системных зависимостей
-RUN apt-get update && apt-get install -y \
+# Установка системных зависимостей (оптимизировано для кэширования)
+# Добавляем libzbar0 для работы QR-сканера (pyzbar)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    libzbar0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Рабочая директория
 WORKDIR /app
 
-# Копирование зависимостей
+# Переменные окружения для оптимизации Python
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONHASHSEED=0
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Копирование зависимостей (отдельный слой для лучшего кэширования)
 COPY requirements.txt .
 
-# Установка Python зависимостей
+# Установка Python зависимостей (кэшируется отдельно)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Копирование кода приложения
@@ -19,10 +28,6 @@ COPY . .
 
 # Создание директории для логов
 RUN mkdir -p /app/logs
-
-# Переменные окружения по умолчанию
-ENV PYTHONUNBUFFERED=1
-ENV LOG_LEVEL=INFO
 
 # Healthcheck (для админ-бота, например)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

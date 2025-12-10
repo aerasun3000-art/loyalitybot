@@ -149,6 +149,37 @@ class TranslationResponse(BaseModel):
     error: str | None = None
 
 
+class RedeemRequest(BaseModel):
+    client_chat_id: str = Field(..., description="Chat ID клиента")
+    service_id: str = Field(..., description="UUID услуги для обмена")
+
+
+class RedeemResponse(BaseModel):
+    success: bool
+    new_balance: int | None = None
+    points_spent: int | None = None
+    service: dict | None = None
+    error: str | None = None
+
+
+class RedeemPromotionRequest(BaseModel):
+    client_chat_id: str = Field(..., description="Chat ID клиента")
+    promotion_id: int = Field(..., description="ID акции")
+    points_to_spend: int = Field(..., gt=0, description="Количество баллов для оплаты")
+
+
+class RedeemPromotionResponse(BaseModel):
+    success: bool
+    current_balance: int | None = None
+    points_to_spend: int | None = None
+    points_value_usd: float | None = None
+    service_price: float | None = None
+    cash_payment: float | None = None
+    promotion: dict | None = None
+    qr_data: str | None = None
+    error: str | None = None
+
+
 @app.get(
     "/health",
     tags=["health"],
@@ -295,6 +326,183 @@ def create_transaction(request: Request, payload: TransactionRequest):
         payload.partner_chat_id,
         payload.txn_type,
         payload.amount
+    )
+
+    if not result.get("success"):
+        detail = result.get("error", "Неизвестная ошибка")
+        raise HTTPException(status_code=400, detail=detail)
+
+    return result
+
+
+@app.post(
+    "/api/redeem",
+    response_model=RedeemResponse,
+    tags=["transactions"],
+    summary="Обменять баллы на услугу",
+    description="Списывает баллы клиента и обменивает их на услугу",
+    response_description="Результат обмена баллов",
+    responses={
+        200: {
+            "description": "Баллы успешно обменены",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "new_balance": 50,
+                        "points_spent": 100,
+                        "service": {
+                            "id": "uuid",
+                            "title": "Маникюр",
+                            "description": "Классический маникюр"
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Ошибка обмена баллов",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Недостаточно баллов"}
+                }
+            }
+        },
+        429: {
+            "description": "Слишком много запросов",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Rate limit exceeded"}
+                }
+            }
+        }
+    }
+)
+@limiter.limit("10/minute")
+def redeem_points(request: Request, payload: RedeemRequest):
+    """
+    Обмен баллов клиента на услугу.
+    
+    Rate Limit: 10 запросов/минуту
+    
+    Параметры:
+    - **client_chat_id**: Telegram Chat ID клиента
+    - **service_id**: UUID услуги для обмена
+    
+    Возвращает:
+    - **success**: Успешность операции
+    - **new_balance**: Новый баланс клиента после обмена
+    - **points_spent**: Количество списанных баллов
+    - **service**: Информация об услуге
+    - **error**: Сообщение об ошибке (если success=false)
+    
+    Пример запроса:
+    ```json
+    {
+        "client_chat_id": "123456789",
+        "service_id": "550e8400-e29b-41d4-a716-446655440000"
+    }
+    ```
+    
+    Пример успешного ответа:
+    ```json
+    {
+        "success": true,
+        "new_balance": 50,
+        "points_spent": 100,
+        "service": {
+            "id": "550e8400-e29b-41d4-a716-446655440000",
+            "title": "Маникюр",
+            "description": "Классический маникюр",
+            "partner_chat_id": "987654321"
+        }
+    }
+    ```
+    """
+    result = manager.redeem_points_for_service(
+        payload.client_chat_id,
+        payload.service_id
+    )
+
+    if not result.get("success"):
+        detail = result.get("error", "Неизвестная ошибка")
+        raise HTTPException(status_code=400, detail=detail)
+
+    return result
+
+
+@app.post(
+    "/api/redeem-promotion",
+    response_model=RedeemPromotionResponse,
+    tags=["transactions"],
+    summary="Подготовить обмен баллов на акцию",
+    description="Подготавливает обмен баллов для акции (частичная оплата). Баллы НЕ списываются сразу - создается QR-код для мастера.",
+    response_description="Результат подготовки обмена",
+    responses={
+        200: {
+            "description": "QR-код успешно создан",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True,
+                        "current_balance": 150,
+                        "points_to_spend": 50,
+                        "points_value_usd": 50.0,
+                        "service_price": 100.0,
+                        "cash_payment": 50.0,
+                        "qr_data": "PROMOTION:123:456789:50:50.00"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Ошибка подготовки обмена",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Недостаточно баллов"}
+                }
+            }
+        }
+    }
+)
+@limiter.limit("10/minute")
+def redeem_promotion(request: Request, payload: RedeemPromotionRequest):
+    """
+    Подготовка обмена баллов на акцию (частичная оплата).
+    
+    Rate Limit: 10 запросов/минуту
+    
+    Параметры:
+    - **client_chat_id**: Telegram Chat ID клиента
+    - **promotion_id**: ID акции
+    - **points_to_spend**: Количество баллов для оплаты
+    
+    Возвращает:
+    - **success**: Успешность операции
+    - **current_balance**: Текущий баланс клиента
+    - **points_to_spend**: Количество баллов для оплаты
+    - **points_value_usd**: Стоимость баллов в долларах
+    - **service_price**: Полная стоимость услуги
+    - **cash_payment**: Сколько нужно доплатить наличными
+    - **promotion**: Информация об акции
+    - **qr_data**: Данные для QR-кода (формат: PROMOTION:id:client_id:points:usd_value)
+    - **error**: Сообщение об ошибке (если success=false)
+    
+    Пример запроса:
+    ```json
+    {
+        "client_chat_id": "123456789",
+        "promotion_id": 123,
+        "points_to_spend": 50
+    }
+    ```
+    
+    **Важно:** Баллы НЕ списываются сразу. Мастер списывает их при сканировании QR-кода.
+    """
+    result = manager.redeem_points_for_promotion(
+        payload.client_chat_id,
+        payload.promotion_id,
+        payload.points_to_spend
     )
 
     if not result.get("success"):

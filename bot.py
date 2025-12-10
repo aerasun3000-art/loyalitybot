@@ -1057,9 +1057,9 @@ def complete_partner_transaction(chat_id: int, client_id: str, txn_type: str, am
     finally:
         partner_main_menu(chat_id)
 
-@bot.message_handler(content_types=['photo'], func=lambda message: USER_STATE.get(message.chat.id) in ['awaiting_client_id_issue', 'awaiting_client_id_spend'])
+@bot.message_handler(content_types=['photo'])
 def process_qr_photo(message):
-    """Обрабатывает фото с QR-кодом для сканирования ID клиента."""
+    """Обрабатывает фото с QR-кодом (акции или клиенты)."""
     chat_id = message.chat.id
     
     if not message.photo:
@@ -1099,34 +1099,152 @@ def process_qr_photo(message):
         bot.send_message(chat_id, error_msg, parse_mode='Markdown')
         return
     
-    # Парсим данные из QR-кода (формат: CLIENT_ID:<chat_id>)
-    if qr_data.startswith('CLIENT_ID:'):
-        client_id_payload = qr_data.replace('CLIENT_ID:', '', 1).strip()
-        client_id = client_id_payload.split(';', 1)[0].strip()
+    # Проверяем, нужно ли обрабатывать как обычный QR-код клиента
+    is_awaiting_client = USER_STATE.get(chat_id) in ['awaiting_client_id_issue', 'awaiting_client_id_spend']
+    
+    # Парсим данные из QR-кода
+    if qr_data.startswith('PROMOTION:'):
+        # Формат: PROMOTION:promotion_id:client_chat_id:points_to_spend:points_value_usd
+        try:
+            parts = qr_data.replace('PROMOTION:', '').split(':')
+            if len(parts) >= 4:
+                promotion_id = int(parts[0])
+                client_id = parts[1]
+                points_to_spend = int(parts[2])
+                points_value_usd = float(parts[3])
+                
+                # Получаем информацию об акции
+                promotion = sm.get_promotion_by_id(promotion_id)
+                if not promotion:
+                    bot.send_message(chat_id, "❌ Акция не найдена.")
+                    return
+                
+                # Получаем информацию о клиенте
+                if not sm.client_exists(client_id):
+                    bot.send_message(chat_id, f"❌ Клиент с ID `{client_id}` не найден.", parse_mode='Markdown')
+                    return
+                
+                client_balance = sm.get_client_balance(client_id)
+                service_price = promotion.get('service_price', 0)
+                cash_payment = service_price - points_value_usd if service_price > 0 else 0
+                
+                # Рассчитываем сколько баллов начислить (5% от суммы доплаты наличными)
+                # Кэшбэк начисляется ТОЛЬКО от cash_payment, НЕ от суммы оплаты баллами
+                if cash_payment > 0:
+                    points_to_earn = sm._calculate_accrual_points(int(chat_id), cash_payment)
+                else:
+                    # Если доплата = 0 (полная оплата баллами), кэшбэк не начисляется
+                    points_to_earn = 0
+                
+                # Сохраняем данные для подтверждения
+                TEMP_DATA[chat_id] = {
+                    'promotion_id': promotion_id,
+                    'client_id': client_id,
+                    'points_to_spend': points_to_spend,
+                    'points_value_usd': points_value_usd,
+                    'cash_payment': cash_payment,  # Передаем cash_payment вместо purchase_amount
+                    'points_to_earn': points_to_earn
+                }
+                
+                # Показываем интерактивное сообщение с кнопками
+                message_text = (
+                    f"🎁 **Оплата по акции**\n\n"
+                    f"**Акция:** {promotion.get('title', 'Не указано')}\n"
+                    f"**Клиент ID:** `{client_id}`\n"
+                    f"**Баланс клиента:** {client_balance} баллов\n\n"
+                    f"📊 **Операции:**\n"
+                    f"➖ Списать: **{points_to_spend}** баллов (${points_value_usd:.2f})\n"
+                )
+                
+                if cash_payment > 0:
+                    message_text += (
+                        f"➕ Начислить: **{points_to_earn}** баллов (5% кэшбэк от доплаты ${cash_payment:.2f})\n"
+                        f"💰 **Доплата наличными:** ${cash_payment:.2f}\n"
+                    )
+                else:
+                    message_text += (
+                        f"💰 **Полная оплата баллами** (кэшбэк не начисляется)\n"
+                    )
+                
+                message_text += f"\n✅ Нажмите 'Одобрить' для выполнения транзакции."
+                
+                markup = types.InlineKeyboardMarkup()
+                btn_approve = types.InlineKeyboardButton("✅ Одобрить", callback_data=f"promo_approve_{promotion_id}_{client_id}")
+                btn_cancel = types.InlineKeyboardButton("❌ Отмена", callback_data="promo_cancel")
+                markup.add(btn_approve, btn_cancel)
+                
+                bot.send_message(chat_id, message_text, parse_mode='Markdown', reply_markup=markup)
+                logger.info(f"Партнёр {chat_id} отсканировал QR-код акции {promotion_id} для клиента {client_id}")
+                return
+        except (ValueError, IndexError) as e:
+            logger.error(f"Ошибка парсинга QR-кода акции: {e}")
+            bot.send_message(chat_id, "❌ Ошибка формата QR-кода акции.")
+            return
+    
+    # Старый формат: CLIENT_ID:<chat_id> (только если партнер ожидает ввода ID клиента)
+    if is_awaiting_client:
+        if qr_data.startswith('CLIENT_ID:'):
+            client_id_payload = qr_data.replace('CLIENT_ID:', '', 1).strip()
+            client_id = client_id_payload.split(';', 1)[0].strip()
+        else:
+            # Если формат другой, пытаемся использовать как есть
+            client_id = qr_data.strip()
+        
+        # Проверяем существование клиента
+        if not sm.client_exists(client_id):
+            bot.send_message(chat_id, 
+                f"❌ Клиент с ID `{client_id}` не найден в системе.\n\n"
+                "Попробуйте отсканировать QR-код еще раз или введите ID вручную.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Успешно получили ID клиента
+        TEMP_DATA[chat_id] = {
+            'client_id': client_id,
+            'txn_type': 'accrual' if USER_STATE[chat_id] == 'awaiting_client_id_issue' else 'spend'
+        }
+        USER_STATE[chat_id] = 'awaiting_amount'
+        
+        current_balance = sm.get_client_balance(client_id)
+        bot.send_message(chat_id, f"✅ QR-код успешно распознан!\n\nКлиент ID: `{client_id}`", parse_mode="Markdown")
+        prompt_transaction_amount(chat_id, client_id, TEMP_DATA[chat_id]['txn_type'], current_balance)
+        logger.info(f"Партнёр {chat_id} отсканировал QR-код клиента {client_id}")
     else:
-        # Если формат другой, пытаемся использовать как есть
-        client_id = qr_data.strip()
-    
-    # Проверяем существование клиента
-    if not sm.client_exists(client_id):
-        bot.send_message(chat_id, 
-            f"❌ Клиент с ID `{client_id}` не найден в системе.\n\n"
-            "Попробуйте отсканировать QR-код еще раз или введите ID вручную.",
-            parse_mode='Markdown'
+        # Если партнер не ожидает ввода ID, но отправил фото - возможно это QR-код акции или клиента
+        # Проверяем формат CLIENT_ID для обратной совместимости
+        if qr_data.startswith('CLIENT_ID:'):
+            client_id_payload = qr_data.replace('CLIENT_ID:', '', 1).strip()
+            client_id = client_id_payload.split(';', 1)[0].strip()
+            
+            if sm.client_exists(client_id):
+                # Предлагаем выбрать действие
+                markup = types.InlineKeyboardMarkup()
+                btn_accrual = types.InlineKeyboardButton("➕ Начислить баллы", callback_data=f"qr_accrual_{client_id}")
+                btn_spend = types.InlineKeyboardButton("➖ Списать баллы", callback_data=f"qr_spend_{client_id}")
+                markup.add(btn_accrual, btn_spend)
+                
+                current_balance = sm.get_client_balance(client_id)
+                bot.send_message(
+                    chat_id,
+                    f"✅ QR-код клиента распознан!\n\n"
+                    f"Клиент ID: `{client_id}`\n"
+                    f"Баланс: {current_balance} баллов\n\n"
+                    f"Выберите действие:",
+                    parse_mode='Markdown',
+                    reply_markup=markup
+                )
+                return
+        
+        # Если формат не распознан
+        bot.send_message(
+            chat_id,
+            "❓ Не удалось распознать формат QR-кода.\n\n"
+            "Поддерживаемые форматы:\n"
+            "• PROMOTION:... (для оплаты по акции)\n"
+            "• CLIENT_ID:... (для операций с клиентом)\n\n"
+            "💡 Используйте меню для выбора операции."
         )
-        return
-    
-    # Успешно получили ID клиента
-    TEMP_DATA[chat_id] = {
-        'client_id': client_id,
-        'txn_type': 'accrual' if USER_STATE[chat_id] == 'awaiting_client_id_issue' else 'spend'
-    }
-    USER_STATE[chat_id] = 'awaiting_amount'
-    
-    current_balance = sm.get_client_balance(client_id)
-    bot.send_message(chat_id, f"✅ QR-код успешно распознан!\n\nКлиент ID: `{client_id}`", parse_mode="Markdown")
-    prompt_transaction_amount(chat_id, client_id, TEMP_DATA[chat_id]['txn_type'], current_balance)
-    logger.info(f"Партнёр {chat_id} отсканировал QR-код клиента {client_id}")
 
 
 @bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) in ['awaiting_client_id_issue', 'awaiting_client_id_spend'])
@@ -1853,11 +1971,150 @@ def handle_promo_callbacks(call):
     elif call.data == 'promo_manage':
         handle_promo_manage_list(chat_id)
         
+    elif call.data == 'promo_cancel':
+        TEMP_DATA.pop(chat_id, None)
+        bot.send_message(chat_id, "❌ Операция отменена.")
+        partner_main_menu(chat_id)
+    
+    elif call.data.startswith('promo_approve_'):
+        # Формат: promo_approve_promotion_id_client_id
+        try:
+            parts = call.data.replace('promo_approve_', '').split('_')
+            if len(parts) >= 2:
+                promotion_id = int(parts[0])
+                client_id = '_'.join(parts[1:])  # На случай если client_id содержит подчеркивания
+                
+                # Получаем данные из TEMP_DATA
+                promo_data = TEMP_DATA.get(chat_id, {})
+                if not promo_data or promo_data.get('promotion_id') != promotion_id:
+                    bot.send_message(chat_id, "❌ Данные транзакции не найдены. Отсканируйте QR-код еще раз.")
+                    bot.answer_callback_query(call.id, "Ошибка: данные не найдены")
+                    return
+                
+                points_to_spend = promo_data.get('points_to_spend', 0)
+                cash_payment = promo_data.get('cash_payment', 0)
+                
+                if points_to_spend <= 0:
+                    bot.send_message(chat_id, "❌ Некорректные данные транзакции.")
+                    bot.answer_callback_query(call.id, "Ошибка данных")
+                    return
+                
+                # Выполняем транзакцию
+                bot.answer_callback_query(call.id, "Выполняю транзакцию...")
+                bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=call.message.message_id,
+                    text=call.message.text + "\n\n⏳ Выполняю транзакцию...",
+                    parse_mode='Markdown'
+                )
+                
+                result = sm.execute_promotion_transaction(
+                    client_id,
+                    str(chat_id),
+                    promotion_id,
+                    points_to_spend,
+                    cash_payment  # Передаем cash_payment вместо purchase_amount
+                )
+                
+                if result.get("success"):
+                    # Очищаем временные данные
+                    TEMP_DATA.pop(chat_id, None)
+                    
+                    success_msg = (
+                        f"✅ **Транзакция выполнена успешно!**\n\n"
+                        f"➖ Списано: **{result.get('points_spent', 0)}** баллов\n"
+                        f"➕ Начислено: **{result.get('points_earned', 0)}** баллов\n"
+                        f"💰 Новый баланс клиента: **{result.get('new_balance', 0)}** баллов\n\n"
+                        f"Клиент ID: `{client_id}`"
+                    )
+                    
+                    if result.get("warning"):
+                        success_msg += f"\n\n⚠️ {result.get('warning')}"
+                    
+                    bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=call.message.message_id,
+                        text=success_msg,
+                        parse_mode='Markdown'
+                    )
+                    
+                    # Отправляем уведомление клиенту
+                    try:
+                        if client_bot:
+                            client_bot.send_message(
+                                client_id,
+                                f"✅ **Оплата по акции выполнена!**\n\n"
+                                f"➖ Списано: {result.get('points_spent', 0)} баллов\n"
+                                f"➕ Начислено: {result.get('points_earned', 0)} баллов\n"
+                                f"💰 Ваш баланс: {result.get('new_balance', 0)} баллов",
+                                parse_mode='Markdown'
+                            )
+                    except Exception as e:
+                        logger.warning(f"Не удалось отправить уведомление клиенту {client_id}: {e}")
+                    
+                    logger.info(f"Партнёр {chat_id} одобрил транзакцию по акции {promotion_id} для клиента {client_id}")
+                else:
+                    error_msg = f"❌ **Ошибка выполнения транзакции:**\n\n{result.get('error', 'Неизвестная ошибка')}"
+                    bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=call.message.message_id,
+                        text=error_msg,
+                        parse_mode='Markdown'
+                    )
+                    bot.answer_callback_query(call.id, "Ошибка транзакции", show_alert=True)
+        except (ValueError, KeyError) as e:
+            logger.error(f"Ошибка обработки подтверждения акции: {e}")
+            bot.send_message(chat_id, "❌ Ошибка обработки запроса.")
+            bot.answer_callback_query(call.id, "Ошибка обработки")
+        
     elif call.data == 'partner_main_menu':
         partner_main_menu(chat_id)
     
-    # Важно: отвечаем на callback query
-    bot.answer_callback_query(call.id)
+    # Важно: отвечаем на callback query (если еще не ответили)
+    if not call.data.startswith('promo_approve_'):
+        bot.answer_callback_query(call.id)
+
+
+# Обработчик для QR-кодов клиентов (выбор операции)
+@bot.callback_query_handler(func=lambda call: call.data.startswith('qr_accrual_') or call.data.startswith('qr_spend_'))
+def handle_qr_operation(call):
+    """Обработка выбора операции после сканирования QR клиента."""
+    chat_id = call.message.chat.id
+    
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    
+    try:
+        parts = call.data.split('_')
+        operation = parts[1]  # accrual или spend
+        client_id = '_'.join(parts[2:])  # client_id может содержать подчеркивания
+        
+        if not sm.client_exists(client_id):
+            bot.send_message(chat_id, f"❌ Клиент с ID `{client_id}` не найден.", parse_mode='Markdown')
+            bot.answer_callback_query(call.id, "Клиент не найден")
+            return
+        
+        TEMP_DATA[chat_id] = {
+            'client_id': client_id,
+            'txn_type': operation
+        }
+        USER_STATE[chat_id] = 'awaiting_amount'
+        
+        current_balance = sm.get_client_balance(client_id)
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=f"✅ Клиент ID: `{client_id}`\nБаланс: {current_balance} баллов",
+            parse_mode='Markdown'
+        )
+        prompt_transaction_amount(chat_id, client_id, operation, current_balance)
+        bot.answer_callback_query(call.id)
+    except Exception as e:
+        logger.error(f"Ошибка обработки QR операции: {e}")
+        bot.send_message(chat_id, "❌ Ошибка обработки запроса.")
+        bot.answer_callback_query(call.id, "Ошибка")
 
 def process_promo_title(message):
     chat_id = message.chat.id
