@@ -3770,12 +3770,67 @@ def process_service_edit_price(message):
 
 
 # ------------------------------------
+# ОБРАБОТЧИКИ СОСТОЯНИЙ СОЗДАНИЯ АКЦИИ (ДОБАВЛЕНО ДЛЯ ПРАВИЛЬНОЙ ОБРАБОТКИ)
+# ------------------------------------
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_title')
+def handle_promo_title_state(message):
+    """Обрабатывает ввод заголовка акции."""
+    process_promo_title(message)
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_description')
+def handle_promo_description_state(message):
+    """Обрабатывает ввод описания акции."""
+    process_promo_description(message)
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_discount')
+def handle_promo_discount_state(message):
+    """Обрабатывает ввод размера скидки."""
+    process_promo_discount(message)
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_end_date')
+def handle_promo_end_date_state(message):
+    """Обрабатывает ввод даты окончания."""
+    process_promo_end_date(message)
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_service_price')
+def handle_promo_service_price_state(message):
+    """Обрабатывает ввод стоимости услуги."""
+    process_promo_service_price(message)
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_max_points')
+def handle_promo_max_points_state(message):
+    """Обрабатывает ввод максимальной оплаты баллами."""
+    process_promo_max_points(message)
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_points_rate')
+def handle_promo_points_rate_state(message):
+    """Обрабатывает ввод курса обмена."""
+    process_promo_points_rate(message)
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_photo')
+def handle_promo_photo_state(message):
+    """Обрабатывает загрузку фото акции."""
+    process_promo_photo(message)
+
+# ------------------------------------
 # ОБРАБОТЧИК ПРОЧИХ СООБЩЕНИЙ (ОСТАВЛЕНО)
 # ------------------------------------
 @bot.message_handler(func=lambda message: True)
 def handle_partner_all_messages(message):
+    """Обработчик всех остальных сообщений. Должен быть последним."""
     chat_id = message.chat.id
-
+    
+    # Если есть состояние, которое не обработано выше - пропускаем
+    # (это означает, что register_next_step_handler должен обработать)
+    if chat_id in USER_STATE:
+        # Проверяем, не является ли это состоянием создания акции (должно быть обработано выше)
+        state = USER_STATE[chat_id]
+        if state.startswith('awaiting_promo_') or state.startswith('awaiting_service_') or state.startswith('awaiting_edit_'):
+            # Эти состояния должны обрабатываться специфичными обработчиками выше
+            # Если мы здесь, значит что-то пошло не так
+            logger.warning(f"Unhandled state {state} for chat {chat_id}, message: {message.text[:50]}")
+            return
+    
     if chat_id not in USER_STATE and not sm.partner_exists(chat_id):
         bot.send_message(chat_id, "Пожалуйста, начните с команды /start.")
         return
@@ -3783,9 +3838,6 @@ def handle_partner_all_messages(message):
     if sm.partner_exists(chat_id) and sm.get_partner_status(chat_id) == 'Approved':
         if chat_id not in USER_STATE:
             partner_main_menu(chat_id, "Используйте меню Партнера.")
-
-    elif chat_id in USER_STATE:
-        pass # Ожидаем ввода в рамках текущего шага диалога
 
 
 # ------------------------------------
