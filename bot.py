@@ -2233,7 +2233,7 @@ def process_promo_title(message):
         bot.register_next_step_handler(msg, process_promo_title)
         return
 
-        TEMP_DATA[chat_id]['title'] = message.text.strip()
+    TEMP_DATA[chat_id]['title'] = message.text.strip()
     USER_STATE[chat_id] = 'awaiting_promo_description'
     
     step_num = "3" if TEMP_DATA[chat_id].get('promotion_type') else "2"
@@ -2548,15 +2548,41 @@ def process_promo_points_rate(message):
 
 def save_promotion(chat_id):
     """Сохранение акции в БД"""
-    promo_data = TEMP_DATA.pop(chat_id, None)
+    promo_data = TEMP_DATA.get(chat_id, {}).copy() if chat_id in TEMP_DATA else None
     USER_STATE.pop(chat_id, None)
 
     if not promo_data:
         bot.send_message(chat_id, "❌ Ошибка сессии. Попробуйте начать снова: /start")
+        TEMP_DATA.pop(chat_id, None)
         return
+    
+    # Проверяем обязательные поля перед сохранением
+    required_fields = ['title', 'description', 'discount_value', 'end_date', 'partner_chat_id']
+    missing_fields = [field for field in required_fields if not promo_data.get(field)]
+    
+    if missing_fields:
+        error_msg = f"❌ Отсутствуют обязательные поля: {', '.join(missing_fields)}\n\n"
+        error_msg += "Попробуйте создать акцию заново."
+        bot.send_message(chat_id, error_msg)
+        logger.error(f"Missing required fields for promotion: {missing_fields}. Data: {promo_data}")
+        TEMP_DATA.pop(chat_id, None)
+        partner_main_menu(chat_id)
+        return
+    
+    # Для акций типа points_redemption проверяем наличие услуг
+    if promo_data.get('promotion_type') == 'points_redemption':
+        if not promo_data.get('service_ids'):
+            bot.send_message(chat_id, "❌ Для акции типа 'Обмен баллов' необходимо выбрать хотя бы одну услугу.\nПопробуйте создать акцию заново.")
+            logger.error(f"points_redemption promotion without service_ids. Data: {promo_data}")
+            TEMP_DATA.pop(chat_id, None)
+            partner_main_menu(chat_id)
+            return
     
     # Логируем данные акции для отладки
     logger.info(f"Saving promotion data: {promo_data}")
+    
+    # Очищаем TEMP_DATA после проверки
+    TEMP_DATA.pop(chat_id, None)
         
     try:
         success = sm.add_promotion(promo_data)
@@ -2579,12 +2605,20 @@ def save_promotion(chat_id):
                 )
         else:
             logger.error(f"Failed to save promotion for partner {chat_id}. Data: {promo_data}")
-            bot.send_message(chat_id, "❌ Ошибка при сохранении акции. Проверьте логи.")
-
+            bot.send_message(
+                chat_id, 
+                "❌ Ошибка при сохранении акции.\n\n"
+                "Возможные причины:\n"
+                "• Партнёр не найден в системе\n"
+                "• Услуги не найдены (для акций типа 'Обмен баллов')\n"
+                "• Ошибка подключения к базе данных\n\n"
+                "Проверьте логи или попробуйте позже."
+            )
+    
     except Exception as e:
-        logger.error(f"Exception saving promotion for partner {chat_id}: {e}")
+        log_exception(logger, e, f"Exception saving promotion for partner {chat_id}")
         bot.send_message(chat_id, "❌ Произошла системная ошибка при сохранении акции.")
-
+    
     partner_main_menu(chat_id)
 
 
