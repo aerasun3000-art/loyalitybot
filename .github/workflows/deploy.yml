@@ -33,7 +33,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           if flyctl apps list | grep -q "loyalitybot-admin"; then
-            flyctl deploy --app loyalitybot-admin --remote-only
+            flyctl deploy --config fly.admin.toml --app loyalitybot-admin --remote-only
           else
             echo "App loyalitybot-admin not found. Create it first with: flyctl launch --app loyalitybot-admin"
           fi
@@ -45,7 +45,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           if flyctl apps list | grep -q "loyalitybot-partner"; then
-            flyctl deploy --app loyalitybot-partner --remote-only
+            flyctl deploy --config fly.partner.toml --app loyalitybot-partner --remote-only
           else
             echo "App loyalitybot-partner not found. Create it first with: flyctl launch --app loyalitybot-partner"
           fi
