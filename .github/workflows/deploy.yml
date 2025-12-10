@@ -57,7 +57,7 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           if flyctl apps list | grep -q "loyalitybot-client"; then
-            flyctl deploy --app loyalitybot-client --remote-only
+            flyctl deploy --config fly.client.toml --app loyalitybot-client --remote-only
           else
             echo "App loyalitybot-client not found. Create it first with: flyctl launch --app loyalitybot-client"
           fi
