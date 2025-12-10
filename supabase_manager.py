@@ -2160,7 +2160,7 @@ class SupabaseManager:
             logging.error(f"Traceback: {traceback.format_exc()}")
             return False
 
-    def update_service(self, service_id: int, partner_chat_id: str, title: str = None, description: str = None, price_points: int = None) -> bool:
+    def update_service(self, service_id: str, partner_chat_id: str, title: str = None, description: str = None, price_points: int = None) -> bool:
         """Обновляет данные услуги (название, описание, стоимость)."""
         if not self.client: return False
         try:
@@ -2173,25 +2173,29 @@ class SupabaseManager:
                 update_data['price_points'] = price_points
             
             if update_data:
+                # Преобразуем service_id в строку для работы с UUID
+                service_id_str = str(service_id)
                 # Проверяем, что услуга принадлежит партнеру
-                response = self.client.from_('services').select('id').eq('id', service_id).eq('partner_chat_id', str(partner_chat_id)).execute()
+                response = self.client.from_('services').select('id').eq('id', service_id_str).eq('partner_chat_id', str(partner_chat_id)).execute()
                 if not response.data:
-                    logging.error(f"Service {service_id} not found or doesn't belong to partner {partner_chat_id}")
+                    logging.error(f"Service {service_id_str} not found or doesn't belong to partner {partner_chat_id}")
                     return False
                 
-                self.client.from_('services').update(update_data).eq('id', service_id).execute()
-                logging.info(f"Service {service_id} updated successfully")
+                self.client.from_('services').update(update_data).eq('id', service_id_str).execute()
+                logging.info(f"Service {service_id_str} updated successfully")
                 return True
             return False
         except Exception as e:
             logging.error(f"Error updating service: {e}")
             return False
 
-    def get_service_by_id(self, service_id: int, partner_chat_id: str) -> Optional[dict]:
+    def get_service_by_id(self, service_id: str, partner_chat_id: str) -> Optional[dict]:
         """Получает услугу по ID с проверкой принадлежности партнеру."""
         if not self.client: return None
         try:
-            response = self.client.from_('services').select('*').eq('id', service_id).eq('partner_chat_id', str(partner_chat_id)).execute()
+            # Преобразуем service_id в строку для работы с UUID
+            service_id_str = str(service_id)
+            response = self.client.from_('services').select('*').eq('id', service_id_str).eq('partner_chat_id', str(partner_chat_id)).execute()
             return response.data[0] if response.data else None
         except Exception as e:
             logging.error(f"Error getting service by id: {e}")

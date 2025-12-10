@@ -6,6 +6,7 @@ import time
 import datetime
 import html
 import requests
+import random
 from io import BytesIO
 import io
 try:
@@ -1987,6 +1988,21 @@ def handle_promo_callbacks(call):
     elif call.data == 'promo_manage':
         handle_promo_manage_list(chat_id)
     
+    elif call.data == 'promo_back':
+        # Возвращаемся в меню акций
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_add = types.InlineKeyboardButton("➕ Создать новую акцию", callback_data="promo_add")
+        btn_manage = types.InlineKeyboardButton("⚙️ Редактировать / Удалить", callback_data="promo_manage")
+        btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
+        markup.add(btn_add, btn_manage, btn_back)
+        
+        bot.edit_message_text(
+            "*Управление Акциями:*\nВыберите действие:",
+            chat_id, call.message.message_id,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+    
     elif call.data.startswith('promo_type_'):
         promo_type = call.data.replace('promo_type_', '')
         if chat_id not in TEMP_DATA:
@@ -2586,8 +2602,9 @@ def handle_services_menu(message):
     btn_add = types.InlineKeyboardButton("➕ Добавить новую услугу", callback_data="service_add")
     btn_manage = types.InlineKeyboardButton("🔍 Мои услуги", callback_data="service_status")
     btn_edit = types.InlineKeyboardButton("✏️ Редактировать услугу", callback_data="service_edit_list")
+    btn_delete = types.InlineKeyboardButton("🗑️ Удалить услугу", callback_data="service_delete_list")
     btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
-    markup.add(btn_add, btn_manage, btn_edit, btn_back)
+    markup.add(btn_add, btn_manage, btn_edit, btn_delete, btn_back)
 
     bot.send_message(chat_id, "*Управление Услугами:*\nСоздайте услугу, которая будет доступна для обмена баллов клиентами (требуется одобрение Администратора).", reply_markup=markup, parse_mode='Markdown')
 
@@ -2623,14 +2640,18 @@ def handle_service_callbacks(call):
     elif call.data == 'service_edit_list':
         handle_service_edit_list(chat_id)
     
+    elif call.data == 'service_delete_list':
+        handle_service_delete_list(chat_id)
+    
     elif call.data == 'service_back':
         # Возвращаемся в меню услуг
         markup = types.InlineKeyboardMarkup(row_width=1)
         btn_add = types.InlineKeyboardButton("➕ Добавить новую услугу", callback_data="service_add")
         btn_manage = types.InlineKeyboardButton("🔍 Мои услуги", callback_data="service_status")
         btn_edit = types.InlineKeyboardButton("✏️ Редактировать услугу", callback_data="service_edit_list")
+        btn_delete = types.InlineKeyboardButton("🗑️ Удалить услугу", callback_data="service_delete_list")
         btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
-        markup.add(btn_add, btn_manage, btn_edit, btn_back)
+        markup.add(btn_add, btn_manage, btn_edit, btn_delete, btn_back)
         
         bot.edit_message_text(
             "*Управление Услугами:*\nСоздайте услугу, которая будет доступна для обмена баллов клиентами (требуется одобрение Администратора).",
@@ -2657,24 +2678,80 @@ def handle_service_edit_callbacks(call):
         pass
     
     if call.data.startswith('edit_service_'):
-        # Формат: edit_service_<service_id>
+        # Формат: edit_service_<service_id> (service_id может быть UUID или int)
         try:
-            service_id = int(call.data.replace('edit_service_', ''))
+            service_id = call.data.replace('edit_service_', '')
+            # Пытаемся преобразовать в int, если не получается - оставляем как строку (UUID)
+            try:
+                service_id = int(service_id)
+            except ValueError:
+                pass  # Оставляем как строку для UUID
             handle_service_edit_menu(chat_id, service_id)
-        except ValueError as e:
+        except Exception as e:
             log_exception(logger, e, f"Ошибка парсинга service_id из {call.data}")
             bot.send_message(chat_id, "❌ Ошибка при обработке запроса. Попробуйте еще раз.")
     
     elif call.data.startswith('edit_field_'):
-        # Формат: edit_field_<service_id>_<field>
+        # Формат: edit_field_<service_id>|<field> (используем | как разделитель для UUID)
         try:
-            parts = call.data.replace('edit_field_', '').split('_')
-            service_id = int(parts[0])
-            field = '_'.join(parts[1:])  # На случай, если field содержит _
+            data_part = call.data.replace('edit_field_', '')
+            # Проверяем, есть ли разделитель |
+            if '|' in data_part:
+                parts = data_part.split('|', 1)
+                service_id = parts[0]
+                field = parts[1]
+            else:
+                # Старый формат для обратной совместимости: edit_field_<service_id>_<field>
+                parts = data_part.split('_', 1)
+                if len(parts) == 2:
+                    service_id = parts[0]
+                    field = parts[1]
+                else:
+                    raise ValueError("Неверный формат callback_data")
+            
+            # Пытаемся преобразовать в int, если не получается - оставляем как строку (UUID)
+            try:
+                service_id = int(service_id)
+            except ValueError:
+                pass  # Оставляем как строку для UUID
+                
             handle_service_field_edit(chat_id, service_id, field)
         except (ValueError, IndexError) as e:
             log_exception(logger, e, f"Ошибка парсинга edit_field из {call.data}")
             bot.send_message(chat_id, "❌ Ошибка при обработке запроса. Попробуйте еще раз.")
+    
+    bot.answer_callback_query(call.id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('delete_service_') or call.data.startswith('confirm_delete_service_') or call.data == 'cancel_delete_service')
+def handle_service_delete_callbacks(call):
+    """Обработчик callback'ов для удаления услуг."""
+    chat_id = call.message.chat.id
+    
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    
+    if call.data.startswith('delete_service_'):
+        # Формат: delete_service_<service_id> - показываем подтверждение
+        try:
+            service_id = call.data.replace('delete_service_', '')
+            handle_service_delete_confirmation(chat_id, service_id)
+        except Exception as e:
+            log_exception(logger, e, f"Ошибка парсинга service_id из {call.data}")
+            bot.send_message(chat_id, "❌ Ошибка при обработке запроса. Попробуйте еще раз.")
+    elif call.data.startswith('confirm_delete_service_'):
+        # Формат: confirm_delete_service_<service_id> - подтверждаем удаление
+        try:
+            service_id = call.data.replace('confirm_delete_service_', '')
+            handle_service_delete(chat_id, service_id)
+        except Exception as e:
+            log_exception(logger, e, f"Ошибка парсинга service_id из {call.data}")
+            bot.send_message(chat_id, "❌ Ошибка при обработке запроса. Попробуйте еще раз.")
+    elif call.data == 'cancel_delete_service':
+        # Отмена удаления - возвращаемся к списку услуг
+        handle_service_delete_list(chat_id)
     
     bot.answer_callback_query(call.id)
 
@@ -3083,67 +3160,178 @@ def process_edit_booking_url(message):
 # ------------------------------------
 
 def handle_promo_manage_list(chat_id):
-    """Показывает список акций партнёра для управления."""
+    """Показывает список акций партнёра для удаления."""
     try:
         # Получаем все акции партнёра
         all_promos = sm.client.from_('promotions').select('*').eq('partner_chat_id', str(chat_id)).execute()
         
         if not all_promos.data:
-            bot.send_message(chat_id, "У вас пока нет созданных акций.")
+            bot.send_message(chat_id, "У вас пока нет созданных акций для удаления.")
             partner_main_menu(chat_id)
             return
         
-        response = "**📋 Ваши акции:**\n\n"
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        
         for promo in all_promos.data:
             promo_id = promo.get('id')
             title = promo.get('title', 'Без названия')
             end_date = promo.get('end_date', 'N/A')
             
-            response += f"• **{title}**\n"
-            response += f"  ID: `{promo_id}` | До: {end_date}\n\n"
+            # Форматируем дату для отображения
+            try:
+                if end_date and end_date != 'N/A':
+                    from datetime import datetime
+                    end_date_obj = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                    end_date_str = end_date_obj.strftime('%d.%m.%Y')
+                else:
+                    end_date_str = 'N/A'
+            except:
+                end_date_str = str(end_date)[:10] if end_date else 'N/A'
+            
+            btn = types.InlineKeyboardButton(
+                f"🗑️ {title} (до {end_date_str})",
+                callback_data=f"delete_promo_{promo_id}"
+            )
+            markup.add(btn)
         
-        response += "\n💡 Для удаления акции отправьте команду:\n`/delete_promo ID_АКЦИИ`"
+        btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="promo_back")
+        markup.add(btn_back)
         
-        bot.send_message(chat_id, response, parse_mode='Markdown')
-        logger.info(f"Партнёр {chat_id} просмотрел список своих акций")
+        bot.send_message(chat_id, "🗑️ **Выберите акцию для удаления:**", reply_markup=markup, parse_mode='Markdown')
+        logger.info(f"Партнёр {chat_id} открыл список акций для удаления")
     
     except Exception as e:
-        log_exception(logger, e, f"Ошибка получения списка акций партнёра {chat_id}")
+        log_exception(logger, e, f"Ошибка получения списка акций для удаления {chat_id}")
         bot.send_message(chat_id, "Ошибка при получении списка акций.")
-    
-    partner_main_menu(chat_id)
 
 
-@bot.message_handler(commands=['delete_promo'])
-def handle_delete_promo(message):
-    """Удаляет акцию по ID."""
-    chat_id = message.chat.id
+@bot.callback_query_handler(func=lambda call: call.data.startswith('delete_promo_') or call.data.startswith('confirm_delete_promo_') or call.data == 'cancel_delete_promo')
+def handle_promo_delete_callbacks(call):
+    """Обработчик callback'ов для удаления акций."""
+    chat_id = call.message.chat.id
     
     try:
-        promo_id = message.text.replace('/delete_promo', '').strip()
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception:
+        pass
+    
+    if call.data.startswith('delete_promo_'):
+        # Формат: delete_promo_<promo_id> - показываем подтверждение
+        try:
+            promo_id = call.data.replace('delete_promo_', '')
+            handle_promo_delete_confirmation(chat_id, promo_id)
+        except Exception as e:
+            log_exception(logger, e, f"Ошибка парсинга promo_id из {call.data}")
+            bot.send_message(chat_id, "❌ Ошибка при обработке запроса. Попробуйте еще раз.")
+    elif call.data.startswith('confirm_delete_promo_'):
+        # Формат: confirm_delete_promo_<promo_id> - подтверждаем удаление
+        try:
+            promo_id = call.data.replace('confirm_delete_promo_', '')
+            handle_promo_delete(chat_id, promo_id)
+        except Exception as e:
+            log_exception(logger, e, f"Ошибка парсинга promo_id из {call.data}")
+            bot.send_message(chat_id, "❌ Ошибка при обработке запроса. Попробуйте еще раз.")
+    elif call.data == 'cancel_delete_promo':
+        # Отмена удаления - возвращаемся к списку акций
+        handle_promo_manage_list(chat_id)
+    
+    bot.answer_callback_query(call.id)
+
+
+def handle_promo_delete_confirmation(chat_id, promo_id):
+    """Показывает подтверждение удаления акции."""
+    try:
+        # Получаем информацию об акции
+        promo_response = sm.client.from_('promotions').select('*').eq('id', promo_id).eq('partner_chat_id', str(chat_id)).execute()
         
-        if not promo_id.isdigit():
-            bot.send_message(chat_id, "❌ Неверный формат. Используйте: /delete_promo ID")
+        if not promo_response.data:
+            bot.send_message(chat_id, "❌ Акция не найдена или у вас нет прав для её удаления.")
+            handle_promo_manage_list(chat_id)
             return
         
-        # Проверяем, принадлежит ли акция этому партнёру
-        promo_check = sm.client.from_('promotions').select('*').eq('id', int(promo_id)).eq('partner_chat_id', str(chat_id)).execute()
+        promo = promo_response.data[0]
+        promo_title = promo.get('title', 'Акция')
+        promo_type = promo.get('promotion_type', 'discount')
+        end_date = promo.get('end_date', 'N/A')
         
-        if not promo_check.data:
-            bot.send_message(chat_id, "❌ Акция не найдена или не принадлежит вам.")
+        # Форматируем дату
+        try:
+            if end_date and end_date != 'N/A':
+                from datetime import datetime
+                end_date_obj = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                end_date_str = end_date_obj.strftime('%d.%m.%Y')
+            else:
+                end_date_str = 'N/A'
+        except:
+            end_date_str = str(end_date)[:10] if end_date else 'N/A'
+        
+        # Типы акций
+        type_names = {
+            'discount': '💰 Скидка',
+            'points_redemption': '💸 Обмен баллов',
+            'cashback': '🎁 Кэшбэк'
+        }
+        type_display = type_names.get(promo_type, promo_type)
+        
+        # Создаем клавиатуру подтверждения
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_confirm = types.InlineKeyboardButton("✅ Да, удалить", callback_data=f"confirm_delete_promo_{promo_id}")
+        btn_cancel = types.InlineKeyboardButton("❌ Отмена", callback_data="cancel_delete_promo")
+        markup.add(btn_confirm, btn_cancel)
+        
+        confirmation_text = f"⚠️ **Подтверждение удаления акции**\n\n"
+        confirmation_text += f"Вы действительно хотите удалить акцию?\n\n"
+        confirmation_text += f"**{promo_title}**\n"
+        confirmation_text += f"Тип: {type_display}\n"
+        confirmation_text += f"Действует до: {end_date_str}\n\n"
+        confirmation_text += f"⚠️ Это действие нельзя отменить!"
+        
+        bot.send_message(chat_id, confirmation_text, reply_markup=markup, parse_mode='Markdown')
+        logger.info(f"Партнёр {chat_id} запросил подтверждение удаления акции {promo_id}")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка показа подтверждения удаления акции {promo_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка. Попробуйте еще раз.")
+        handle_promo_manage_list(chat_id)
+
+
+def handle_promo_delete(chat_id, promo_id):
+    """Удаляет акцию после подтверждения."""
+    try:
+        # Получаем информацию об акции перед удалением
+        promo_response = sm.client.from_('promotions').select('*').eq('id', promo_id).eq('partner_chat_id', str(chat_id)).execute()
+        
+        if not promo_response.data:
+            bot.send_message(chat_id, "❌ Акция не найдена или у вас нет прав для её удаления.")
+            partner_main_menu(chat_id)
             return
+        
+        promo = promo_response.data[0]
+        promo_title = promo.get('title', 'Акция')
         
         # Удаляем акцию
-        sm.client.from_('promotions').delete().eq('id', int(promo_id)).execute()
+        sm.client.from_('promotions').delete().eq('id', promo_id).execute()
         
-        bot.send_message(chat_id, f"✅ Акция ID {promo_id} успешно удалена!")
+        bot.send_message(chat_id, f"✅ Акция **{promo_title}** успешно удалена!", parse_mode='Markdown')
         logger.info(f"Партнёр {chat_id} удалил акцию {promo_id}")
     
     except Exception as e:
-        log_exception(logger, e, f"Ошибка удаления акции партнёром {chat_id}")
-        bot.send_message(chat_id, "Произошла ошибка при удалении акции.")
+        log_exception(logger, e, f"Ошибка удаления акции {promo_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при удалении акции.")
     
-    partner_main_menu(chat_id)
+    # Возвращаемся в меню акций
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    btn_add = types.InlineKeyboardButton("➕ Создать новую акцию", callback_data="promo_add")
+    btn_manage = types.InlineKeyboardButton("⚙️ Редактировать / Удалить", callback_data="promo_manage")
+    btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
+    markup.add(btn_add, btn_manage, btn_back)
+    
+    bot.send_message(
+        chat_id,
+        "*Управление Акциями:*\nВыберите действие:",
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
 
 
 # ------------------------------------
@@ -3223,10 +3411,45 @@ def handle_service_edit_list(chat_id):
         bot.send_message(chat_id, "Ошибка при получении списка услуг.")
 
 
+def handle_service_delete_list(chat_id):
+    """Показывает список услуг для удаления."""
+    try:
+        all_services = sm.client.from_('services').select('*').eq('partner_chat_id', str(chat_id)).execute()
+        
+        if not all_services.data:
+            bot.send_message(chat_id, "У вас пока нет созданных услуг для удаления.")
+            partner_main_menu(chat_id)
+            return
+        
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        
+        for service in all_services.data:
+            service_id = service.get('id')
+            title = service.get('title', 'Без названия')
+            price = service.get('price_points', 0)
+            
+            btn = types.InlineKeyboardButton(
+                f"🗑️ {title} ({price} баллов)",
+                callback_data=f"delete_service_{service_id}"
+            )
+            markup.add(btn)
+        
+        btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="service_back")
+        markup.add(btn_back)
+        
+        bot.send_message(chat_id, "🗑️ **Выберите услугу для удаления:**", reply_markup=markup, parse_mode='Markdown')
+        logger.info(f"Партнёр {chat_id} открыл список услуг для удаления")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка получения списка услуг для удаления {chat_id}")
+        bot.send_message(chat_id, "Ошибка при получении списка услуг.")
+
+
 def handle_service_edit_menu(chat_id, service_id):
     """Показывает меню выбора поля для редактирования услуги."""
     try:
-        service = sm.get_service_by_id(service_id, str(chat_id))
+        # Преобразуем service_id в строку для работы с UUID
+        service = sm.get_service_by_id(str(service_id), str(chat_id))
         
         if not service:
             bot.send_message(chat_id, "❌ Услуга не найдена или у вас нет прав для её редактирования.")
@@ -3234,9 +3457,10 @@ def handle_service_edit_menu(chat_id, service_id):
             return
         
         markup = types.InlineKeyboardMarkup(row_width=1)
-        btn_title = types.InlineKeyboardButton("👤 Редактировать название", callback_data=f"edit_field_{service_id}_title")
-        btn_desc = types.InlineKeyboardButton("📝 Редактировать описание", callback_data=f"edit_field_{service_id}_description")
-        btn_price = types.InlineKeyboardButton("💎 Редактировать стоимость", callback_data=f"edit_field_{service_id}_price_points")
+        # Используем | как разделитель для поддержки UUID
+        btn_title = types.InlineKeyboardButton("👤 Редактировать название", callback_data=f"edit_field_{service_id}|title")
+        btn_desc = types.InlineKeyboardButton("📝 Редактировать описание", callback_data=f"edit_field_{service_id}|description")
+        btn_price = types.InlineKeyboardButton("💎 Редактировать стоимость", callback_data=f"edit_field_{service_id}|price_points")
         btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="service_edit_list")
         markup.add(btn_title, btn_desc, btn_price, btn_back)
         
@@ -3254,10 +3478,100 @@ def handle_service_edit_menu(chat_id, service_id):
         bot.send_message(chat_id, "Ошибка при открытии меню редактирования.")
 
 
+def handle_service_delete_confirmation(chat_id, service_id):
+    """Показывает подтверждение удаления услуги."""
+    try:
+        # Получаем информацию об услуге
+        service_response = sm.client.from_('services').select('*').eq('id', service_id).eq('partner_chat_id', str(chat_id)).execute()
+        
+        if not service_response.data:
+            bot.send_message(chat_id, "❌ Услуга не найдена или у вас нет прав для её удаления.")
+            handle_service_delete_list(chat_id)
+            return
+        
+        service = service_response.data[0]
+        service_title = service.get('title', 'Услуга')
+        service_price = service.get('price_points', 0)
+        service_status = service.get('approval_status', 'Unknown')
+        
+        # Создаем клавиатуру подтверждения
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_confirm = types.InlineKeyboardButton("✅ Да, удалить", callback_data=f"confirm_delete_service_{service_id}")
+        btn_cancel = types.InlineKeyboardButton("❌ Отмена", callback_data="cancel_delete_service")
+        markup.add(btn_confirm, btn_cancel)
+        
+        status_emoji = {
+            'Pending': '⏳',
+            'Approved': '✅',
+            'Rejected': '❌'
+        }.get(service_status, '❓')
+        
+        confirmation_text = f"⚠️ **Подтверждение удаления услуги**\n\n"
+        confirmation_text += f"Вы действительно хотите удалить услугу?\n\n"
+        confirmation_text += f"**{service_title}**\n"
+        confirmation_text += f"💎 Стоимость: {service_price} баллов\n"
+        confirmation_text += f"Статус: {status_emoji} {service_status}\n\n"
+        confirmation_text += f"⚠️ Это действие нельзя отменить!"
+        
+        bot.send_message(chat_id, confirmation_text, reply_markup=markup, parse_mode='Markdown')
+        logger.info(f"Партнёр {chat_id} запросил подтверждение удаления услуги {service_id}")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка показа подтверждения удаления услуги {service_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка. Попробуйте еще раз.")
+        handle_service_delete_list(chat_id)
+
+
+def handle_service_delete(chat_id, service_id):
+    """Удаляет услугу после подтверждения."""
+    try:
+        # Получаем информацию об услуге перед удалением
+        service_response = sm.client.from_('services').select('*').eq('id', service_id).eq('partner_chat_id', str(chat_id)).execute()
+        
+        if not service_response.data:
+            bot.send_message(chat_id, "❌ Услуга не найдена или у вас нет прав для её удаления.")
+            partner_main_menu(chat_id)
+            return
+        
+        service = service_response.data[0]
+        service_title = service.get('title', 'Услуга')
+        
+        # Удаляем услугу
+        success = sm.delete_service(service_id, str(chat_id))
+        
+        if success:
+            bot.send_message(chat_id, f"✅ Услуга **{service_title}** успешно удалена!", parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} удалил услугу {service_id}")
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при удалении услуги. Попробуйте еще раз.")
+            logger.error(f"Ошибка удаления услуги {service_id} для партнёра {chat_id}")
+    
+    except Exception as e:
+        log_exception(logger, e, f"Ошибка удаления услуги {service_id}")
+        bot.send_message(chat_id, "❌ Произошла ошибка при удалении услуги.")
+    
+    # Возвращаемся в меню услуг
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    btn_add = types.InlineKeyboardButton("➕ Добавить новую услугу", callback_data="service_add")
+    btn_manage = types.InlineKeyboardButton("🔍 Мои услуги", callback_data="service_status")
+    btn_edit = types.InlineKeyboardButton("✏️ Редактировать услугу", callback_data="service_edit_list")
+    btn_delete = types.InlineKeyboardButton("🗑️ Удалить услугу", callback_data="service_delete_list")
+    btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
+    markup.add(btn_add, btn_manage, btn_edit, btn_delete, btn_back)
+    
+    bot.send_message(
+        chat_id,
+        "*Управление Услугами:*\nСоздайте услугу, которая будет доступна для обмена баллов клиентами (требуется одобрение Администратора).",
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
+
+
 def handle_service_field_edit(chat_id, service_id, field):
     """Инициирует процесс редактирования поля услуги."""
     try:
-        service = sm.get_service_by_id(service_id, str(chat_id))
+        # Преобразуем service_id в строку для работы с UUID
+        service = sm.get_service_by_id(str(service_id), str(chat_id))
         
         if not service:
             bot.send_message(chat_id, "❌ Услуга не найдена.")
@@ -3305,8 +3619,14 @@ def process_service_edit_title(message):
     """Обрабатывает ввод нового названия услуги."""
     chat_id = message.chat.id
     
+    # Проверяем состояние и данные сессии
+    if chat_id not in USER_STATE or USER_STATE[chat_id] != 'awaiting_service_edit_title':
+        bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать редактирование снова.")
+        return
+    
     if chat_id not in TEMP_DATA or 'editing_service_id' not in TEMP_DATA[chat_id]:
         bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать редактирование снова.")
+        USER_STATE.pop(chat_id, None)
         return
     
     service_id = TEMP_DATA[chat_id]['editing_service_id']
@@ -3318,7 +3638,8 @@ def process_service_edit_title(message):
         return
     
     try:
-        success = sm.update_service(service_id, str(chat_id), title=new_title)
+        # Преобразуем service_id в строку для работы с UUID
+        success = sm.update_service(str(service_id), str(chat_id), title=new_title)
         if success:
             bot.send_message(chat_id, f"✅ Название услуги успешно обновлено на: **{new_title}**", parse_mode='Markdown')
             logger.info(f"Партнёр {chat_id} обновил название услуги {service_id}")
@@ -3337,8 +3658,14 @@ def process_service_edit_description(message):
     """Обрабатывает ввод нового описания услуги."""
     chat_id = message.chat.id
     
+    # Проверяем состояние и данные сессии
+    if chat_id not in USER_STATE or USER_STATE[chat_id] != 'awaiting_service_edit_description':
+        bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать редактирование снова.")
+        return
+    
     if chat_id not in TEMP_DATA or 'editing_service_id' not in TEMP_DATA[chat_id]:
         bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать редактирование снова.")
+        USER_STATE.pop(chat_id, None)
         return
     
     service_id = TEMP_DATA[chat_id]['editing_service_id']
@@ -3350,7 +3677,8 @@ def process_service_edit_description(message):
         return
     
     try:
-        success = sm.update_service(service_id, str(chat_id), description=new_description)
+        # Преобразуем service_id в строку для работы с UUID
+        success = sm.update_service(str(service_id), str(chat_id), description=new_description)
         if success:
             bot.send_message(chat_id, f"✅ Описание услуги успешно обновлено!", parse_mode='Markdown')
             logger.info(f"Партнёр {chat_id} обновил описание услуги {service_id}")
@@ -3369,8 +3697,14 @@ def process_service_edit_price(message):
     """Обрабатывает ввод новой стоимости услуги."""
     chat_id = message.chat.id
     
+    # Проверяем состояние и данные сессии
+    if chat_id not in USER_STATE or USER_STATE[chat_id] != 'awaiting_service_edit_price_points':
+        bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать редактирование снова.")
+        return
+    
     if chat_id not in TEMP_DATA or 'editing_service_id' not in TEMP_DATA[chat_id]:
         bot.send_message(chat_id, "Ошибка сессии. Попробуйте начать редактирование снова.")
+        USER_STATE.pop(chat_id, None)
         return
     
     service_id = TEMP_DATA[chat_id]['editing_service_id']
@@ -3385,7 +3719,8 @@ def process_service_edit_price(message):
         return
     
     try:
-        success = sm.update_service(service_id, str(chat_id), price_points=new_price)
+        # Преобразуем service_id в строку для работы с UUID
+        success = sm.update_service(str(service_id), str(chat_id), price_points=new_price)
         if success:
             bot.send_message(chat_id, f"✅ Стоимость услуги успешно обновлена на: **{new_price}** баллов", parse_mode='Markdown')
             logger.info(f"Партнёр {chat_id} обновил стоимость услуги {service_id}")
@@ -3620,16 +3955,79 @@ def handle_back_to_messages(call):
 # ------------------------------------
 def run_bot():
     logger.info("=== Партнёрский бот запущен ===")
+    
+    # Проверка токена при старте (мягкая проверка - не падаем, если есть проблема)
+    try:
+        bot_info = bot.get_me()
+        logger.info(f"✅ Бот успешно подключен: @{bot_info.username} (ID: {bot_info.id})")
+    except Exception as e:
+        error_msg = str(e)
+        if "401" in error_msg or "Unauthorized" in error_msg:
+            logger.warning(f"⚠️ Проблема с токеном при старте (401). Бот попытается переподключиться.")
+            logger.warning("Проверьте токен TOKEN_PARTNER в переменных окружения")
+        else:
+            logger.warning(f"⚠️ Не удалось проверить подключение при старте: {e}. Продолжаем работу.")
+    
+    # Проверка и удаление webhook перед polling (если есть)
+    try:
+        import requests
+        webhook_info = requests.get(f"https://api.telegram.org/bot{PARTNER_TOKEN}/getWebhookInfo", timeout=5).json()
+        if webhook_info.get('result', {}).get('url'):
+            logger.warning(f"Обнаружен активный webhook: {webhook_info['result']['url']}")
+            delete_result = requests.post(f"https://api.telegram.org/bot{PARTNER_TOKEN}/deleteWebhook", timeout=5).json()
+            if delete_result.get('ok'):
+                logger.info("✅ Webhook удален, переходим на polling")
+            else:
+                logger.warning("⚠️ Не удалось удалить webhook")
+    except Exception as e:
+        logger.debug(f"Не удалось проверить webhook (это нормально): {e}")
+    
+    retry_count = 0
+    max_retries = 10
+    base_delay = 5
+    
     while True:
         try:
+            # Сбрасываем счетчик при успешном подключении
+            retry_count = 0
             bot.polling(none_stop=True, interval=1, timeout=20)
         except KeyboardInterrupt:
             logger.info("Бот остановлен пользователем (KeyboardInterrupt)")
             break
         except Exception as e:
+            error_msg = str(e)
+            
+            # Проверяем тип ошибки
+            if "401" in error_msg or "Unauthorized" in error_msg:
+                logger.error(f"Ошибка авторизации (401): {e}")
+                
+                # Проверяем токен перед повторной попыткой
+                try:
+                    bot_info = bot.get_me()
+                    logger.info(f"Токен валиден, бот: @{bot_info.username}")
+                except Exception as token_error:
+                    logger.critical(f"Токен невалиден! Проверьте TOKEN_PARTNER. Ошибка: {token_error}")
+                    # Увеличиваем задержку при проблемах с токеном
+                    delay = base_delay * (2 ** min(retry_count, 5))
+                    logger.warning(f"Переподключение через {delay} секунд... (попытка {retry_count + 1}/{max_retries})")
+                    time.sleep(delay)
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        logger.critical("Превышено максимальное количество попыток. Остановка бота.")
+                        break
+                    continue
+            
             log_exception(logger, e, "Ошибка соединения с Telegram API")
-            logger.warning("Переподключение через 5 секунд...")
-            time.sleep(5)
+            
+            # Exponential backoff с небольшим jitter
+            delay = base_delay * (2 ** min(retry_count, 5)) + random.uniform(0, 1)
+            logger.warning(f"Переподключение через {delay:.1f} секунд... (попытка {retry_count + 1}/{max_retries})")
+            time.sleep(delay)
+            retry_count += 1
+            
+            if retry_count >= max_retries:
+                logger.critical("Превышено максимальное количество попыток. Остановка бота.")
+                break
 
 if __name__ == '__main__':
     try:
