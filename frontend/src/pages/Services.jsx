@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, redeemService } from '../services/supabase'
+import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, getPromotionsForService } from '../services/supabase'
 import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
 import { getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
@@ -39,9 +39,6 @@ const Services = () => {
   const [isQrLoading, setIsQrLoading] = useState(false)
   const [qrImage, setQrImage] = useState('')
   const [qrError, setQrError] = useState(null)
-  const [isRedeeming, setIsRedeeming] = useState(false)
-  const [redeemError, setRedeemError] = useState(null)
-  const [redeemSuccess, setRedeemSuccess] = useState(false)
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
   const [selectedCity, setSelectedCity] = useState(cityParam || '')
   const [selectedDistrict, setSelectedDistrict] = useState(districtParam || '')
@@ -50,6 +47,7 @@ const Services = () => {
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false)
   const [partnersMetrics, setPartnersMetrics] = useState({})
   const [referralPartnerInfo, setReferralPartnerInfo] = useState(null)
+  const [servicePromotions, setServicePromotions] = useState({}) // serviceId -> promotions[]
 
   const resolveCategory = useCallback((code) => {
     if (!code) return null
@@ -436,12 +434,21 @@ const Services = () => {
     setExpandedItem(expandedItem === groupId ? null : groupId)
   }
 
-  const handleServiceClick = (service) => {
+  const handleServiceClick = async (service) => {
     hapticFeedback('medium')
     setSelectedService(service)
     setIsServiceModalOpen(true)
     setQrImage('')
     setQrError(null)
+    
+    // Загружаем акции для этой услуги
+    if (service.id) {
+      const promotions = await getPromotionsForService(service.id)
+      setServicePromotions(prev => ({
+        ...prev,
+        [service.id]: promotions
+      }))
+    }
   }
 
   const handleCloseServiceModal = () => {
@@ -450,73 +457,28 @@ const Services = () => {
     setSelectedService(null)
     setQrImage('')
     setQrError(null)
-    setRedeemError(null)
-    setRedeemSuccess(false)
   }
 
-  const handleRedeemPoints = async () => {
-    if (!chatId) {
-      showAlert('Авторизуйтесь через Telegram, чтобы обменять баллы.')
-      return
-    }
-
-    if (!selectedService) {
-      return
-    }
-
-    // Проверяем баланс
-    if (balance < selectedService.price_points) {
-      showAlert(`Недостаточно баллов. Требуется: ${selectedService.price_points}, доступно: ${balance}`)
-      return
-    }
-
-    // Подтверждение
-    const confirmed = window.confirm(
-      language === 'ru'
-        ? `Обменять ${selectedService.price_points} баллов на услугу "${selectedService.title}"?`
-        : `Exchange ${selectedService.price_points} points for service "${selectedService.title}"?`
+  const handleRedeemViaPromotion = () => {
+    if (!selectedService) return
+    
+    // Находим первую активную акцию для обмена баллов
+    const promotions = servicePromotions[selectedService.id] || []
+    const redemptionPromotion = promotions.find(p => 
+      p.promotion_type === 'points_redemption' && 
+      p.max_points_payment && 
+      p.max_points_payment > 0
     )
-
-    if (!confirmed) {
-      return
-    }
-
-    try {
-      setIsRedeeming(true)
-      setRedeemError(null)
-      setRedeemSuccess(false)
-
-      const result = await redeemService(chatId, selectedService.id)
-
-      if (result.success) {
-        setRedeemSuccess(true)
-        hapticFeedback('success')
-        
-        // Обновляем баланс
-        const newBalance = result.new_balance || balance - result.points_spent
-        setBalance(newBalance)
-        
-        // Обновляем данные
-        await loadData()
-        
-        // Показываем успешное сообщение
-        showAlert(
-          language === 'ru'
-            ? `✅ Успешно! Обменено ${result.points_spent} баллов. Новый баланс: ${newBalance}`
-            : `✅ Success! Exchanged ${result.points_spent} points. New balance: ${newBalance}`
-        )
-      } else {
-        setRedeemError(result.error || 'Ошибка при обмене баллов')
-        hapticFeedback('error')
-        showAlert(result.error || 'Ошибка при обмене баллов')
-      }
-    } catch (error) {
-      console.error('Error redeeming points:', error)
-      setRedeemError('Ошибка сети. Проверьте подключение к интернету.')
-      hapticFeedback('error')
-      showAlert('Ошибка сети. Проверьте подключение к интернету.')
-    } finally {
-      setIsRedeeming(false)
+    
+    if (redemptionPromotion) {
+      hapticFeedback('medium')
+      navigate(`/promotions/${redemptionPromotion.id}`)
+    } else {
+      showAlert(
+        language === 'ru' 
+          ? 'Для этой услуги нет активных акций с возможностью обмена баллов'
+          : 'No active promotions with points redemption available for this service'
+      )
     }
   }
 
@@ -964,39 +926,31 @@ const Services = () => {
                 </div>
               </div>
 
-              {redeemSuccess && (
-                <div className="bg-green-100/80 border-2 border-green-400 rounded-2xl p-4 mb-4">
-                  <p className="text-green-800 font-semibold text-center">
-                    {language === 'ru' ? '✅ Баллы успешно обменены!' : '✅ Points successfully redeemed!'}
-                  </p>
-                </div>
-              )}
-
-              {redeemError && (
-                <div className="bg-red-100/80 border-2 border-red-400 rounded-2xl p-4 mb-4">
-                  <p className="text-red-800 text-sm text-center">{redeemError}</p>
-                </div>
-              )}
 
               <div className="space-y-3">
-                <button
-                  onClick={handleRedeemPoints}
-                  disabled={isRedeeming || balance < selectedService.price_points || !chatId}
-                  className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-mid to-sakura-dark text-white font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isRedeeming ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      {language === 'ru' ? 'Обмениваем...' : 'Redeeming...'}
-                    </span>
-                  ) : (
-                    <span>
-                      {language === 'ru' 
-                        ? `💸 Обменять ${selectedService.price_points} баллов`
-                        : `💸 Redeem ${selectedService.price_points} points`}
-                    </span>
-                  )}
-                </button>
+                {/* Кнопка обмена по акции (показывается только если есть активная акция) */}
+                {(() => {
+                  const promotions = servicePromotions[selectedService.id] || []
+                  const redemptionPromotion = promotions.find(p => 
+                    p.promotion_type === 'points_redemption' && 
+                    p.max_points_payment && 
+                    p.max_points_payment > 0
+                  )
+                  
+                  if (redemptionPromotion) {
+                    return (
+                      <button
+                        onClick={handleRedeemViaPromotion}
+                        className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-mid to-sakura-dark text-white font-semibold shadow-md hover:shadow-lg transition-all"
+                      >
+                        {language === 'ru' 
+                          ? `🎁 Обменять по акции: ${redemptionPromotion.title}`
+                          : `🎁 Redeem via promotion: ${redemptionPromotion.title}`}
+                      </button>
+                    )
+                  }
+                  return null
+                })()}
 
                 <button
                   onClick={handleGetCashback}

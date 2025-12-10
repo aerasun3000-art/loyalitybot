@@ -339,40 +339,15 @@ def create_transaction(request: Request, payload: TransactionRequest):
     "/api/redeem",
     response_model=RedeemResponse,
     tags=["transactions"],
-    summary="Обменять баллы на услугу",
-    description="Списывает баллы клиента и обменивает их на услугу",
+    summary="[DEPRECATED] Обменять баллы на услугу",
+    description="⚠️ DEPRECATED: Прямой обмен баллов на услуги больше не поддерживается. Используйте акции через /api/redeem-promotion",
     response_description="Результат обмена баллов",
     responses={
-        200: {
-            "description": "Баллы успешно обменены",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "success": True,
-                        "new_balance": 50,
-                        "points_spent": 100,
-                        "service": {
-                            "id": "uuid",
-                            "title": "Маникюр",
-                            "description": "Классический маникюр"
-                        }
-                    }
-                }
-            }
-        },
         400: {
             "description": "Ошибка обмена баллов",
             "content": {
                 "application/json": {
-                    "example": {"detail": "Недостаточно баллов"}
-                }
-            }
-        },
-        429: {
-            "description": "Слишком много запросов",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "Rate limit exceeded"}
+                    "example": {"detail": "Прямой обмен баллов на услуги не поддерживается. Используйте акции."}
                 }
             }
         }
@@ -381,54 +356,18 @@ def create_transaction(request: Request, payload: TransactionRequest):
 @limiter.limit("10/minute")
 def redeem_points(request: Request, payload: RedeemRequest):
     """
-    Обмен баллов клиента на услугу.
+    ⚠️ DEPRECATED: Прямой обмен баллов на услуги больше не поддерживается.
+    
+    Для обмена баллов на услуги используйте систему акций:
+    1. Найдите активную акцию для услуги через getPromotionsForService()
+    2. Используйте /api/redeem-promotion для обмена баллов через акцию
     
     Rate Limit: 10 запросов/минуту
-    
-    Параметры:
-    - **client_chat_id**: Telegram Chat ID клиента
-    - **service_id**: UUID услуги для обмена
-    
-    Возвращает:
-    - **success**: Успешность операции
-    - **new_balance**: Новый баланс клиента после обмена
-    - **points_spent**: Количество списанных баллов
-    - **service**: Информация об услуге
-    - **error**: Сообщение об ошибке (если success=false)
-    
-    Пример запроса:
-    ```json
-    {
-        "client_chat_id": "123456789",
-        "service_id": "550e8400-e29b-41d4-a716-446655440000"
-    }
-    ```
-    
-    Пример успешного ответа:
-    ```json
-    {
-        "success": true,
-        "new_balance": 50,
-        "points_spent": 100,
-        "service": {
-            "id": "550e8400-e29b-41d4-a716-446655440000",
-            "title": "Маникюр",
-            "description": "Классический маникюр",
-            "partner_chat_id": "987654321"
-        }
-    }
-    ```
     """
-    result = manager.redeem_points_for_service(
-        payload.client_chat_id,
-        payload.service_id
+    raise HTTPException(
+        status_code=400, 
+        detail="Прямой обмен баллов на услуги не поддерживается. Используйте акции. Найдите активную акцию для услуги и используйте /api/redeem-promotion"
     )
-
-    if not result.get("success"):
-        detail = result.get("error", "Неизвестная ошибка")
-        raise HTTPException(status_code=400, detail=detail)
-
-    return result
 
 
 @app.post(

@@ -138,6 +138,58 @@ export const getPromotionById = async (id) => {
 }
 
 /**
+ * Получить активные акции для услуги
+ * @param {string} serviceId - UUID услуги
+ * @returns {Promise<Array>} Массив акций
+ */
+export const getPromotionsForService = async (serviceId) => {
+  if (!serviceId) return []
+  
+  try {
+    // Используем функцию БД или делаем JOIN через promotion_services
+    const { data: promotionServices, error } = await supabase
+      .from('promotion_services')
+      .select(`
+        promotion_id,
+        promotions (
+          *,
+          partners(name, company_name, booking_url, google_maps_link)
+        )
+      `)
+      .eq('service_id', serviceId)
+    
+    if (error) {
+      console.error('Error fetching promotions for service:', error)
+      return []
+    }
+    
+    if (!promotionServices || promotionServices.length === 0) {
+      return []
+    }
+    
+    // Фильтруем активные акции
+    const today = new Date().toISOString().split('T')[0]
+    const activePromotions = promotionServices
+      .map(ps => ps.promotions)
+      .filter(p => 
+        p && 
+        p.is_active && 
+        p.start_date <= today && 
+        p.end_date >= today
+      )
+      .map(p => ({
+        ...p,
+        partner: p.partners
+      }))
+    
+    return activePromotions
+  } catch (error) {
+    console.error('Error in getPromotionsForService:', error)
+    return []
+  }
+}
+
+/**
  * Получить все одобренные услуги
  */
 export const getApprovedServices = async () => {

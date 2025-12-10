@@ -1897,6 +1897,13 @@ class SupabaseManager:
         Требуемые поля таблицы promotions: partner_chat_id (text), title (text), description (text),
         discount_value (text), start_date (date, YYYY-MM-DD), end_date (date, YYYY-MM-DD).
         Не передаем явные id/created_at (есть default), статус трактуем как is_active: True.
+        
+        Новые поля:
+        - promotion_type: 'discount', 'points_redemption', 'cashback'
+        - service_ids: список UUID услуг для связи (опционально)
+        - service_price: стоимость услуги (для points_redemption)
+        - max_points_payment: максимальная оплата баллами (для points_redemption)
+        - points_to_dollar_rate: курс обмена (для points_redemption)
         """
         if not self.client:
             return False
@@ -1908,11 +1915,22 @@ class SupabaseManager:
         partner_chat_id = str(promo_data.get('partner_chat_id', '')).strip()
         start_date = promo_data.get('start_date')  # ожидается YYYY-MM-DD
         end_date = promo_data.get('end_date')      # ожидается YYYY-MM-DD
+        promotion_type = promo_data.get('promotion_type', 'discount')
+        service_ids = promo_data.get('service_ids', [])  # Список UUID услуг
+        service_price = promo_data.get('service_price')
+        max_points_payment = promo_data.get('max_points_payment')
+        points_to_dollar_rate = promo_data.get('points_to_dollar_rate', 1.0)
 
         # Простейшая валидация обязательных полей
         if not title or not description or not discount_value or not partner_chat_id or not end_date:
             logging.error(f"add_promotion: missing required fields. title={title}, description={description}, discount_value={discount_value}, partner_chat_id={partner_chat_id}, end_date={end_date}")
             print(f"ERROR: add_promotion missing required fields")
+            return False
+
+        # Для акций типа points_redemption нужны услуги
+        if promotion_type == 'points_redemption' and not service_ids:
+            logging.error(f"add_promotion: points_redemption promotion requires service_ids")
+            print(f"ERROR: points_redemption promotion requires service_ids")
             return False
 
         # Предварительная проверка существования партнера в таблице partners (для FK)
@@ -1926,6 +1944,25 @@ class SupabaseManager:
             logging.error(f"add_promotion: partners precheck failed: {e}")
             print(f"ERROR: partners precheck failed: {e}")
             return False
+
+        # Проверка существования услуг (если указаны)
+        if service_ids:
+            try:
+                services_check = self.client.from_('services').select('id, partner_chat_id').in_('id', service_ids).execute()
+                if not services_check.data:
+                    logging.error(f"add_promotion: no services found for provided IDs")
+                    print(f"ERROR: no services found")
+                    return False
+                # Проверяем, что все услуги принадлежат партнеру
+                for service in services_check.data:
+                    if service.get('partner_chat_id') != partner_chat_id:
+                        logging.error(f"add_promotion: service {service.get('id')} does not belong to partner {partner_chat_id}")
+                        print(f"ERROR: service does not belong to partner")
+                        return False
+            except Exception as e:
+                logging.error(f"add_promotion: services precheck failed: {e}")
+                print(f"ERROR: services precheck failed: {e}")
+                return False
 
         # Нормализация дат: если нет start_date, ставим сегодня; конвертируем к YYYY-MM-DD
         try:
@@ -1950,16 +1987,48 @@ class SupabaseManager:
             'start_date': start_date,
             'end_date': end_date,
             'is_active': True,  # Акция активна по умолчанию
+            'promotion_type': promotion_type,
         }
         
         # Добавляем image_url если есть
         if promo_data.get('image_url'):
             record['image_url'] = promo_data.get('image_url')
+        
+        # Добавляем поля для оплаты баллами (если указаны)
+        if service_price is not None:
+            record['service_price'] = float(service_price)
+        if max_points_payment is not None:
+            record['max_points_payment'] = float(max_points_payment)
+        if points_to_dollar_rate is not None:
+            record['points_to_dollar_rate'] = float(points_to_dollar_rate)
 
         try:
+            # Вставляем акцию
             result = self.client.from_('promotions').insert(record).execute()
-            print(f"SUCCESS: Promotion inserted successfully. Result: {result}")
-            logging.info(f"Promotion inserted successfully for partner {partner_chat_id}")
+            
+            if not result.data or len(result.data) == 0:
+                logging.error(f"add_promotion: no data returned after insert")
+                print(f"ERROR: no data returned")
+                return False
+            
+            promotion_id = result.data[0].get('id')
+            
+            # Создаем связи с услугами (если указаны)
+            if service_ids and promotion_id:
+                promotion_services_records = [
+                    {'promotion_id': promotion_id, 'service_id': service_id}
+                    for service_id in service_ids
+                ]
+                try:
+                    self.client.from_('promotion_services').insert(promotion_services_records).execute()
+                    logging.info(f"Created {len(promotion_services_records)} service links for promotion {promotion_id}")
+                except Exception as e:
+                    logging.error(f"Error creating promotion_services links: {e}")
+                    # Не прерываем выполнение - акция создана, связи можно добавить позже
+                    print(f"WARNING: failed to create service links: {e}")
+            
+            print(f"SUCCESS: Promotion inserted successfully. ID: {promotion_id}")
+            logging.info(f"Promotion inserted successfully for partner {partner_chat_id}, ID: {promotion_id}")
             return True
         except APIError as e:
             logging.error(f"Error adding promotion (API): {e}")
@@ -1971,6 +2040,60 @@ class SupabaseManager:
             import traceback
             traceback.print_exc()
             return False
+
+    def get_promotions_for_service(self, service_id: str) -> list[dict]:
+        """Возвращает список активных акций для услуги."""
+        if not self.client:
+            return []
+        try:
+            # Используем функцию из БД или делаем JOIN
+            result = self.client.rpc('get_promotions_for_service', {'service_uuid': service_id}).execute()
+            return result.data or []
+        except Exception as e:
+            logging.error(f"Error getting promotions for service {service_id}: {e}")
+            # Fallback: делаем JOIN вручную
+            try:
+                result = self.client.from_('promotion_services').select(
+                    'promotion_id, promotions(*)'
+                ).eq('service_id', service_id).execute()
+                
+                promotions = []
+                for item in result.data or []:
+                    promo = item.get('promotions')
+                    if promo and promo.get('is_active') and \
+                       promo.get('start_date') <= datetime.date.today().isoformat() and \
+                       promo.get('end_date') >= datetime.date.today().isoformat():
+                        promotions.append(promo)
+                return promotions
+            except Exception as e2:
+                logging.error(f"Error in fallback get_promotions_for_service: {e2}")
+                return []
+
+    def get_services_for_promotion(self, promotion_id: str) -> list[dict]:
+        """Возвращает список услуг, привязанных к акции."""
+        if not self.client:
+            return []
+        try:
+            # Используем функцию из БД или делаем JOIN
+            result = self.client.rpc('get_services_for_promotion', {'promo_id': promotion_id}).execute()
+            return result.data or []
+        except Exception as e:
+            logging.error(f"Error getting services for promotion {promotion_id}: {e}")
+            # Fallback: делаем JOIN вручную
+            try:
+                result = self.client.from_('promotion_services').select(
+                    'service_id, services(*)'
+                ).eq('promotion_id', promotion_id).execute()
+                
+                services = []
+                for item in result.data or []:
+                    service = item.get('services')
+                    if service:
+                        services.append(service)
+                return services
+            except Exception as e2:
+                logging.error(f"Error in fallback get_services_for_promotion: {e2}")
+                return []
 
     def add_service(self, service_data: dict) -> bool:
         """Добавляет новую услугу."""
@@ -2084,7 +2207,7 @@ class SupabaseManager:
             logging.error(f"Error getting service by UUID: {e}")
             return None
 
-    def get_promotion_by_id(self, promotion_id: int) -> Optional[dict]:
+    def get_promotion_by_id(self, promotion_id: str) -> Optional[dict]:
         """Получает акцию по ID."""
         if not self.client: return None
         try:
@@ -2094,7 +2217,7 @@ class SupabaseManager:
             logging.error(f"Error getting promotion by id: {e}")
             return None
 
-    def execute_promotion_transaction(self, client_chat_id: str, partner_chat_id: str, promotion_id: int, 
+    def execute_promotion_transaction(self, client_chat_id: str, partner_chat_id: str, promotion_id: str, 
                                      points_to_spend: int, cash_payment: float) -> dict:
         """
         Выполняет транзакцию по акции: списывает баллы и начисляет новые за покупку.
@@ -2198,7 +2321,7 @@ class SupabaseManager:
                 "new_balance": 0
             }
 
-    def redeem_points_for_promotion(self, client_chat_id: str, promotion_id: int, points_to_spend: int) -> dict:
+    def redeem_points_for_promotion(self, client_chat_id: str, promotion_id: str, points_to_spend: int) -> dict:
         """
         Подготавливает обмен баллов для акции (частичная оплата).
         Баллы НЕ списываются сразу - создается QR-код для мастера.
