@@ -275,7 +275,7 @@ const Promotions = () => {
               })()
 
               return (
-                <div className="mb-6">
+                <div className="mb-8">
                   <div
                     onClick={() => {
                       hapticFeedback('light')
@@ -389,7 +389,16 @@ const Promotions = () => {
               if (gridPromotions.length === 0) return null
 
               return (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="mt-8">
+                  {/* Заголовок секции */}
+                  <div className="mb-4">
+                    <h2 className="text-xl font-bold text-gray-900" style={{ fontFamily: 'serif' }}>
+                      {gridPromotions.length === 1 ? 'Другие акции' : `Другие акции (${gridPromotions.length})`}
+                    </h2>
+                    <div className="h-1 w-16 bg-red-500 rounded-full mt-2"></div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
                   {gridPromotions.map((promo, index) => {
                     const daysLeft = getDaysRemaining(promo.end_date)
                     const isHighlighted = promo.id === highlightId
@@ -410,9 +419,8 @@ const Promotions = () => {
                         }}
                         className={`relative rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 hover:shadow-xl ${
                           isHighlighted ? 'ring-2 ring-white ring-offset-2' : ''
-                        }`}
+                        } ${!promo.image_url ? colors.bg : ''}`}
                         style={{ aspectRatio: '1 / 1.2' }}
-                        className={`${!promo.image_url ? colors.bg : ''}`}
                       >
                         {/* Фоновое изображение с градиентом */}
                         {promo.image_url ? (
@@ -483,6 +491,7 @@ const Promotions = () => {
                       </div>
                     )
                   })}
+                  </div>
                 </div>
               )
             })()}
