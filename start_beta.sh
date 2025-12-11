@@ -3,6 +3,31 @@
 
 cd /Users/ghbi/Downloads/loyalitybot || exit 1
 
+# ⚠️ ПРОВЕРКА: Предупреждение о конфликте с Fly.io
+echo "🔍 Проверка конфликтов..."
+if command -v flyctl &> /dev/null; then
+    PARTNER_STATUS=$(flyctl status --app loyalitybot-partner 2>/dev/null | grep -i "started" || echo "")
+    if [ ! -z "$PARTNER_STATUS" ]; then
+        echo ""
+        echo "⚠️  ВНИМАНИЕ: Партнёрский бот УЖЕ запущен на Fly.io!"
+        echo ""
+        echo "❌ Запуск локального бота вызовет ошибку 409 (Conflict)"
+        echo ""
+        echo "Выберите действие:"
+        echo "1) Остановить бот на Fly.io и запустить локально"
+        echo "2) Отменить запуск (использовать бот на Fly.io)"
+        echo ""
+        read -p "Ваш выбор (1/2): " choice
+        if [ "$choice" != "1" ]; then
+            echo "✅ Отменено. Используйте бот на Fly.io"
+            exit 0
+        fi
+        echo "🛑 Останавливаем бот на Fly.io..."
+        flyctl machine stop $(flyctl machine list --app loyalitybot-partner --json | jq -r '.[0].id') --app loyalitybot-partner 2>/dev/null || echo "⚠️  Не удалось остановить (возможно, уже остановлен)"
+        sleep 3
+    fi
+fi
+
 # Активируем виртуальное окружение
 source venv/bin/activate
 
