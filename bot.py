@@ -2023,18 +2023,18 @@ def handle_promo_callbacks(call):
             return
         
         # Переходим к параметрам оплаты баллами
-        USER_STATE[chat_id] = 'awaiting_promo_service_price'
-        bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=call.message.message_id,
-            text=f"✅ Выбрано услуг: {selected_count}\n\n"
+            USER_STATE[chat_id] = 'awaiting_promo_service_price'
+            bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=call.message.message_id,
+                text=f"✅ Выбрано услуг: {selected_count}\n\n"
                  f"✍️ *Создание Акции (Шаг 5 из 6):*\n\n"
-                 f"Введите **стоимость услуги в долларах** (например: 100):",
-            parse_mode='Markdown'
-        )
-        bot.answer_callback_query(call.id, f"Выбрано {selected_count} услуг")
-        msg = bot.send_message(chat_id, "Введите стоимость услуги в долларах:")
-        bot.register_next_step_handler(msg, process_promo_service_price)
+                     f"Введите **стоимость услуги в долларах** (например: 100):",
+                parse_mode='Markdown'
+            )
+            bot.answer_callback_query(call.id, f"Выбрано {selected_count} услуг")
+            msg = bot.send_message(chat_id, "Введите стоимость услуги в долларах:")
+            bot.register_next_step_handler(msg, process_promo_service_price)
     
     elif call.data == 'promo_payment_full':
         # Полная оплата баллами
@@ -2044,8 +2044,8 @@ def handle_promo_callbacks(call):
         TEMP_DATA[chat_id]['discount_value'] = "Оплата баллами (полная)"
         
         bot.answer_callback_query(call.id, "Полная оплата баллами")
-        USER_STATE[chat_id] = 'awaiting_promo_photo'
-        handle_promo_photo_step(chat_id)
+            USER_STATE[chat_id] = 'awaiting_promo_photo'
+            handle_promo_photo_step(chat_id)
     
     elif call.data == 'promo_payment_partial':
         # Частичная оплата - запрашиваем максимальную сумму
@@ -2264,8 +2264,8 @@ def process_promo_end_date(message):
         return
 
     # Переходим к выбору услуг (Шаг 4)
-    USER_STATE[chat_id] = 'awaiting_promo_services'
-    handle_promo_service_selection(chat_id)
+        USER_STATE[chat_id] = 'awaiting_promo_services'
+        handle_promo_service_selection(chat_id)
 
 def handle_promo_service_selection(chat_id):
     """Показывает список услуг партнера для выбора"""
@@ -2520,12 +2520,12 @@ def save_promotion(chat_id):
         return
     
     # Проверяем наличие услуг
-    if not promo_data.get('service_ids'):
+        if not promo_data.get('service_ids'):
         bot.send_message(chat_id, "❌ Необходимо выбрать хотя бы одну услугу.\nПопробуйте создать акцию заново.")
         logger.error(f"Promotion without service_ids. Data: {promo_data}")
-        TEMP_DATA.pop(chat_id, None)
-        partner_main_menu(chat_id)
-        return
+            TEMP_DATA.pop(chat_id, None)
+            partner_main_menu(chat_id)
+            return
     
     # Устанавливаем discount_value если его нет
     if not promo_data.get('discount_value'):

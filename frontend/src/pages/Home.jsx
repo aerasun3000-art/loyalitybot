@@ -712,105 +712,234 @@ const Home = () => {
             </button>
           </div>
 
-          <div className="overflow-x-auto flex gap-4 pb-2 scrollbar-hide snap-x snap-mandatory">
-            {translatedPromotions.slice(0, 3).map((promo, index) => {
-              // Градиенты для разнообразия
-              const imageGradients = [
-                'from-jewelry-pink-dark via-jewelry-rose to-jewelry-pink-light',
-                'from-jewelry-rose via-jewelry-pink-light to-jewelry-pink-medium',
-                'from-jewelry-pink-medium via-jewelry-pink-dark to-jewelry-rose'
-              ]
-              const imageGradient = imageGradients[index % imageGradients.length]
-              const partnerCategory =
-                promo.partner?.category ||
-                promo.partner?.business_type ||
-                promo.partner?.industry ||
-                promo.category_label
-              
-              return (
-                <div
-                  key={promo.id}
-                  onClick={() => handlePromotionClick(promo.id)}
-                  className="flex-shrink-0 w-72 cursor-pointer group snap-start active:scale-[0.985] transition-transform"
-                >
-                  <div className="bg-gradient-to-br from-white/33 to-sakura-surface/33 backdrop-blur-sm rounded-xl overflow-hidden shadow-xl group-hover:shadow-2xl transition-all duration-300 border border-sakura-border/40">
-                    {/* Изображение */}
-                    {promo.image_url ? (
-                      // Реальное фото
-                      <div className="h-40 relative overflow-hidden">
-                        <img 
-                          src={promo.image_url} 
-                          alt={promo.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover opacity-65 transition-transform duration-500 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                        
-                        {/* Бэдж скидки (если есть) */}
-                        {promo.required_points === 0 && (
-                          <div className="absolute top-3 right-3 bg-sakura-accent text-white px-3 py-1 rounded-lg text-xs font-bold shadow-lg border border-sakura-border/40">
-                            FREE
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      // Placeholder с градиентом
-                      <div className={`h-40 bg-gradient-to-br ${imageGradient} flex items-center justify-center relative overflow-hidden`}>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" className="relative z-10 text-jewelry-cream opacity-90">
-                          <rect x="3" y="7" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                          <path d="M8 7V5C8 3.895 8.895 3 10 3H14C15.105 3 16 3.895 16 5V7M8 12H16M8 16H12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                          <circle cx="17" cy="11" r="1.5" fill="currentColor" />
-                        </svg>
-                        
-                        {/* Бэдж скидки (если есть) */}
-                        {promo.required_points === 0 && (
-                          <div className="absolute top-3 right-3 bg-sakura-accent text-white px-3 py-1 rounded-lg text-xs font-bold shadow-lg border border-sakura-border/40">
-                            FREE
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Контент */}
-                    <div className="p-4 bg-gradient-to-br from-white/33 to-sakura-surface/33 backdrop-blur-sm">
-                      <h3 className="font-bold text-sakura-deep mb-1 line-clamp-2 min-h-[2.5rem]">
-                        {promo.title}
-                      </h3>
-                      {partnerCategory && (
-                        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-sakura-mid/80 mb-2">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                            <path d="M12 3L4 9V21H9V14H15V21H20V9L12 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                          <span className="line-clamp-1">{partnerCategory}</span>
-                        </div>
+          {translatedPromotions.length > 0 ? (
+            <>
+              {/* Hero-акция (первая) */}
+              {(() => {
+                const heroPromo = translatedPromotions[0]
+                if (!heroPromo) return null
+
+                const getDaysRemaining = (endDate) => {
+                  const now = new Date()
+                  const end = new Date(endDate)
+                  const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24))
+                  return diff
+                }
+
+                const daysLeft = getDaysRemaining(heroPromo.end_date)
+                const isEndingSoon = daysLeft <= 3
+                const isNew = (() => {
+                  const created = new Date(heroPromo.created_at || heroPromo.start_date)
+                  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                  return created >= sevenDaysAgo
+                })()
+
+                return (
+                  <div className="mb-4">
+                    <div
+                      onClick={() => handlePromotionClick(heroPromo.id)}
+                      className="relative rounded-3xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 shadow-2xl"
+                      style={{ 
+                        height: '50vh',
+                        minHeight: '350px',
+                        maxHeight: '450px',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                      }}
+                    >
+                      {/* Фоновое изображение */}
+                      {heroPromo.image_url ? (
+                        <>
+                          <img
+                            src={heroPromo.image_url}
+                            alt={heroPromo.title}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
+                        </>
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-pink-600 to-red-500" />
                       )}
-                      <p className="text-sm text-sakura-mid mb-3">
-                        {promo.partner?.company_name || promo.partner?.name || t('partner_not_connected')}
-                      </p>
-                      <div className="flex items-center justify-between flex-wrap gap-3">
-                        <div className="flex items-center gap-1 text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            <path d="M12 8V12L15 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            <path d="M8 12H16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                          </svg>
-                          <span className="text-xl font-bold">
-                            {promo.required_points || 'Free'}
-                          </span>
+
+                      {/* Бейджи */}
+                      <div className="absolute top-4 left-4 right-4 z-20 flex items-start justify-between gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          {isEndingSoon && (
+                            <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-pulse">
+                              🔥 ГОРЯЧЕЕ ПРЕДЛОЖЕНИЕ
+                            </div>
+                          )}
+                          {isNew && !isEndingSoon && (
+                            <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                              ⚡ НОВАЯ АКЦИЯ
+                            </div>
+                          )}
+                          {!isEndingSoon && !isNew && (
+                            <div className="bg-yellow-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                              ⭐ ТОП АКЦИЯ
+                            </div>
+                          )}
                         </div>
-                        <button className="bg-sakura-accent/15 text-sakura-deep text-sm font-semibold px-3 py-1 rounded-lg border border-sakura-accent/20 hover:bg-sakura-accent/25 transition-colors drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                          {t('promo_details')}
-                          <span className="ml-1" aria-hidden="true">→</span>
+                        {isEndingSoon && (
+                          <div className="bg-black/70 backdrop-blur-sm text-white px-3 py-1.5 rounded-xl border-2 border-red-500 shadow-lg">
+                            <div className="text-[10px] font-semibold text-red-300 mb-0.5">Осталось</div>
+                            <div className="text-sm font-bold text-white">
+                              {daysLeft === 0 ? 'Сегодня' : `${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}`}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Контент внизу */}
+                      <div className="absolute bottom-0 left-0 right-0 z-20 p-5">
+                        <h2 className="text-white font-bold text-2xl mb-2 drop-shadow-2xl leading-tight">
+                          {heroPromo.title}
+                        </h2>
+                        {heroPromo.partner?.company_name && (
+                          <p className="text-white/90 text-sm mb-3 drop-shadow-lg">
+                            {heroPromo.partner.company_name}
+                          </p>
+                        )}
+                        <div className="mb-4">
+                          <div className="bg-white/20 backdrop-blur-md rounded-xl px-4 py-2.5 inline-block border border-white/30">
+                            <div className="text-white text-lg font-bold">
+                              {heroPromo.discount_value || (heroPromo.required_points > 0 ? `${heroPromo.required_points} баллов` : 'БЕСПЛАТНО')}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            hapticFeedback('medium')
+                            handlePromotionClick(heroPromo.id)
+                          }}
+                          className="w-full bg-white text-gray-900 font-bold py-3.5 rounded-xl shadow-2xl hover:bg-gray-100 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2"
+                        >
+                          <span>Активировать сейчас</span>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                          </svg>
                         </button>
                       </div>
                     </div>
                   </div>
+                )
+              })()}
+
+              {/* Остальные акции в сетке (2 колонки) */}
+              {translatedPromotions.slice(1, 3).length > 0 && (
+                <div className="grid grid-cols-2 gap-4">
+                  {translatedPromotions.slice(1, 3).map((promo, index) => {
+                    const getDaysRemaining = (endDate) => {
+                      const now = new Date()
+                      const end = new Date(endDate)
+                      const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24))
+                      return diff
+                    }
+
+                    const daysLeft = getDaysRemaining(promo.end_date)
+                    const isEndingSoon = daysLeft <= 3
+                    const isNew = (() => {
+                      const created = new Date(promo.created_at || promo.start_date)
+                      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                      return created >= sevenDaysAgo
+                    })()
+
+                    const cardColors = [
+                      { bg: 'bg-yellow-400', text: 'text-yellow-900' },
+                      { bg: 'bg-teal-500', text: 'text-teal-900' },
+                      { bg: 'bg-pink-400', text: 'text-pink-900' },
+                      { bg: 'bg-purple-400', text: 'text-purple-900' },
+                      { bg: 'bg-blue-400', text: 'text-blue-900' },
+                      { bg: 'bg-green-400', text: 'text-green-900' },
+                      { bg: 'bg-orange-400', text: 'text-orange-900' },
+                      { bg: 'bg-indigo-400', text: 'text-indigo-900' }
+                    ]
+                    const colors = cardColors[parseInt(promo.id) || index % cardColors.length]
+
+                      return (
+                      <div
+                        key={promo.id}
+                        onClick={() => handlePromotionClick(promo.id)}
+                        className={`relative rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 hover:shadow-xl ${!promo.image_url ? colors.bg : ''}`}
+                        style={{ aspectRatio: '1 / 1.2' }}
+                      >
+                        {/* Фоновое изображение с градиентом */}
+                        {promo.image_url ? (
+                          <>
+                            <img
+                              src={promo.image_url}
+                              alt={promo.title}
+                              className="absolute inset-0 w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
+                          </>
+                        ) : (
+                          <div className={`absolute inset-0 ${colors.bg} opacity-90`} />
+                        )}
+
+                        {/* Бейджи статуса */}
+                        <div className="absolute top-2 left-2 right-2 z-10 flex items-start justify-between gap-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            {isEndingSoon && (
+                              <div className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
+                                🔥 {daysLeft}д
+                              </div>
+                            )}
+                            {isNew && !isEndingSoon && (
+                              <div className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
+                                ⚡ НОВАЯ
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Название */}
+                        <div className="absolute top-2 left-2 right-2 z-10 pt-6">
+                          <h3 
+                            className="text-white font-bold leading-tight drop-shadow-lg"
+                            style={{
+                              fontSize: 'clamp(12px, 3.2vw, 15px)',
+                              lineHeight: '1.2',
+                              maxHeight: '2.4em',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical'
+                            }}
+                          >
+                            {promo.title}
+                          </h3>
+                        </div>
+
+                        {/* Партнер */}
+                        {promo.partner?.company_name && (
+                          <div className="absolute top-14 left-2 right-2 z-10">
+                            <p className="text-white/90 text-[10px] drop-shadow-md truncate">
+                              {promo.partner.company_name}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Цена/скидка внизу */}
+                        <div className="absolute bottom-3 left-3 right-3 z-10">
+                          <div className="bg-white/25 backdrop-blur-md rounded-xl px-3 py-2 border border-white/30">
+                            <div className="text-white text-sm font-bold">
+                              {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} баллов` : 'Бесплатно')}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
+              )}
+            </>
+          ) : (
+            <div className="bg-sakura-surface/15 rounded-xl p-8 text-center border border-sakura-border/30">
+              <p className="text-sakura-mid">{t('no_promotions') || 'Нет активных акций'}</p>
+            </div>
+          )}
         </div>
       </div>
 

@@ -393,6 +393,12 @@ const Promotions = () => {
                   {gridPromotions.map((promo, index) => {
                     const daysLeft = getDaysRemaining(promo.end_date)
                     const isHighlighted = promo.id === highlightId
+                    const isEndingSoon = daysLeft <= 3
+                    const isNew = (() => {
+                      const created = new Date(promo.created_at || promo.start_date)
+                      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                      return created >= sevenDaysAgo
+                    })()
                     const colors = getCardColor(parseInt(promo.id) || index)
                     
                     return (
@@ -402,17 +408,48 @@ const Promotions = () => {
                           hapticFeedback('light')
                           navigate(`/promotions/${promo.id}`)
                         }}
-                        className={`${colors.bg} rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 hover:shadow-xl relative ${
+                        className={`relative rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 hover:shadow-xl ${
                           isHighlighted ? 'ring-2 ring-white ring-offset-2' : ''
                         }`}
                         style={{ aspectRatio: '1 / 1.2' }}
+                        className={`${!promo.image_url ? colors.bg : ''}`}
                       >
-                        {/* Название вверху слева */}
-                        <div className="absolute top-3 left-3 right-3 z-10">
+                        {/* Фоновое изображение с градиентом */}
+                        {promo.image_url ? (
+                          <>
+                            <img
+                              src={promo.image_url}
+                              alt={promo.title}
+                              className="absolute inset-0 w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
+                          </>
+                        ) : (
+                          <div className={`absolute inset-0 ${colors.bg} opacity-90`} />
+                        )}
+
+                        {/* Бейджи статуса */}
+                        <div className="absolute top-2 left-2 right-2 z-10 flex items-start justify-between gap-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            {isEndingSoon && (
+                              <div className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
+                                🔥 {daysLeft}д
+                              </div>
+                            )}
+                            {isNew && !isEndingSoon && (
+                              <div className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
+                                ⚡ НОВАЯ
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Название */}
+                        <div className="absolute top-2 left-2 right-2 z-10 pt-6">
                           <h3 
                             className="text-white font-bold leading-tight drop-shadow-lg"
                             style={{
-                              fontSize: 'clamp(11px, 3vw, 14px)',
+                              fontSize: 'clamp(12px, 3.2vw, 15px)',
                               lineHeight: '1.2',
                               maxHeight: '2.4em',
                               overflow: 'hidden',
@@ -422,37 +459,23 @@ const Promotions = () => {
                               WebkitBoxOrient: 'vertical'
                             }}
                           >
-                            {promo.title.toUpperCase()}
+                            {promo.title}
                           </h3>
-                          {daysLeft <= 3 && (
-                            <div className="mt-1.5 inline-block bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold">
-                              {daysLeft === 0 ? '⚠️' : `ℹ️ ${daysLeft}д`}
-                            </div>
-                          )}
                         </div>
 
-                        {/* Большое изображение (70-80% карточки) */}
-                        <div className="absolute inset-0 flex items-end justify-center pt-12 pb-16">
-                          {promo.image_url ? (
-                            <img
-                              src={promo.image_url}
-                              alt={promo.title}
-                              className="w-full h-auto max-h-[75%] object-contain"
-                              style={{ 
-                                objectPosition: 'center bottom'
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center max-h-[75%]">
-                              <span className="text-8xl leading-none opacity-40">⭐</span>
-                            </div>
-                          )}
-                        </div>
+                        {/* Партнер (если есть место) */}
+                        {promo.partner?.company_name && (
+                          <div className="absolute top-14 left-2 right-2 z-10">
+                            <p className="text-white/90 text-[10px] drop-shadow-md truncate">
+                              {promo.partner.company_name}
+                            </p>
+                          </div>
+                        )}
 
                         {/* Цена/скидка внизу */}
-                        <div className="absolute bottom-4 left-4 right-4 z-10">
-                          <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2">
-                            <div className="text-white text-sm font-semibold">
+                        <div className="absolute bottom-3 left-3 right-3 z-10">
+                          <div className="bg-white/25 backdrop-blur-md rounded-xl px-3 py-2 border border-white/30">
+                            <div className="text-white text-sm font-bold">
                               {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} баллов` : 'Бесплатно')}
                             </div>
                           </div>
