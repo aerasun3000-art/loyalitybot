@@ -1958,32 +1958,24 @@ def handle_promo_callbacks(call):
         pass
 
     if call.data == 'promo_add':
-        USER_STATE[chat_id] = 'awaiting_promo_type'
+        USER_STATE[chat_id] = 'awaiting_promo_title'
         # Заполняем TEMP_DATA начальными данными
         TEMP_DATA[chat_id] = {
             'partner_chat_id': str(chat_id), 
             'start_date': datetime.datetime.now().strftime("%Y-%m-%d"),
             'image_url': None,
-            'service_ids': []  # Список выбранных услуг
+            'service_ids': [],  # Список выбранных услуг
+            'promotion_type': 'points_redemption'  # Только оплата баллами
         } 
-        
-        # Создаем клавиатуру для выбора типа акции
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        markup.add(types.InlineKeyboardButton("💰 Обычная скидка", callback_data="promo_type_discount"))
-        markup.add(types.InlineKeyboardButton("💸 Обмен баллов на услуги", callback_data="promo_type_points_redemption"))
-        markup.add(types.InlineKeyboardButton("🎁 Кэшбэк/Бонусы", callback_data="promo_type_cashback"))
-        markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data="promo_cancel"))
         
         msg = bot.send_message(
             chat_id, 
-            "✍️ *Создание Акции (Шаг 1 из 7):*\n\n"
-            "Выберите **тип акции**:\n\n"
-            "💰 *Обычная скидка* - просто скидка без обмена баллов\n"
-            "💸 *Обмен баллов* - клиенты могут обменивать баллы на услуги\n"
-            "🎁 *Кэшбэк* - начисление баллов за покупку",
-            reply_markup=markup,
+            "💸 *Создание Акции (Шаг 1 из 6):*\n\n"
+            "Создайте акцию, где клиенты смогут оплатить услугу баллами (полностью или частично).\n\n"
+            "Введите **Название акции** (например: 'Оплата баллами - Маникюр'):",
             parse_mode='Markdown'
         )
+        bot.register_next_step_handler(msg, process_promo_title)
     
     elif call.data == 'promo_manage':
         handle_promo_manage_list(chat_id)
@@ -2003,36 +1995,6 @@ def handle_promo_callbacks(call):
             parse_mode='Markdown'
         )
     
-    elif call.data.startswith('promo_type_'):
-        promo_type = call.data.replace('promo_type_', '')
-        if chat_id not in TEMP_DATA:
-            TEMP_DATA[chat_id] = {
-                'partner_chat_id': str(chat_id),
-                'start_date': datetime.datetime.now().strftime("%Y-%m-%d"),
-                'image_url': None,
-                'service_ids': []
-            }
-        TEMP_DATA[chat_id]['promotion_type'] = promo_type
-        USER_STATE[chat_id] = 'awaiting_promo_title'
-        
-        type_names = {
-            'discount': 'Обычная скидка',
-            'points_redemption': 'Обмен баллов на услуги',
-            'cashback': 'Кэшбэк/Бонусы'
-        }
-        
-        bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=call.message.message_id,
-            text=f"✅ Выбран тип: **{type_names.get(promo_type, promo_type)}**\n\n"
-                 f"✍️ *Создание Акции (Шаг 2 из 7):*\n\n"
-                 f"Введите **Заголовок** акции (например: 'Скидка 20% на десерты'):",
-            parse_mode='Markdown'
-        )
-        bot.answer_callback_query(call.id, f"Тип: {type_names.get(promo_type, promo_type)}")
-        
-        msg = bot.send_message(chat_id, "Введите заголовок акции:")
-        bot.register_next_step_handler(msg, process_promo_title)
     
     elif call.data.startswith('promo_toggle_service_'):
         # Переключение выбора услуги
@@ -2056,28 +2018,51 @@ def handle_promo_callbacks(call):
         # Завершение выбора услуг
         selected_count = len(TEMP_DATA.get(chat_id, {}).get('service_ids', []))
         
-        if TEMP_DATA[chat_id].get('promotion_type') == 'points_redemption' and selected_count == 0:
+        if selected_count == 0:
             bot.answer_callback_query(call.id, "Выберите хотя бы одну услугу")
             return
         
-        # Переходим к параметрам оплаты баллами (если points_redemption)
-        if TEMP_DATA[chat_id].get('promotion_type') == 'points_redemption':
-            USER_STATE[chat_id] = 'awaiting_promo_service_price'
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=call.message.message_id,
-                text=f"✅ Выбрано услуг: {selected_count}\n\n"
-                     f"✍️ *Создание Акции (Шаг 7 из 7):*\n\n"
-                     f"Введите **стоимость услуги в долларах** (например: 100):",
-                parse_mode='Markdown'
-            )
-            bot.answer_callback_query(call.id, f"Выбрано {selected_count} услуг")
-            msg = bot.send_message(chat_id, "Введите стоимость услуги в долларах:")
-            bot.register_next_step_handler(msg, process_promo_service_price)
-        else:
-            # Для других типов акций переходим к фото
-            USER_STATE[chat_id] = 'awaiting_promo_photo'
-            handle_promo_photo_step(chat_id)
+        # Переходим к параметрам оплаты баллами
+        USER_STATE[chat_id] = 'awaiting_promo_service_price'
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=f"✅ Выбрано услуг: {selected_count}\n\n"
+                 f"✍️ *Создание Акции (Шаг 5 из 6):*\n\n"
+                 f"Введите **стоимость услуги в долларах** (например: 100):",
+            parse_mode='Markdown'
+        )
+        bot.answer_callback_query(call.id, f"Выбрано {selected_count} услуг")
+        msg = bot.send_message(chat_id, "Введите стоимость услуги в долларах:")
+        bot.register_next_step_handler(msg, process_promo_service_price)
+    
+    elif call.data == 'promo_payment_full':
+        # Полная оплата баллами
+        service_price = TEMP_DATA[chat_id].get('service_price', 0)
+        TEMP_DATA[chat_id]['max_points_payment'] = service_price
+        TEMP_DATA[chat_id]['points_to_dollar_rate'] = 1.0
+        TEMP_DATA[chat_id]['discount_value'] = "Оплата баллами (полная)"
+        
+        bot.answer_callback_query(call.id, "Полная оплата баллами")
+        USER_STATE[chat_id] = 'awaiting_promo_photo'
+        handle_promo_photo_step(chat_id)
+    
+    elif call.data == 'promo_payment_partial':
+        # Частичная оплата - запрашиваем максимальную сумму
+        service_price = TEMP_DATA[chat_id].get('service_price', 0)
+        USER_STATE[chat_id] = 'awaiting_promo_max_points'
+        
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=f"✅ Выбрана частичная оплата\n\n"
+                 f"Введите **максимальную сумму оплаты баллами** в долларах (например: {min(50, service_price)}):\n\n"
+                 f"Максимум: ${service_price}",
+            parse_mode='Markdown'
+        )
+        bot.answer_callback_query(call.id, "Частичная оплата")
+        msg = bot.send_message(chat_id, f"Введите максимальную сумму оплаты баллами (максимум ${service_price}):")
+        bot.register_next_step_handler(msg, process_promo_max_points)
         
     elif call.data == 'promo_cancel':
         TEMP_DATA.pop(chat_id, None)
@@ -2229,39 +2214,32 @@ def handle_qr_operation(call):
 def process_promo_title(message):
     chat_id = message.chat.id
     if len(message.text.strip()) < 3:
-        msg = bot.send_message(chat_id, "Заголовок слишком короткий. Введите более подробный заголовок:")
+        msg = bot.send_message(chat_id, "Название слишком короткое. Введите более подробное название:")
         bot.register_next_step_handler(msg, process_promo_title)
         return
 
     TEMP_DATA[chat_id]['title'] = message.text.strip()
     USER_STATE[chat_id] = 'awaiting_promo_description'
     
-    step_num = "3" if TEMP_DATA[chat_id].get('promotion_type') else "2"
-    total_steps = "7" if TEMP_DATA[chat_id].get('promotion_type') == 'points_redemption' else "6"
-    
-    msg = bot.send_message(chat_id, f"✍️ *Создание Акции (Шаг {step_num} из {total_steps}):*\n\n{step_num}. Введите **Описание** акции (подробности и условия):", parse_mode='Markdown')
+    msg = bot.send_message(
+        chat_id, 
+        "✍️ *Создание Акции (Шаг 2 из 6):*\n\n"
+        "Введите **Описание** акции (подробности и условия):",
+        parse_mode='Markdown'
+    )
     bot.register_next_step_handler(msg, process_promo_description)
 
 def process_promo_description(message):
     chat_id = message.chat.id
     TEMP_DATA[chat_id]['description'] = message.text.strip()
-    USER_STATE[chat_id] = 'awaiting_promo_discount'
-    
-    step_num = "4" if TEMP_DATA[chat_id].get('promotion_type') else "3"
-    total_steps = "7" if TEMP_DATA[chat_id].get('promotion_type') == 'points_redemption' else "6"
-    
-    msg = bot.send_message(chat_id, f"✍️ *Создание Акции (Шаг {step_num} из {total_steps}):*\n\n{step_num}. Введите **Размер скидки/Бонуса** (например: '20%' или 'x2 бонуса'):", parse_mode='Markdown')
-    bot.register_next_step_handler(msg, process_promo_discount)
-
-def process_promo_discount(message):
-    chat_id = message.chat.id
-    TEMP_DATA[chat_id]['discount_value'] = message.text.strip()
     USER_STATE[chat_id] = 'awaiting_promo_end_date'
     
-    step_num = "5" if TEMP_DATA[chat_id].get('promotion_type') else "4"
-    total_steps = "7" if TEMP_DATA[chat_id].get('promotion_type') == 'points_redemption' else "6"
-    
-    msg = bot.send_message(chat_id, f"✍️ *Создание Акции (Шаг {step_num} из {total_steps}):*\n\n{step_num}. Введите **Дату окончания** акции в формате *ДД.ММ.ГГГГ* (например: 31.12.2025):", parse_mode='Markdown')
+    msg = bot.send_message(
+        chat_id, 
+        "✍️ *Создание Акции (Шаг 3 из 6):*\n\n"
+        "Введите **Дату окончания** акции в формате *ДД.ММ.ГГГГ* (например: 31.12.2025):",
+        parse_mode='Markdown'
+    )
     bot.register_next_step_handler(msg, process_promo_end_date)
 
 def process_promo_end_date(message):
@@ -2285,17 +2263,9 @@ def process_promo_end_date(message):
         bot.register_next_step_handler(msg, process_promo_end_date)
         return
 
-    # Проверяем тип акции - если points_redemption, нужно выбрать услуги
-    promotion_type = TEMP_DATA[chat_id].get('promotion_type', 'discount')
-    
-    if promotion_type == 'points_redemption':
-        # Переходим к выбору услуг (Шаг 6)
-        USER_STATE[chat_id] = 'awaiting_promo_services'
-        handle_promo_service_selection(chat_id)
-    else:
-        # Переходим к загрузке фото (Шаг 6 для обычных акций)
-        USER_STATE[chat_id] = 'awaiting_promo_photo'
-        handle_promo_photo_step(chat_id)
+    # Переходим к выбору услуг (Шаг 4)
+    USER_STATE[chat_id] = 'awaiting_promo_services'
+    handle_promo_service_selection(chat_id)
 
 def handle_promo_service_selection(chat_id):
     """Показывает список услуг партнера для выбора"""
@@ -2343,7 +2313,7 @@ def handle_promo_service_selection(chat_id):
         
         bot.send_message(
             chat_id,
-            f"✍️ *Создание Акции (Шаг 6 из 7):*\n\n"
+            f"✍️ *Создание Акции (Шаг 4 из 6):*\n\n"
             f"Выберите **услуги** для акции (можно выбрать несколько):\n\n"
             f"Выбрано: {selected_count}",
             reply_markup=markup,
@@ -2356,18 +2326,14 @@ def handle_promo_service_selection(chat_id):
 
 def handle_promo_photo_step(chat_id):
     """Показывает шаг загрузки фото"""
-    promotion_type = TEMP_DATA[chat_id].get('promotion_type', 'discount')
-    step_num = "7" if promotion_type == 'points_redemption' else "6"
-    total_steps = "7" if promotion_type == 'points_redemption' else "6"
-    
     # Создаём кнопку для пропуска загрузки фото
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     markup.add(types.KeyboardButton("⏩ Пропустить загрузку фото"))
     
     bot.send_message(
         chat_id, 
-        f"📸 *Создание Акции (Шаг {step_num} из {total_steps}):*\n\n"
-        f"{step_num}. Загрузите **Изображение** для акции (фото товара, баннер и т.д.)\n\n"
+        f"📸 *Создание Акции (Шаг 6 из 6):*\n\n"
+        f"Загрузите **Изображение** для акции (фото услуги, баннер и т.д.)\n\n"
         f"Или нажмите кнопку *'Пропустить'* для создания акции без изображения.",
         reply_markup=markup,
         parse_mode='Markdown'
@@ -2478,16 +2444,24 @@ def process_promo_service_price(message):
             return
         
         TEMP_DATA[chat_id]['service_price'] = service_price
-        USER_STATE[chat_id] = 'awaiting_promo_max_points'
+        USER_STATE[chat_id] = 'awaiting_promo_payment_type'
+        
+        # Создаем клавиатуру для выбора типа оплаты
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(types.InlineKeyboardButton("💯 Полная оплата баллами", callback_data="promo_payment_full"))
+        markup.add(types.InlineKeyboardButton("💵 Частичная оплата баллами", callback_data="promo_payment_partial"))
+        markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data="promo_cancel"))
         
         msg = bot.send_message(
             chat_id,
             f"✅ Стоимость услуги: ${service_price}\n\n"
-            f"Введите **максимальную сумму оплаты баллами** в долларах (например: {min(50, service_price)}):\n\n"
-            f"Максимум: ${service_price}",
+            f"✍️ *Создание Акции (Шаг 6 из 6):*\n\n"
+            f"Выберите **тип оплаты баллами**:\n\n"
+            f"💯 *Полная оплата* - клиент может оплатить всю стоимость баллами\n"
+            f"💵 *Частичная оплата* - клиент может оплатить часть стоимости баллами",
+            reply_markup=markup,
             parse_mode='Markdown'
         )
-        bot.register_next_step_handler(msg, process_promo_max_points)
     except ValueError:
         msg = bot.send_message(chat_id, "❌ Неверный формат. Введите число (например: 100):")
         bot.register_next_step_handler(msg, process_promo_service_price)
@@ -2512,39 +2486,15 @@ def process_promo_max_points(message):
             return
         
         TEMP_DATA[chat_id]['max_points_payment'] = max_points
-        USER_STATE[chat_id] = 'awaiting_promo_points_rate'
-        
-        msg = bot.send_message(
-            chat_id,
-            f"✅ Максимальная оплата баллами: ${max_points}\n\n"
-            f"Введите **курс обмена** (сколько долларов стоит 1 балл):\n\n"
-            f"По умолчанию: 1.0 (1 балл = $1)",
-            parse_mode='Markdown'
-        )
-        bot.register_next_step_handler(msg, process_promo_points_rate)
-    except ValueError:
-        msg = bot.send_message(chat_id, "❌ Неверный формат. Введите число (например: 50):")
-        bot.register_next_step_handler(msg, process_promo_max_points)
-
-def process_promo_points_rate(message):
-    """Обработка курса обмена"""
-    chat_id = message.chat.id
-    
-    try:
-        rate = float(message.text.strip())
-        if rate <= 0:
-            msg = bot.send_message(chat_id, "❌ Курс должен быть больше 0. Введите курс:")
-            bot.register_next_step_handler(msg, process_promo_points_rate)
-            return
-        
-        TEMP_DATA[chat_id]['points_to_dollar_rate'] = rate
+        TEMP_DATA[chat_id]['points_to_dollar_rate'] = 1.0  # По умолчанию 1 балл = $1
+        TEMP_DATA[chat_id]['discount_value'] = f"Оплата баллами (до ${max_points})"
         
         # Переходим к загрузке фото
         USER_STATE[chat_id] = 'awaiting_promo_photo'
         handle_promo_photo_step(chat_id)
     except ValueError:
-        msg = bot.send_message(chat_id, "❌ Неверный формат. Введите число (например: 1.0):")
-        bot.register_next_step_handler(msg, process_promo_points_rate)
+        msg = bot.send_message(chat_id, "❌ Неверный формат. Введите число (например: 50):")
+        bot.register_next_step_handler(msg, process_promo_max_points)
 
 def save_promotion(chat_id):
     """Сохранение акции в БД"""
@@ -2557,7 +2507,7 @@ def save_promotion(chat_id):
         return
     
     # Проверяем обязательные поля перед сохранением
-    required_fields = ['title', 'description', 'discount_value', 'end_date', 'partner_chat_id']
+    required_fields = ['title', 'description', 'end_date', 'partner_chat_id', 'service_price', 'max_points_payment']
     missing_fields = [field for field in required_fields if not promo_data.get(field)]
     
     if missing_fields:
@@ -2569,14 +2519,22 @@ def save_promotion(chat_id):
         partner_main_menu(chat_id)
         return
     
-    # Для акций типа points_redemption проверяем наличие услуг
-    if promo_data.get('promotion_type') == 'points_redemption':
-        if not promo_data.get('service_ids'):
-            bot.send_message(chat_id, "❌ Для акции типа 'Обмен баллов' необходимо выбрать хотя бы одну услугу.\nПопробуйте создать акцию заново.")
-            logger.error(f"points_redemption promotion without service_ids. Data: {promo_data}")
-            TEMP_DATA.pop(chat_id, None)
-            partner_main_menu(chat_id)
-            return
+    # Проверяем наличие услуг
+    if not promo_data.get('service_ids'):
+        bot.send_message(chat_id, "❌ Необходимо выбрать хотя бы одну услугу.\nПопробуйте создать акцию заново.")
+        logger.error(f"Promotion without service_ids. Data: {promo_data}")
+        TEMP_DATA.pop(chat_id, None)
+        partner_main_menu(chat_id)
+        return
+    
+    # Устанавливаем discount_value если его нет
+    if not promo_data.get('discount_value'):
+        max_payment = promo_data.get('max_points_payment', 0)
+        service_price = promo_data.get('service_price', 0)
+        if max_payment >= service_price:
+            promo_data['discount_value'] = f"Оплата баллами (полная)"
+        else:
+            promo_data['discount_value'] = f"Оплата баллами (до ${max_payment})"
     
     # Логируем данные акции для отладки
     logger.info(f"Saving promotion data: {promo_data}")
@@ -3782,11 +3740,6 @@ def handle_promo_description_state(message):
     """Обрабатывает ввод описания акции."""
     process_promo_description(message)
 
-@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_discount')
-def handle_promo_discount_state(message):
-    """Обрабатывает ввод размера скидки."""
-    process_promo_discount(message)
-
 @bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_end_date')
 def handle_promo_end_date_state(message):
     """Обрабатывает ввод даты окончания."""
@@ -3801,11 +3754,6 @@ def handle_promo_service_price_state(message):
 def handle_promo_max_points_state(message):
     """Обрабатывает ввод максимальной оплаты баллами."""
     process_promo_max_points(message)
-
-@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_points_rate')
-def handle_promo_points_rate_state(message):
-    """Обрабатывает ввод курса обмена."""
-    process_promo_points_rate(message)
 
 @bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'awaiting_promo_photo')
 def handle_promo_photo_state(message):

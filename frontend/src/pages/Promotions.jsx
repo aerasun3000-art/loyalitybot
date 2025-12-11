@@ -13,10 +13,44 @@ const Promotions = () => {
   const [loading, setLoading] = useState(true)
   const [promotions, setPromotions] = useState([])
   const [filter, setFilter] = useState('all') // all, active, ending
+  const [timeRemaining, setTimeRemaining] = useState({})
+
+  // Форматирование времени до окончания
+  const formatTimeRemaining = (milliseconds) => {
+    const days = Math.floor(milliseconds / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((milliseconds % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60))
+
+    if (days > 0) {
+      return `${days}д ${hours}ч`
+    } else if (hours > 0) {
+      return `${hours}ч ${minutes}м`
+    } else {
+      return `${minutes}м`
+    }
+  }
 
   useEffect(() => {
     loadPromotions()
   }, [])
+
+  // Обновление счетчика времени каждую секунду для hero-акции
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date()
+      const updated = {}
+      promotions.forEach(promo => {
+        const end = new Date(promo.end_date)
+        const diff = end - now
+        if (diff > 0) {
+          updated[promo.id] = formatTimeRemaining(diff)
+        }
+      })
+      setTimeRemaining(updated)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [promotions])
 
   const loadPromotions = async () => {
     try {
@@ -55,6 +89,32 @@ const Promotions = () => {
       default:
         return promotions
     }
+  }
+
+  // Функция для выбора hero-акции
+  const getHeroPromotion = (promotionsList) => {
+    if (!promotionsList || promotionsList.length === 0) return null
+
+    const now = new Date()
+    const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+    // Приоритет 1: Заканчивается < 3 дня
+    const endingSoon = promotionsList.find(p => {
+      const endDate = new Date(p.end_date)
+      return endDate <= threeDaysFromNow && endDate > now
+    })
+    if (endingSoon) return endingSoon
+
+    // Приоритет 2: Новая (< 7 дней)
+    const newPromo = promotionsList.find(p => {
+      const created = new Date(p.created_at || p.start_date)
+      return created >= sevenDaysAgo
+    })
+    if (newPromo) return newPromo
+
+    // Приоритет 3: Первая в списке
+    return promotionsList[0]
   }
 
   const getCardColor = (index) => {
@@ -192,78 +252,218 @@ const Promotions = () => {
             <p className="text-jewelry-brown-dark">Нет активных акций</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
-            {filteredPromotions.map((promo, index) => {
-              const daysLeft = getDaysRemaining(promo.end_date)
-              const isHighlighted = promo.id === highlightId
-              const colors = getCardColor(parseInt(promo.id) || index)
+          <>
+            {/* Hero-акция */}
+            {(() => {
+              const heroPromo = getHeroPromotion(filteredPromotions)
+              if (!heroPromo) return null
+
+              const daysLeft = getDaysRemaining(heroPromo.end_date)
+              const isHighlighted = heroPromo.id === highlightId
+              const isEndingSoon = daysLeft <= 3
+              const isNew = (() => {
+                const created = new Date(heroPromo.created_at || heroPromo.start_date)
+                const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                return created >= sevenDaysAgo
+              })()
               
+              const heroTimeRemaining = timeRemaining[heroPromo.id] || (() => {
+                const now = new Date()
+                const end = new Date(heroPromo.end_date)
+                const diff = end - now
+                return diff > 0 ? formatTimeRemaining(diff) : '0м'
+              })()
+
               return (
-                <div
-                  key={promo.id}
-                  onClick={() => {
-                    hapticFeedback('light')
-                    navigate(`/promotions/${promo.id}`)
-                  }}
-                  className={`${colors.bg} rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 hover:shadow-xl relative ${
-                    isHighlighted ? 'ring-2 ring-white ring-offset-2' : ''
-                  }`}
-                  style={{ aspectRatio: '1 / 1.2' }}
-                >
-                  {/* Название вверху слева */}
-                  <div className="absolute top-3 left-3 right-3 z-10">
-                    <h3 
-                      className="text-white font-bold leading-tight drop-shadow-lg"
-                      style={{
-                        fontSize: 'clamp(11px, 3vw, 14px)',
-                        lineHeight: '1.2',
-                        maxHeight: '2.4em',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical'
-                      }}
-                    >
-                      {promo.title.toUpperCase()}
-                    </h3>
-                    {daysLeft <= 3 && (
-                      <div className="mt-1.5 inline-block bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold">
-                        {daysLeft === 0 ? '⚠️' : `ℹ️ ${daysLeft}д`}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Большое изображение (70-80% карточки) */}
-                  <div className="absolute inset-0 flex items-end justify-center pt-12 pb-16">
-                    {promo.image_url ? (
-                      <img
-                        src={promo.image_url}
-                        alt={promo.title}
-                        className="w-full h-auto max-h-[75%] object-contain"
-                        style={{ 
-                          objectPosition: 'center bottom'
-                        }}
-                      />
+                <div className="mb-6">
+                  <div
+                    onClick={() => {
+                      hapticFeedback('light')
+                      navigate(`/promotions/${heroPromo.id}`)
+                    }}
+                    className={`relative rounded-3xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 shadow-2xl ${
+                      isHighlighted ? 'ring-4 ring-red-500 ring-offset-2' : ''
+                    }`}
+                    style={{ 
+                      height: '60vh',
+                      minHeight: '400px',
+                      maxHeight: '500px',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                    }}
+                  >
+                    {/* Фоновое изображение */}
+                    {heroPromo.image_url ? (
+                      <>
+                        <img
+                          src={heroPromo.image_url}
+                          alt={heroPromo.title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
+                      </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center max-h-[75%]">
-                        <span className="text-8xl leading-none opacity-40">⭐</span>
+                      <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-pink-600 to-red-500" />
+                    )}
+
+                    {/* Бейджи */}
+                    <div className="absolute top-4 left-4 right-4 z-20 flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        {isEndingSoon && (
+                          <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-pulse">
+                            🔥 ГОРЯЧЕЕ ПРЕДЛОЖЕНИЕ
+                          </div>
+                        )}
+                        {isNew && !isEndingSoon && (
+                          <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                            ⚡ НОВАЯ АКЦИЯ
+                          </div>
+                        )}
+                        {!isEndingSoon && !isNew && (
+                          <div className="bg-yellow-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                            ⭐ ТОП АКЦИЯ
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Счетчик времени (если заканчивается < 3 дня) */}
+                    {isEndingSoon && (
+                      <div className="absolute top-4 right-4 z-20">
+                        <div className="bg-black/70 backdrop-blur-sm text-white px-4 py-2 rounded-xl border-2 border-red-500 shadow-lg">
+                          <div className="text-xs font-semibold text-red-300 mb-1">Осталось</div>
+                          <div className="text-xl font-bold text-white">{heroTimeRemaining}</div>
+                        </div>
                       </div>
                     )}
-                  </div>
 
-                  {/* Цена/скидка внизу */}
-                  <div className="absolute bottom-4 left-4 right-4 z-10">
-                    <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2">
-                      <div className="text-white text-sm font-semibold">
-                        {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} баллов` : 'Бесплатно')}
+                    {/* Контент внизу */}
+                    <div className="absolute bottom-0 left-0 right-0 z-20 p-6">
+                      {/* Название */}
+                      <h2 className="text-white font-bold text-2xl mb-2 drop-shadow-2xl leading-tight">
+                        {heroPromo.title}
+                      </h2>
+
+                      {/* Партнер */}
+                      {heroPromo.partner?.company_name && (
+                        <p className="text-white/90 text-sm mb-3 drop-shadow-lg">
+                          {heroPromo.partner.company_name}
+                        </p>
+                      )}
+
+                      {/* Ценность предложения */}
+                      <div className="mb-4">
+                        <div className="bg-white/20 backdrop-blur-md rounded-xl px-4 py-3 inline-block border border-white/30">
+                          <div className="text-white text-lg font-bold">
+                            {heroPromo.discount_value || (heroPromo.required_points > 0 ? `${heroPromo.required_points} баллов` : 'БЕСПЛАТНО')}
+                          </div>
+                        </div>
                       </div>
+
+                      {/* CTA-кнопка */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          hapticFeedback('medium')
+                          navigate(`/promotions/${heroPromo.id}`)
+                        }}
+                        className="w-full bg-white text-gray-900 font-bold py-4 rounded-xl shadow-2xl hover:bg-gray-100 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2"
+                      >
+                        <span>Активировать сейчас</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 </div>
               )
-            })}
-          </div>
+            })()}
+
+            {/* Сетка остальных акций */}
+            {(() => {
+              const heroPromo = getHeroPromotion(filteredPromotions)
+              const gridPromotions = heroPromo 
+                ? filteredPromotions.filter(p => p.id !== heroPromo.id)
+                : filteredPromotions
+
+              if (gridPromotions.length === 0) return null
+
+              return (
+                <div className="grid grid-cols-2 gap-4">
+                  {gridPromotions.map((promo, index) => {
+                    const daysLeft = getDaysRemaining(promo.end_date)
+                    const isHighlighted = promo.id === highlightId
+                    const colors = getCardColor(parseInt(promo.id) || index)
+                    
+                    return (
+                      <div
+                        key={promo.id}
+                        onClick={() => {
+                          hapticFeedback('light')
+                          navigate(`/promotions/${promo.id}`)
+                        }}
+                        className={`${colors.bg} rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 hover:shadow-xl relative ${
+                          isHighlighted ? 'ring-2 ring-white ring-offset-2' : ''
+                        }`}
+                        style={{ aspectRatio: '1 / 1.2' }}
+                      >
+                        {/* Название вверху слева */}
+                        <div className="absolute top-3 left-3 right-3 z-10">
+                          <h3 
+                            className="text-white font-bold leading-tight drop-shadow-lg"
+                            style={{
+                              fontSize: 'clamp(11px, 3vw, 14px)',
+                              lineHeight: '1.2',
+                              maxHeight: '2.4em',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical'
+                            }}
+                          >
+                            {promo.title.toUpperCase()}
+                          </h3>
+                          {daysLeft <= 3 && (
+                            <div className="mt-1.5 inline-block bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold">
+                              {daysLeft === 0 ? '⚠️' : `ℹ️ ${daysLeft}д`}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Большое изображение (70-80% карточки) */}
+                        <div className="absolute inset-0 flex items-end justify-center pt-12 pb-16">
+                          {promo.image_url ? (
+                            <img
+                              src={promo.image_url}
+                              alt={promo.title}
+                              className="w-full h-auto max-h-[75%] object-contain"
+                              style={{ 
+                                objectPosition: 'center bottom'
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center max-h-[75%]">
+                              <span className="text-8xl leading-none opacity-40">⭐</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Цена/скидка внизу */}
+                        <div className="absolute bottom-4 left-4 right-4 z-10">
+                          <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2">
+                            <div className="text-white text-sm font-semibold">
+                              {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} баллов` : 'Бесплатно')}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </>
         )}
       </div>
 
