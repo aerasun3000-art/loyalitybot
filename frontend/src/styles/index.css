@@ -141,3 +141,55 @@ html {
 .delay-300 { animation-delay: 0.3s; }
 .delay-400 { animation-delay: 0.4s; }
 
+/* Modern Flat Design Variants */
+@layer components {
+  /* Orange Variant Styles */
+  .card-flat-orange {
+    @apply bg-white rounded-2xl shadow-md hover:shadow-lg transition-all;
+  }
+  
+  .btn-flat-orange {
+    @apply bg-orange-500 text-white rounded-lg px-4 py-2 font-medium 
+           hover:bg-orange-600 active:scale-95 transition-all;
+  }
+  
+  /* Sakura Variant Styles */
+  .card-flat-sakura {
+    @apply bg-white rounded-2xl shadow-md hover:shadow-lg transition-all;
+  }
+  
+  .btn-flat-sakura {
+    @apply bg-sakura-accent text-white rounded-lg px-4 py-2 font-medium 
+           hover:bg-sakura-mid active:scale-95 transition-all;
+  }
+  
+  /* Minimal Variant Styles */
+  .card-flat-minimal {
+    @apply bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all;
+  }
+  
+  .btn-flat-minimal {
+    @apply bg-gray-800 text-white rounded-md px-3 py-1.5 text-sm font-medium 
+           hover:bg-gray-900 active:scale-95 transition-all;
+  }
+  
+  /* Search Bar Styles */
+  .search-bar-flat {
+    @apply w-full bg-gray-50 rounded-xl px-4 py-3 text-gray-600 
+           placeholder-gray-400 border-0 focus:outline-none focus:ring-2 
+           focus:ring-orange-500/20 transition-all;
+  }
+  
+  .search-bar-sakura {
+    @apply w-full bg-sakura-light rounded-xl px-4 py-3 text-gray-600 
+           placeholder-gray-400 border-0 focus:outline-none focus:ring-2 
+           focus:ring-sakura-accent/20 transition-all;
+  }
+  
+  .search-bar-minimal {
+    @apply w-full bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-600 
+           placeholder-gray-400 border border-gray-200 focus:outline-none 
+           focus:border-gray-400 transition-all;
+  }
+}
+

@@ -1,6 +1,6 @@
-# 🚀 Деплой на Vercel
+# 🚀 Деплой на Netlify
 
-Vercel - лучшая платформа для деплоя React приложений. Бесплатный план включает:
+Netlify - платформа для деплоя React приложений. Бесплатный план включает:
 - ✅ Безлимитные деплои
 - ✅ Автоматический HTTPS
 - ✅ Global CDN
@@ -19,22 +19,19 @@ git commit -m "Add frontend"
 git push origin main
 ```
 
-### Шаг 2: Подключить Vercel
+### Шаг 2: Подключить Netlify
 
-1. Перейдите на https://vercel.com
+1. Перейдите на https://app.netlify.com
 2. Войдите через GitHub
-3. Нажмите **"New Project"**
+3. Нажмите **"Add new site"** → **"Import an existing project"**
 4. Выберите ваш репозиторий `loyalitybot`
 5. Настройте проект:
 
-**Framework Preset:** Vite
+**Base directory:** `frontend` ⚠️ **ВАЖНО!**
 
-**Root Directory:** `frontend` ⚠️ **ВАЖНО!**
+**Build command:** `npm run build`
 
-**Build Settings:**
-- Build Command: `npm run build`
-- Output Directory: `dist`
-- Install Command: `npm install`
+**Publish directory:** `frontend/dist`
 
 **Environment Variables:**
 ```
@@ -44,34 +41,34 @@ VITE_APP_NAME=LoyalityBot
 VITE_APP_VERSION=0.1.0
 ```
 
-6. Нажмите **"Deploy"**
+6. Нажмите **"Deploy site"**
 
 ### Шаг 3: Получить URL
 
-После деплоя Vercel выдаст URL, например:
+После деплоя Netlify выдаст URL, например:
 ```
-https://loyalitybot-frontend.vercel.app
+https://loyalitybot.netlify.app
 ```
 
 ---
 
-## 📦 Способ 2: Через Vercel CLI
+## 📦 Способ 2: Через Netlify CLI
 
 ```bash
-# Установить Vercel CLI
-npm i -g vercel
+# Установить Netlify CLI
+npm install -g netlify-cli
 
-# Перейти в папку frontend
-cd frontend
+# Перейти в корень проекта
+cd /Users/ghbi/Downloads/loyalitybot
 
 # Залогиниться
-vercel login
+netlify login
+
+# Инициализировать проект (первый раз)
+netlify init
 
 # Деплой
-vercel
-
-# Production деплой
-vercel --prod
+netlify deploy --prod
 ```
 
 ---
@@ -89,7 +86,7 @@ vercel --prod
 web_app_url = "https://tma-bot-rewards.lovable.app"
 
 # Стало:
-web_app_url = "https://loyalitybot-frontend.vercel.app"
+web_app_url = "https://loyalitybot.netlify.app"  # или ваш кастомный домен
 ```
 
 Добавьте кнопку с Web App:
@@ -100,7 +97,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 markup = InlineKeyboardMarkup()
 webapp_button = InlineKeyboardButton(
     text="🚀 Открыть приложение",
-    web_app=WebAppInfo(url="https://loyalitybot-frontend.vercel.app")
+    web_app=WebAppInfo(url="https://loyalitybot.netlify.app")
 )
 markup.add(webapp_button)
 
@@ -117,7 +114,7 @@ bot.send_message(
 
 После настройки каждый `git push` в ветку `main` будет автоматически:
 1. Запускать сборку
-2. Деплоить на Vercel
+2. Деплоить на Netlify
 3. Обновлять production URL
 
 ---
@@ -126,15 +123,15 @@ bot.send_message(
 
 Если хотите свой домен (например `app.loyalitybot.com`):
 
-1. В Vercel Dashboard → Settings → Domains
+1. В Netlify Dashboard → Site settings → Domain management
 2. Добавьте ваш домен
-3. Настройте DNS записи (Vercel покажет инструкции)
+3. Настройте DNS записи (Netlify покажет инструкции)
 
 ---
 
 ## 📊 Мониторинг
 
-Vercel Dashboard показывает:
+Netlify Dashboard показывает:
 - 📈 Аналитику посещений
 - ⚡ Скорость загрузки
 - 🐛 Логи ошибок
@@ -170,20 +167,26 @@ USING (auth.uid() = chat_id::text);
 - Убедитесь, что `package.json` в корне `frontend/`
 
 ### Ошибка: "Environment variables not working"
-- В Vercel переменные должны начинаться с `VITE_`
+- В Netlify переменные должны начинаться с `VITE_`
 - После изменения переменных нужен новый деплой
 
 ### Ошибка: "App doesn't work in Telegram"
-- URL должен быть HTTPS (Vercel даёт автоматически)
+- URL должен быть HTTPS (Netlify даёт автоматически)
 - Проверьте, что Web App URL обновлён в боте
 - Откройте Web Inspector в Telegram Desktop для дебага
+
+### Ошибка: "404 DEPLOYMENT_NOT_FOUND"
+- Убедитесь, что проект создан в Netlify Dashboard
+- Проверьте, что Base directory указан как `frontend`
+- Проверьте, что Publish directory указан как `frontend/dist`
+- Если используете CLI, выполните `netlify init` сначала
 
 ---
 
 **Готово!** 🎉 Ваше приложение доступно в интернете!
 
 ### Полезные ссылки:
-- 📚 Vercel Docs: https://vercel.com/docs
+- 📚 Netlify Docs: https://docs.netlify.com
 - 🤖 Telegram Web Apps: https://core.telegram.org/bots/webapps
 - 💾 Supabase Docs: https://supabase.com/docs
 

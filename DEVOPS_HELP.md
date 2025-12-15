@@ -9,7 +9,7 @@
 
 ### ✅ Что уже есть:
 - 3 Telegram бота (клиентский, партнёрский, админский)
-- Frontend на Vercel
+- Frontend
 - База данных Supabase
 - Docker конфигурация
 - Конфигурации для Fly.io, Render, Railway

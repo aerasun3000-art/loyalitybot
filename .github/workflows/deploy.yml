@@ -26,6 +26,12 @@ jobs:
       
       - name: Setup Fly.io CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
+        with:
+          version: latest
+      
+      - name: Authenticate Fly.io
+        run: |
+          echo "${{ secrets.FLY_API_TOKEN }}" | flyctl auth import
       
       - name: Deploy Admin Bot
         if: github.event.inputs.bot == 'all' || github.event.inputs.bot == 'admin' || github.event_name == 'push'

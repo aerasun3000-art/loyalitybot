@@ -2044,8 +2044,8 @@ def handle_promo_callbacks(call):
         TEMP_DATA[chat_id]['discount_value'] = "Оплата баллами (полная)"
         
         bot.answer_callback_query(call.id, "Полная оплата баллами")
-            USER_STATE[chat_id] = 'awaiting_promo_photo'
-            handle_promo_photo_step(chat_id)
+        USER_STATE[chat_id] = 'awaiting_promo_photo'
+        handle_promo_photo_step(chat_id)
     
     elif call.data == 'promo_payment_partial':
         # Частичная оплата - запрашиваем максимальную сумму
@@ -2520,12 +2520,12 @@ def save_promotion(chat_id):
         return
     
     # Проверяем наличие услуг
-        if not promo_data.get('service_ids'):
+    if not promo_data.get('service_ids'):
         bot.send_message(chat_id, "❌ Необходимо выбрать хотя бы одну услугу.\nПопробуйте создать акцию заново.")
         logger.error(f"Promotion without service_ids. Data: {promo_data}")
-            TEMP_DATA.pop(chat_id, None)
-            partner_main_menu(chat_id)
-            return
+        TEMP_DATA.pop(chat_id, None)
+        partner_main_menu(chat_id)
+        return
     
     # Устанавливаем discount_value если его нет
     if not promo_data.get('discount_value'):

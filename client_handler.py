@@ -59,10 +59,12 @@ except Exception as e:
     log_exception(logger, e, "Ошибка инициализации SupabaseManager")
     raise
 
-# Используем переменную окружения или актуальный URL последнего деплоя
-# Новый URL создан для обхода кэша Telegram WebView
-# Production URL: используем основной домен Vercel или последний деплой
-BASE_DOMAIN = os.environ.get('FRONTEND_URL', 'https://loyalitybot-frontend-7mdv03lt0-alekseis-projects-3b6bffb8.vercel.app')
+# Используем переменную окружения для URL фронтенда
+# Production URL: должен быть установлен через переменную окружения FRONTEND_URL
+BASE_DOMAIN = os.environ.get('FRONTEND_URL')
+if not BASE_DOMAIN:
+    logger.warning("FRONTEND_URL не установлен в переменных окружения!")
+    BASE_DOMAIN = 'https://your-frontend-domain.com'  # Замените на ваш реальный домен
 
 # Регулярное выражение для парсинга реферальной ссылки
 # Ожидаемый формат: /start partner_<ID> или /start ref_<CODE>

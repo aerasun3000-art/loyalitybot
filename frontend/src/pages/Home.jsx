@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
 import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage } from '../services/supabase'
@@ -43,6 +43,8 @@ const Home = () => {
   const [selectedServiceCategory, setSelectedServiceCategory] = useState(null)
   const [popularCategories, setPopularCategories] = useState([])
   const [pointsToNextReward, setPointsToNextReward] = useState(null)
+  const carouselRef = useRef(null)
+  const isScrollingRef = useRef(false)
 
   useEffect(() => {
     loadData()
@@ -269,6 +271,51 @@ const Home = () => {
     
     navigate(`/services?${params.toString()}`)
   }
+
+  // Обработчик бесконечного скролла для карусели акций
+  useEffect(() => {
+    const container = carouselRef.current
+    if (!container || translatedPromotions.length <= 1) return
+
+    const handleScroll = () => {
+      if (isScrollingRef.current) return
+      
+      const scrollLeft = container.scrollLeft
+      const containerWidth = container.offsetWidth
+      const cardWidth = 280
+      const gap = 16
+      const cardWithGap = cardWidth + gap
+      
+      // Получаем данные о реальных карточках из DOM
+      const firstCard = container.querySelector('[data-real-index="0"]')
+      if (!firstCard) return
+      
+      const realStartIndex = parseInt(firstCard.getAttribute('data-index') || '0')
+      const baseLength = translatedPromotions.length
+      const realEndIndex = realStartIndex + baseLength
+      
+      // Если прокрутили слишком далеко вправо (к концу клонов)
+      if (scrollLeft >= (realEndIndex * cardWithGap) - containerWidth) {
+        isScrollingRef.current = true
+        // Переходим к началу реальных карточек
+        container.scrollLeft = realStartIndex * cardWithGap + (scrollLeft - realEndIndex * cardWithGap)
+        setTimeout(() => { isScrollingRef.current = false }, 50)
+      }
+      // Если прокрутили слишком далеко влево (к началу клонов)
+      else if (scrollLeft <= (realStartIndex * cardWithGap) - containerWidth / 2) {
+        isScrollingRef.current = true
+        // Переходим к концу реальных карточек
+        container.scrollLeft = realEndIndex * cardWithGap - containerWidth / 2 + (scrollLeft - (realStartIndex * cardWithGap - containerWidth / 2))
+        setTimeout(() => { isScrollingRef.current = false }, 50)
+      }
+    }
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+    }
+  }, [translatedPromotions.length])
 
   // Функция для получения дефолтных услуг, отсортированных по популярности
   const getDefaultServicesByPopularity = () => {
@@ -714,226 +761,197 @@ const Home = () => {
 
           {translatedPromotions.length > 0 ? (
             <>
-              {/* Hero-акция (первая) */}
+              {/* Единая карусель всех акций (включая hero) */}
               {(() => {
-                const heroPromo = translatedPromotions[0]
-                if (!heroPromo) return null
+                // Используем ВСЕ акции для карусели, первая акция - это hero
+                const carouselPromotions = translatedPromotions
 
-                const getDaysRemaining = (endDate) => {
-                  const now = new Date()
-                  const end = new Date(endDate)
-                  const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24))
-                  return diff
-                }
+                // Создаем бесконечную карусель: дублируем карточки в начале и конце
+                const basePromotions = carouselPromotions.length < 2 
+                  ? [...carouselPromotions, ...carouselPromotions]
+                  : carouselPromotions
+                  
+                // Для бесконечной карусели дублируем карточки в начале и конце
+                const displayPromotions = basePromotions.length > 1
+                  ? [...basePromotions, ...basePromotions, ...basePromotions]
+                  : basePromotions
 
-                const daysLeft = getDaysRemaining(heroPromo.end_date)
-                const isEndingSoon = daysLeft <= 3
-                const isNew = (() => {
-                  const created = new Date(heroPromo.created_at || heroPromo.start_date)
-                  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-                  return created >= sevenDaysAgo
-                })()
+                // Вычисляем позицию начала "реальных" карточек (после первых клонов)
+                const realStartIndex = basePromotions.length
+                const realEndIndex = realStartIndex + basePromotions.length
 
                 return (
-                  <div className="mb-4">
-                    <div
-                      onClick={() => handlePromotionClick(heroPromo.id)}
-                      className="relative rounded-3xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 shadow-2xl"
-                      style={{ 
-                        height: '50vh',
-                        minHeight: '350px',
-                        maxHeight: '450px',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                  <div className="relative">
+                    <div 
+                      ref={(el) => {
+                        carouselRef.current = el
+                        
+                        if (el && displayPromotions.length > 0 && basePromotions.length > 1) {
+                          // Центрируем первую реальную карточку при загрузке
+                          setTimeout(() => {
+                            const container = el
+                            const containerWidth = container.offsetWidth
+                            const cardWidth = 280
+                            const gap = 16
+                            // Прокручиваем к началу реальных карточек
+                            const scrollPosition = realStartIndex * (cardWidth + gap) + (containerWidth / 2) - (cardWidth / 2) - 16
+                            container.scrollLeft = scrollPosition
+                          }, 100)
+                        }
+                      }}
+                      className="flex gap-4 overflow-x-auto scrollbar-hide"
+                      style={{
+                        paddingLeft: '16px',
+                        paddingRight: '16px',
+                        WebkitOverflowScrolling: 'touch',
+                        scrollBehavior: 'smooth'
                       }}
                     >
-                      {/* Фоновое изображение */}
-                      {heroPromo.image_url ? (
-                        <>
-                          <img
-                            src={heroPromo.image_url}
-                            alt={heroPromo.title}
-                            className="absolute inset-0 w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
-                        </>
-                      ) : (
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-pink-600 to-red-500" />
-                      )}
+                      {displayPromotions.map((promo, index) => {
+                        const getDaysRemaining = (endDate) => {
+                          const now = new Date()
+                          const end = new Date(endDate)
+                          const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24))
+                          return diff
+                        }
 
-                      {/* Бейджи */}
-                      <div className="absolute top-4 left-4 right-4 z-20 flex items-start justify-between gap-2">
-                        <div className="flex flex-wrap gap-2">
-                          {isEndingSoon && (
-                            <div className="bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-pulse">
-                              🔥 ГОРЯЧЕЕ ПРЕДЛОЖЕНИЕ
+                        const daysLeft = getDaysRemaining(promo.end_date)
+                        const isEndingSoon = daysLeft <= 3
+                        const isNew = (() => {
+                          const created = new Date(promo.created_at || promo.start_date)
+                          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                          return created >= sevenDaysAgo
+                        })()
+
+                        const cardColors = [
+                          { bg: 'bg-yellow-400', text: 'text-yellow-900' },
+                          { bg: 'bg-teal-500', text: 'text-teal-900' },
+                          { bg: 'bg-pink-400', text: 'text-pink-900' },
+                          { bg: 'bg-purple-400', text: 'text-purple-900' },
+                          { bg: 'bg-blue-400', text: 'text-blue-900' },
+                          { bg: 'bg-green-400', text: 'text-green-900' },
+                          { bg: 'bg-orange-400', text: 'text-orange-900' },
+                          { bg: 'bg-indigo-400', text: 'text-indigo-900' }
+                        ]
+                        const colors = cardColors[parseInt(promo.id) || index % cardColors.length]
+
+                        // Определяем, является ли это реальной карточкой (не клоном)
+                        const isRealCard = basePromotions.length > 1 
+                          ? (index >= realStartIndex && index < realEndIndex)
+                          : true
+                        const realIndex = basePromotions.length > 1 
+                          ? (index % basePromotions.length)
+                          : index
+                        const isRealHero = realIndex === 0 && isRealCard
+                        
+                        return (
+                          <div
+                            key={`${promo.id}-${index}-clone`}
+                            data-index={index}
+                            data-real-index={realIndex}
+                            data-hero={isRealHero ? 'true' : 'false'}
+                            onClick={() => handlePromotionClick(promo.id)}
+                            className={`relative flex-shrink-0 cursor-pointer active:scale-[0.98] transition-all duration-300 ${
+                              !promo.image_url ? colors.bg : ''
+                            } ${isRealHero ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}`}
+                            style={{
+                              width: '280px',
+                              height: '380px',
+                              borderRadius: '20px',
+                              overflow: 'hidden',
+                              boxShadow: isRealHero ? '0 8px 12px rgba(0, 0, 0, 0.2)' : '0 4px 6px rgba(0, 0, 0, 0.1)',
+                              transform: isRealHero ? 'scale(1.02)' : 'scale(1)'
+                            }}
+                          >
+                            {/* Фоновое изображение с градиентным overlay */}
+                            {promo.image_url ? (
+                              <>
+                                <img
+                                  src={promo.image_url}
+                                  alt={promo.title}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                />
+                                <div 
+                                  className="absolute inset-0"
+                                  style={{
+                                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.6))'
+                                  }}
+                                />
+                              </>
+                            ) : (
+                              <div className={`absolute inset-0 ${colors.bg} opacity-90`} />
+                            )}
+
+                            {/* Иконка "подробнее" в правом верхнем углу */}
+                            <div className="absolute top-3 right-3 z-20">
+                              <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                                  <path d="M7 17L17 7M7 7h10v10" />
+                                </svg>
+                              </div>
                             </div>
-                          )}
-                          {isNew && !isEndingSoon && (
-                            <div className="bg-green-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
-                              ⚡ НОВАЯ АКЦИЯ
+
+                            {/* Название и бренд вверху */}
+                            <div className="absolute top-0 left-0 right-0 z-10 p-5 pt-16">
+                              <h3 
+                                className="text-white font-bold mb-1 drop-shadow-lg"
+                                style={{
+                                  fontSize: '18px',
+                                  fontWeight: 700,
+                                  lineHeight: '1.2',
+                                  color: '#FFFFFF'
+                                }}
+                              >
+                                {promo.title}
+                              </h3>
+                              {promo.partner?.company_name && (
+                                <p 
+                                  className="text-white/90 drop-shadow-md"
+                                  style={{
+                                    fontSize: '14px',
+                                    fontWeight: 400,
+                                    opacity: 0.9
+                                  }}
+                                >
+                                  {promo.partner.company_name}
+                                </p>
+                              )}
                             </div>
-                          )}
-                          {!isEndingSoon && !isNew && (
-                            <div className="bg-yellow-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
-                              ⭐ ТОП АКЦИЯ
+
+                            {/* Бейджи статуса */}
+                            <div className="absolute top-3 left-3 z-20 flex flex-wrap gap-1.5">
+                              {isEndingSoon && (
+                                <div className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
+                                  🔥 {daysLeft}д
+                                </div>
+                              )}
+                              {isNew && !isEndingSoon && (
+                                <div className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
+                                  ⚡ НОВАЯ
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        {isEndingSoon && (
-                          <div className="bg-black/70 backdrop-blur-sm text-white px-3 py-1.5 rounded-xl border-2 border-red-500 shadow-lg">
-                            <div className="text-[10px] font-semibold text-red-300 mb-0.5">Осталось</div>
-                            <div className="text-sm font-bold text-white">
-                              {daysLeft === 0 ? 'Сегодня' : `${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}`}
+
+                            {/* Цена в правом нижнем углу */}
+                            <div className="absolute bottom-4 right-4 z-10">
+                              <div 
+                                className="text-white font-bold drop-shadow-lg"
+                                style={{
+                                  fontSize: '20px',
+                                  fontWeight: 700,
+                                  color: '#FFFFFF'
+                                }}
+                              >
+                                {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} баллов` : 'Бесплатно')}
+                              </div>
                             </div>
                           </div>
-                        )}
-                      </div>
-
-                      {/* Контент внизу */}
-                      <div className="absolute bottom-0 left-0 right-0 z-20 p-5">
-                        <h2 className="text-white font-bold text-2xl mb-2 drop-shadow-2xl leading-tight">
-                          {heroPromo.title}
-                        </h2>
-                        {heroPromo.partner?.company_name && (
-                          <p className="text-white/90 text-sm mb-3 drop-shadow-lg">
-                            {heroPromo.partner.company_name}
-                          </p>
-                        )}
-                        <div className="mb-4">
-                          <div className="bg-white/20 backdrop-blur-md rounded-xl px-4 py-2.5 inline-block border border-white/30">
-                            <div className="text-white text-lg font-bold">
-                              {heroPromo.discount_value || (heroPromo.required_points > 0 ? `${heroPromo.required_points} баллов` : 'БЕСПЛАТНО')}
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            hapticFeedback('medium')
-                            handlePromotionClick(heroPromo.id)
-                          }}
-                          className="w-full bg-white text-gray-900 font-bold py-3.5 rounded-xl shadow-2xl hover:bg-gray-100 active:scale-95 transition-all duration-200 flex items-center justify-center gap-2"
-                        >
-                          <span>Активировать сейчас</span>
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M5 12h14M12 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                      </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )
               })()}
-
-              {/* Остальные акции в сетке (2 колонки) */}
-              {translatedPromotions.slice(1, 3).length > 0 && (
-                <div className="grid grid-cols-2 gap-4">
-                  {translatedPromotions.slice(1, 3).map((promo, index) => {
-                    const getDaysRemaining = (endDate) => {
-                      const now = new Date()
-                      const end = new Date(endDate)
-                      const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24))
-                      return diff
-                    }
-
-                    const daysLeft = getDaysRemaining(promo.end_date)
-                    const isEndingSoon = daysLeft <= 3
-                    const isNew = (() => {
-                      const created = new Date(promo.created_at || promo.start_date)
-                      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-                      return created >= sevenDaysAgo
-                    })()
-
-                    const cardColors = [
-                      { bg: 'bg-yellow-400', text: 'text-yellow-900' },
-                      { bg: 'bg-teal-500', text: 'text-teal-900' },
-                      { bg: 'bg-pink-400', text: 'text-pink-900' },
-                      { bg: 'bg-purple-400', text: 'text-purple-900' },
-                      { bg: 'bg-blue-400', text: 'text-blue-900' },
-                      { bg: 'bg-green-400', text: 'text-green-900' },
-                      { bg: 'bg-orange-400', text: 'text-orange-900' },
-                      { bg: 'bg-indigo-400', text: 'text-indigo-900' }
-                    ]
-                    const colors = cardColors[parseInt(promo.id) || index % cardColors.length]
-
-                      return (
-                      <div
-                        key={promo.id}
-                        onClick={() => handlePromotionClick(promo.id)}
-                        className={`relative rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-all duration-300 hover:shadow-xl ${!promo.image_url ? colors.bg : ''}`}
-                        style={{ aspectRatio: '1 / 1.2' }}
-                      >
-                        {/* Фоновое изображение с градиентом */}
-                        {promo.image_url ? (
-                          <>
-                            <img
-                              src={promo.image_url}
-                              alt={promo.title}
-                              className="absolute inset-0 w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
-                          </>
-                        ) : (
-                          <div className={`absolute inset-0 ${colors.bg} opacity-90`} />
-                        )}
-
-                        {/* Бейджи статуса */}
-                        <div className="absolute top-2 left-2 right-2 z-10 flex items-start justify-between gap-2">
-                          <div className="flex flex-wrap gap-1.5">
-                            {isEndingSoon && (
-                              <div className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
-                                🔥 {daysLeft}д
-                              </div>
-                            )}
-                            {isNew && !isEndingSoon && (
-                              <div className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
-                                ⚡ НОВАЯ
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Название */}
-                        <div className="absolute top-2 left-2 right-2 z-10 pt-6">
-                          <h3 
-                            className="text-white font-bold leading-tight drop-shadow-lg"
-                            style={{
-                              fontSize: 'clamp(12px, 3.2vw, 15px)',
-                              lineHeight: '1.2',
-                              maxHeight: '2.4em',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical'
-                            }}
-                          >
-                            {promo.title}
-                          </h3>
-                        </div>
-
-                        {/* Партнер */}
-                        {promo.partner?.company_name && (
-                          <div className="absolute top-14 left-2 right-2 z-10">
-                            <p className="text-white/90 text-[10px] drop-shadow-md truncate">
-                              {promo.partner.company_name}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Цена/скидка внизу */}
-                        <div className="absolute bottom-3 left-3 right-3 z-10">
-                          <div className="bg-white/25 backdrop-blur-md rounded-xl px-3 py-2 border border-white/30">
-                            <div className="text-white text-sm font-bold">
-                              {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} баллов` : 'Бесплатно')}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
             </>
           ) : (
             <div className="bg-sakura-surface/15 rounded-xl p-8 text-center border border-sakura-border/30">

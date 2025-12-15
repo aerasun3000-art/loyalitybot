@@ -71,7 +71,6 @@ frontend/
 ├── package.json
 ├── vite.config.js
 ├── tailwind.config.js
-├── vercel.json            # Настройки для Vercel
 ├── SETUP.md              # 📖 Инструкция по запуску
 └── DEPLOY.md             # 🚀 Инструкция по деплою
 ```
@@ -97,16 +96,11 @@ npm run dev
 
 ### 3. Деплой
 
-```bash
-# Через Vercel CLI
-vercel --prod
-
-# Или через GitHub + Vercel (автоматически)
-```
+См. инструкции в [DEPLOY.md](./DEPLOY.md)
 
 📖 **Подробные инструкции:**
 - [SETUP.md](./SETUP.md) - Запуск локально
-- [DEPLOY.md](./DEPLOY.md) - Деплой на Vercel
+- [DEPLOY.md](./DEPLOY.md) - Инструкция по деплою
 
 ---
 
@@ -244,7 +238,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 markup = InlineKeyboardMarkup()
 webapp = InlineKeyboardButton(
     "🚀 Открыть приложение",
-    web_app=WebAppInfo(url="https://your-app.vercel.app")
+    web_app=WebAppInfo(url="https://your-frontend-domain.com")
 )
 markup.add(webapp)
 
