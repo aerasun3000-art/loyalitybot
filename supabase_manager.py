@@ -2486,6 +2486,14 @@ class SupabaseManager:
             if news_data.get('image_url'):
                 record['image_url'] = news_data['image_url']
             
+            # Добавляем предзаполненные переводы, если они были сгенерированы на уровне админ-бота
+            if news_data.get('title_en'):
+                record['title_en'] = news_data['title_en']
+            if news_data.get('preview_text_en'):
+                record['preview_text_en'] = news_data['preview_text_en']
+            if news_data.get('content_en'):
+                record['content_en'] = news_data['content_en']
+            
             result = self.client.from_('news').insert(record).execute()
             
             if result.data and len(result.data) > 0:

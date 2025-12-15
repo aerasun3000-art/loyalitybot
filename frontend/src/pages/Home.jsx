@@ -59,6 +59,17 @@ const Home = () => {
     }
 
     const checkApiAndTranslate = async () => {
+      // Если в БД уже есть предзаполненные английские поля, используем их без обращения к API
+      if (language === 'en' && news.some(item => item.title_en || item.preview_text_en)) {
+        const mapped = news.map(item => ({
+          ...item,
+          title: item.title_en || item.title,
+          preview_text: item.preview_text_en || item.preview_text
+        }))
+        setTranslatedNews(mapped)
+        return
+      }
+
       const apiUrl = import.meta.env.VITE_API_URL
       if (!apiUrl) {
         console.warn('⚠️ VITE_API_URL не установлен. Переводы отключены. Показываем оригинальный текст.')

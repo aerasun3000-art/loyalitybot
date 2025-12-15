@@ -16,6 +16,7 @@ from supabase_manager import SupabaseManager
 from dashboard_urls import get_admin_dashboard_url, get_onepager_url
 from partner_revenue_share import PartnerRevenueShare
 from instagram_outreach_manager import InstagramOutreachManager 
+from ai_helper import translate_text_ai
 
 load_dotenv()
 
@@ -989,6 +990,20 @@ async def process_news_image(message: types.Message, state: FSMContext):
     
     # Добавляем ID автора
     data['author_chat_id'] = str(message.chat.id)
+
+    # Пытаемся заранее сгенерировать английские переводы (мягкий режим: не падаем при ошибке)
+    try:
+        title = data.get('title', '')
+        content = data.get('content', '')
+        preview_source = data.get('preview_text') or (content[:200] if content else '')
+        if title:
+            data['title_en'] = await translate_text_ai(title, target_lang='en', source_lang='ru')
+        if preview_source:
+            data['preview_text_en'] = await translate_text_ai(preview_source, target_lang='en', source_lang='ru')
+        if content:
+            data['content_en'] = await translate_text_ai(content, target_lang='en', source_lang='ru')
+    except Exception as e:
+        logging.error(f"Error auto-translating news to English: {e}")
     
     # Создаем новость в БД
     success, news_id = db_manager.create_news(data)
@@ -1161,7 +1176,21 @@ async def save_edited_field(message: types.Message, state: FSMContext):
     }
     
     db_field = field_mapping.get(field)
-    success = db_manager.update_news(news_id, {db_field: new_value})
+    updates = {db_field: new_value}
+
+    # При изменении русских полей мягко обновляем английские переводы,
+    # чтобы фронтенд использовал их без повторных обращений к ИИ.
+    try:
+        if field == 'title':
+            updates['title_en'] = await translate_text_ai(new_value, target_lang='en', source_lang='ru')
+        elif field == 'content':
+            updates['content_en'] = await translate_text_ai(new_value, target_lang='en', source_lang='ru')
+        elif field == 'preview':
+            updates['preview_text_en'] = await translate_text_ai(new_value, target_lang='en', source_lang='ru')
+    except Exception as e:
+        logging.error(f"Error auto-translating updated news field '{field}' to English: {e}")
+    
+    success = db_manager.update_news(news_id, updates)
     
     if success:
         await message.answer(

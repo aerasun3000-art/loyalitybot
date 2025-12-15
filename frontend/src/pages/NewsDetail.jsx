@@ -30,6 +30,18 @@ const NewsDetail = () => {
 
     // Проверяем, доступен ли API для переводов
     const checkApiAndTranslate = async () => {
+      // Если в БД уже есть предзаполненные английские поля, используем их без обращения к API
+      if (language === 'en' && (news.title_en || news.preview_text_en || news.content_en)) {
+        const mapped = {
+          ...news,
+          title: news.title_en || news.title,
+          preview_text: news.preview_text_en || news.preview_text,
+          content: news.content_en || news.content
+        }
+        setTranslatedNews(mapped)
+        return
+      }
+
       // Если API URL не установлен, используем оригинальный текст
       const apiUrl = import.meta.env.VITE_API_URL
       if (!apiUrl) {
@@ -106,7 +118,7 @@ const NewsDetail = () => {
     }
   }
 
-  if (loading || translating) {
+  if (loading) {
     return <Loader />
   }
 
