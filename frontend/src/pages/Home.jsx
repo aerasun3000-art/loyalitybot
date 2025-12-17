@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
-import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage } from '../services/supabase'
+import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage, getReferralPartnerInfo } from '../services/supabase'
 import { getServiceIcon, getMainPageCategories, getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
 import { useTranslation, translateDynamicContent, declinePoints } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
@@ -43,6 +43,7 @@ const Home = () => {
   const [selectedServiceCategory, setSelectedServiceCategory] = useState(null)
   const [popularCategories, setPopularCategories] = useState([])
   const [pointsToNextReward, setPointsToNextReward] = useState(null)
+  const [referralPartnerInfo, setReferralPartnerInfo] = useState(null)
   const carouselRef = useRef(null)
   const isScrollingRef = useRef(false)
 
@@ -168,6 +169,10 @@ const Home = () => {
     try {
       setLoading(true)
       
+      // Получаем информацию о партнере, который добавил клиента
+      const partnerInfo = await getReferralPartnerInfo(chatId)
+      setReferralPartnerInfo(partnerInfo)
+      
       // Загружаем данные параллельно
       const [balanceData, promotionsData, servicesData, newsData, popularCats] = await Promise.all([
         getClientBalance(chatId),
@@ -189,8 +194,11 @@ const Home = () => {
       }
       setPopularCategories(categories || [])
       
+      // Фильтруем конкурентов перед сортировкой
+      const filteredServices = filterCompetitors(servicesData, partnerInfo)
+      
       // Сортируем услуги по популярности категорий
-      const sortedServices = sortServicesByPopularity(servicesData, categories)
+      const sortedServices = sortServicesByPopularity(filteredServices, categories)
       setServices(sortedServices.slice(0, 8))
 
       setPointsToNextReward(
@@ -201,6 +209,49 @@ const Home = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Функция для нормализации кода категории
+  const normalizeCategoryCode = (code) => {
+    if (!code) return null
+    const categoryData = getCategoryByCode(code) || serviceCategories[code]
+    return categoryData?.code || code
+  }
+
+  // Функция для проверки, является ли партнер конкурентом
+  const isCompetitor = (service, referralPartnerInfo) => {
+    // Если у клиента нет партнера, который его добавил, не скрываем никого
+    if (!referralPartnerInfo) {
+      return false
+    }
+
+    const servicePartnerId = service.partner_chat_id || service.partnerId
+    const serviceCategory = service.partner?.business_type || service.category || service.categoryCode
+    
+    // Если это сам партнер, который добавил клиента - НЕ конкурент (показываем)
+    if (servicePartnerId === referralPartnerInfo.chatId) {
+      return false
+    }
+
+    if (!serviceCategory || !referralPartnerInfo.businessType) {
+      return false
+    }
+
+    // Нормализуем категории для сравнения
+    const referralCategory = normalizeCategoryCode(referralPartnerInfo.businessType)
+    const serviceCategoryNormalized = normalizeCategoryCode(serviceCategory)
+
+    // Если категории совпадают - это конкурент (скрываем)
+    return referralCategory === serviceCategoryNormalized
+  }
+
+  // Функция для фильтрации конкурентов
+  const filterCompetitors = (servicesList, referralPartnerInfo) => {
+    if (!referralPartnerInfo || !servicesList || servicesList.length === 0) {
+      return servicesList
+    }
+
+    return servicesList.filter(service => !isCompetitor(service, referralPartnerInfo))
   }
 
   // Функция для сортировки услуг по популярности категорий

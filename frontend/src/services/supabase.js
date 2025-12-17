@@ -583,6 +583,7 @@ export const createPartnerApplication = async (applicationData) => {
       district: applicationData.district || '',
       username: applicationData.username || null, // Username мастера
       booking_url: applicationData.bookingUrl || null, // Ссылка на бронирование
+      referred_by_chat_id: applicationData.referredByChatId || null, // Chat ID партнера, который пригласил
       status: 'Pending',
       created_at: new Date().toISOString()
     }

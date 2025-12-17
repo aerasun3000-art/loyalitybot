@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createPartnerApplication } from '../services/supabase'
-import { getChatId, hapticFeedback, getTelegramUser } from '../utils/telegram'
+import { getChatId, hapticFeedback, getTelegramUser, getStartParam } from '../utils/telegram'
 import { getPartnerCitiesList, getDistrictsByCity, isOnlineService } from '../utils/locations'
 import { getAllServiceCategories } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
@@ -32,6 +32,21 @@ const PartnerApply = () => {
   const [districts, setDistricts] = useState([])
   const [showSuccess, setShowSuccess] = useState(false)
   const [serviceCategories] = useState(getAllServiceCategories())
+  const [referredByChatId, setReferredByChatId] = useState(null) // Chat ID партнера, который пригласил
+
+  // Получаем referred_by_chat_id из start_param при загрузке компонента
+  useEffect(() => {
+    const startParam = getStartParam()
+    if (startParam) {
+      // Парсим partner_{id} из start_param
+      const partnerMatch = startParam.match(/^partner_(\d+)$/i)
+      if (partnerMatch) {
+        const referrerChatId = partnerMatch[1]
+        setReferredByChatId(referrerChatId)
+        console.log('📎 Обнаружен пригласивший партнер:', referrerChatId)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     // Загружаем районы при выборе города
@@ -172,7 +187,8 @@ const PartnerApply = () => {
         city: formData.city,
         district: formData.district || 'All',
         username: formData.username.replace('@', '').trim() || null, // Username опционален, убираем @ перед сохранением
-        bookingUrl: formData.bookingUrl.trim() || null // Ссылка на бронирование (опционально)
+        bookingUrl: formData.bookingUrl.trim() || null, // Ссылка на бронирование (опционально)
+        referredByChatId: referredByChatId || null // Chat ID партнера, который пригласил (если есть)
       }
       
       console.log('Submitting application:', applicationData)

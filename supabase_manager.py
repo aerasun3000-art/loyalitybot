@@ -1637,9 +1637,75 @@ class SupabaseManager:
         """Одобряет заявку партнера."""
         if not self.client: return False
         try:
+            # Получаем данные заявки, включая referred_by_chat_id
+            app_response = self.client.from_('partner_applications').select('*').eq('chat_id', str(chat_id)).limit(1).execute()
+            if not app_response.data:
+                logging.error(f"approve_partner: application not found for {chat_id}")
+                return False
+            
+            app_data = app_response.data[0]
+            referred_by_chat_id = app_data.get('referred_by_chat_id')
+            
+            # Обновляем статус заявки
             self.client.from_('partner_applications').update({'status': 'Approved'}).eq('chat_id', str(chat_id)).execute()
+            
             # Создаем/обновляем запись в partners для соблюдения внешних ключей
             self.ensure_partner_record(str(chat_id))
+            
+            # Если партнер был приглашен другим партнером, создаем записи в partner_network
+            if referred_by_chat_id:
+                try:
+                    # Проверяем, что пригласивший партнер существует
+                    referrer_check = self.client.from_('partners').select('chat_id').eq('chat_id', str(referred_by_chat_id)).limit(1).execute()
+                    if referrer_check.data:
+                        # Создаем запись уровня 1 (прямое приглашение)
+                        network_data = {
+                            'referrer_chat_id': str(referred_by_chat_id),
+                            'referred_chat_id': str(chat_id),
+                            'level': 1,
+                            'is_active': True
+                        }
+                        # Проверяем существование записи перед вставкой
+                        existing = self.client.from_('partner_network').select('id').eq('referrer_chat_id', str(referred_by_chat_id)).eq('referred_chat_id', str(chat_id)).limit(1).execute()
+                        if not existing.data:
+                            self.client.from_('partner_network').insert(network_data).execute()
+                        
+                        # Создаем записи для уровней 2 и 3 (если есть)
+                        # Уровень 2: пригласивший пригласившего
+                        referrer_2_check = self.client.from_('partners').select('referred_by_chat_id').eq('chat_id', str(referred_by_chat_id)).limit(1).execute()
+                        if referrer_2_check.data and referrer_2_check.data[0].get('referred_by_chat_id'):
+                            referrer_2_id = referrer_2_check.data[0]['referred_by_chat_id']
+                            network_data_2 = {
+                                'referrer_chat_id': str(referrer_2_id),
+                                'referred_chat_id': str(chat_id),
+                                'level': 2,
+                                'is_active': True
+                            }
+                            existing_2 = self.client.from_('partner_network').select('id').eq('referrer_chat_id', str(referrer_2_id)).eq('referred_chat_id', str(chat_id)).limit(1).execute()
+                            if not existing_2.data:
+                                self.client.from_('partner_network').insert(network_data_2).execute()
+                            
+                            # Уровень 3: пригласивший пригласившего пригласившего
+                            referrer_3_check = self.client.from_('partners').select('referred_by_chat_id').eq('chat_id', str(referrer_2_id)).limit(1).execute()
+                            if referrer_3_check.data and referrer_3_check.data[0].get('referred_by_chat_id'):
+                                referrer_3_id = referrer_3_check.data[0]['referred_by_chat_id']
+                                network_data_3 = {
+                                    'referrer_chat_id': str(referrer_3_id),
+                                    'referred_chat_id': str(chat_id),
+                                    'level': 3,
+                                    'is_active': True
+                                }
+                                existing_3 = self.client.from_('partner_network').select('id').eq('referrer_chat_id', str(referrer_3_id)).eq('referred_chat_id', str(chat_id)).limit(1).execute()
+                                if not existing_3.data:
+                                    self.client.from_('partner_network').insert(network_data_3).execute()
+                        
+                        logging.info(f"Созданы записи в partner_network для партнера {chat_id}, приглашенного партнером {referred_by_chat_id}")
+                    else:
+                        logging.warning(f"Пригласивший партнер {referred_by_chat_id} не найден в системе")
+                except Exception as e:
+                    logging.error(f"Ошибка создания записей в partner_network для партнера {chat_id}: {e}")
+                    # Не прерываем процесс одобрения, если ошибка в создании сети
+            
             return True
         except Exception as e:
             logging.error(f"Error approving partner: {e}")
@@ -1679,7 +1745,8 @@ class SupabaseManager:
                 'city': app_data.get('city', ''),
                 'district': app_data.get('district', ''),
                 'username': app_data.get('username'),  # Копируем username мастера
-                'booking_url': app_data.get('booking_url')  # Копируем ссылку на бронирование
+                'booking_url': app_data.get('booking_url'),  # Копируем ссылку на бронирование
+                'referred_by_chat_id': app_data.get('referred_by_chat_id')  # Копируем chat_id пригласившего партнера
             }
             
             # upsert по chat_id — если строка есть, не меняем другие поля
@@ -2465,6 +2532,32 @@ class SupabaseManager:
         if not self.client:
             return False, None
         
+        # #region agent log
+        try:
+            import json as _json
+            _payload = {
+                "sessionId": "debug-session",
+                "runId": "pre-fix",
+                "hypothesisId": "H1-H5",
+                "location": "supabase_manager.py:create_news:entry",
+                "message": "Entered create_news",
+                "data": {
+                    "has_title": bool(news_data.get("title")),
+                    "has_content": bool(news_data.get("content")),
+                    "keys": sorted(list(news_data.keys())),
+                },
+                "timestamp": __import__("time").time(),
+            }
+            logging.info(f"[DEBUG] {_json.dumps(_payload, ensure_ascii=False)}")
+            try:
+                with open("/Users/ghbi/Downloads/loyalitybot/.cursor/debug.log", "a", encoding="utf-8") as _f:
+                    _f.write(_json.dumps(_payload, ensure_ascii=False) + "\n")
+            except Exception:
+                pass
+        except Exception:
+            pass
+        # #endregion agent log
+        
         try:
             # Валидация обязательных полей
             if not news_data.get('title') or not news_data.get('content'):
@@ -2494,12 +2587,70 @@ class SupabaseManager:
             if news_data.get('content_en'):
                 record['content_en'] = news_data['content_en']
             
+            # #region agent log
+            try:
+                import json as _json
+                _payload = {
+                    "sessionId": "debug-session",
+                    "runId": "pre-fix",
+                    "hypothesisId": "H2-H4",
+                    "location": "supabase_manager.py:create_news:before_insert",
+                    "message": "Before insert into news",
+                    "data": {
+                        "has_title_en": "title_en" in record,
+                        "has_preview_text_en": "preview_text_en" in record,
+                        "has_content_en": "content_en" in record,
+                        "record_keys": sorted(list(record.keys())),
+                    },
+                    "timestamp": __import__("time").time(),
+                }
+                _log_msg = f"[DEBUG] {_json.dumps(_payload, ensure_ascii=False)}"
+                logging.info(_log_msg)
+                print(_log_msg, flush=True)  # Гарантированный вывод в stdout
+                try:
+                    with open("/Users/ghbi/Downloads/loyalitybot/.cursor/debug.log", "a", encoding="utf-8") as _f:
+                        _f.write(_json.dumps(_payload, ensure_ascii=False) + "\n")
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            # #endregion agent log
+            
             try:
                 # Пытаемся вставить запись с переводами
                 result = self.client.from_('news').insert(record).execute()
             except Exception as e:
                 # Если колонок _en ещё нет в БД, пробуем вставить запись без переводов
-                logging.warning(f"Failed to insert news with translations, retrying without *_en columns. Error: {e}")
+                _warn_msg = f"Failed to insert news with translations, retrying without *_en columns. Error: {e}"
+                logging.warning(_warn_msg)
+                print(f"[WARNING] {_warn_msg}", flush=True)
+                
+                # #region agent log
+                try:
+                    import json as _json
+                    _payload = {
+                        "sessionId": "debug-session",
+                        "runId": "pre-fix",
+                        "hypothesisId": "H2-H3",
+                        "location": "supabase_manager.py:create_news:retry_without_translations",
+                        "message": "Retry insert without *_en columns after error",
+                        "data": {
+                            "error_str": str(e)[:500],
+                        },
+                        "timestamp": __import__("time").time(),
+                    }
+                    _log_msg = f"[DEBUG] {_json.dumps(_payload, ensure_ascii=False)}"
+                    logging.error(_log_msg)
+                    print(_log_msg, flush=True)
+                    try:
+                        with open("/Users/ghbi/Downloads/loyalitybot/.cursor/debug.log", "a", encoding="utf-8") as _f:
+                            _f.write(_json.dumps(_payload, ensure_ascii=False) + "\n")
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                # #endregion agent log
+
                 record.pop('title_en', None)
                 record.pop('preview_text_en', None)
                 record.pop('content_en', None)
@@ -2508,12 +2659,64 @@ class SupabaseManager:
             if result.data and len(result.data) > 0:
                 news_id = result.data[0]['id']
                 logging.info(f"News created successfully with ID: {news_id}")
+                
+                # #region agent log
+                try:
+                    import json as _json
+                    _payload = {
+                        "sessionId": "debug-session",
+                        "runId": "pre-fix",
+                        "hypothesisId": "H1-H4",
+                        "location": "supabase_manager.py:create_news:success",
+                        "message": "News created successfully",
+                        "data": {
+                            "news_id": news_id,
+                        },
+                        "timestamp": __import__("time").time(),
+                    }
+                    logging.info(f"[DEBUG] {_json.dumps(_payload, ensure_ascii=False)}")
+                    try:
+                        with open("/Users/ghbi/Downloads/loyalitybot/.cursor/debug.log", "a", encoding="utf-8") as _f:
+                            _f.write(_json.dumps(_payload, ensure_ascii=False) + "\n")
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                # #endregion agent log
+
                 return True, news_id
             
             return False, None
             
         except Exception as e:
             logging.error(f"Error creating news: {e}")
+            
+            # #region agent log
+            try:
+                import json as _json
+                _payload = {
+                    "sessionId": "debug-session",
+                    "runId": "pre-fix",
+                    "hypothesisId": "H1-H5",
+                    "location": "supabase_manager.py:create_news:exception",
+                    "message": "Exception in create_news",
+                    "data": {
+                        "error_str": str(e)[:500],
+                    },
+                    "timestamp": __import__("time").time(),
+                }
+                _log_msg = f"[DEBUG] {_json.dumps(_payload, ensure_ascii=False)}"
+                logging.error(_log_msg)
+                print(_log_msg, flush=True)  # Гарантированный вывод в stdout
+                try:
+                    with open("/Users/ghbi/Downloads/loyalitybot/.cursor/debug.log", "a", encoding="utf-8") as _f:
+                        _f.write(_json.dumps(_payload, ensure_ascii=False) + "\n")
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            # #endregion agent log
+
             return False, None
 
     def get_all_news(self, published_only: bool = True) -> pd.DataFrame:
