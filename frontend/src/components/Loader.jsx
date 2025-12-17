@@ -68,17 +68,26 @@ const Loader = ({ text }) => {
     if (language === 'en' && quote) {
       // Сначала показываем оригинал, чтобы не было пустого экрана
       setTranslatedQuote(quote)
-      // Затем переводим в фоне
-      translateDynamicContent(quote, 'en', 'ru')
-        .then(translated => {
+      
+      // Затем загружаем перевод из кэша Supabase в фоне
+      // Пока цитата показывается, параллельно загружаем перевод из базы
+      const loadTranslation = async () => {
+        try {
+          // Используем translateDynamicContent - он сам проверит все кэши
+          // (localStorage -> in-memory -> Supabase -> API)
+          const translated = await translateDynamicContent(quote, 'en', 'ru')
           if (translated && translated !== quote) {
+            // Обновляем только если получили перевод
             setTranslatedQuote(translated)
           }
-        })
-        .catch(() => {
-          // Оставляем оригинал при ошибке
-          setTranslatedQuote(quote)
-        })
+        } catch (error) {
+          // При ошибке оставляем оригинал
+          console.warn('Failed to load translation:', error)
+        }
+      }
+      
+      // Запускаем загрузку перевода в фоне
+      loadTranslation()
     } else {
       setTranslatedQuote(quote)
     }
