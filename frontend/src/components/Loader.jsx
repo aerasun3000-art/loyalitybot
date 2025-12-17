@@ -89,7 +89,7 @@ const Loader = ({ text }) => {
   }, [])
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden">
       {/* Background image */}
       <div
         className="absolute inset-0 -z-20 bg-center bg-cover opacity-85 pointer-events-none select-none"
@@ -99,15 +99,15 @@ const Loader = ({ text }) => {
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
       
       {/* Content - изречение на весь экран */}
-      <div className="relative z-10 w-full h-screen flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 py-8">
+      <div className="relative z-10 w-full h-full flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 py-8">
         {displayText && (
-          <div className="text-sakura-deep text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-relaxed w-full flex-1 flex items-center justify-center font-medium italic drop-shadow-2xl px-4 sm:px-6 md:px-8 lg:px-12">
-            <div className="w-full max-w-6xl">
+          <div className="text-sakura-deep text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl leading-relaxed w-full h-full flex items-center justify-center font-medium italic drop-shadow-2xl px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+            <div className="w-full">
               {displayText}
             </div>
           </div>
         )}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20">
           <Spinner size="l" />
         </div>
       </div>
