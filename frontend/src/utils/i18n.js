@@ -36,6 +36,11 @@ const translations = {
     promo_points: 'баллов',
     promo_last_day: 'Последний день',
     promo_days: 'дн.',
+    promo_new: 'НОВАЯ',
+    promo_search: 'Поиск акций',
+    promo_all_promotions: 'Все акции',
+    promo_free: 'Бесплатно',
+    promo_promotion: 'Акция',
     
     // Services Page
     services_title: 'Услуги',
@@ -297,6 +302,11 @@ const translations = {
     promo_points: 'points',
     promo_last_day: 'Last day',
     promo_days: 'days',
+    promo_new: 'NEW',
+    promo_search: 'Search promotions',
+    promo_all_promotions: 'All promotions',
+    promo_free: 'Free',
+    promo_promotion: 'Promotion',
     
     // Services Page
     services_title: 'Services',

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getActivePromotions } from '../services/supabase'
 import { hapticFeedback } from '../utils/telegram'
+import { useTranslation, translateDynamicContent } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 import { PromotionSkeleton } from '../components/SkeletonCard'
 
@@ -9,10 +11,15 @@ const Promotions = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const highlightId = searchParams.get('id')
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
   
   const [loading, setLoading] = useState(true)
   const [promotions, setPromotions] = useState([])
+  const [translatedPromotions, setTranslatedPromotions] = useState([])
+  const [translating, setTranslating] = useState(false)
   const [filter, setFilter] = useState('all') // all, active, ending
+  const [searchQuery, setSearchQuery] = useState('')
   const [timeRemaining, setTimeRemaining] = useState({})
   const carouselRef = useRef(null)
   const isScrollingRef = useRef(false)
@@ -31,6 +38,69 @@ const Promotions = () => {
       return `${minutes}м`
     }
   }
+
+  const formatShortDate = (dateString) => {
+    const date = new Date(dateString)
+    const options = { year: 'numeric', month: 'short', day: 'numeric' }
+    const locale = language === 'ru' ? 'ru-RU' : 'en-US'
+    return date.toLocaleDateString(locale, options)
+  }
+
+  // Автоматический перевод акций при изменении языка
+  useEffect(() => {
+    if (promotions.length === 0 || language === 'ru') {
+      setTranslatedPromotions(promotions)
+      return
+    }
+
+    const checkApiAndTranslate = async () => {
+      // Если в БД уже есть предзаполненные английские поля, используем их без обращения к API
+      if (language === 'en' && promotions.some(item => item.title_en || item.description_en)) {
+        const mapped = promotions.map(item => ({
+          ...item,
+          title: item.title_en || item.title,
+          description: item.description_en || item.description
+        }))
+        setTranslatedPromotions(mapped)
+        return
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL
+      if (!apiUrl) {
+        console.warn('⚠️ VITE_API_URL не установлен. Переводы отключены. Показываем оригинальный текст.')
+        setTranslatedPromotions(promotions)
+        return
+      }
+
+      setTranslating(true)
+      try {
+        const translated = await Promise.all(
+          promotions.map(async (item) => {
+            try {
+              return {
+                ...item,
+                title: await translateDynamicContent(item.title, language, 'ru'),
+                description: item.description
+                  ? await translateDynamicContent(item.description, language, 'ru')
+                  : null,
+              }
+            } catch (error) {
+              console.warn(`Translation failed for promotion ${item.id}:`, error)
+              return item
+            }
+          })
+        )
+        setTranslatedPromotions(translated)
+      } catch (error) {
+        console.error('Error translating promotions:', error)
+        setTranslatedPromotions(promotions)
+      } finally {
+        setTranslating(false)
+      }
+    }
+
+    checkApiAndTranslate()
+  }, [promotions, language])
 
   useEffect(() => {
     loadPromotions()
@@ -132,15 +202,30 @@ const Promotions = () => {
   const getFilteredPromotions = () => {
     const now = new Date()
     const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
-    
+
+    const displayPromotions = translatedPromotions.length > 0 ? translatedPromotions : promotions
+    let result = displayPromotions
     switch (filter) {
       case 'ending':
-        return promotions.filter(p => new Date(p.end_date) <= threeDaysFromNow)
+        result = result.filter(p => new Date(p.end_date) <= threeDaysFromNow)
+        break
       case 'active':
-        return promotions.filter(p => new Date(p.end_date) > threeDaysFromNow)
+        result = result.filter(p => new Date(p.end_date) > threeDaysFromNow)
+        break
       default:
-        return promotions
+        break
     }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter(p =>
+        p.title?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.partner?.company_name?.toLowerCase().includes(q)
+      )
+    }
+
+    return result
   }
 
   // Функция для выбора hero-акции
@@ -220,277 +305,230 @@ const Promotions = () => {
   }
 
   const filteredPromotions = getFilteredPromotions()
+  const featuredPromotions = filteredPromotions.slice(0, Math.min(filteredPromotions.length, 3))
+  const listPromotions = filteredPromotions
 
   return (
-    <div className="min-h-screen bg-[#F5F5DC]">
-      {/* Шапка */}
-      <div className="bg-[#F5F5DC] px-4 pt-6 pb-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <button
-              onClick={() => navigate('/')}
-              className="text-gray-800 mr-3"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M15 18L9 12L15 6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-            <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: 'serif' }}>Акции</h1>
-          </div>
-          <button className="text-gray-800">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-          </button>
-        </div>
+    <div className="relative min-h-screen overflow-hidden pb-24 text-sakura-surface">
+      <div className="absolute inset-0 -z-20">
+        <img
+          src="/bg/sakura.jpg"
+          alt="Sakura background"
+          className="w-full h-full object-cover opacity-85"
+        />
+      </div>
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
 
-        {/* Фильтры (категории) */}
-        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
-          <button
-            onClick={() => handleFilterChange('all')}
-            className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 relative ${
-              filter === 'all'
-                ? 'text-gray-900'
-                : 'text-gray-600'
-            }`}
+      {/* Header */}
+      <div className="sticky top-0 z-20 bg-sakura-deep/90 backdrop-blur-xl border-b border-sakura-border/40">
+        <div className="px-4 pt-14 pb-4">
+          <h1 className="text-[28px] font-bold text-white leading-tight">{t('promo_title')}</h1>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="sticky top-[70px] z-10 px-4 pt-4 pb-2 bg-sakura-deep/90 backdrop-blur-xl">
+        <div className="flex items-center gap-3 h-12 px-4 bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)]">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#6B7280"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            Все
-            {filter === 'all' && (
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-500 rounded-full" />
-            )}
-          </button>
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('promo_search')}
+            className="flex-1 text-base text-[#111827] placeholder:text-[#9CA3AF] outline-none bg-transparent"
+          />
           <button
-            onClick={() => handleFilterChange('active')}
-            className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 relative ${
-              filter === 'active'
-                ? 'text-gray-900'
-                : 'text-gray-600'
-            }`}
+            onClick={() => setSearchQuery('')}
+            className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
           >
-            Активные
-            {filter === 'active' && (
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-500 rounded-full" />
-            )}
-          </button>
-          <button
-            onClick={() => handleFilterChange('ending')}
-            className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap transition-all duration-200 relative ${
-              filter === 'ending'
-                ? 'text-gray-900'
-                : 'text-gray-600'
-            }`}
-          >
-            Скоро закончатся
-            {filter === 'ending' && (
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-red-500 rounded-full" />
-            )}
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#6B7280"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="m15 9-6 6M9 9l6 6" />
+            </svg>
           </button>
         </div>
       </div>
 
-      {/* Список акций */}
-      <div className="px-4 pb-20 pt-2">
+      {/* Category Tabs */}
+      <div className="sticky top-[134px] z-10 px-4 pt-2 pb-3 bg-sakura-deep/90 backdrop-blur-xl">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          {[
+            { id: 'all', label: t('promo_all') },
+            { id: 'active', label: t('promo_active') },
+            { id: 'ending', label: t('promo_ending') }
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => handleFilterChange(cat.id)}
+              className={`flex-shrink-0 h-10 px-4 rounded-[20px] text-sm font-medium transition-all duration-200 ${
+                filter === cat.id ? 'bg-sakura-accent text-white' : 'bg-white text-[#6B7280]'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="relative z-10 pt-6 pb-6">
         {filteredPromotions.length === 0 ? (
-          <div className="bg-jewelry-cream rounded-xl p-8 text-center shadow-lg border border-jewelry-gold/20">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" className="mx-auto mb-4 text-jewelry-gray-elegant">
-              <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="currentColor"/>
-            </svg>
-            <p className="text-jewelry-brown-dark">Нет активных акций</p>
+          <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 text-center border border-sakura-border/40 shadow-xl mx-4">
+            <span className="text-6xl leading-none mx-auto mb-4 block">🌸</span>
+            <h3 className="text-xl font-bold mb-2 text-[#111827]">{t('promo_no_items')}</h3>
+            <p className="text-sm text-[#6B7280]">
+              {language === 'ru' 
+                ? 'Следите за обновлениями — новые акции появятся здесь.'
+                : 'Stay tuned — new promotions will appear here.'}
+            </p>
           </div>
         ) : (
           <>
-            {/* Единая карусель всех акций (включая hero) */}
-            {(() => {
-              // Используем ВСЕ акции для карусели, hero-акция будет первой
-              const heroPromo = getHeroPromotion(filteredPromotions)
-              
-              // Если есть hero-акция, ставим её первой, остальные после неё
-              // Важно: используем filteredPromotions полностью, чтобы не потерять акции
-              let carouselPromotions = heroPromo && filteredPromotions.length > 1
-                ? [heroPromo, ...filteredPromotions.filter(p => p.id !== heroPromo.id)]
-                : filteredPromotions
+            {/* Hero carousel with peek effect */}
+            {featuredPromotions.length > 0 && (
+              <div className="mb-6">
+                <div
+                  className="flex gap-4 overflow-x-auto scrollbar-hide px-4"
+                  style={{
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    scrollSnapType: 'x mandatory',
+                    WebkitOverflowScrolling: 'touch'
+                  }}
+                >
+                  {featuredPromotions.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => navigate(`/promotions/${item.id}`)}
+                      className="flex-shrink-0 bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.1)] overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.98]"
+                      style={{
+                        scrollSnapAlign: 'start',
+                        minWidth: '85%',
+                        maxWidth: '85%'
+                      }}
+                    >
+                      <div className="relative h-[280px] overflow-hidden">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-sakura-accent/70 via-sakura-mid/60 to-sakura-deep/70 flex items-center justify-center">
+                            <span className="text-6xl text-white/30">🎁</span>
+                          </div>
+                        )}
+                      </div>
 
+                      <div style={{ padding: '16px' }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs text-[#6B7280] leading-[1.4] font-normal">
+                            {t('promo_until')} {formatShortDate(item.end_date)}
+                          </span>
+                        </div>
 
-              // Создаем бесконечную карусель: дублируем карточки в начале и конце
-              // Если карточек меньше 2, повторяем для сохранения дизайна
-              const basePromotions = carouselPromotions.length < 2 
-                ? [...carouselPromotions, ...carouselPromotions]
-                : carouselPromotions
-              
-              // Для бесконечной карусели дублируем карточки в начале и конце
-              const displayPromotions = basePromotions.length > 1
-                ? [...basePromotions, ...basePromotions, ...basePromotions]
-                : basePromotions
+                        <h3 className="text-lg font-bold text-[#111827] leading-[1.4] line-clamp-3">
+                          {item.title}
+                        </h3>
 
-              // Вычисляем позицию начала "реальных" карточек (после первых клонов)
-              const realStartIndex = basePromotions.length
-              const realEndIndex = realStartIndex + basePromotions.length
+                        {item.description && (
+                          <p className="text-sm text-[#6B7280] leading-[1.5] mt-2 line-clamp-2">
+                            {item.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-              return (
-                <div className="relative">
-                  <div 
-                    ref={(el) => {
-                      carouselRef.current = el
-                      
-                      if (el && displayPromotions.length > 0 && basePromotions.length > 1) {
-                        // Центрируем первую реальную карточку при загрузке
-                        setTimeout(() => {
-                          const container = el
-                          const containerWidth = container.offsetWidth
-                          const cardWidth = 280
-                          const gap = 16
-                          // Прокручиваем к началу реальных карточек
-                          const scrollPosition = realStartIndex * (cardWidth + gap) + (containerWidth / 2) - (cardWidth / 2) - 16
-                          container.scrollLeft = scrollPosition
-                        }, 100)
-                      }
-                    }}
-                    className="flex gap-4 overflow-x-auto scrollbar-hide"
-                    style={{
-                      paddingLeft: '16px',
-                      paddingRight: '16px',
-                      WebkitOverflowScrolling: 'touch',
-                      scrollBehavior: 'smooth'
-                    }}
-                  >
-                      {displayPromotions.map((promo, index) => {
-                        const daysLeft = getDaysRemaining(promo.end_date)
-                        const isHighlighted = promo.id === highlightId
-                        const isEndingSoon = daysLeft <= 3
-                        const isNew = (() => {
-                          const created = new Date(promo.created_at || promo.start_date)
-                          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-                          return created >= sevenDaysAgo
-                        })()
-                        const colors = getCardColor(parseInt(promo.id) || index)
-                        
-                        // Определяем, является ли это реальной карточкой (не клоном)
-                        const isRealCard = basePromotions.length > 1 
-                          ? (index >= realStartIndex && index < realEndIndex)
-                          : true
-                        const realIndex = basePromotions.length > 1 
-                          ? (index % basePromotions.length)
-                          : index
-                        const isRealHero = realIndex === 0 && isRealCard
-                        
-                        return (
-                          <div
-                            key={`${promo.id}-${index}-clone`}
-                            data-index={index}
-                            data-real-index={realIndex}
-                            data-hero={isRealHero ? 'true' : 'false'}
-                            onClick={() => {
-                              hapticFeedback('light')
-                              navigate(`/promotions/${promo.id}`)
-                            }}
-                            className={`relative flex-shrink-0 cursor-pointer active:scale-[0.98] transition-all duration-300 ${
-                              isHighlighted ? 'ring-2 ring-white ring-offset-2' : ''
-                            } ${isRealHero ? 'ring-2 ring-yellow-400 ring-offset-2' : ''} ${!promo.image_url ? colors.bg : ''}`}
+            {/* List with thumbnails */}
+            {listPromotions.length > 0 && (
+              <div className="px-4 mt-6">
+                <div className="mb-4">
+                  <h2 className="text-[20px] font-bold text-[#111827] leading-[1.3]">
+                    {t('promo_all_promotions')}
+                  </h2>
+                </div>
+                <div className="bg-white rounded-xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+                  {listPromotions.map((item, index) => (
+                    <div
+                      key={item.id}
+                      onClick={() => navigate(`/promotions/${item.id}`)}
+                      className="flex items-start cursor-pointer transition-all duration-200 hover:bg-gray-50 active:bg-gray-100"
+                      style={{
+                        padding: '16px',
+                        gap: '16px',
+                        borderBottom: index < listPromotions.length - 1 ? '1px solid #E5E7EB' : 'none',
+                        minHeight: '100px'
+                      }}
+                    >
+                      <div className="flex-1 min-w-0" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <p className="text-sm font-medium text-[#111827] leading-[1.5]" style={{ fontSize: '14px', fontWeight: 500 }}>
+                          {item.partner?.company_name || t('promo_promotion')}
+                        </p>
+
+                        <h3 className="text-base font-semibold text-[#111827] leading-[1.5] line-clamp-2" style={{ fontSize: '16px', fontWeight: 600 }}>
+                          {item.title}
+                        </h3>
+
+                        <p className="text-xs text-[#6B7280] leading-[1.4]" style={{ fontSize: '12px', fontWeight: 400 }}>
+                          {`${t('promo_until')} ${formatShortDate(item.end_date)}`}
+                        </p>
+                      </div>
+
+                      <div className="flex-shrink-0">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.title}
+                            className="object-cover"
                             style={{
-                              width: '280px',
-                              height: '380px',
-                              borderRadius: '20px',
-                              overflow: 'hidden',
-                              boxShadow: isRealHero ? '0 8px 12px rgba(0, 0, 0, 0.2)' : '0 4px 6px rgba(0, 0, 0, 0.1)',
-                              transform: isRealHero ? 'scale(1.02)' : 'scale(1)'
+                              width: '80px',
+                              height: '80px',
+                              borderRadius: '8px'
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className="bg-gradient-to-br from-sakura-accent/70 via-sakura-mid/60 to-sakura-deep/70 flex items-center justify-center"
+                            style={{
+                              width: '80px',
+                              height: '80px',
+                              borderRadius: '8px'
                             }}
                           >
-                            {/* Фоновое изображение с градиентным overlay */}
-                            {promo.image_url ? (
-                              <>
-                                <img
-                                  src={promo.image_url}
-                                  alt={promo.title}
-                                  className="absolute inset-0 w-full h-full object-cover"
-                                  style={{ filter: 'blur(0px)' }}
-                                />
-                                <div 
-                                  className="absolute inset-0"
-                                  style={{
-                                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.6))'
-                                  }}
-                                />
-                              </>
-                            ) : (
-                              <div className={`absolute inset-0 ${colors.bg} opacity-90`} />
-                            )}
-
-                            {/* Иконка "подробнее" в правом верхнем углу */}
-                            <div className="absolute top-3 right-3 z-20">
-                              <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                  <path d="M7 17L17 7M7 7h10v10" />
-                                </svg>
-                              </div>
-                            </div>
-
-                            {/* Название и бренд вверху */}
-                            <div className="absolute top-0 left-0 right-0 z-10 p-5 pt-16">
-                              <h3 
-                                className="text-white font-bold mb-1 drop-shadow-lg"
-                                style={{
-                                  fontSize: '18px',
-                                  fontWeight: 700,
-                                  lineHeight: '1.2',
-                                  color: '#FFFFFF'
-                                }}
-                              >
-                                {promo.title}
-                              </h3>
-                              {promo.partner?.company_name && (
-                                <p 
-                                  className="text-white/90 drop-shadow-md"
-                                  style={{
-                                    fontSize: '14px',
-                                    fontWeight: 400,
-                                    opacity: 0.9
-                                  }}
-                                >
-                                  {promo.partner.company_name}
-                                </p>
-                              )}
-                            </div>
-
-                            {/* Бейджи статуса */}
-                            <div className="absolute top-3 left-3 z-20 flex flex-wrap gap-1.5">
-                              {isEndingSoon && (
-                                <div className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
-                                  🔥 {daysLeft}д
-                                </div>
-                              )}
-                              {isNew && !isEndingSoon && (
-                                <div className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
-                                  ⚡ НОВАЯ
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Цена в правом нижнем углу */}
-                            <div className="absolute bottom-4 right-4 z-10">
-                              <div 
-                                className="text-white font-bold drop-shadow-lg"
-                                style={{
-                                  fontSize: '20px',
-                                  fontWeight: 700,
-                                  color: '#FFFFFF'
-                                }}
-                              >
-                                {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} баллов` : 'Бесплатно')}
-                              </div>
-                            </div>
+                            <span className="text-2xl text-white/30">🎁</span>
                           </div>
-                        )
-                      })}
+                        )}
+                      </div>
                     </div>
-                  </div>
-              )
-            })()}
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -989,7 +989,7 @@ const Home = () => {
                               )}
                               {isNew && !isEndingSoon && (
                                 <div className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
-                                  ⚡ НОВАЯ
+                                  ⚡ {t('promo_new')}
                                 </div>
                               )}
                             </div>
@@ -1004,7 +1004,7 @@ const Home = () => {
                                   color: '#FFFFFF'
                                 }}
                               >
-                                {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} баллов` : 'Бесплатно')}
+                                {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} ${t('promo_points')}` : t('promo_free'))}
                               </div>
                             </div>
                           </div>
