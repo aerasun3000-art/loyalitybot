@@ -66,7 +66,19 @@ const Loader = ({ text }) => {
   // Переводим цитату при изменении языка
   useEffect(() => {
     if (language === 'en' && quote) {
-      translateDynamicContent(quote, 'en', 'ru').then(setTranslatedQuote).catch(() => setTranslatedQuote(quote))
+      // Сначала показываем оригинал, чтобы не было пустого экрана
+      setTranslatedQuote(quote)
+      // Затем переводим в фоне
+      translateDynamicContent(quote, 'en', 'ru')
+        .then(translated => {
+          if (translated && translated !== quote) {
+            setTranslatedQuote(translated)
+          }
+        })
+        .catch(() => {
+          // Оставляем оригинал при ошибке
+          setTranslatedQuote(quote)
+        })
     } else {
       setTranslatedQuote(quote)
     }

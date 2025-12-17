@@ -32,6 +32,52 @@ const API_BASE_URL = getApiBaseUrl()
 // Кэш переводов для оптимизации (хранится в памяти)
 const translationCache = new Map()
 
+// Кэш в localStorage для персистентности между сессиями
+const STORAGE_KEY = 'translation_cache'
+const MAX_STORAGE_SIZE = 1000 // Максимум записей в localStorage
+
+/**
+ * Загружает кэш из localStorage
+ */
+const loadStorageCache = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      Object.entries(parsed).forEach(([key, value]) => {
+        translationCache.set(key, value)
+      })
+    }
+  } catch (error) {
+    console.warn('Failed to load translation cache from localStorage:', error)
+  }
+}
+
+/**
+ * Сохраняет кэш в localStorage
+ */
+const saveStorageCache = () => {
+  try {
+    const cacheObj = Object.fromEntries(translationCache)
+    const toStore = {}
+    let count = 0
+    for (const [key, value] of Object.entries(cacheObj)) {
+      if (count >= MAX_STORAGE_SIZE) break
+      toStore[key] = value
+      count++
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore))
+  } catch (error) {
+    // localStorage может быть переполнен, игнорируем ошибку
+    console.warn('Failed to save translation cache to localStorage:', error)
+  }
+}
+
+// Загружаем кэш при инициализации
+if (typeof window !== 'undefined') {
+  loadStorageCache()
+}
+
 /**
  * Генерирует ключ для кэша
  */
@@ -100,6 +146,12 @@ const checkSupabaseCache = async (text, sourceLang, targetLang) => {
       // Сохраняем в локальный кэш для быстрого доступа
       const cacheKey = getCacheKey(text, sourceLang, targetLang)
       translationCache.set(cacheKey, data.translated_text)
+      
+      // Сохраняем в localStorage для персистентности
+      if (typeof window !== 'undefined') {
+        saveStorageCache()
+      }
+      
       return data.translated_text
     }
     
@@ -136,16 +188,26 @@ export const translateText = async (
     return text
   }
 
-  // Проверяем локальный кэш
+  // Проверяем кэш (в порядке скорости: in-memory -> Supabase)
   if (useCache) {
     const cacheKey = getCacheKey(text, sourceLang, targetLang)
+    
+    // 1. Проверяем in-memory кэш (самый быстрый)
     const cached = translationCache.get(cacheKey)
     if (cached) {
       return cached
     }
     
-    // Проверяем кэш в Supabase
-    const supabaseCached = await checkSupabaseCache(text, sourceLang, targetLang)
+    // 2. Проверяем кэш в Supabase (может быть медленнее, но проверяем параллельно)
+    // Запускаем проверку Supabase и API запрос параллельно для оптимизации
+    const supabaseCachePromise = checkSupabaseCache(text, sourceLang, targetLang)
+    
+    // Если Supabase кэш найден быстро, используем его
+    const supabaseCached = await Promise.race([
+      supabaseCachePromise,
+      new Promise(resolve => setTimeout(() => resolve(null), 100)) // Таймаут 100мс
+    ])
+    
     if (supabaseCached) {
       return supabaseCached
     }
@@ -195,6 +257,11 @@ export const translateText = async (
         if (translationCache.size > 1000) {
           const firstKey = translationCache.keys().next().value
           translationCache.delete(firstKey)
+        }
+        
+        // Сохраняем в localStorage для персистентности
+        if (typeof window !== 'undefined') {
+          saveStorageCache()
         }
       }
 
