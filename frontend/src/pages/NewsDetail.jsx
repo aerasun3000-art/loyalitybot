@@ -118,7 +118,7 @@ const NewsDetail = () => {
     }
   }
 
-  if (loading) {
+  if (loading || translating) {
     return <Loader />
   }
 

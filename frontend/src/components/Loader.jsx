@@ -1,6 +1,8 @@
 import { Spinner } from '@telegram-apps/telegram-ui'
 import { useState, useEffect } from 'react'
 import { getBackgroundImage } from '../services/supabase'
+import useLanguageStore from '../store/languageStore'
+import { translateDynamicContent } from '../utils/i18n'
 
 const quotes = [
   'Где почитаются женщины, там боги радуются; но там, где их не почитают, все священные обряды не приносят наград (Ману-смрити, III.55).',
@@ -56,9 +58,21 @@ const quotes = [
 ]
 
 const Loader = ({ text }) => {
+  const { language } = useLanguageStore()
   const [quote] = useState(() => quotes[Math.floor(Math.random() * quotes.length)])
+  const [translatedQuote, setTranslatedQuote] = useState(quote)
   const [bgImage, setBgImage] = useState((import.meta.env && import.meta.env.VITE_BG_IMAGE) || '/bg/sakura.jpg')
-  const displayText = text !== undefined && text !== null && text !== '' ? text : quote
+  
+  // Переводим цитату при изменении языка
+  useEffect(() => {
+    if (language === 'en' && quote) {
+      translateDynamicContent(quote, 'en', 'ru').then(setTranslatedQuote).catch(() => setTranslatedQuote(quote))
+    } else {
+      setTranslatedQuote(quote)
+    }
+  }, [quote, language])
+  
+  const displayText = text !== undefined && text !== null && text !== '' ? text : translatedQuote
 
   useEffect(() => {
     const loadBg = async () => {
@@ -75,7 +89,7 @@ const Loader = ({ text }) => {
   }, [])
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center">
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-center overflow-hidden">
       {/* Background image */}
       <div
         className="absolute inset-0 -z-20 bg-center bg-cover opacity-85 pointer-events-none select-none"
@@ -84,14 +98,18 @@ const Loader = ({ text }) => {
       {/* Gradient overlay */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
       
-      {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center gap-6 px-4 py-8">
-        <Spinner size="l" />
+      {/* Content - изречение на весь экран */}
+      <div className="relative z-10 w-full h-screen flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 py-8">
         {displayText && (
-          <p className="text-sakura-deep text-center text-lg leading-relaxed max-w-2xl font-medium italic drop-shadow-lg bg-sakura-surface/30 backdrop-blur-sm px-6 py-4 rounded-2xl border border-sakura-border/40">
-            {displayText}
-          </p>
+          <div className="text-sakura-deep text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-relaxed w-full flex-1 flex items-center justify-center font-medium italic drop-shadow-2xl px-4 sm:px-6 md:px-8 lg:px-12">
+            <div className="w-full max-w-6xl">
+              {displayText}
+            </div>
+          </div>
         )}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
+          <Spinner size="l" />
+        </div>
       </div>
     </div>
   )

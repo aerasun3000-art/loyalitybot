@@ -211,7 +211,7 @@ const News = () => {
   
   const listSectionTitle = language === 'ru' ? 'Рекомендуемые для вас' : 'For you today news'
   
-  if (loading) {
+  if (loading || translating) {
     return <Loader />
   }
 

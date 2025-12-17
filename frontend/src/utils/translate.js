@@ -40,6 +40,78 @@ const getCacheKey = (text, sourceLang, targetLang) => {
 }
 
 /**
+ * Вычисляет SHA-256 хэш текста (совместимо с бэкендом)
+ */
+const calculateTextHash = async (text) => {
+  try {
+    // Используем Web Crypto API если доступен
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      const encoder = new TextEncoder()
+      const data = encoder.encode(text)
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+      const hashArray = Array.from(new Uint8Array(hashBuffer))
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+    }
+    // Fallback: простой хэш (не криптографически безопасный, но достаточный для кэша)
+    let hash = 0
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(16)
+  } catch (error) {
+    // Если не удалось вычислить хэш, возвращаем null
+    console.warn('Failed to calculate text hash:', error)
+    return null
+  }
+}
+
+/**
+ * Проверяет кэш переводов в Supabase
+ */
+const checkSupabaseCache = async (text, sourceLang, targetLang) => {
+  try {
+    // Динамически импортируем supabase, чтобы избежать циклических зависимостей
+    const { supabase } = await import('../services/supabase')
+    
+    // Вычисляем хэш текста (как на бэкенде)
+    const textHash = await calculateTextHash(text)
+    if (!textHash) {
+      return null
+    }
+    
+    // Проверяем кэш в Supabase
+    const { data, error } = await supabase
+      .from('translation_cache')
+      .select('translated_text')
+      .eq('text_hash', textHash)
+      .eq('source_lang', sourceLang)
+      .eq('target_lang', targetLang)
+      .limit(1)
+      .maybeSingle()
+    
+    if (error && error.code !== 'PGRST116') {
+      console.warn('Error checking Supabase translation cache:', error)
+      return null
+    }
+    
+    if (data?.translated_text) {
+      // Сохраняем в локальный кэш для быстрого доступа
+      const cacheKey = getCacheKey(text, sourceLang, targetLang)
+      translationCache.set(cacheKey, data.translated_text)
+      return data.translated_text
+    }
+    
+    return null
+  } catch (error) {
+    // Игнорируем ошибки проверки кэша - просто продолжим с API запросом
+    console.warn('Failed to check Supabase cache:', error)
+    return null
+  }
+}
+
+/**
  * Переводит текст с помощью AI через backend API
  * 
  * @param {string} text - Текст для перевода
@@ -64,12 +136,18 @@ export const translateText = async (
     return text
   }
 
-  // Проверяем кэш
+  // Проверяем локальный кэш
   if (useCache) {
     const cacheKey = getCacheKey(text, sourceLang, targetLang)
     const cached = translationCache.get(cacheKey)
     if (cached) {
       return cached
+    }
+    
+    // Проверяем кэш в Supabase
+    const supabaseCached = await checkSupabaseCache(text, sourceLang, targetLang)
+    if (supabaseCached) {
+      return supabaseCached
     }
   }
 
