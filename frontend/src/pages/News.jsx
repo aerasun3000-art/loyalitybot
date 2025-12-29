@@ -114,17 +114,6 @@ const News = () => {
 
   const loadNews = async () => {
     try {
-      const cached = sessionStorage.getItem('news_cache')
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached)
-          if (Array.isArray(parsed)) {
-            setNews(parsed)
-            setLoading(false)
-          }
-        } catch {}
-      }
-
       const newsData = await getPublishedNews()
       setNews(newsData)
       sessionStorage.setItem('news_cache', JSON.stringify(newsData))
