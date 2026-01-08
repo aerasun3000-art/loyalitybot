@@ -111,6 +111,53 @@ const translations = {
     positionPending: 'Under Review',
     showAvailability: 'Show Availability Map',
     hideAvailability: 'Hide Availability Map',
+    noCommissionTitle: '💰 Zero Commission for Your Clients',
+    noCommissionDesc: 'Clients who register via your referral link are YOUR clients. You pay ZERO commission to the system for them!',
+    noCommissionYourClients: 'Your Clients (via your link)',
+    noCommissionYourClientsDesc: '✅ You pay 0% commission\n✅ Work with them as usual\n✅ Get 100% of revenue',
+    noCommissionOtherClients: 'Clients from Other Masters',
+    noCommissionOtherClientsDesc: 'You pay 10% commission per visit\nThis is the fee for the system bringing you a client',
+    noCommissionExample: 'Example:',
+    noCommissionExample1: '20 YOUR clients: $2,000 revenue → You pay: $0 ✅',
+    noCommissionExample2: '10 clients from others: $1,000 revenue → You pay: $100 (10%)',
+    noCommissionTotal: 'Total: $3,000 revenue, You pay: $100, Your net income: $2,900 ✅',
+    competitorProtectionTitle: '🛡️ Competitor Protection',
+    competitorProtectionDesc: 'Clients do NOT see competitors in the app!',
+    competitorProtectionHow: 'How it works:',
+    competitorProtectionExample: 'A client registered via a nail care master\'s link',
+    competitorProtectionExample1: '→ Does NOT see other nail care masters (competitors hidden)',
+    competitorProtectionExample2: '→ DOES see makeup, sugaring, massage masters, etc.',
+    competitorProtectionExample3: '→ If you\'re a makeup master, they\'ll see you!',
+    competitorProtectionBenefit: 'This protects you from competition - your clients won\'t leave to competitors through the app!',
+    howClientsFindYouTitle: '🌟 How Clients Find You in the App',
+    howClientsFindYouDesc: 'When a client registers in the system (via any master\'s link), they get access to the app with all masters!',
+    howClientsFindYouWhat: 'What clients see:',
+    howClientsFindYouWhat1: '✅ Promotions from masters with different services (not competitors)',
+    howClientsFindYouWhat2: '✅ Services from masters with different services',
+    howClientsFindYouWhat3: '✅ Can filter by district, service category',
+    howClientsFindYouWhat4: '✅ Can search for masters by name or service',
+    howClientsFindYouWhat5: '✅ See ratings and reviews',
+    howClientsFindYouWhat6: '❌ Do NOT see competitors (masters with same services)',
+    howClientsFindYouBenefit: 'You get clients automatically:',
+    howClientsFindYouBenefit1: '✅ Clients see you in the app, even if they registered with another master',
+    howClientsFindYouBenefit2: '✅ All clients in the system see your promotions',
+    howClientsFindYouBenefit3: '✅ More masters in system = more clients see you',
+    howClientsFindYouBenefit4: '✅ You don\'t spend money on ads - clients find you themselves!',
+    referralLinkTitle: '📱 Get Your Referral Link & QR Code',
+    referralLinkDesc: 'After registration, you\'ll receive:',
+    referralLinkItem1: '✅ Your unique referral link',
+    referralLinkItem2: '✅ QR code for printing',
+    referralLinkWhere: 'Where to place:',
+    referralLinkWhere1: '✅ Instagram profile (in bio)',
+    referralLinkWhere2: '✅ Instagram Stories',
+    referralLinkWhere3: '✅ Business card',
+    referralLinkWhere4: '✅ Reception desk (QR code)',
+    referralLinkWhere5: '✅ WhatsApp status',
+    referralLinkResult: 'When a client clicks your link:',
+    referralLinkResult1: '✅ Automatically registers',
+    referralLinkResult2: '✅ Gets 100 welcome points',
+    referralLinkResult3: '✅ Becomes YOUR client',
+    referralLinkResult4: '✅ All visits count toward you',
   },
   ru: {
     badge: '🎁 ОГРАНИЧЕННОЕ ВРЕМЯ: Раннее предложение для Нью-Йорка',
@@ -217,6 +264,53 @@ const translations = {
     positionPending: 'На Рассмотрении',
     showAvailability: 'Показать Карту Доступности',
     hideAvailability: 'Скрыть Карту Доступности',
+    noCommissionTitle: '💰 Нулевая Комиссия за Ваших Клиентов',
+    noCommissionDesc: 'Клиенты, которые зарегистрировались по вашей ссылке — это ВАШИ клиенты. За них вы платите НОЛЬ процентов системе!',
+    noCommissionYourClients: 'Ваши Клиенты (по вашей ссылке)',
+    noCommissionYourClientsDesc: '✅ Вы платите 0% комиссии\n✅ Работаете с ними как обычно\n✅ Получаете 100% дохода',
+    noCommissionOtherClients: 'Клиенты от Других Мастеров',
+    noCommissionOtherClientsDesc: 'Вы платите 10% комиссии с каждого посещения\nЭто плата за то, что система привела вам клиента',
+    noCommissionExample: 'Пример:',
+    noCommissionExample1: '20 ВАШИХ клиентов: $2,000 оборот → Вы платите: $0 ✅',
+    noCommissionExample2: '10 клиентов от других: $1,000 оборот → Вы платите: $100 (10%)',
+    noCommissionTotal: 'Итого: $3,000 оборот, Вы платите: $100, Ваш чистый доход: $2,900 ✅',
+    competitorProtectionTitle: '🛡️ Защита от Конкурентов',
+    competitorProtectionDesc: 'Клиенты НЕ видят конкурентов в приложении!',
+    competitorProtectionHow: 'Как это работает:',
+    competitorProtectionExample: 'Клиентка зарегистрировалась по ссылке мастера по маникюру',
+    competitorProtectionExample1: '→ НЕ увидит других мастеров по маникюру (конкуренты скрыты)',
+    competitorProtectionExample2: '→ УВИДИТ мастеров по макияжу, шугарингу, массажу и т.д.',
+    competitorProtectionExample3: '→ Если вы мастер по макияжу — она увидит вас!',
+    competitorProtectionBenefit: 'Это защита от конкуренции — ваши клиенты не уйдут к конкурентам через приложение!',
+    howClientsFindYouTitle: '🌟 Как Клиенты Находят Вас в Приложении',
+    howClientsFindYouDesc: 'Когда клиент регистрируется в системе (по ссылке любого мастера), он получает доступ к приложению со всеми мастерами!',
+    howClientsFindYouWhat: 'Что видят клиенты:',
+    howClientsFindYouWhat1: '✅ Акции от мастеров с другими услугами (не конкурентов)',
+    howClientsFindYouWhat2: '✅ Услуги от мастеров с другими услугами',
+    howClientsFindYouWhat3: '✅ Могут фильтровать по району, категории услуг',
+    howClientsFindYouWhat4: '✅ Могут искать мастера по названию или услуге',
+    howClientsFindYouWhat5: '✅ Видят рейтинги и отзывы',
+    howClientsFindYouWhat6: '❌ НЕ видят конкурентов (мастеров с теми же услугами)',
+    howClientsFindYouBenefit: 'Вы получаете клиентов автоматически:',
+    howClientsFindYouBenefit1: '✅ Клиенты видят вас в приложении, даже если зарегистрировались у другого мастера',
+    howClientsFindYouBenefit2: '✅ Все клиенты в системе видят ваши акции',
+    howClientsFindYouBenefit3: '✅ Чем больше мастеров в системе, тем больше клиентов видят вас',
+    howClientsFindYouBenefit4: '✅ Вы не тратите деньги на рекламу — клиенты находят вас сами!',
+    referralLinkTitle: '📱 Получите Вашу Реферальную Ссылку и QR-код',
+    referralLinkDesc: 'После регистрации вы получите:',
+    referralLinkItem1: '✅ Вашу уникальную реферальную ссылку',
+    referralLinkItem2: '✅ QR-код для печати',
+    referralLinkWhere: 'Где разместить:',
+    referralLinkWhere1: '✅ В Instagram профиле (в описании)',
+    referralLinkWhere2: '✅ В Instagram Stories',
+    referralLinkWhere3: '✅ На визитке',
+    referralLinkWhere4: '✅ На стойке ресепшена (QR-код)',
+    referralLinkWhere5: '✅ В WhatsApp статусе',
+    referralLinkResult: 'Когда клиент переходит по вашей ссылке:',
+    referralLinkResult1: '✅ Автоматически регистрируется',
+    referralLinkResult2: '✅ Получает 100 приветственных баллов',
+    referralLinkResult3: '✅ Становится ВАШИМ клиентом',
+    referralLinkResult4: '✅ Все посещения учитываются у вас',
   }
 };
 
@@ -473,6 +567,240 @@ const OnePagerPartner = () => {
               title={t('step4Title')}
               description={t('step4Desc')}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Реферальная ссылка и QR-код */}
+      <div className="bg-white py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-gradient-to-br from-sakura-light to-sakura-cream rounded-2xl p-8 shadow-lg border border-sakura-mid/20">
+            <h2 className="text-4xl font-bold text-center text-sakura-dark mb-6">
+              {t('referralLinkTitle')}
+            </h2>
+            <p className="text-xl text-center text-gray-700 mb-8">
+              {t('referralLinkDesc')}
+            </p>
+            
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="text-2xl mb-4">🔗</div>
+                <div className="font-bold text-sakura-dark mb-2">{t('referralLinkItem1')}</div>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="text-2xl mb-4">📱</div>
+                <div className="font-bold text-sakura-dark mb-2">{t('referralLinkItem2')}</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-6 mb-6">
+              <h3 className="text-xl font-bold text-sakura-dark mb-4">{t('referralLinkWhere')}</h3>
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('referralLinkWhere1')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('referralLinkWhere2')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('referralLinkWhere3')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('referralLinkWhere4')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('referralLinkWhere5')}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-sakura-mid/10 rounded-xl p-6">
+              <h3 className="text-xl font-bold text-sakura-dark mb-4">{t('referralLinkResult')}</h3>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('referralLinkResult1')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('referralLinkResult2')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('referralLinkResult3')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('referralLinkResult4')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Нулевая комиссия за своих клиентов */}
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-green-200">
+            <h2 className="text-4xl font-bold text-center text-sakura-dark mb-6">
+              {t('noCommissionTitle')}
+            </h2>
+            <p className="text-xl text-center text-gray-700 mb-8">
+              {t('noCommissionDesc')}
+            </p>
+            
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-green-50 rounded-xl p-6 border-2 border-green-200">
+                <h3 className="text-xl font-bold text-sakura-dark mb-4">
+                  {t('noCommissionYourClients')}
+                </h3>
+                <div className="space-y-2 text-gray-700 whitespace-pre-line">
+                  {t('noCommissionYourClientsDesc')}
+                </div>
+              </div>
+              
+              <div className="bg-sakura-light rounded-xl p-6 border-2 border-sakura-mid/30">
+                <h3 className="text-xl font-bold text-sakura-dark mb-4">
+                  {t('noCommissionOtherClients')}
+                </h3>
+                <div className="space-y-2 text-gray-700">
+                  {t('noCommissionOtherClientsDesc')}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-sakura-light to-sakura-cream rounded-xl p-6 border border-sakura-mid/30">
+              <h3 className="text-lg font-bold text-sakura-dark mb-4">{t('noCommissionExample')}</h3>
+              <div className="space-y-2 text-gray-700">
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600 font-bold">•</span>
+                  <span>{t('noCommissionExample1')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-sakura-dark font-bold">•</span>
+                  <span>{t('noCommissionExample2')}</span>
+                </div>
+                <div className="mt-4 pt-4 border-t border-sakura-mid/30">
+                  <div className="font-bold text-lg text-sakura-dark">
+                    {t('noCommissionTotal')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Защита от конкурентов */}
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-blue-200">
+            <h2 className="text-4xl font-bold text-center text-sakura-dark mb-6">
+              {t('competitorProtectionTitle')}
+            </h2>
+            <p className="text-xl text-center text-gray-700 mb-8">
+              {t('competitorProtectionDesc')}
+            </p>
+            
+            <div className="bg-blue-50 rounded-xl p-6 mb-6 border border-blue-200">
+              <h3 className="text-lg font-bold text-sakura-dark mb-4">{t('competitorProtectionHow')}</h3>
+              <div className="space-y-3 text-gray-700">
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-600">→</span>
+                  <span>{t('competitorProtectionExample')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-red-500">→</span>
+                  <span>{t('competitorProtectionExample1')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">→</span>
+                  <span>{t('competitorProtectionExample2')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-600">→</span>
+                  <span>{t('competitorProtectionExample3')}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200">
+              <div className="text-lg font-bold text-green-800 text-center">
+                {t('competitorProtectionBenefit')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Как клиенты находят вас */}
+      <div className="bg-white py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-gradient-to-br from-sakura-light to-sakura-cream rounded-2xl p-8 shadow-lg border border-sakura-mid/30">
+            <h2 className="text-4xl font-bold text-center text-sakura-dark mb-6">
+              {t('howClientsFindYouTitle')}
+            </h2>
+            <p className="text-xl text-center text-gray-700 mb-8">
+              {t('howClientsFindYouDesc')}
+            </p>
+            
+            <div className="bg-white rounded-xl p-6 mb-6 shadow-sm">
+              <h3 className="text-xl font-bold text-sakura-dark mb-4">{t('howClientsFindYouWhat')}</h3>
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span className="text-sm">{t('howClientsFindYouWhat1')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span className="text-sm">{t('howClientsFindYouWhat2')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span className="text-sm">{t('howClientsFindYouWhat3')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span className="text-sm">{t('howClientsFindYouWhat4')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span className="text-sm">{t('howClientsFindYouWhat5')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-red-500">❌</span>
+                  <span className="text-sm">{t('howClientsFindYouWhat6')}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-sakura-mid/10 rounded-xl p-6">
+              <h3 className="text-xl font-bold text-sakura-dark mb-4">{t('howClientsFindYouBenefit')}</h3>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('howClientsFindYouBenefit1')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('howClientsFindYouBenefit2')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('howClientsFindYouBenefit3')}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-green-500">✅</span>
+                  <span>{t('howClientsFindYouBenefit4')}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1164,3 +1492,5 @@ const ConditionItem = ({ text }) => (
 );
 
 export default OnePagerPartner;
+
+
