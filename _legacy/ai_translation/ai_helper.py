@@ -6,16 +6,34 @@ import logging
 from typing import Optional
 from openai import OpenAI
 from dotenv import load_dotenv
+from supabase import create_client, Client
 
 # Загружаем переменные окружения из .env
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+# Простейший in-memory кэш для переводов:
+# ключ: (исходный_текст, целевой_язык, исходный_язык) -> значение: переведённый_текст
+_translation_cache = {}
+
 # Получаем API ключ и настройки из переменных окружения
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
 OPENAI_MAX_TOKENS = int(os.getenv('OPENAI_MAX_TOKENS', '500'))
+
+# Настройки Supabase для постоянного кэша переводов (если доступны)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+_translation_cache_db_client: Optional[Client] = None
+
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        _translation_cache_db_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        logger.warning(f"Failed to initialize Supabase client for translation cache: {e}")
+        _translation_cache_db_client = None
 
 # Системный промпт для AI ассистента
 SYSTEM_PROMPT = """Ты - дружелюбный помощник в боте программы лояльности.
@@ -284,12 +302,62 @@ async def translate_text_ai(text: str, target_lang: str = 'en', source_lang: str
     """
     if not text or not text.strip():
         return text
-    
+
+    # Проверяем in-memory кэш, чтобы не дергать OpenAI для одинаковых текстов в рамках процесса
+    cache_key = (text, target_lang, source_lang)
+    cached = _translation_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # Проверяем постоянный кэш в Supabase (если доступен)
+    db_translation = None
+    if _translation_cache_db_client is not None:
+        try:
+            # Используем хэш текста, чтобы не хранить потенциально длинные строки в индексе
+            import hashlib
+            text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            response = (
+                _translation_cache_db_client
+                .from_("translation_cache")
+                .select("translated_text")
+                .eq("text_hash", text_hash)
+                .eq("source_lang", source_lang)
+                .eq("target_lang", target_lang)
+                .limit(1)
+                .execute()
+            )
+            if response.data:
+                db_translation = response.data[0].get("translated_text")
+        except Exception as e:
+            logger.warning(f"Failed to read translation cache from Supabase: {e}")
+
+    if db_translation:
+        _translation_cache[cache_key] = db_translation
+        return db_translation
+
+    # Если в кэше нет — обращаемся к OpenAI
     translated = await ai_assistant.translate_text(text, target_lang, source_lang)
     
     if translated:
+        _translation_cache[cache_key] = translated
+
+        # Пишем в постоянный кэш Supabase (мягкий режим: не падаем при ошибке)
+        if _translation_cache_db_client is not None:
+            try:
+                import hashlib
+                text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+                _translation_cache_db_client.from_("translation_cache").insert({
+                    "text_hash": text_hash,
+                    "source_lang": source_lang,
+                    "target_lang": target_lang,
+                    "source_text": text,
+                    "translated_text": translated,
+                }).execute()
+            except Exception as e:
+                logger.warning(f"Failed to write translation cache to Supabase: {e}")
+
         return translated
     else:
-        logger.warning(f"Translation failed, returning original text")
+        logger.warning("Translation failed, returning original text")
         return text
 

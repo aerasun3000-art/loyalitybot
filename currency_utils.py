@@ -160,3 +160,7 @@ def format_currency(value, city=None, currency=None):
 
 
 
+
+
+
+

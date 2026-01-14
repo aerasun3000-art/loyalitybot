@@ -220,3 +220,7 @@ if income_from_transaction < min_commission:
 
 
 
+
+
+
+

@@ -614,3 +614,7 @@ CREATE INDEX idx_partner_photos_partner ON partner_photos(partner_chat_id);
 **Версия:** 1.0
 
 
+
+
+
+

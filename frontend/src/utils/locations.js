@@ -165,6 +165,11 @@ export const PARTNER_CITIES = [
     name: 'Seattle',
     label: 'Seattle',
     districts: ['All']
+  },
+  {
+    name: 'Nha Trang',
+    label: 'Nha Trang',
+    districts: ['All']
   }
 ]
 

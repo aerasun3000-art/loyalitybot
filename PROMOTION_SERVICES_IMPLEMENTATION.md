@@ -157,3 +157,7 @@ export const getServicesForPromotion = async (promotionId) => {
 3. Добавить функции в `supabase.js`
 4. Обновить UI для показа акций рядом с услугами
 5. Протестировать весь флоу
+
+
+
+

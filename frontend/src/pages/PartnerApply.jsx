@@ -21,11 +21,14 @@ const PartnerApply = () => {
     name: user?.first_name || '',
     phone: '',
     companyName: '',
-    businessType: '',
+    categoryGroup: '', // Глобальная категория: beauty, food, retail, influencer
+    businessType: '', // Категория услуг внутри категории (для beauty)
     city: '',
     district: '',
     username: user?.username || '', // Пытаемся получить username автоматически
-    bookingUrl: '' // Ссылка на систему бронирования
+    bookingUrl: '', // Ссылка на систему бронирования
+    workMode: 'offline', // online, offline, hybrid
+    referralCommissionPercent: 10 // Процент комиссии системе за реферала
   })
   const [errors, setErrors] = useState({})
   const [cities] = useState(getPartnerCitiesList())
@@ -114,16 +117,29 @@ const PartnerApply = () => {
       newErrors.phone = t('partner_phone_invalid')
     }
     
-    if (!formData.companyName.trim()) {
+    // Проверка глобальной категории
+    if (!formData.categoryGroup) {
+      newErrors.categoryGroup = language === 'ru' ? 'Выберите тип бизнеса' : 'Select business type'
+    }
+    
+    // Компания обязательна только для не-блогеров
+    if (formData.categoryGroup !== 'influencer' && !formData.companyName.trim()) {
       newErrors.companyName = t('partner_company_required')
     }
     
-    if (!formData.businessType) {
+    // Категория услуг обязательна только для beauty
+    if (formData.categoryGroup === 'beauty' && !formData.businessType) {
       newErrors.businessType = language === 'ru' ? 'Выберите категорию услуг' : 'Select service category'
     }
     
-    if (!formData.city) {
+    // Город обязателен только для оффлайн
+    if (formData.workMode === 'offline' && !formData.city) {
       newErrors.city = t('partner_city_required')
+    }
+    
+    // Проверка процента комиссии
+    if (!formData.referralCommissionPercent || formData.referralCommissionPercent < 0 || formData.referralCommissionPercent > 100) {
+      newErrors.referralCommissionPercent = language === 'ru' ? 'Введите процент от 0 до 100' : 'Enter percentage from 0 to 100'
     }
     
     // Для New York район обязателен и не может быть "All"
@@ -182,13 +198,16 @@ const PartnerApply = () => {
         chatId: chatId.toString(),
         name: formData.name.trim(),
         phone: formData.phone.trim(),
-        companyName: formData.companyName.trim(),
+        companyName: formData.companyName.trim() || (formData.categoryGroup === 'influencer' ? formData.name.trim() : ''),
+        categoryGroup: formData.categoryGroup, // НОВОЕ: глобальная категория
         businessType: formData.businessType,
-        city: formData.city,
+        city: formData.city || (formData.workMode === 'online' ? 'Online' : ''),
         district: formData.district || 'All',
-        username: formData.username.replace('@', '').trim() || null, // Username опционален, убираем @ перед сохранением
-        bookingUrl: formData.bookingUrl.trim() || null, // Ссылка на бронирование (опционально)
-        referredByChatId: referredByChatId || null // Chat ID партнера, который пригласил (если есть)
+        username: formData.username.replace('@', '').trim() || null,
+        bookingUrl: formData.bookingUrl.trim() || null,
+        workMode: formData.workMode, // НОВОЕ: режим работы
+        referralCommissionPercent: parseFloat(formData.referralCommissionPercent) || 10, // НОВОЕ: процент комиссии
+        referredByChatId: referredByChatId || null
       }
       
       console.log('Submitting application:', applicationData)
@@ -371,11 +390,37 @@ const PartnerApply = () => {
             )}
           </div>
 
-          {/* Название компании */}
+          {/* Глобальная категория бизнеса */}
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">
-              {t('partner_company')} {t('required_field')}
+              {language === 'ru' ? 'Тип бизнеса' : 'Business Type'} {t('required_field')}
             </label>
+            <select
+              name="categoryGroup"
+              value={formData.categoryGroup}
+              onChange={handleInputChange}
+              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                errors.categoryGroup ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+              } focus:outline-none transition-all`}
+              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+            >
+              <option value="">{language === 'ru' ? 'Выберите тип бизнеса' : 'Select business type'}</option>
+              <option value="beauty">💄 {language === 'ru' ? 'Красота (Салон/Мастер)' : 'Beauty (Salon/Master)'}</option>
+              <option value="food">🍔 {language === 'ru' ? 'Еда (Кафе/Ресторан)' : 'Food (Cafe/Restaurant)'}</option>
+              <option value="retail">🛍️ {language === 'ru' ? 'Розница (Магазин)' : 'Retail (Store)'}</option>
+              <option value="influencer">🤳 {language === 'ru' ? 'Блогер/Инфлюенсер' : 'Influencer/Blogger'}</option>
+            </select>
+            {errors.categoryGroup && (
+              <p className="text-red-500 text-sm mt-1">{errors.categoryGroup}</p>
+            )}
+          </div>
+
+          {/* Название компании */}
+          {formData.categoryGroup !== 'influencer' && (
+            <div className="mb-4">
+              <label className="block text-gray-700 font-semibold mb-2">
+                {t('partner_company')} {t('required_field')}
+              </label>
             <input
               type="text"
               name="companyName"
@@ -391,12 +436,14 @@ const PartnerApply = () => {
               <p className="text-red-500 text-sm mt-1">{errors.companyName}</p>
             )}
           </div>
+          )}
 
-          {/* Категория услуг */}
-          <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
-              {language === 'ru' ? 'Категория услуг' : 'Service Category'} {t('required_field')}
-            </label>
+          {/* Категория услуг (только для Beauty) */}
+          {formData.categoryGroup === 'beauty' && (
+            <div className="mb-4">
+              <label className="block text-gray-700 font-semibold mb-2">
+                {language === 'ru' ? 'Категория услуг' : 'Service Category'} {t('required_field')}
+              </label>
             <select
               name="businessType"
               value={formData.businessType}
@@ -417,12 +464,42 @@ const PartnerApply = () => {
               <p className="text-red-500 text-sm mt-1">{errors.businessType}</p>
             )}
           </div>
+          )}
 
-          {/* Город */}
+          {/* Режим работы */}
           <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2">
-              {t('partner_city')} {t('required_field')}
+              {language === 'ru' ? 'Режим работы' : 'Work Mode'} {t('required_field')}
             </label>
+            <select
+              name="workMode"
+              value={formData.workMode}
+              onChange={handleInputChange}
+              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                errors.workMode ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+              } focus:outline-none transition-all`}
+              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+            >
+              <option value="offline">📍 {language === 'ru' ? 'Оффлайн (только в своем городе)' : 'Offline (only in your city)'}</option>
+              <option value="online">🌍 {language === 'ru' ? 'Онлайн (всем городам)' : 'Online (all cities)'}</option>
+              <option value="hybrid">🔄 {language === 'ru' ? 'Гибрид (онлайн + оффлайн, всем городам)' : 'Hybrid (online + offline, all cities)'}</option>
+            </select>
+            {errors.workMode && (
+              <p className="text-red-500 text-sm mt-1">{errors.workMode}</p>
+            )}
+            <p className="text-gray-500 text-xs mt-1">
+              {language === 'ru' 
+                ? '💡 Онлайн и Гибрид партнеры видны клиентам всех городов' 
+                : '💡 Online and Hybrid partners are visible to clients in all cities'}
+            </p>
+          </div>
+
+          {/* Город (обязателен только для оффлайн) */}
+          {formData.workMode === 'offline' && (
+            <div className="mb-4">
+              <label className="block text-gray-700 font-semibold mb-2">
+                {t('partner_city')} {t('required_field')}
+              </label>
             <select
               name="city"
               value={formData.city}
@@ -442,6 +519,39 @@ const PartnerApply = () => {
             {errors.city && (
               <p className="text-red-500 text-sm mt-1">{errors.city}</p>
             )}
+          </div>
+          )}
+
+          {/* Процент комиссии системе */}
+          <div className="mb-4">
+            <label className="block text-gray-700 font-semibold mb-2">
+              {language === 'ru' ? 'Процент комиссии системе за клиента' : 'Commission % to system per client'} {t('required_field')}
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="referralCommissionPercent"
+                value={formData.referralCommissionPercent}
+                onChange={handleInputChange}
+                min="0"
+                max="100"
+                step="0.1"
+                className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
+                  errors.referralCommissionPercent ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
+                } focus:outline-none transition-all placeholder-sakura-dark/40`}
+                style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+                placeholder="10"
+              />
+              <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
+            </div>
+            {errors.referralCommissionPercent && (
+              <p className="text-red-500 text-sm mt-1">{errors.referralCommissionPercent}</p>
+            )}
+            <p className="text-gray-500 text-xs mt-1">
+              {language === 'ru' 
+                ? '💡 Процент, который вы платите системе за каждого клиента, пришедшего от другого партнера. Эти средства распределяются как Revenue Share.' 
+                : '💡 Percentage you pay to the system for each client referred by another partner. These funds are distributed as Revenue Share.'}
+            </p>
           </div>
 
           {/* Username (Telegram) */}

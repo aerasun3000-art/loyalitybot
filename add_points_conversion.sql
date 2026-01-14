@@ -193,3 +193,7 @@ COMMENT ON FUNCTION convert_leaderboard_points_to_loyalty_points IS 'Конве�
 
 
 
+
+
+
+

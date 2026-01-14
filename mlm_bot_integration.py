@@ -345,3 +345,7 @@ def update_partner_stats_on_transaction(sm: SupabaseManager, partner_chat_id: st
 
 
 
+
+
+
+

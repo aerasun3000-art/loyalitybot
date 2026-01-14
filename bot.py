@@ -64,6 +64,7 @@ sys.path.append(os.path.dirname(__file__))
 from supabase_manager import SupabaseManager
 from currency_utils import format_currency, get_currency_by_city
 from partner_revenue_share import PartnerRevenueShare
+from bot_registration import start_registration
 
 # --- Инициализация ---
 PARTNER_TOKEN = os.environ.get('TOKEN_PARTNER')
@@ -124,28 +125,60 @@ except ImportError:
 # КЛАВИАТУРЫ И УВЕДОМЛЕНИЯ
 # ------------------------------------
 
-def get_partner_keyboard():
-    """Главная клавиатура Партнера - оптимизированная версия."""
+def get_partner_keyboard(chat_id=None):
+    """Главная клавиатура Партнера - адаптивная версия (Eco 2.0)."""
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     
+    # Получаем конфиг партнера
+    is_influencer = False
+    
+    if chat_id:
+        try:
+            config = sm.get_partner_config(str(chat_id))
+            category = config.get('category_group', 'beauty')
+            is_influencer = category == 'influencer'
+        except Exception:
+            pass # Если ошибка, показываем дефолт
+            
     # Основные категории
     btn_operations = types.KeyboardButton("💰 Операции")
     btn_content = types.KeyboardButton("📝 Контент")
     btn_analytics = types.KeyboardButton("📊 Аналитика")
-    btn_revenue = types.KeyboardButton("💎 Revenue Share")
-    btn_invite = types.KeyboardButton("👥 Пригласить клиента")
+    btn_revenue = types.KeyboardButton("💎 Revenue Share") # Доступно всем
+    btn_invite = types.KeyboardButton("👥 Пригласить клиента") # Доступно всем (рефка)
     btn_more = types.KeyboardButton("⚙️ Ещё")
     
-    markup.add(btn_operations, btn_content)
-    markup.add(btn_analytics, btn_revenue)
-    markup.add(btn_invite, btn_more)
+    # Логика отображения
+    if is_influencer:
+        # Блогеру не нужны операции (он не сканирует) и контент (у него нет услуг)
+        markup.add(btn_analytics, btn_revenue)
+        markup.add(btn_invite, btn_more)
+    else:
+        # Стандарт для Beauty/Food
+        markup.add(btn_operations, btn_content)
+        markup.add(btn_analytics, btn_revenue)
+        markup.add(btn_invite, btn_more)
+        
     return markup
 
 def partner_main_menu(chat_id, message_text="Выберите следующее действие:"):
     """Возвращает партнера в главное меню."""
-    markup = get_partner_keyboard()
+    markup = get_partner_keyboard(chat_id)
     bot.send_message(chat_id, message_text, reply_markup=markup, parse_mode='Markdown')
 
+
+# ------------------------------------
+# РЕГИСТРАЦИЯ
+# ------------------------------------
+
+@bot.message_handler(commands=['register'])
+def handle_register_command(message):
+    """Запуск регистрации через бота."""
+    start_registration(bot, message, sm)
+
+@bot.message_handler(func=lambda message: message.text == "🚀 Зарегистрироваться")
+def handle_registration_btn(message):
+    start_registration(bot, message, sm)
 
 # ------------------------------------
 # ГЛАВНЫЙ ОБРАБОТЧИК /START
@@ -184,9 +217,15 @@ def handle_partner_start(message):
             bot.send_message(chat_id, "❌ Ваша заявка была отклонена. Свяжитесь с администратором.", reply_markup=types.ReplyKeyboardRemove())
             return
 
-    # Если не партнер: Запуск регистрации (оставлено в качестве заглушки)
-    bot.send_message(chat_id, "Для начала работы нажмите ссылку на регистрацию Партнера.", reply_markup=types.ReplyKeyboardRemove())
-    # Здесь должна быть ссылка на фронтенд /partner-apply
+    # Если не партнер: Запуск регистрации
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add(types.KeyboardButton("🚀 Зарегистрироваться"))
+    bot.send_message(chat_id, 
+        "Добро пожаловать в LoyalityBot!\n\n"
+        "Вы еще не зарегистрированы как партнер.\n"
+        "Нажмите кнопку ниже, чтобы начать.", 
+        reply_markup=markup
+    )
 
 
 # ------------------------------------
@@ -198,6 +237,13 @@ def handle_partner_start(message):
 def handle_partner_categories(message):
     """Обработчик категорий главного меню."""
     chat_id = message.chat.id
+    
+    # Проверяем, не находится ли пользователь в процессе создания/редактирования (register_next_step_handler должен обработать)
+    if chat_id in USER_STATE:
+        state = USER_STATE[chat_id]
+        if state.startswith('awaiting_promo_') or state.startswith('awaiting_service_') or state.startswith('awaiting_edit_') or state.startswith('awaiting_'):
+            # Пропускаем обработку, чтобы сообщение попало в register_next_step_handler
+            return
     
     if not sm.partner_exists(chat_id) or sm.get_partner_status(chat_id) != 'Approved':
         bot.send_message(chat_id, "У вас нет прав для выполнения этой операции.")
@@ -2011,8 +2057,8 @@ def handle_promo_callbacks(call):
             TEMP_DATA[chat_id]['service_ids'].append(service_id)
             bot.answer_callback_query(call.id, "Услуга выбрана")
         
-        # Обновляем список услуг
-        handle_promo_service_selection(chat_id)
+        # Обновляем список услуг (редактируем существующее сообщение)
+        handle_promo_service_selection(chat_id, call.message.message_id)
     
     elif call.data == 'promo_services_done':
         # Завершение выбора услуг
@@ -2023,18 +2069,18 @@ def handle_promo_callbacks(call):
             return
         
         # Переходим к параметрам оплаты баллами
-            USER_STATE[chat_id] = 'awaiting_promo_service_price'
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=call.message.message_id,
-                text=f"✅ Выбрано услуг: {selected_count}\n\n"
-                 f"✍️ *Создание Акции (Шаг 5 из 6):*\n\n"
-                     f"Введите **стоимость услуги в долларах** (например: 100):",
-                parse_mode='Markdown'
-            )
-            bot.answer_callback_query(call.id, f"Выбрано {selected_count} услуг")
-            msg = bot.send_message(chat_id, "Введите стоимость услуги в долларах:")
-            bot.register_next_step_handler(msg, process_promo_service_price)
+        USER_STATE[chat_id] = 'awaiting_promo_service_price'
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=f"✅ Выбрано услуг: {selected_count}\n\n"
+             f"✍️ *Создание Акции (Шаг 5 из 6):*\n\n"
+                 f"Введите **стоимость услуги в долларах** (например: 100):",
+            parse_mode='Markdown'
+        )
+        bot.answer_callback_query(call.id, f"Выбрано {selected_count} услуг")
+        msg = bot.send_message(chat_id, "Введите стоимость услуги в долларах:")
+        bot.register_next_step_handler(msg, process_promo_service_price)
     
     elif call.data == 'promo_payment_full':
         # Полная оплата баллами
@@ -2213,6 +2259,9 @@ def handle_qr_operation(call):
 
 def process_promo_title(message):
     chat_id = message.chat.id
+    # Проверяем, что мы действительно в процессе создания акции
+    if USER_STATE.get(chat_id) != 'awaiting_promo_title' or chat_id not in TEMP_DATA:
+        return
     if len(message.text.strip()) < 3:
         msg = bot.send_message(chat_id, "Название слишком короткое. Введите более подробное название:")
         bot.register_next_step_handler(msg, process_promo_title)
@@ -2231,6 +2280,9 @@ def process_promo_title(message):
 
 def process_promo_description(message):
     chat_id = message.chat.id
+    # Проверяем, что мы действительно в процессе создания акции
+    if USER_STATE.get(chat_id) != 'awaiting_promo_description' or chat_id not in TEMP_DATA:
+        return
     TEMP_DATA[chat_id]['description'] = message.text.strip()
     USER_STATE[chat_id] = 'awaiting_promo_end_date'
     
@@ -2244,6 +2296,9 @@ def process_promo_description(message):
 
 def process_promo_end_date(message):
     chat_id = message.chat.id
+    # Проверяем, что мы действительно в процессе создания акции
+    if USER_STATE.get(chat_id) != 'awaiting_promo_end_date' or chat_id not in TEMP_DATA:
+        return
     date_str = message.text.strip()
     
     try:
@@ -2264,10 +2319,10 @@ def process_promo_end_date(message):
         return
 
     # Переходим к выбору услуг (Шаг 4)
-        USER_STATE[chat_id] = 'awaiting_promo_services'
-        handle_promo_service_selection(chat_id)
+    USER_STATE[chat_id] = 'awaiting_promo_services'
+    handle_promo_service_selection(chat_id)
 
-def handle_promo_service_selection(chat_id):
+def handle_promo_service_selection(chat_id, message_id=None):
     """Показывает список услуг партнера для выбора"""
     try:
         # Получаем одобренные услуги партнера
@@ -2311,14 +2366,37 @@ def handle_promo_service_selection(chat_id):
         ))
         markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data="promo_cancel"))
         
-        bot.send_message(
-            chat_id,
+        message_text = (
             f"✍️ *Создание Акции (Шаг 4 из 6):*\n\n"
             f"Выберите **услуги** для акции (можно выбрать несколько):\n\n"
-            f"Выбрано: {selected_count}",
-            reply_markup=markup,
-            parse_mode='Markdown'
+            f"Выбрано: {selected_count}"
         )
+        
+        # Если есть message_id, редактируем существующее сообщение, иначе отправляем новое
+        if message_id:
+            try:
+                bot.edit_message_text(
+                    message_text,
+                    chat_id,
+                    message_id,
+                    reply_markup=markup,
+                    parse_mode='Markdown'
+                )
+            except Exception:
+                # Если не можем редактировать, отправляем новое сообщение
+                bot.send_message(
+                    chat_id,
+                    message_text,
+                    reply_markup=markup,
+                    parse_mode='Markdown'
+                )
+        else:
+            bot.send_message(
+                chat_id,
+                message_text,
+                reply_markup=markup,
+                parse_mode='Markdown'
+            )
     except Exception as e:
         logger.error(f"Error in handle_promo_service_selection: {e}")
         bot.send_message(chat_id, "❌ Ошибка при получении списка услуг.")
@@ -2344,6 +2422,9 @@ def handle_promo_photo_step(chat_id):
 def process_promo_photo(message):
     """Обработка загрузки фото для акции (новый шаг 5)"""
     chat_id = message.chat.id
+    # Проверяем, что мы действительно в процессе создания акции
+    if USER_STATE.get(chat_id) != 'awaiting_promo_photo' or chat_id not in TEMP_DATA:
+        return
     
     # Убираем кастомную клавиатуру
     markup_remove = types.ReplyKeyboardRemove()
@@ -2435,6 +2516,9 @@ def process_promo_photo(message):
 def process_promo_service_price(message):
     """Обработка стоимости услуги"""
     chat_id = message.chat.id
+    # Проверяем, что мы действительно в процессе создания акции
+    if USER_STATE.get(chat_id) != 'awaiting_promo_service_price' or chat_id not in TEMP_DATA:
+        return
     
     try:
         service_price = float(message.text.strip())
@@ -2465,10 +2549,14 @@ def process_promo_service_price(message):
     except ValueError:
         msg = bot.send_message(chat_id, "❌ Неверный формат. Введите число (например: 100):")
         bot.register_next_step_handler(msg, process_promo_service_price)
+        return
 
 def process_promo_max_points(message):
     """Обработка максимальной оплаты баллами"""
     chat_id = message.chat.id
+    # Проверяем, что мы действительно в процессе создания акции
+    if USER_STATE.get(chat_id) != 'awaiting_promo_max_points' or chat_id not in TEMP_DATA:
+        return
     service_price = TEMP_DATA[chat_id].get('service_price', 0)
     
     try:
@@ -2495,6 +2583,7 @@ def process_promo_max_points(message):
     except ValueError:
         msg = bot.send_message(chat_id, "❌ Неверный формат. Введите число (например: 50):")
         bot.register_next_step_handler(msg, process_promo_max_points)
+        return
 
 def save_promotion(chat_id):
     """Сохранение акции в БД"""

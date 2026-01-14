@@ -559,3 +559,7 @@ const BeautyPartnerPresentation = () => {
 
 export default BeautyPartnerPresentation
 
+
+
+
+

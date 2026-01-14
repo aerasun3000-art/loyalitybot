@@ -235,3 +235,7 @@ COMMENT ON TABLE outreach_ab_test_stats IS 'Дневная статистика 
 
 
 
+
+
+
+

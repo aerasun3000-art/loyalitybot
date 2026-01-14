@@ -100,3 +100,7 @@ CREATE POLICY "Anon can manage activation" ON partner_activation_conditions FOR 
 - Файл с решением: `restore_bot_permissions.sql`
 - Оригинальный скрипт безопасности: `fix_security_policies.sql`
 - Документация Supabase RLS: https://supabase.com/docs/guides/auth/row-level-security
+
+
+
+

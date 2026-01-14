@@ -584,6 +584,10 @@ export const createPartnerApplication = async (applicationData) => {
       username: applicationData.username || null, // Username мастера
       booking_url: applicationData.bookingUrl || null, // Ссылка на бронирование
       referred_by_chat_id: applicationData.referredByChatId || null, // Chat ID партнера, который пригласил
+      // Новые поля для Экосистемы 2.0
+      category_group: applicationData.categoryGroup || null,
+      work_mode: applicationData.workMode || 'offline',
+      default_referral_commission_percent: applicationData.referralCommissionPercent || 10,
       status: 'Pending',
       created_at: new Date().toISOString()
     }

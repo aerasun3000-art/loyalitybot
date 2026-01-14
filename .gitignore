@@ -84,3 +84,6 @@ htmlcov/
 docker-compose.override.yml
 
 .vercel
+
+# Local Netlify folder
+.netlify
