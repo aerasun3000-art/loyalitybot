@@ -288,9 +288,10 @@ def handle_partner_categories(message):
     if message.text == "⚙️ Ещё":
         markup = types.InlineKeyboardMarkup(row_width=1)
         btn_messages = types.InlineKeyboardButton("💬 Мои сообщения", callback_data="menu_messages")
+        btn_partnership = types.InlineKeyboardButton("🤝 Партнерство", callback_data="menu_partnership")
         btn_settings = types.InlineKeyboardButton("⚙️ Настройки", callback_data="menu_settings")
         btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="partner_main_menu")
-        markup.add(btn_messages, btn_settings, btn_back)
+        markup.add(btn_messages, btn_partnership, btn_settings, btn_back)
         bot.send_message(chat_id, "*⚙️ Ещё:*\nВыберите действие:", reply_markup=markup, parse_mode='Markdown')
         return
 
@@ -299,7 +300,7 @@ def handle_partner_categories(message):
 # ОБРАБОТЧИК CALLBACK ДЛЯ ПОДМЕНЮ
 # ------------------------------------
 @bot.callback_query_handler(
-    func=lambda call: call.data.startswith('menu_') or call.data in (
+    func=lambda call: call.data.startswith('menu_') or call.data.startswith('deal_') or call.data in (
         'partner_main_menu',
         'revenue_share_info',
         'revenue_pv',
@@ -414,6 +415,55 @@ def handle_menu_callbacks(call):
                 self.text = "⚙️ Настройки"
         
         handle_partner_settings(TempMessage(chat_id))
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'menu_partnership':
+        handle_partnership_menu(chat_id)
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'menu_more_back':
+        # Возврат в меню "⚙️ Ещё"
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        btn_messages = types.InlineKeyboardButton("💬 Мои сообщения", callback_data="menu_messages")
+        btn_partnership = types.InlineKeyboardButton("🤝 Партнерство", callback_data="menu_partnership")
+        btn_settings = types.InlineKeyboardButton("⚙️ Настройки", callback_data="menu_settings")
+        btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="partner_main_menu")
+        markup.add(btn_messages, btn_partnership, btn_settings, btn_back)
+        bot.edit_message_text("*⚙️ Ещё:*\nВыберите действие:", chat_id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'deal_create':
+        USER_STATE[chat_id] = 'deal_awaiting_target_partner'
+        bot.send_message(chat_id, 
+            "🤝 *Создание B2B сделки*\n\n"
+            "Введите Chat ID партнера, с которым хотите создать сделку:",
+            parse_mode='Markdown'
+        )
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'deal_list_incoming':
+        show_incoming_deals(chat_id)
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data == 'deal_list_my':
+        show_my_deals(chat_id)
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data.startswith('deal_accept_'):
+        deal_id = call.data.replace('deal_accept_', '')
+        accept_deal(chat_id, deal_id)
+        bot.answer_callback_query(call.id)
+        return
+    
+    if call.data.startswith('deal_reject_'):
+        deal_id = call.data.replace('deal_reject_', '')
+        reject_deal(chat_id, deal_id)
         bot.answer_callback_query(call.id)
         return
     
@@ -4109,6 +4159,194 @@ def run_bot():
     max_retries = 10
     base_delay = 5
     
+# ------------------------------------
+# B2B DEALS (Партнерство)
+# ------------------------------------
+
+def handle_partnership_menu(chat_id):
+    """Меню партнерства (B2B Deals)."""
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    btn_create = types.InlineKeyboardButton("➕ Создать сделку", callback_data="deal_create")
+    btn_incoming = types.InlineKeyboardButton("📥 Входящие предложения", callback_data="deal_list_incoming")
+    btn_my = types.InlineKeyboardButton("📋 Мои сделки", callback_data="deal_list_my")
+    btn_back = types.InlineKeyboardButton("⬅️ Назад", callback_data="menu_more_back")
+    markup.add(btn_create, btn_incoming, btn_my, btn_back)
+    bot.send_message(chat_id, 
+        "🤝 *Партнерство (B2B Deals)*\n\n"
+        "Создавайте индивидуальные условия с другими партнерами:\n"
+        "• Повышенный кэшбэк для клиентов\n"
+        "• Комиссия за привлечение\n\n"
+        "Выберите действие:",
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
+
+def show_incoming_deals(chat_id):
+    """Показывает входящие предложения сделок."""
+    try:
+        # Получаем входящие сделки (где target = текущий партнер)
+        deals = sm.client.from_('partner_deals').select('*').eq('target_partner_chat_id', str(chat_id)).eq('status', 'pending').execute()
+        
+        if not deals.data or len(deals.data) == 0:
+            bot.send_message(chat_id, "📭 У вас нет входящих предложений.")
+            return
+        
+        for deal in deals.data:
+            source_id = deal.get('source_partner_chat_id')
+            cashback = deal.get('client_cashback_percent', 5)
+            commission = deal.get('referral_commission_percent', 10)
+            
+            # Получаем имя партнера-источника
+            partner_info = sm.client.from_('partners').select('name, company_name').eq('chat_id', source_id).single().execute()
+            partner_name = partner_info.data.get('company_name') or partner_info.data.get('name') if partner_info.data else f"Партнер {source_id}"
+            
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            btn_accept = types.InlineKeyboardButton("✅ Принять", callback_data=f"deal_accept_{deal['id']}")
+            btn_reject = types.InlineKeyboardButton("❌ Отклонить", callback_data=f"deal_reject_{deal['id']}")
+            markup.add(btn_accept, btn_reject)
+            
+            bot.send_message(chat_id,
+                f"📥 *Входящее предложение*\n\n"
+                f"От: {partner_name}\n"
+                f"Кэшбэк клиентам: {cashback}%\n"
+                f"Ваша комиссия: {commission}%\n\n"
+                f"Принять предложение?",
+                reply_markup=markup,
+                parse_mode='Markdown'
+            )
+    except Exception as e:
+        logger.error(f"Ошибка при получении входящих сделок: {e}")
+        bot.send_message(chat_id, "❌ Ошибка при загрузке предложений.")
+
+def show_my_deals(chat_id):
+    """Показывает активные сделки партнера."""
+    try:
+        # Получаем сделки, где source = текущий партнер
+        deals = sm.client.from_('partner_deals').select('*').eq('source_partner_chat_id', str(chat_id)).eq('status', 'active').execute()
+        
+        if not deals.data or len(deals.data) == 0:
+            bot.send_message(chat_id, "📋 У вас нет активных сделок.")
+            return
+        
+        text = "📋 *Ваши активные сделки:*\n\n"
+        for deal in deals.data:
+            target_id = deal.get('target_partner_chat_id')
+            cashback = deal.get('client_cashback_percent', 5)
+            commission = deal.get('referral_commission_percent', 10)
+            
+            partner_info = sm.client.from_('partners').select('name, company_name').eq('chat_id', target_id).single().execute()
+            partner_name = partner_info.data.get('company_name') or partner_info.data.get('name') if partner_info.data else f"Партнер {target_id}"
+            
+            text += f"• {partner_name}\n"
+            text += f"  Кэшбэк: {cashback}% | Комиссия: {commission}%\n\n"
+        
+        bot.send_message(chat_id, text, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Ошибка при получении сделок: {e}")
+        bot.send_message(chat_id, "❌ Ошибка при загрузке сделок.")
+
+def accept_deal(chat_id, deal_id):
+    """Принимает сделку."""
+    try:
+        sm.client.from_('partner_deals').update({'status': 'active'}).eq('id', deal_id).execute()
+        bot.send_message(chat_id, "✅ Сделка принята и активирована!")
+    except Exception as e:
+        logger.error(f"Ошибка при принятии сделки: {e}")
+        bot.send_message(chat_id, "❌ Ошибка при принятии сделки.")
+
+def reject_deal(chat_id, deal_id):
+    """Отклоняет сделку."""
+    try:
+        sm.client.from_('partner_deals').update({'status': 'rejected'}).eq('id', deal_id).execute()
+        bot.send_message(chat_id, "❌ Сделка отклонена.")
+    except Exception as e:
+        logger.error(f"Ошибка при отклонении сделки: {e}")
+        bot.send_message(chat_id, "❌ Ошибка при отклонении сделки.")
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'deal_awaiting_target_partner')
+def process_deal_target_partner(message):
+    """Обрабатывает ввод Chat ID целевого партнера."""
+    chat_id = message.chat.id
+    target_id = message.text.strip()
+    
+    if not target_id.isdigit():
+        bot.send_message(chat_id, "❌ Введите корректный Chat ID (только цифры).")
+        return
+    
+    # Проверяем, существует ли партнер
+    if not sm.partner_exists(int(target_id)):
+        bot.send_message(chat_id, "❌ Партнер с таким Chat ID не найден.")
+        USER_STATE.pop(chat_id, None)
+        return
+    
+    TEMP_DATA.setdefault(chat_id, {})['deal_target'] = target_id
+    USER_STATE[chat_id] = 'deal_awaiting_cashback'
+    bot.send_message(chat_id, "💵 Введите процент кэшбэка для клиентов (например: 15):")
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'deal_awaiting_cashback')
+def process_deal_cashback(message):
+    """Обрабатывает ввод процента кэшбэка."""
+    chat_id = message.chat.id
+    try:
+        cashback = float(message.text.strip())
+        if cashback < 0 or cashback > 100:
+            bot.send_message(chat_id, "❌ Процент должен быть от 0 до 100.")
+            return
+        TEMP_DATA.setdefault(chat_id, {})['deal_cashback'] = cashback
+        USER_STATE[chat_id] = 'deal_awaiting_commission'
+        bot.send_message(chat_id, "💰 Введите процент комиссии для партнера (например: 20):")
+    except ValueError:
+        bot.send_message(chat_id, "❌ Введите корректное число.")
+
+@bot.message_handler(func=lambda message: USER_STATE.get(message.chat.id) == 'deal_awaiting_commission')
+def process_deal_commission(message):
+    """Обрабатывает ввод процента комиссии и создает сделку."""
+    chat_id = message.chat.id
+    try:
+        commission = float(message.text.strip())
+        if commission < 0 or commission > 100:
+            bot.send_message(chat_id, "❌ Процент должен быть от 0 до 100.")
+            return
+        
+        data = TEMP_DATA.get(chat_id, {})
+        target_id = data.get('deal_target')
+        cashback = data.get('deal_cashback')
+        
+        if not target_id or cashback is None:
+            bot.send_message(chat_id, "❌ Ошибка: данные не найдены. Начните заново.")
+            USER_STATE.pop(chat_id, None)
+            TEMP_DATA.pop(chat_id, None)
+            return
+        
+        # Создаем сделку
+        deal = sm.create_partner_deal(
+            source_partner_chat_id=str(chat_id),
+            target_partner_chat_id=str(target_id),
+            client_cashback_percent=cashback,
+            referral_commission_percent=commission
+        )
+        
+        if deal:
+            bot.send_message(chat_id, 
+                f"✅ *Сделка создана!*\n\n"
+                f"Партнер: {target_id}\n"
+                f"Кэшбэк клиентам: {cashback}%\n"
+                f"Комиссия: {commission}%\n\n"
+                f"Ожидайте подтверждения от партнера.",
+                parse_mode='Markdown'
+            )
+        else:
+            bot.send_message(chat_id, "❌ Ошибка при создании сделки.")
+        
+        USER_STATE.pop(chat_id, None)
+        TEMP_DATA.pop(chat_id, None)
+    except ValueError:
+        bot.send_message(chat_id, "❌ Введите корректное число.")
+
+# ------------------------------------
+# ЗАПУСК БОТА
+# ------------------------------------
+
     while True:
         try:
             # Сбрасываем счетчик при успешном подключении

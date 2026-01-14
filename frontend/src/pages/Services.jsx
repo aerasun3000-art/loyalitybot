@@ -268,6 +268,13 @@ const Services = () => {
   }
 
   const isOnlinePartner = (partner) => {
+    if (!partner) return false
+    // Используем новое поле work_mode, если оно есть
+    const workMode = partner.work_mode || partner.workMode
+    if (workMode === 'online' || workMode === 'hybrid') {
+      return true
+    }
+    // Обратная совместимость: проверяем старую логику с городом
     const city = partner?.city?.trim()
     if (!city) return true
     return city.toLowerCase() === 'все'

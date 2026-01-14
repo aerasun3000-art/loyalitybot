@@ -220,7 +220,7 @@ export const getApprovedServices = async () => {
   // Получаем данные партнёров отдельным запросом
   const { data: partners, error: partnersError } = await supabase
     .from('partners')
-    .select('chat_id, name, company_name, city, district, business_type, username, contact_link, google_maps_link')
+    .select('chat_id, name, company_name, city, district, business_type, username, contact_link, google_maps_link, work_mode, category_group')
     .in('chat_id', partnerIds)
   
   if (partnersError) {
@@ -282,7 +282,7 @@ export const getFilteredServices = async (city = null, district = null, category
   if (partnerIds.length > 0) {
     const { data: partners, error: partnersError } = await supabase
       .from('partners')
-      .select('chat_id, name, company_name, city, district, business_type, username, contact_link, booking_url, google_maps_link')
+      .select('chat_id, name, company_name, city, district, business_type, username, contact_link, booking_url, google_maps_link, work_mode, category_group')
       .in('chat_id', partnerIds)
     
     if (!partnersError && partners) {
@@ -305,13 +305,24 @@ export const getFilteredServices = async (city = null, district = null, category
   // Применяем фильтры на клиентской стороне
   if (city) {
     filteredData = filteredData.filter(service => {
-      // Показываем услугу если:
-      // 1. Город партнера совпадает с выбранным
-      // 2. У партнера город = "Все" (работает везде, например онлайн)
-      // 3. У партнера нет указанного города (NULL) - работает везде
-      return service.partner?.city === city || 
-             service.partner?.city === 'Все' || 
-             !service.partner?.city
+      const partner = service.partner
+      if (!partner) return false
+      
+      // Логика фильтрации по work_mode:
+      // - online/hybrid: показываем всем городам
+      // - offline: показываем только в своем городе
+      const workMode = partner.work_mode || 'offline'
+      
+      if (workMode === 'online' || workMode === 'hybrid') {
+        // Онлайн и гибридные партнеры показываются всем городам
+        return true
+      }
+      
+      // Для offline партнеров проверяем город
+      // Также поддерживаем старую логику для обратной совместимости
+      return partner.city === city || 
+             partner.city === 'Все' || 
+             !partner.city
     })
   }
   

@@ -44,6 +44,7 @@ const Home = () => {
   const [popularCategories, setPopularCategories] = useState([])
   const [pointsToNextReward, setPointsToNextReward] = useState(null)
   const [referralPartnerInfo, setReferralPartnerInfo] = useState(null)
+  const [selectedCategoryGroup, setSelectedCategoryGroup] = useState(null) // Фильтр по category_group
   const carouselRef = useRef(null)
   const isScrollingRef = useRef(false)
 
@@ -406,6 +407,15 @@ const Home = () => {
   // Возвращает ровно 8 плиток услуг: сначала реальные услуги (уже отсортированы по популярности),
   // затем – дефолтные иконки по глобальной популярности, чтобы добить до 8 без повторов
   const getServiceTiles = () => {
+    // Фильтруем услуги по выбранной category_group, если она выбрана
+    let filteredServices = services
+    if (selectedCategoryGroup) {
+      filteredServices = services.filter(service => {
+        const partnerCategoryGroup = service.partner?.category_group || 'beauty'
+        return partnerCategoryGroup === selectedCategoryGroup
+      })
+    }
+    
     const tiles = []
     const addedCodes = new Set()
     const normalizeCode = (code) => {
@@ -440,8 +450,8 @@ const Home = () => {
       addedCodes.add(canonicalCode)
     }
  
-    if (services && services.length > 0) {
-      services.forEach(service => {
+    if (filteredServices && filteredServices.length > 0) {
+      filteredServices.forEach(service => {
         let categoryCode = service.partner?.business_type || service.category || null
         if (!categoryCode) {
           const inferredCode = getServiceIcon(service.title)
@@ -770,6 +780,88 @@ const Home = () => {
                 NEW
               </span>
             )}
+          </button>
+        </div>
+
+        {/* Фильтры по категориям (category_group) */}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+          <button
+            onClick={() => {
+              hapticFeedback('light')
+              setSelectedCategoryGroup(null)
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
+              selectedCategoryGroup === null
+                ? 'bg-sakura-accent text-white shadow-md'
+                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
+            }`}
+          >
+            {language === 'ru' ? 'Все' : 'All'}
+          </button>
+          <button
+            onClick={() => {
+              hapticFeedback('light')
+              setSelectedCategoryGroup('beauty')
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
+              selectedCategoryGroup === 'beauty'
+                ? 'bg-sakura-accent text-white shadow-md'
+                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
+            }`}
+          >
+            {language === 'ru' ? '💅 Красота' : '💅 Beauty'}
+          </button>
+          <button
+            onClick={() => {
+              hapticFeedback('light')
+              setSelectedCategoryGroup('food')
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
+              selectedCategoryGroup === 'food'
+                ? 'bg-sakura-accent text-white shadow-md'
+                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
+            }`}
+          >
+            {language === 'ru' ? '🍽️ Еда' : '🍽️ Food'}
+          </button>
+          <button
+            onClick={() => {
+              hapticFeedback('light')
+              setSelectedCategoryGroup('retail')
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
+              selectedCategoryGroup === 'retail'
+                ? 'bg-sakura-accent text-white shadow-md'
+                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
+            }`}
+          >
+            {language === 'ru' ? '🛍️ Магазины' : '🛍️ Retail'}
+          </button>
+          <button
+            onClick={() => {
+              hapticFeedback('light')
+              setSelectedCategoryGroup('activity')
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
+              selectedCategoryGroup === 'activity'
+                ? 'bg-sakura-accent text-white shadow-md'
+                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
+            }`}
+          >
+            {language === 'ru' ? '🎯 Активности' : '🎯 Activity'}
+          </button>
+          <button
+            onClick={() => {
+              hapticFeedback('light')
+              setSelectedCategoryGroup('influencer')
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
+              selectedCategoryGroup === 'influencer'
+                ? 'bg-sakura-accent text-white shadow-md'
+                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
+            }`}
+          >
+            {language === 'ru' ? '📱 Блогеры' : '📱 Influencers'}
           </button>
         </div>
 
