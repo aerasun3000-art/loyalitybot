@@ -2,7 +2,7 @@ import os
 import json
 import math
 import datetime
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Dict, List
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from postgrest.exceptions import APIError
@@ -12,6 +12,17 @@ import logging
 from dateutil import parser # Добавлена библиотека для безопасного парсинга дат
 from transaction_queue import TransactionQueue
 import sentry_sdk
+
+# Импорт нового калькулятора комиссий
+try:
+    from referral_calculator import (
+        ReferralCalculator, PurchaseInput, PartnerData, B2BDeal, 
+        User as CalcUser, CommissionDistribution
+    )
+    REFERRAL_CALCULATOR_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"ReferralCalculator not available: {e}. Will use fallback logic.")
+    REFERRAL_CALCULATOR_AVAILABLE = False
 
 load_dotenv()
 
@@ -36,6 +47,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 USER_TABLE = 'users'
 PHONE_COLUMN = 'phone'
 BALANCE_COLUMN = 'balance'
+COMMISSION_BALANCE_COLUMN = 'commission_balance'
 PARTNER_ID_COLUMN = 'referral_source'
 TRANSACTION_TABLE = 'transactions'
 
@@ -460,8 +472,14 @@ class SupabaseManager:
                     if recent_txn.data:
                         transaction_id = recent_txn.data[0].get('id')
                     
-                    # Обрабатываем реферальные бонусы
-                    self.process_referral_transaction_bonuses(str(client_chat_id), transaction_amount_points, transaction_id)
+                    # Обрабатываем реферальные бонусы (новая логика с raw_amount и seller_partner_id)
+                    self.process_referral_transaction_bonuses(
+                        str(client_chat_id), 
+                        transaction_amount_points, 
+                        transaction_id,
+                        raw_amount=raw_amount,
+                        seller_partner_id=str(partner_chat_id)
+                    )
                 except Exception as e:
                     logging.error(f"Error processing referral transaction bonuses: {e}")
                     # Не прерываем основную транзакцию из-за ошибки реферальных бонусов
@@ -3393,12 +3411,18 @@ class SupabaseManager:
                 bonus_points = config['registration_bonus'].get(bonus_key, 0)
                 
                 if bonus_points > 0:
-                    # Начисляем бонусы
-                    current_balance = self.get_client_balance(int(referrer_id))
-                    new_balance = current_balance + bonus_points
+                    # Начисляем бонусы в кошелёк комиссий
+                    current_commission = 0
+                    try:
+                        commission_data = self.client.from_(USER_TABLE).select(COMMISSION_BALANCE_COLUMN).eq('chat_id', referrer_id).limit(1).execute()
+                        if commission_data.data:
+                            current_commission = commission_data.data[0].get(COMMISSION_BALANCE_COLUMN, 0) or 0
+                    except Exception as e:
+                        logging.error(f"Error fetching commission balance for referrer {referrer_id}: {e}")
+                    new_commission = current_commission + bonus_points
                     
-                    # Обновляем баланс
-                    self.client.from_(USER_TABLE).update({BALANCE_COLUMN: new_balance}).eq('chat_id', referrer_id).execute()
+                    # Обновляем кошелёк комиссий
+                    self.client.from_(USER_TABLE).update({COMMISSION_BALANCE_COLUMN: new_commission}).eq('chat_id', referrer_id).execute()
                     
                     # Записываем в referral_rewards
                     reward_data = {
@@ -3449,8 +3473,219 @@ class SupabaseManager:
             logging.error(f"Error processing referral registration bonuses: {e}")
             return False
 
-    def process_referral_transaction_bonuses(self, user_chat_id: str, earned_points: int, transaction_id: int = None) -> bool:
-        """Обрабатывает бонусы с транзакций для рефералов (многоуровневая система)."""
+    def _get_partner_data_for_calculator(self, partner_chat_id: str) -> Optional[PartnerData]:
+        """Получает данные партнера для калькулятора комиссий."""
+        if not self.client or not REFERRAL_CALCULATOR_AVAILABLE:
+            return None
+        try:
+            response = self.client.from_('partners').select('chat_id, base_reward_percent').eq('chat_id', str(partner_chat_id)).limit(1).execute()
+            if response.data and len(response.data) > 0:
+                partner = response.data[0]
+                return PartnerData(
+                    id=str(partner['chat_id']),
+                    base_reward_percent=float(partner.get('base_reward_percent', 0.05))
+                )
+            return None
+        except Exception as e:
+            logging.error(f"Error getting partner data for calculator: {e}")
+            return None
+
+    def _get_active_b2b_deals_for_calculator(self) -> List[B2BDeal]:
+        """Получает список активных B2B сделок для калькулятора."""
+        if not self.client or not REFERRAL_CALCULATOR_AVAILABLE:
+            return []
+        try:
+            response = self.client.from_('partner_deals').select('*').eq('status', 'active').execute()
+            deals = []
+            for deal_data in (response.data or []):
+                # Проверка срока действия
+                if deal_data.get('expires_at'):
+                    try:
+                        expires_str = deal_data['expires_at']
+                        expires = datetime.datetime.fromisoformat(expires_str.replace('Z', '+00:00'))
+                        if expires < datetime.datetime.now(datetime.timezone.utc):
+                            continue
+                    except Exception:
+                        pass
+                
+                # Маппинг полей: referral_commission_percent -> seller_pays_percent
+                # client_cashback_percent -> buyer_gets_percent
+                deals.append(B2BDeal(
+                    seller_partner_id=str(deal_data.get('target_partner_chat_id', '')),
+                    source_partner_id=str(deal_data.get('source_partner_chat_id', '')),
+                    seller_pays_percent=float(deal_data.get('referral_commission_percent', 0.10)),
+                    buyer_gets_percent=float(deal_data.get('client_cashback_percent', 0.15)),
+                    status=str(deal_data.get('status', 'active'))
+                ))
+            return deals
+        except Exception as e:
+            logging.error(f"Error getting active B2B deals for calculator: {e}")
+            return []
+
+    def _build_users_dict_for_calculator(self, start_user_id: str, max_depth: int = 4) -> Dict[str, CalcUser]:
+        """Строит словарь пользователей для калькулятора (с цепочкой рефералов до 3 уровней)."""
+        if not self.client or not REFERRAL_CALCULATOR_AVAILABLE:
+            return {}
+        try:
+            users_dict = {}
+            visited = set()
+            queue = [(start_user_id, 0)]  # (user_id, depth)
+            
+            while queue and len(users_dict) < 20:  # Защита от бесконечного цикла
+                current_id, depth = queue.pop(0)
+                if current_id in visited or depth > max_depth:
+                    continue
+                visited.add(current_id)
+                
+                # Получаем данные пользователя
+                user_data = self.client.from_(USER_TABLE).select(
+                    'chat_id, referred_by_chat_id, commission_balance'
+                ).eq('chat_id', str(current_id)).limit(1).execute()
+                
+                if user_data.data:
+                    user_row = user_data.data[0]
+                    user_id = str(user_row['chat_id'])
+                    referrer_id = user_row.get('referred_by_chat_id')
+                    
+                    users_dict[user_id] = CalcUser(
+                        id=user_id,
+                        referrer_id=str(referrer_id) if referrer_id else None,
+                        commission_balance=float(user_row.get(COMMISSION_BALANCE_COLUMN, 0) or 0)
+                    )
+                    
+                    # Добавляем реферера в очередь
+                    if referrer_id and depth < max_depth:
+                        queue.append((str(referrer_id), depth + 1))
+            
+            return users_dict
+        except Exception as e:
+            logging.error(f"Error building users dict for calculator: {e}")
+            return {}
+
+    def _apply_commission_distribution(self, distribution: CommissionDistribution, user_chat_id: str, transaction_id: Optional[int] = None) -> bool:
+        """Применяет результаты расчета комиссий: начисляет в commission_balance и balance."""
+        if not self.client:
+            return False
+        
+        try:
+            for commission in distribution.commissions:
+                if commission.user_id == "SYSTEM":
+                    # Системная комиссия просто логируется
+                    logging.info(f"System commission: {commission.amount:.2f} ({commission.description})")
+                    continue
+                
+                # Начисляем комиссию в commission_balance
+                current_commission = 0
+                try:
+                    commission_data = self.client.from_(USER_TABLE).select(COMMISSION_BALANCE_COLUMN).eq('chat_id', commission.user_id).limit(1).execute()
+                    if commission_data.data:
+                        current_commission = float(commission_data.data[0].get(COMMISSION_BALANCE_COLUMN, 0) or 0)
+                except Exception as e:
+                    logging.error(f"Error fetching commission balance for {commission.user_id}: {e}")
+                
+                new_commission = current_commission + commission.amount
+                
+                # Обновляем commission_balance
+                self.client.from_(USER_TABLE).update({
+                    COMMISSION_BALANCE_COLUMN: new_commission
+                }).eq('chat_id', commission.user_id).execute()
+                
+                # Записываем в referral_rewards
+                reward_data = {
+                    'referrer_chat_id': commission.user_id,
+                    'referred_chat_id': user_chat_id,
+                    'reward_type': 'transaction',
+                    'level': 1 if commission.type == 'L1' else (2 if commission.type == 'L2' else (3 if commission.type == 'L3' else 0)),
+                    'points': int(commission.amount),
+                    'transaction_id': transaction_id,
+                    'description': commission.description
+                }
+                self.client.from_('referral_rewards').insert(reward_data).execute()
+                
+                logging.info(f"Commission awarded: {commission.user_id} +{commission.amount:.2f} ({commission.type})")
+            
+            # Если есть спец-кэшбэк покупателю (B2B), начисляем в balance
+            if distribution.buyer_special_reward and distribution.buyer_special_reward > 0:
+                current_balance = self.get_client_balance(int(user_chat_id))
+                new_balance = current_balance + distribution.buyer_special_reward
+                self.client.from_(USER_TABLE).update({
+                    BALANCE_COLUMN: new_balance
+                }).eq('chat_id', user_chat_id).execute()
+                
+                # Записываем транзакцию
+                self.record_transaction(
+                    int(user_chat_id),
+                    None,
+                    int(distribution.buyer_special_reward),
+                    'accrual',
+                    f"Спец-кэшбэк по B2B сделке: {distribution.buyer_special_reward:.2f} баллов",
+                    raw_amount=distribution.buyer_special_reward
+                )
+                
+                logging.info(f"B2B special reward awarded to buyer {user_chat_id}: {distribution.buyer_special_reward:.2f}")
+            
+            return True
+        except Exception as e:
+            logging.error(f"Error applying commission distribution: {e}")
+            return False
+
+    def process_referral_transaction_bonuses(self, user_chat_id: str, earned_points: int, transaction_id: int = None, 
+                                             raw_amount: Optional[float] = None, seller_partner_id: Optional[str] = None) -> bool:
+        """
+        Обрабатывает бонусы с транзакций для рефералов.
+        
+        Новая логика (приоритет):
+        - Если доступен ReferralCalculator и есть raw_amount + seller_partner_id: использует новую логику (Standard MLM или B2B)
+        - Иначе: fallback на старую логику (8%/4%/2% от earned_points)
+        
+        :param user_chat_id: ID покупателя
+        :param earned_points: Заработанные баллы (кэшбэк)
+        :param transaction_id: ID транзакции
+        :param raw_amount: Сумма чека в рублях (для новой логики)
+        :param seller_partner_id: ID партнера-продавца (для новой логики)
+        """
+        if not self.client or earned_points <= 0:
+            return False
+        
+        # Попытка использовать новую логику
+        if REFERRAL_CALCULATOR_AVAILABLE and raw_amount and raw_amount > 0 and seller_partner_id:
+            try:
+                # Получаем данные для калькулятора
+                users_dict = self._build_users_dict_for_calculator(user_chat_id)
+                if not users_dict:
+                    logging.warning(f"Could not build users dict for {user_chat_id}, falling back to old logic")
+                    return self._process_referral_bonuses_old_logic(user_chat_id, earned_points, transaction_id)
+                
+                deals = self._get_active_b2b_deals_for_calculator()
+                seller_data = self._get_partner_data_for_calculator(seller_partner_id)
+                
+                # Создаем калькулятор
+                calculator = ReferralCalculator(users_dict, deals)
+                
+                # Рассчитываем комиссии
+                purchase = PurchaseInput(
+                    user_id=user_chat_id,
+                    amount=raw_amount,
+                    seller_partner_id=seller_partner_id
+                )
+                
+                result = calculator.calculate_commissions(purchase, seller_data)
+                
+                logging.info(f"New commission logic applied ({result.logic_type}): {len(result.commissions)} commissions, system_total={result.system_total:.2f}")
+                
+                # Применяем результаты
+                return self._apply_commission_distribution(result, user_chat_id, transaction_id)
+                
+            except Exception as e:
+                logging.error(f"Error in new referral commission logic, falling back to old: {e}")
+                # Fallback на старую логику
+                return self._process_referral_bonuses_old_logic(user_chat_id, earned_points, transaction_id)
+        
+        # Fallback: старая логика
+        return self._process_referral_bonuses_old_logic(user_chat_id, earned_points, transaction_id)
+
+    def _process_referral_bonuses_old_logic(self, user_chat_id: str, earned_points: int, transaction_id: int = None) -> bool:
+        """Старая логика обработки реферальных бонусов (8%/4%/2% от earned_points). Fallback."""
         if not self.client or earned_points <= 0:
             return False
         
@@ -3477,12 +3712,18 @@ class SupabaseManager:
                     bonus_points = int(earned_points * percent)
                     
                     if bonus_points > 0:
-                        # Начисляем бонусы
-                        current_balance = self.get_client_balance(int(referrer_id))
-                        new_balance = current_balance + bonus_points
+                        # Начисляем бонусы в кошелёк комиссий
+                        current_commission = 0
+                        try:
+                            commission_data = self.client.from_(USER_TABLE).select(COMMISSION_BALANCE_COLUMN).eq('chat_id', referrer_id).limit(1).execute()
+                            if commission_data.data:
+                                current_commission = commission_data.data[0].get(COMMISSION_BALANCE_COLUMN, 0) or 0
+                        except Exception as e:
+                            logging.error(f"Error fetching commission balance for referrer {referrer_id}: {e}")
+                        new_commission = current_commission + bonus_points
                         
-                        # Обновляем баланс
-                        self.client.from_(USER_TABLE).update({BALANCE_COLUMN: new_balance}).eq('chat_id', referrer_id).execute()
+                        # Обновляем кошелёк комиссий
+                        self.client.from_(USER_TABLE).update({COMMISSION_BALANCE_COLUMN: new_commission}).eq('chat_id', referrer_id).execute()
                         
                         # Записываем в referral_rewards
                         reward_data = {
@@ -3672,11 +3913,17 @@ class SupabaseManager:
                     
                     # Проверяем, не получено ли уже это достижение
                     if achievement_desc not in existing_descriptions:
-                        # Начисляем бонус
-                        current_balance = self.get_client_balance(int(chat_id))
-                        new_balance = current_balance + bonus_points
+                        # Начисляем бонус в кошелёк комиссий
+                        current_commission = 0
+                        try:
+                            commission_data = self.client.from_(USER_TABLE).select(COMMISSION_BALANCE_COLUMN).eq('chat_id', chat_id).limit(1).execute()
+                            if commission_data.data:
+                                current_commission = commission_data.data[0].get(COMMISSION_BALANCE_COLUMN, 0) or 0
+                        except Exception as e:
+                            logging.error(f"Error fetching commission balance for achievements {chat_id}: {e}")
+                        new_commission = current_commission + bonus_points
                         
-                        self.client.from_(USER_TABLE).update({BALANCE_COLUMN: new_balance}).eq('chat_id', chat_id).execute()
+                        self.client.from_(USER_TABLE).update({COMMISSION_BALANCE_COLUMN: new_commission}).eq('chat_id', chat_id).execute()
                         
                         # Записываем достижение
                         reward_data = {
@@ -4842,12 +5089,80 @@ class SupabaseManager:
         if not self.client: return {}
         try:
             response = self.client.table('partners').select(
-                'category_group, ui_config, default_cashback_percent, default_referral_commission_percent'
+                'category_group, ui_config, default_cashback_percent, default_referral_commission_percent, base_reward_percent'
             ).eq('chat_id', str(partner_chat_id)).single().execute()
             return response.data or {}
         except Exception as e:
             logging.error(f"Error getting partner config: {e}")
             return {}
+
+    def get_partner_b2b_deals(self, partner_chat_id: str, as_source: bool = True, as_target: bool = True) -> List[dict]:
+        """
+        Получает список B2B сделок партнера.
+        
+        :param partner_chat_id: ID партнера
+        :param as_source: Включить сделки, где партнер является источником (привел клиентов)
+        :param as_target: Включить сделки, где партнер является целью (куда привели клиентов)
+        :return: Список сделок
+        """
+        if not self.client: return []
+        try:
+            deals = []
+            
+            if as_source:
+                # Сделки, где партнер привел клиентов к другим
+                response_source = self.client.table('partner_deals').select('*').eq('source_partner_chat_id', str(partner_chat_id)).execute()
+                if response_source.data:
+                    deals.extend(response_source.data)
+            
+            if as_target:
+                # Сделки, где к партнеру привели клиентов
+                response_target = self.client.table('partner_deals').select('*').eq('target_partner_chat_id', str(partner_chat_id)).execute()
+                if response_target.data:
+                    deals.extend(response_target.data)
+            
+            # Фильтруем по сроку действия
+            active_deals = []
+            now = datetime.datetime.now(datetime.timezone.utc)
+            for deal in deals:
+                if deal.get('status') != 'active':
+                    continue
+                if deal.get('expires_at'):
+                    try:
+                        expires_str = deal['expires_at']
+                        expires = datetime.datetime.fromisoformat(expires_str.replace('Z', '+00:00'))
+                        if expires < now:
+                            continue
+                    except Exception:
+                        pass
+                active_deals.append(deal)
+            
+            return active_deals
+        except Exception as e:
+            logging.error(f"Error getting partner B2B deals: {e}")
+            return []
+
+    def update_partner_base_reward_percent(self, partner_chat_id: str, new_percent: float) -> bool:
+        """
+        Обновляет процент комиссионного фонда партнера (base_reward_percent).
+        
+        :param partner_chat_id: ID партнера
+        :param new_percent: Новый процент (например, 0.05 для 5%)
+        :return: True если успешно
+        """
+        if not self.client: return False
+        if new_percent < 0 or new_percent > 1:
+            logging.error(f"Invalid base_reward_percent: {new_percent} (must be between 0 and 1)")
+            return False
+        try:
+            self.client.table('partners').update({
+                'base_reward_percent': new_percent
+            }).eq('chat_id', str(partner_chat_id)).execute()
+            logging.info(f"Updated base_reward_percent for partner {partner_chat_id} to {new_percent}")
+            return True
+        except Exception as e:
+            logging.error(f"Error updating base_reward_percent: {e}")
+            return False
 
     def _get_referral_source(self, client_chat_id: str) -> Optional[str]:
         """Получает ID партнера, который пригласил клиента."""

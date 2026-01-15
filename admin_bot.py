@@ -1,5 +1,6 @@
 import os
 import asyncio
+import datetime
 from dotenv import load_dotenv
 import requests
 from aiogram import Bot, Dispatcher, types, F
@@ -145,6 +146,10 @@ async def handle_start_admin(message: types.Message):
             InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats"),
             InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard"),
             InlineKeyboardButton(text="💎 MLM Revenue Share", callback_data="admin_mlm"),
+        ],
+        # B2B Сделки
+        [
+            InlineKeyboardButton(text="🤝 B2B Сделки", callback_data="admin_b2b_deals"),
         ],
         # Специальные разделы
         [
@@ -544,6 +549,12 @@ class ServiceManage(StatesGroup):
     selecting_city = State()
     selecting_district = State()
     choosing_services_action = State()
+
+class B2BDealCreation(StatesGroup):
+    waiting_source_partner = State()
+    waiting_target_partner = State()
+    waiting_seller_pays = State()
+    waiting_buyer_gets = State()
     adding_title = State()
     adding_description = State()
     adding_price = State()
@@ -881,6 +892,10 @@ async def back_to_main_menu(callback_query: types.CallbackQuery):
             InlineKeyboardButton(text="📊 Общая статистика", callback_data="admin_stats"),
             InlineKeyboardButton(text="🏆 Лидерборд", callback_data="admin_leaderboard"),
             InlineKeyboardButton(text="💎 MLM Revenue Share", callback_data="admin_mlm"),
+        ],
+        # B2B Сделки
+        [
+            InlineKeyboardButton(text="🤝 B2B Сделки", callback_data="admin_b2b_deals"),
         ],
         # Специальные разделы
         [
@@ -1543,6 +1558,263 @@ async def set_background(callback_query: types.CallbackQuery):
         await show_background_menu(callback_query)
     else:
         await callback_query.answer("❌ Ошибка при сохранении фона", show_alert=True)
+
+
+# --- B2B Сделки ---
+
+@dp.callback_query(F.data == "admin_b2b_deals")
+async def show_b2b_deals_menu(callback_query: types.CallbackQuery):
+    """Показывает меню управления B2B сделками."""
+    await callback_query.answer("Загрузка меню...")
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📋 Все активные сделки", callback_data="b2b_list_all")],
+        [InlineKeyboardButton(text="➕ Создать сделку", callback_data="b2b_create")],
+        [InlineKeyboardButton(text="🔍 Найти сделку по партнерам", callback_data="b2b_find")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    
+    await callback_query.message.edit_text(
+        "🤝 **Управление B2B Сделками**\n\n"
+        "B2B сделка — это персональное соглашение между двумя партнерами о повышенных условиях комиссии.\n\n"
+        "**Как это работает:**\n"
+        "• Партнер-продавец платит % от чека (например, 10%)\n"
+        "• Система забирает 30% от этого фонда\n"
+        "• Партнер-источник получает 70% (БЕЗ MLM!)\n"
+        "• Покупатель получает повышенный кэшбэк\n\n"
+        "Выберите действие:",
+        reply_markup=keyboard
+    )
+
+
+@dp.callback_query(F.data == "b2b_list_all")
+async def list_all_b2b_deals(callback_query: types.CallbackQuery):
+    """Показывает список всех активных B2B сделок."""
+    await callback_query.answer("Загрузка сделок...")
+    
+    try:
+        # Получаем все активные сделки
+        if not db_manager.client:
+            await callback_query.message.edit_text("❌ База данных недоступна.")
+            return
+        
+        response = db_manager.client.table('partner_deals').select('*').eq('status', 'active').execute()
+        deals = response.data or []
+        
+        # Фильтруем по сроку действия
+        now = datetime.datetime.now(datetime.timezone.utc)
+        active_deals = []
+        for deal in deals:
+            if deal.get('expires_at'):
+                try:
+                    expires_str = deal['expires_at']
+                    expires = datetime.datetime.fromisoformat(expires_str.replace('Z', '+00:00'))
+                    if expires < now:
+                        continue
+                except Exception:
+                    pass
+            active_deals.append(deal)
+        
+        if not active_deals:
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="➕ Создать сделку", callback_data="b2b_create")],
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_b2b_deals")]
+            ])
+            await callback_query.message.edit_text(
+                "📋 **Активные B2B Сделки**\n\n"
+                "Активных сделок нет.\n\n"
+                "Создайте первую сделку, чтобы установить персональные условия комиссии между партнерами.",
+                reply_markup=keyboard
+            )
+            return
+        
+        # Формируем список
+        text = f"📋 **Активные B2B Сделки**\n\n*Всего активных: {len(active_deals)}*\n\n"
+        
+        for i, deal in enumerate(active_deals[:20], 1):  # Показываем максимум 20
+            source_id = deal.get('source_partner_chat_id', 'N/A')
+            target_id = deal.get('target_partner_chat_id', 'N/A')
+            seller_pays = deal.get('referral_commission_percent', 0) * 100
+            buyer_gets = deal.get('client_cashback_percent', 0) * 100
+            
+            text += (
+                f"*{i}. Сделка ID: {deal.get('id', 'N/A')[:8]}...*\n"
+                f"Источник (привел): `{source_id}`\n"
+                f"Цель (куда): `{target_id}`\n"
+                f"Продавец платит: {seller_pays:.1f}%\n"
+                f"Покупатель получает: {buyer_gets:.1f}% кэшбэк\n"
+                f"Комиссия партнеру: {seller_pays * 0.7:.1f}% (70%)\n"
+                f"Комиссия системе: {seller_pays * 0.3:.1f}% (30%)\n\n"
+            )
+        
+        if len(active_deals) > 20:
+            text += f"... и еще {len(active_deals) - 20} сделок\n\n"
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="➕ Создать сделку", callback_data="b2b_create")],
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_b2b_deals")]
+        ])
+        
+        await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+        
+    except Exception as e:
+        logging.error(f"Error listing B2B deals: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при получении списка сделок.")
+
+
+@dp.callback_query(F.data == "b2b_create")
+async def create_b2b_deal_start(callback_query: types.CallbackQuery, state: FSMContext):
+    """Начинает процесс создания B2B сделки."""
+    await callback_query.answer("Создание сделки...")
+    
+    await callback_query.message.edit_text(
+        "➕ **Создание B2B Сделки**\n\n"
+        "Введите ID партнера-источника (кто привел клиентов):\n"
+        "Например: `123456789`",
+        parse_mode='Markdown'
+    )
+    
+    # Устанавливаем состояние ожидания ввода
+    await state.set_state("b2b_waiting_source_partner")
+
+
+@dp.message(B2BDealCreation.waiting_source_partner)
+async def receive_b2b_source_partner(message: types.Message, state: FSMContext):
+    """Получает ID партнера-источника и запрашивает ID цели."""
+    if not message.text or not message.text.strip().isdigit():
+        await message.answer("❌ Введите корректный ID партнера (только цифры):")
+        return
+    
+    source_id = message.text.strip()
+    await state.update_data(source_partner_id=source_id)
+    
+    await message.answer(
+        f"✅ Партнер-источник: `{source_id}`\n\n"
+        "Теперь введите ID партнера-цели (куда привели клиентов):\n"
+        "Например: `987654321`",
+        parse_mode='Markdown'
+    )
+    
+    await state.set_state(B2BDealCreation.waiting_target_partner)
+
+
+@dp.message(B2BDealCreation.waiting_target_partner)
+async def receive_b2b_target_partner(message: types.Message, state: FSMContext):
+    """Получает ID партнера-цели и запрашивает проценты."""
+    if not message.text or not message.text.strip().isdigit():
+        await message.answer("❌ Введите корректный ID партнера (только цифры):")
+        return
+    
+    target_id = message.text.strip()
+    data = await state.get_data()
+    source_id = data.get('source_partner_id')
+    
+    if not source_id:
+        await message.answer("❌ Ошибка: не найден ID источника. Начните заново.")
+        await state.clear()
+        return
+    
+    await state.update_data(target_partner_id=target_id)
+    
+    await message.answer(
+        f"✅ Партнер-цель: `{target_id}`\n\n"
+        "Введите процент, который платит продавец (от суммы чека):\n"
+        "Например: `10` для 10%",
+        parse_mode='Markdown'
+    )
+    
+    await state.set_state(B2BDealCreation.waiting_seller_pays)
+
+
+@dp.message(B2BDealCreation.waiting_seller_pays)
+async def receive_b2b_seller_pays(message: types.Message, state: FSMContext):
+    """Получает процент продавца и запрашивает процент покупателя."""
+    try:
+        if not message.text:
+            await message.answer("❌ Введите число:")
+            return
+        
+        seller_pays = float(message.text.strip())
+        if seller_pays < 0 or seller_pays > 100:
+            await message.answer("❌ Процент должен быть от 0 до 100. Попробуйте снова:")
+            return
+        
+        await state.update_data(seller_pays_percent=seller_pays / 100.0)
+        
+        await message.answer(
+            f"✅ Продавец платит: {seller_pays}%\n\n"
+            "Введите процент кэшбэка для покупателя (от суммы чека):\n"
+            "Например: `15` для 15%",
+            parse_mode='Markdown'
+        )
+        
+        await state.set_state(B2BDealCreation.waiting_buyer_gets)
+    except ValueError:
+        await message.answer("❌ Неверный формат. Введите число (например: 10):")
+
+
+@dp.message(B2BDealCreation.waiting_buyer_gets)
+async def receive_b2b_buyer_gets(message: types.Message, state: FSMContext):
+    """Получает процент покупателя и создает сделку."""
+    try:
+        buyer_gets = float(message.text.strip())
+        if buyer_gets < 0 or buyer_gets > 100:
+            await message.answer("❌ Процент должен быть от 0 до 100. Попробуйте снова:")
+            return
+        
+        data = await state.get_data()
+        source_id = data.get('source_partner_id')
+        target_id = data.get('target_partner_id')
+        seller_pays = data.get('seller_pays_percent', 0.10)
+        
+        if not source_id or not target_id:
+            await message.answer("❌ Ошибка: не найдены ID партнеров. Начните заново.")
+            await state.clear()
+            return
+        
+        # Создаем сделку
+        try:
+            if not db_manager.client:
+                await message.answer("❌ База данных недоступна.")
+                await state.clear()
+                return
+            
+            deal_data = {
+                'source_partner_chat_id': str(source_id),
+                'target_partner_chat_id': str(target_id),
+                'referral_commission_percent': seller_pays,  # seller_pays_percent
+                'client_cashback_percent': buyer_gets / 100.0,  # buyer_gets_percent
+                'status': 'active'
+            }
+            
+            response = db_manager.client.table('partner_deals').insert(deal_data).execute()
+            
+            if response.data:
+                deal = response.data[0]
+                await message.answer(
+                    f"✅ **B2B Сделка создана!**\n\n"
+                    f"*Детали:*\n"
+                    f"Источник: `{source_id}`\n"
+                    f"Цель: `{target_id}`\n"
+                    f"Продавец платит: {seller_pays * 100:.1f}%\n"
+                    f"Покупатель получает: {buyer_gets:.1f}% кэшбэк\n"
+                    f"Партнер получит: {seller_pays * 0.7 * 100:.1f}% (70%)\n"
+                    f"Система получит: {seller_pays * 0.3 * 100:.1f}% (30%)\n\n"
+                    f"Сделка активна и будет применяться к новым транзакциям.",
+                    parse_mode='Markdown'
+                )
+                logging.info(f"Admin created B2B deal: {source_id} -> {target_id}")
+            else:
+                await message.answer("❌ Ошибка при создании сделки. Попробуйте снова.")
+        
+        except Exception as e:
+            logging.error(f"Error creating B2B deal: {e}")
+            await message.answer(f"❌ Ошибка при создании сделки: {str(e)}")
+        
+        await state.clear()
+        
+    except ValueError:
+        await message.answer("❌ Неверный формат. Введите число (например: 15):")
 
 
 # --- Одностраничники ---

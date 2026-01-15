@@ -3049,8 +3049,10 @@ def handle_partner_settings(message):
     btn_bonus = types.InlineKeyboardButton("🎁 Изменить приветственный бонус", callback_data="settings_bonus")
     btn_info = types.InlineKeyboardButton("ℹ️ Моя информация", callback_data="settings_info")
     btn_edit = types.InlineKeyboardButton("✏️ Редактировать данные", callback_data="settings_edit")
+    btn_commission = types.InlineKeyboardButton("💰 Комиссия сети", callback_data="settings_commission")
+    btn_deals = types.InlineKeyboardButton("🤝 B2B Сделки", callback_data="settings_deals")
     btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
-    markup.add(btn_bonus, btn_info, btn_edit, btn_back)
+    markup.add(btn_bonus, btn_info, btn_edit, btn_commission, btn_deals, btn_back)
     
     bot.send_message(chat_id, "*⚙️ Настройки партнёра:*\nВыберите действие:", reply_markup=markup, parse_mode='Markdown')
 
@@ -3108,14 +3110,86 @@ def handle_settings_callbacks(call):
         
         bot.send_message(chat_id, "✏️ *Редактирование данных:*\n\nВыберите поле, которое хотите изменить:", reply_markup=markup, parse_mode='Markdown')
     
+    elif call.data == 'settings_commission':
+        # Показываем текущий процент комиссионного фонда
+        try:
+            partner_config = sm.get_partner_config(str(chat_id))
+            current_percent = partner_config.get('base_reward_percent', 0.05)
+            percent_display = f"{current_percent * 100:.1f}%"
+            
+            text = (
+                f"*💰 Комиссия сети*\n\n"
+                f"Текущий процент комиссионного фонда: **{percent_display}**\n\n"
+                f"Это процент от суммы чека, который вы отдаете в комиссионный фонд для стандартной MLM логики.\n"
+                f"Он распределяется по цепочке рефералов (5%/5%/5%) и системе (85%).\n\n"
+                f"*Примечание:* Для изменения этого процента обратитесь к администратору."
+            )
+            bot.send_message(chat_id, text, parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} просмотрел настройки комиссии")
+        except Exception as e:
+            log_exception(logger, e, f"Ошибка получения настроек комиссии партнёра {chat_id}")
+            bot.send_message(chat_id, "❌ Ошибка при получении информации о комиссии.")
+        
+        partner_main_menu(chat_id)
+    
+    elif call.data == 'settings_deals':
+        # Показываем список активных B2B сделок
+        try:
+            deals = sm.get_partner_b2b_deals(str(chat_id), as_source=True, as_target=True)
+            
+            if not deals:
+                text = (
+                    "*🤝 B2B Сделки*\n\n"
+                    "У вас пока нет активных B2B сделок.\n\n"
+                    "B2B сделка — это персональное соглашение с другим партнером о повышенных условиях комиссии.\n"
+                    "При покупке клиента от партнера-источника: 70% комиссии идет партнеру, 30% системе.\n\n"
+                    "Для создания сделки обратитесь к администратору."
+                )
+            else:
+                text = f"*🤝 B2B Сделки*\n\n*Активных сделок: {len(deals)}*\n\n"
+                
+                for i, deal in enumerate(deals[:10], 1):  # Показываем максимум 10
+                    source_id = deal.get('source_partner_chat_id', '')
+                    target_id = deal.get('target_partner_chat_id', '')
+                    seller_pays = deal.get('referral_commission_percent', 0) * 100
+                    buyer_gets = deal.get('client_cashback_percent', 0) * 100
+                    
+                    # Определяем роль партнера
+                    if str(chat_id) == str(source_id):
+                        role = "Вы привели клиентов к"
+                        other_id = target_id
+                    else:
+                        role = "К вам привели клиентов от"
+                        other_id = source_id
+                    
+                    text += (
+                        f"*{i}. Сделка с партнером {other_id}*\n"
+                        f"Роль: {role}\n"
+                        f"Продавец платит: {seller_pays:.1f}% от чека\n"
+                        f"Покупатель получает: {buyer_gets:.1f}% кэшбэк\n\n"
+                    )
+                
+                if len(deals) > 10:
+                    text += f"... и еще {len(deals) - 10} сделок\n\n"
+            
+            bot.send_message(chat_id, text, parse_mode='Markdown')
+            logger.info(f"Партнёр {chat_id} просмотрел список B2B сделок")
+        except Exception as e:
+            log_exception(logger, e, f"Ошибка получения B2B сделок партнёра {chat_id}")
+            bot.send_message(chat_id, "❌ Ошибка при получении информации о сделках.")
+        
+        partner_main_menu(chat_id)
+    
     elif call.data == 'settings_back':
         # Возвращаемся в меню настроек
         markup = types.InlineKeyboardMarkup(row_width=1)
         btn_bonus = types.InlineKeyboardButton("🎁 Изменить приветственный бонус", callback_data="settings_bonus")
         btn_info = types.InlineKeyboardButton("ℹ️ Моя информация", callback_data="settings_info")
         btn_edit = types.InlineKeyboardButton("✏️ Редактировать данные", callback_data="settings_edit")
+        btn_commission = types.InlineKeyboardButton("💰 Комиссия сети", callback_data="settings_commission")
+        btn_deals = types.InlineKeyboardButton("🤝 B2B Сделки", callback_data="settings_deals")
         btn_back = types.InlineKeyboardButton("⬅️ Назад в меню", callback_data="partner_main_menu")
-        markup.add(btn_bonus, btn_info, btn_edit, btn_back)
+        markup.add(btn_bonus, btn_info, btn_edit, btn_commission, btn_deals, btn_back)
         
         bot.edit_message_text(
             "*⚙️ Настройки партнёра:*\nВыберите действие:",

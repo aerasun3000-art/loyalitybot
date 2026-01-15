@@ -63,3 +63,13 @@ COMMENT ON COLUMN partners.category_group IS 'Глобальная катего�
 COMMENT ON COLUMN partners.ui_config IS 'JSON конфигурация интерфейса (скрытие кнопок, кастомные тексты)';
 COMMENT ON COLUMN partners.work_mode IS 'Режим работы: online (показывается всем городам), offline (только свой город), hybrid (всем городам)';
 COMMENT ON COLUMN partners.default_referral_commission_percent IS 'Процент комиссии, который партнер платит системе за клиента от другого партнера (для Revenue Share)';
+
+-- 4. Обновление таблицы users: отдельный кошелёк для комиссий (commission_balance)
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS commission_balance NUMERIC DEFAULT 0.0;
+
+-- 5. Добавление поля base_reward_percent в partners (для стандартной MLM логики)
+ALTER TABLE partners
+ADD COLUMN IF NOT EXISTS base_reward_percent NUMERIC DEFAULT 0.05;
+
+COMMENT ON COLUMN partners.base_reward_percent IS 'Процент от суммы чека, который партнер-продавец отдает в комиссионный фонд для стандартной MLM логики (по умолчанию 5%)';
