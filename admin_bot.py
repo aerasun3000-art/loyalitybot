@@ -549,14 +549,17 @@ class ServiceManage(StatesGroup):
     selecting_city = State()
     selecting_district = State()
     choosing_services_action = State()
+    adding_title = State()
+    adding_description = State()
+    adding_price = State()
+    adding_category = State()
+    waiting_new_field_value = State()
 
 class B2BDealCreation(StatesGroup):
     waiting_source_partner = State()
     waiting_target_partner = State()
     waiting_seller_pays = State()
     waiting_buyer_gets = State()
-    adding_title = State()
-    adding_description = State()
     adding_price = State()
     adding_category = State()
     choosing_service_for_edit = State()
@@ -2691,12 +2694,14 @@ async def handle_mlm_partner_command(message: types.Message):
 # --- Instagram Outreach Handlers ---
 
 # Инициализация Instagram Outreach Manager
-try:
-        db_manager,
-        default_link=get_onepager_url('partner') if hasattr(get_onepager_url, '__call__') else None
-    )
-except Exception as e:
-    logger.warning(f"Ошибка инициализации InstagramOutreachManager: {e}")
+# TODO: Восстановить инициализацию InstagramOutreachManager при необходимости
+# try:
+#     InstagramOutreachManager(
+#         db_manager,
+#         default_link=get_onepager_url('partner') if hasattr(get_onepager_url, '__call__') else None
+#     )
+# except Exception as e:
+#     logger.warning(f"Ошибка инициализации InstagramOutreachManager: {e}")
 
 # FSM States для outreach
 class OutreachAdd(StatesGroup):
