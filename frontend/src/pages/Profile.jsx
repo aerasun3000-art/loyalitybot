@@ -30,8 +30,14 @@ const Profile = () => {
       
       // Проверяем, является ли пользователь одобренным партнером
       if (chatId) {
-        const partnerStatus = await isApprovedPartner(chatId)
-        setIsPartner(partnerStatus)
+        try {
+          const partnerStatus = await isApprovedPartner(chatId)
+          console.log('[Profile] Partner status check result:', partnerStatus)
+          setIsPartner(partnerStatus)
+        } catch (error) {
+          console.error('[Profile] Error checking partner status:', error)
+          setIsPartner(false)
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error)
