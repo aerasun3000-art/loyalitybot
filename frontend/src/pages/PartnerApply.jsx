@@ -220,7 +220,7 @@ const PartnerApply = () => {
       // Перенаправляем через 3 секунды
       setTimeout(() => {
         // Можно отправить в партнерский бот
-        window.location.href = `https://t.me/YOUR_PARTNER_BOT?start=partner_applied`
+        window.location.href = `https://t.me/ghbipartnerbot?start=partner_applied`
       }, 3000)
       
     } catch (error) {
