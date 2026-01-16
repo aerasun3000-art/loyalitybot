@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { supabase, getPartnerInfo } from '../services/supabase';
+import { supabase, getPartnerInfo, updatePartnerInfo } from '../services/supabase';
 import { formatCurrencySimple } from '../utils/currency';
 import Loader from '../components/Loader';
 import { openTelegramLink } from '../utils/telegram';
+import { getPartnerCitiesList, getDistrictsByCity } from '../utils/locations';
+import { getAllServiceCategories } from '../utils/serviceIcons';
 
 const PartnerAnalytics = () => {
   const [searchParams] = useSearchParams();
@@ -15,6 +17,14 @@ const PartnerAnalytics = () => {
   const [period, setPeriod] = useState(30); // дней
   const [ratedClients, setRatedClients] = useState([]); // Клиенты, которые поставили оценку
   const [partnerCity, setPartnerCity] = useState(null);
+  const [partnerData, setPartnerData] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFormData, setEditFormData] = useState({});
+  const [editErrors, setEditErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [cities] = useState(getPartnerCitiesList());
+  const [districts, setDistricts] = useState([]);
+  const [serviceCategories] = useState(getAllServiceCategories());
 
   useEffect(() => {
     if (partnerId) {
@@ -31,8 +41,13 @@ const PartnerAnalytics = () => {
       
       // Загружаем информацию о партнере (для определения валюты)
       const partnerInfo = await getPartnerInfo(partnerId);
-      if (partnerInfo?.city) {
-        setPartnerCity(partnerInfo.city);
+      if (partnerInfo) {
+        setPartnerData(partnerInfo);
+        if (partnerInfo.city) {
+          setPartnerCity(partnerInfo.city);
+          const districtsForCity = getDistrictsByCity(partnerInfo.city);
+          setDistricts(districtsForCity);
+        }
       }
       
       const startDate = new Date();
@@ -179,6 +194,83 @@ const PartnerAnalytics = () => {
     }
   };
 
+  const handleSavePartnerData = async (e) => {
+    e.preventDefault();
+    setEditErrors({});
+    
+    // Валидация
+    const newErrors = {};
+    if (!editFormData.name?.trim()) {
+      newErrors.name = 'Имя обязательно';
+    }
+    if (!editFormData.phone?.trim()) {
+      newErrors.phone = 'Телефон обязателен';
+    } else if (!/^\+?[0-9\s\-()]{10,}$/.test(editFormData.phone)) {
+      newErrors.phone = 'Неверный формат телефона';
+    }
+    if (!editFormData.company_name?.trim()) {
+      newErrors.company_name = 'Название компании обязательно';
+    }
+    if (!editFormData.category_group) {
+      newErrors.category_group = 'Выберите тип бизнеса';
+    }
+    if (editFormData.category_group === 'beauty' && !editFormData.business_type) {
+      newErrors.business_type = 'Выберите категорию услуг';
+    }
+    if (editFormData.work_mode === 'offline' && !editFormData.city) {
+      newErrors.city = 'Город обязателен для оффлайн режима';
+    }
+    if (editFormData.work_mode === 'offline' && editFormData.city && !editFormData.district) {
+      newErrors.district = 'Район обязателен';
+    }
+    if (editFormData.default_referral_commission_percent < 0 || editFormData.default_referral_commission_percent > 100) {
+      newErrors.default_referral_commission_percent = 'Процент должен быть от 0 до 100';
+    }
+    if (editFormData.username && !/^[a-zA-Z0-9_]{5,32}$/.test(editFormData.username.replace('@', '').trim())) {
+      newErrors.username = 'Username должен содержать только буквы, цифры и подчеркивания (5-32 символа)';
+    }
+    
+    if (Object.keys(newErrors).length > 0) {
+      setEditErrors(newErrors);
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      const updateData = {
+        name: editFormData.name.trim(),
+        phone: editFormData.phone.trim(),
+        company_name: editFormData.company_name.trim(),
+        category_group: editFormData.category_group,
+        business_type: editFormData.business_type || null,
+        work_mode: editFormData.work_mode,
+        city: editFormData.work_mode === 'offline' ? editFormData.city : (editFormData.work_mode === 'online' ? 'Online' : editFormData.city || ''),
+        district: editFormData.work_mode === 'offline' ? (editFormData.district || 'All') : 'All',
+        username: editFormData.username?.replace('@', '').trim() || null,
+        booking_url: editFormData.booking_url?.trim() || null,
+        default_referral_commission_percent: parseFloat(editFormData.default_referral_commission_percent) || 10
+      };
+      
+      await updatePartnerInfo(partnerId, updateData);
+      
+      // Обновляем локальные данные
+      const updatedPartnerData = await getPartnerInfo(partnerId);
+      setPartnerData(updatedPartnerData);
+      if (updatedPartnerData?.city) {
+        setPartnerCity(updatedPartnerData.city);
+      }
+      
+      setIsEditing(false);
+      setEditFormData({});
+      setEditErrors({});
+    } catch (error) {
+      console.error('Error saving partner data:', error);
+      setEditErrors({ submit: error.message || 'Ошибка при сохранении данных' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!partnerId) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
@@ -247,6 +339,344 @@ const PartnerAnalytics = () => {
           </p>
         </div>
       </div>
+
+      {/* Данные партнера */}
+      {partnerData && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                📋 Данные партнера
+              </h2>
+              {!isEditing && (
+                <button
+                  onClick={() => {
+                    setIsEditing(true);
+                    setEditFormData({
+                      name: partnerData.name || '',
+                      phone: partnerData.phone || '',
+                      company_name: partnerData.company_name || '',
+                      city: partnerData.city || '',
+                      district: partnerData.district || '',
+                      username: partnerData.username || '',
+                      booking_url: partnerData.booking_url || '',
+                      category_group: partnerData.category_group || '',
+                      business_type: partnerData.business_type || '',
+                      work_mode: partnerData.work_mode || 'offline',
+                      default_referral_commission_percent: partnerData.default_referral_commission_percent || 10
+                    });
+                    if (partnerData.city) {
+                      const districtsForCity = getDistrictsByCity(partnerData.city);
+                      setDistricts(districtsForCity);
+                    }
+                  }}
+                  className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+                >
+                  ✏️ Редактировать
+                </button>
+              )}
+            </div>
+
+            {!isEditing ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Имя</label>
+                  <p className="text-gray-900 dark:text-white">{partnerData.name || 'Не указано'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Телефон</label>
+                  <p className="text-gray-900 dark:text-white">{partnerData.phone || 'Не указан'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Название компании</label>
+                  <p className="text-gray-900 dark:text-white">{partnerData.company_name || 'Не указано'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Тип бизнеса</label>
+                  <p className="text-gray-900 dark:text-white">
+                    {partnerData.category_group === 'beauty' ? '💄 Красота' :
+                     partnerData.category_group === 'food' ? '🍔 Еда' :
+                     partnerData.category_group === 'retail' ? '🛍️ Розница' :
+                     partnerData.category_group === 'influencer' ? '🤳 Блогер' :
+                     partnerData.category_group || 'Не указано'}
+                  </p>
+                </div>
+                {partnerData.business_type && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Категория услуг</label>
+                    <p className="text-gray-900 dark:text-white">
+                      {serviceCategories.find(c => c.code === partnerData.business_type)?.emoji || ''} {serviceCategories.find(c => c.code === partnerData.business_type)?.name || partnerData.business_type}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Режим работы</label>
+                  <p className="text-gray-900 dark:text-white">
+                    {partnerData.work_mode === 'online' ? '🌍 Онлайн' :
+                     partnerData.work_mode === 'hybrid' ? '🔄 Гибрид' :
+                     partnerData.work_mode === 'offline' ? '📍 Оффлайн' :
+                     partnerData.work_mode || 'Не указано'}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Город</label>
+                  <p className="text-gray-900 dark:text-white">{partnerData.city || 'Не указан'}</p>
+                </div>
+                {partnerData.district && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Район</label>
+                    <p className="text-gray-900 dark:text-white">{partnerData.district}</p>
+                  </div>
+                )}
+                {partnerData.username && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Telegram username</label>
+                    <p className="text-gray-900 dark:text-white">@{partnerData.username}</p>
+                  </div>
+                )}
+                {partnerData.booking_url && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Ссылка на бронирование</label>
+                    <p className="text-gray-900 dark:text-white">
+                      <a href={partnerData.booking_url} target="_blank" rel="noopener noreferrer" className="text-primary-500 hover:underline">
+                        {partnerData.booking_url}
+                      </a>
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Процент комиссии системе</label>
+                  <p className="text-gray-900 dark:text-white">{partnerData.default_referral_commission_percent || 10}%</p>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSavePartnerData} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Имя *
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.name || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      required
+                    />
+                    {editErrors.name && <p className="text-red-500 text-xs mt-1">{editErrors.name}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Телефон *
+                    </label>
+                    <input
+                      type="tel"
+                      value={editFormData.phone || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      required
+                    />
+                    {editErrors.phone && <p className="text-red-500 text-xs mt-1">{editErrors.phone}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Название компании *
+                    </label>
+                    <input
+                      type="text"
+                      value={editFormData.company_name || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, company_name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      required
+                    />
+                    {editErrors.company_name && <p className="text-red-500 text-xs mt-1">{editErrors.company_name}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Тип бизнеса *
+                    </label>
+                    <select
+                      value={editFormData.category_group || ''}
+                      onChange={(e) => {
+                        setEditFormData({ ...editFormData, category_group: e.target.value, business_type: e.target.value !== 'beauty' ? '' : editFormData.business_type });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      required
+                    >
+                      <option value="">Выберите тип бизнеса</option>
+                      <option value="beauty">💄 Красота (Салон/Мастер)</option>
+                      <option value="food">🍔 Еда (Кафе/Ресторан)</option>
+                      <option value="retail">🛍️ Розница (Магазин)</option>
+                      <option value="influencer">🤳 Блогер/Инфлюенсер</option>
+                    </select>
+                    {editErrors.category_group && <p className="text-red-500 text-xs mt-1">{editErrors.category_group}</p>}
+                  </div>
+                  {editFormData.category_group === 'beauty' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Категория услуг *
+                      </label>
+                      <select
+                        value={editFormData.business_type || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, business_type: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        required
+                      >
+                        <option value="">Выберите категорию услуг</option>
+                        {serviceCategories.map((category) => (
+                          <option key={category.code} value={category.code}>
+                            {category.emoji} {category.name}
+                          </option>
+                        ))}
+                      </select>
+                      {editErrors.business_type && <p className="text-red-500 text-xs mt-1">{editErrors.business_type}</p>}
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Режим работы *
+                    </label>
+                    <select
+                      value={editFormData.work_mode || 'offline'}
+                      onChange={(e) => setEditFormData({ ...editFormData, work_mode: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      required
+                    >
+                      <option value="offline">📍 Оффлайн (только в своем городе)</option>
+                      <option value="online">🌍 Онлайн (всем городам)</option>
+                      <option value="hybrid">🔄 Гибрид (онлайн + оффлайн, всем городам)</option>
+                    </select>
+                    {editErrors.work_mode && <p className="text-red-500 text-xs mt-1">{editErrors.work_mode}</p>}
+                  </div>
+                  {editFormData.work_mode === 'offline' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Город *
+                        </label>
+                        <select
+                          value={editFormData.city || ''}
+                          onChange={(e) => {
+                            const city = e.target.value;
+                            const districtsForCity = getDistrictsByCity(city);
+                            setDistricts(districtsForCity);
+                            const newDistrict = (districtsForCity.length > 0 && districtsForCity[0].value === 'All') ? 'All' : '';
+                            setEditFormData({ ...editFormData, city, district: newDistrict });
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          required
+                        >
+                          <option value="">Выберите город</option>
+                          {cities.map((city) => (
+                            <option key={city.value} value={city.value}>
+                              {city.label}
+                            </option>
+                          ))}
+                        </select>
+                        {editErrors.city && <p className="text-red-500 text-xs mt-1">{editErrors.city}</p>}
+                      </div>
+                      {editFormData.city && districts.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Район *
+                          </label>
+                          <select
+                            value={editFormData.district || ''}
+                            onChange={(e) => setEditFormData({ ...editFormData, district: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            required
+                          >
+                            <option value="">Выберите район</option>
+                            {districts.map((district) => (
+                              <option key={district.value} value={district.value}>
+                                {district.label}
+                              </option>
+                            ))}
+                          </select>
+                          {editErrors.district && <p className="text-red-500 text-xs mt-1">{editErrors.district}</p>}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Telegram username (необязательно)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">@</span>
+                      <input
+                        type="text"
+                        value={editFormData.username || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, username: e.target.value.replace('@', '').trim() })}
+                        className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="vera_yoga03"
+                      />
+                    </div>
+                    {editErrors.username && <p className="text-red-500 text-xs mt-1">{editErrors.username}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Ссылка на бронирование (необязательно)
+                    </label>
+                    <input
+                      type="url"
+                      value={editFormData.booking_url || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, booking_url: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="https://example.com/booking"
+                    />
+                    {editErrors.booking_url && <p className="text-red-500 text-xs mt-1">{editErrors.booking_url}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Процент комиссии системе *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={editFormData.default_referral_commission_percent || 10}
+                        onChange={(e) => setEditFormData({ ...editFormData, default_referral_commission_percent: parseFloat(e.target.value) || 10 })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        required
+                      />
+                      <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
+                    </div>
+                    {editErrors.default_referral_commission_percent && <p className="text-red-500 text-xs mt-1">{editErrors.default_referral_commission_percent}</p>}
+                  </div>
+                </div>
+                {editErrors.submit && (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mt-4">
+                    <p className="text-red-700 dark:text-red-300 text-sm">{editErrors.submit}</p>
+                  </div>
+                )}
+                <div className="flex gap-2 pt-4">
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
+                  >
+                    {saving ? 'Сохранение...' : '💾 Сохранить'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditFormData({});
+                      setEditErrors({});
+                    }}
+                    className="px-6 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Фильтр по периоду */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

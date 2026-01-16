@@ -423,13 +423,36 @@ export const getPartnerInfo = async (partnerChatId) => {
   
   const { data, error } = await supabase
     .from('partners')
-    .select('chat_id, name, company_name, city, district, google_maps_link')
+    .select('chat_id, name, phone, company_name, city, district, google_maps_link, username, booking_url, category_group, work_mode, default_referral_commission_percent, business_type')
     .eq('chat_id', partnerChatId)
     .maybeSingle()
   
   if (error) {
     console.error('Error fetching partner info:', error)
     return null
+  }
+  
+  return data
+}
+
+/**
+ * Обновить информацию о партнере
+ */
+export const updatePartnerInfo = async (partnerChatId, updateData) => {
+  if (!partnerChatId) {
+    throw new Error('Partner chat ID is required')
+  }
+  
+  const { data, error } = await supabase
+    .from('partners')
+    .update(updateData)
+    .eq('chat_id', partnerChatId)
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error updating partner info:', error)
+    throw error
   }
   
   return data
