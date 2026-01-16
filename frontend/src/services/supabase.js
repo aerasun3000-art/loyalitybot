@@ -415,43 +415,96 @@ export const getReferralPartnerInfo = async (clientChatId) => {
  */
 /**
  * Получить информацию о партнере
+ * Сначала проверяет таблицу partners, если данных нет - берет из partner_applications
  */
 export const getPartnerInfo = async (partnerChatId) => {
   if (!partnerChatId) {
     return null
   }
   
-  const { data, error } = await supabase
+  // Сначала пытаемся получить данные из таблицы partners (одобренные партнеры)
+  const { data: partnerData, error: partnerError } = await supabase
     .from('partners')
     .select('chat_id, name, phone, company_name, city, district, google_maps_link, username, booking_url, category_group, work_mode, default_referral_commission_percent, business_type')
     .eq('chat_id', partnerChatId)
     .maybeSingle()
   
-  if (error) {
-    console.error('Error fetching partner info:', error)
+  if (partnerError) {
+    console.error('Error fetching partner info from partners table:', partnerError)
+  }
+  
+  // Если данные найдены в partners, возвращаем их
+  if (partnerData) {
+    return partnerData
+  }
+  
+  // Если данных нет в partners, пытаемся получить из partner_applications
+  const { data: applicationData, error: applicationError } = await supabase
+    .from('partner_applications')
+    .select('chat_id, name, phone, company_name, city, district, username, booking_url, category_group, work_mode, default_referral_commission_percent, business_type')
+    .eq('chat_id', partnerChatId)
+    .maybeSingle()
+  
+  if (applicationError) {
+    console.error('Error fetching partner info from partner_applications table:', applicationError)
     return null
   }
   
-  return data
+  // Если данные найдены в partner_applications, возвращаем их
+  if (applicationData) {
+    return applicationData
+  }
+  
+  return null
 }
 
 /**
  * Обновить информацию о партнере
+ * Обновляет данные в partners, если партнер одобрен, иначе обновляет partner_applications
  */
 export const updatePartnerInfo = async (partnerChatId, updateData) => {
   if (!partnerChatId) {
     throw new Error('Partner chat ID is required')
   }
   
-  const { data, error } = await supabase
+  // Сначала проверяем, есть ли партнер в таблице partners
+  const { data: existingPartner, error: checkError } = await supabase
     .from('partners')
+    .select('chat_id')
+    .eq('chat_id', partnerChatId)
+    .maybeSingle()
+  
+  if (checkError && checkError.code !== 'PGRST116') {
+    console.error('Error checking partner existence:', checkError)
+  }
+  
+  // Если партнер одобрен (есть в partners), обновляем partners
+  if (existingPartner) {
+    const { data, error } = await supabase
+      .from('partners')
+      .update(updateData)
+      .eq('chat_id', partnerChatId)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Error updating partner info in partners table:', error)
+      throw error
+    }
+    
+    return data
+  }
+  
+  // Если партнер не одобрен, обновляем partner_applications
+  const { data, error } = await supabase
+    .from('partner_applications')
     .update(updateData)
     .eq('chat_id', partnerChatId)
     .select()
     .single()
   
   if (error) {
-    console.error('Error updating partner info:', error)
+    console.error('Error updating partner info in partner_applications table:', error)
     throw error
   }
   

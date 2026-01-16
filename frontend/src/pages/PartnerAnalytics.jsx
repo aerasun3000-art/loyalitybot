@@ -41,6 +41,7 @@ const PartnerAnalytics = () => {
       
       // Загружаем информацию о партнере (для определения валюты)
       const partnerInfo = await getPartnerInfo(partnerId);
+      console.log('[PartnerAnalytics] Partner info loaded:', partnerInfo);
       if (partnerInfo) {
         setPartnerData(partnerInfo);
         if (partnerInfo.city) {
@@ -48,6 +49,8 @@ const PartnerAnalytics = () => {
           const districtsForCity = getDistrictsByCity(partnerInfo.city);
           setDistricts(districtsForCity);
         }
+      } else {
+        console.warn('[PartnerAnalytics] No partner data found for partnerId:', partnerId);
       }
       
       const startDate = new Date();
@@ -311,20 +314,7 @@ const PartnerAnalytics = () => {
     );
   }
 
-  if (!stats) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            📊 Нет данных
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Данные для этого партнёра пока отсутствуют
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Не блокируем отображение, если нет статистики - показываем данные партнера
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -678,27 +668,29 @@ const PartnerAnalytics = () => {
         </div>
       )}
 
-      {/* Фильтр по периоду */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-2 flex-wrap">
-          {[7, 30, 90, 365].map(days => (
-            <button
-              key={days}
-              onClick={() => setPeriod(days)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                period === days
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-            >
-              {days === 365 ? 'Год' : `${days} дней`}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Фильтр по периоду и метрики - только если есть статистика */}
+      {stats && (
+        <>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex gap-2 flex-wrap">
+              {[7, 30, 90, 365].map(days => (
+                <button
+                  key={days}
+                  onClick={() => setPeriod(days)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    period === days
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {days === 365 ? 'Год' : `${days} дней`}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {/* Метрики */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+          {/* Метрики */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         {/* Финансовые метрики */}
         <div className="mb-8">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
@@ -912,7 +904,23 @@ const PartnerAnalytics = () => {
             </p>
           </div>
         )}
-      </div>
+          </div>
+        </>
+      )}
+
+      {/* Сообщение, если нет статистики, но есть данные партнера */}
+      {!stats && partnerData && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6 text-center">
+            <h3 className="text-lg font-bold text-blue-900 dark:text-blue-200 mb-2">
+              📊 Статистика появится после первых транзакций
+            </h3>
+            <p className="text-blue-700 dark:text-blue-300">
+              Как только у вас появятся клиенты и транзакции, здесь отобразится аналитика.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
