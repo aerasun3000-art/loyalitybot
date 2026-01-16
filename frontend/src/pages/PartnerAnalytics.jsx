@@ -22,6 +22,7 @@ const PartnerAnalytics = () => {
   const [editFormData, setEditFormData] = useState({});
   const [editErrors, setEditErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [cities] = useState(getPartnerCitiesList());
   const [districts, setDistricts] = useState([]);
   const [serviceCategories] = useState(getAllServiceCategories());
@@ -45,7 +46,7 @@ const PartnerAnalytics = () => {
       if (partnerInfo) {
         setPartnerData(partnerInfo);
         if (partnerInfo.city) {
-          setPartnerCity(partnerInfo.city);
+        setPartnerCity(partnerInfo.city);
           const districtsForCity = getDistrictsByCity(partnerInfo.city);
           setDistricts(districtsForCity);
         }
@@ -261,11 +262,19 @@ const PartnerAnalytics = () => {
       setPartnerData(updatedPartnerData);
       if (updatedPartnerData?.city) {
         setPartnerCity(updatedPartnerData.city);
+        const districtsForCity = getDistrictsByCity(updatedPartnerData.city);
+        setDistricts(districtsForCity);
       }
       
       setIsEditing(false);
       setEditFormData({});
       setEditErrors({});
+      setSaveSuccess(true);
+      
+      // Скрываем сообщение об успехе через 3 секунды
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 3000);
     } catch (error) {
       console.error('Error saving partner data:', error);
       setEditErrors({ submit: error.message || 'Ошибка при сохранении данных' });
@@ -359,10 +368,12 @@ const PartnerAnalytics = () => {
                       const districtsForCity = getDistrictsByCity(partnerData.city);
                       setDistricts(districtsForCity);
                     }
+                    setSaveSuccess(false);
+                    setEditErrors({});
                   }}
-                  className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+                  className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors shadow-md hover:shadow-lg font-medium"
                 >
-                  ✏️ Редактировать
+                  ✏️ Редактировать данные
                 </button>
               )}
             </div>
@@ -637,6 +648,14 @@ const PartnerAnalytics = () => {
                     {editErrors.default_referral_commission_percent && <p className="text-red-500 text-xs mt-1">{editErrors.default_referral_commission_percent}</p>}
                   </div>
                 </div>
+                {saveSuccess && (
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mt-4">
+                    <p className="text-green-700 dark:text-green-300 text-sm flex items-center gap-2">
+                      <span>✅</span>
+                      <span>Данные успешно сохранены!</span>
+                    </p>
+                  </div>
+                )}
                 {editErrors.submit && (
                   <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mt-4">
                     <p className="text-red-700 dark:text-red-300 text-sm">{editErrors.submit}</p>
@@ -671,26 +690,26 @@ const PartnerAnalytics = () => {
       {/* Фильтр по периоду и метрики - только если есть статистика */}
       {stats && (
         <>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex gap-2 flex-wrap">
-              {[7, 30, 90, 365].map(days => (
-                <button
-                  key={days}
-                  onClick={() => setPeriod(days)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    period === days
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  {days === 365 ? 'Год' : `${days} дней`}
-                </button>
-              ))}
-            </div>
-          </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex gap-2 flex-wrap">
+          {[7, 30, 90, 365].map(days => (
+            <button
+              key={days}
+              onClick={() => setPeriod(days)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                period === days
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              {days === 365 ? 'Год' : `${days} дней`}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          {/* Метрики */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+      {/* Метрики */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         {/* Финансовые метрики */}
         <div className="mb-8">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
@@ -904,7 +923,7 @@ const PartnerAnalytics = () => {
             </p>
           </div>
         )}
-          </div>
+      </div>
         </>
       )}
 
