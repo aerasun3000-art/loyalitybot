@@ -479,10 +479,12 @@ export const updatePartnerInfo = async (partnerChatId, updateData) => {
   }
   
   // Если партнер одобрен (есть в partners), обновляем partners
+  // Но убираем phone, так как в таблице partners может не быть этого поля
   if (existingPartner) {
+    const { phone, ...updateDataForPartners } = updateData
     const { data, error } = await supabase
       .from('partners')
-      .update(updateData)
+      .update(updateDataForPartners)
       .eq('chat_id', partnerChatId)
       .select()
       .single()

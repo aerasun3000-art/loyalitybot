@@ -227,6 +227,10 @@ const PartnerAnalytics = () => {
     if (editFormData.work_mode === 'offline' && editFormData.city && !editFormData.district) {
       newErrors.district = 'Район обязателен';
     }
+    // Для гибридного режима город не обязателен, но если указан - нужен район
+    if (editFormData.work_mode === 'hybrid' && editFormData.city && !editFormData.district) {
+      newErrors.district = 'Если указан город, выберите район';
+    }
     if (editFormData.default_referral_commission_percent < 0 || editFormData.default_referral_commission_percent > 100) {
       newErrors.default_referral_commission_percent = 'Процент должен быть от 0 до 100';
     }
@@ -248,8 +252,8 @@ const PartnerAnalytics = () => {
         category_group: editFormData.category_group,
         business_type: editFormData.business_type || null,
         work_mode: editFormData.work_mode,
-        city: editFormData.work_mode === 'offline' ? editFormData.city : (editFormData.work_mode === 'online' ? 'Online' : editFormData.city || ''),
-        district: editFormData.work_mode === 'offline' ? (editFormData.district || 'All') : 'All',
+        city: editFormData.work_mode === 'online' ? 'Online' : (editFormData.city || ''),
+        district: editFormData.work_mode === 'online' ? 'All' : (editFormData.district || 'All'),
         username: editFormData.username?.replace('@', '').trim() || null,
         booking_url: editFormData.booking_url?.trim() || null,
         default_referral_commission_percent: parseFloat(editFormData.default_referral_commission_percent) || 10
@@ -549,11 +553,11 @@ const PartnerAnalytics = () => {
                     </select>
                     {editErrors.work_mode && <p className="text-red-500 text-xs mt-1">{editErrors.work_mode}</p>}
                   </div>
-                  {editFormData.work_mode === 'offline' && (
+                  {(editFormData.work_mode === 'offline' || editFormData.work_mode === 'hybrid') && (
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Город *
+                          Город {editFormData.work_mode === 'offline' ? '*' : '(для оффлайн части)'}
                         </label>
                         <select
                           value={editFormData.city || ''}
@@ -565,7 +569,7 @@ const PartnerAnalytics = () => {
                             setEditFormData({ ...editFormData, city, district: newDistrict });
                           }}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          required
+                          required={editFormData.work_mode === 'offline'}
                         >
                           <option value="">Выберите город</option>
                           {cities.map((city) => (
@@ -575,17 +579,22 @@ const PartnerAnalytics = () => {
                           ))}
                         </select>
                         {editErrors.city && <p className="text-red-500 text-xs mt-1">{editErrors.city}</p>}
+                        {editFormData.work_mode === 'hybrid' && (
+                          <p className="text-gray-500 text-xs mt-1">
+                            💡 Укажите город для оффлайн части работы
+                          </p>
+                        )}
                       </div>
                       {editFormData.city && districts.length > 0 && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Район *
+                            Район {editFormData.work_mode === 'offline' ? '*' : '(для оффлайн части)'}
                           </label>
                           <select
                             value={editFormData.district || ''}
                             onChange={(e) => setEditFormData({ ...editFormData, district: e.target.value })}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            required
+                            required={editFormData.work_mode === 'offline'}
                           >
                             <option value="">Выберите район</option>
                             {districts.map((district) => (
