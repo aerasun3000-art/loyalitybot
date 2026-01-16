@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getClientAnalytics } from '../services/supabase'
+import { getClientAnalytics, isApprovedPartner } from '../services/supabase'
 import { getTelegramUser, getChatId, hapticFeedback, closeApp } from '../utils/telegram'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
@@ -16,6 +16,7 @@ const Profile = () => {
   
   const [loading, setLoading] = useState(true)
   const [clientData, setClientData] = useState(null)
+  const [isPartner, setIsPartner] = useState(false)
 
   useEffect(() => {
     loadProfile()
@@ -26,6 +27,12 @@ const Profile = () => {
       setLoading(true)
       const data = await getClientAnalytics(chatId)
       setClientData(data)
+      
+      // Проверяем, является ли пользователь одобренным партнером
+      if (chatId) {
+        const partnerStatus = await isApprovedPartner(chatId)
+        setIsPartner(partnerStatus)
+      }
     } catch (error) {
       console.error('Error loading profile:', error)
     } finally {
@@ -41,6 +48,11 @@ const Profile = () => {
   const handleBecomePartner = () => {
     hapticFeedback('medium')
     navigate('/partner/apply')
+  }
+
+  const handleOpenDashboard = () => {
+    hapticFeedback('medium')
+    navigate(`/partner/analytics?partner_id=${chatId}`)
   }
 
   if (loading) {
@@ -108,32 +120,62 @@ const Profile = () => {
 
       {/* Основной контент */}
       <div className="px-4 -mt-8 pb-20">
-        {/* Кнопка стать партнером */}
-        <div className="bg-gradient-to-br from-jewelry-brown-dark to-jewelry-burgundy rounded-xl p-6 shadow-xl mb-4 relative overflow-hidden border border-jewelry-gold/30">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-jewelry-gold/10 rounded-full -mr-16 -mt-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-jewelry-gold/10 rounded-full -ml-12 -mb-12"></div>
-          
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-3">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
-                <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <path d="M8 8H16M8 12H16M8 16H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-              <h3 className="font-bold text-white text-lg">
-                {t('profile_become_partner')}
-              </h3>
+        {/* Плашка для партнеров или для тех, кто хочет стать партнером */}
+        {isPartner ? (
+          /* Плашка для одобренных партнеров */
+          <div className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl p-6 shadow-xl mb-4 relative overflow-hidden border border-green-500/30">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-green-400/10 rounded-full -mr-16 -mt-16"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-green-400/10 rounded-full -ml-12 -mb-12"></div>
+            
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-green-200">
+                  <path d="M9 12L11 14L15 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                </svg>
+                <h3 className="font-bold text-white text-lg">
+                  {t('profile_you_are_partner')}
+                </h3>
+              </div>
+              <p className="text-white/90 text-sm mb-4">
+                {t('profile_partner_dashboard_description')}
+              </p>
+              <button
+                onClick={handleOpenDashboard}
+                className="w-full bg-white text-green-700 py-3 rounded-lg font-semibold hover:bg-green-50 transition-colors shadow-lg border border-green-300/30"
+              >
+                {t('profile_open_dashboard')} →
+              </button>
             </div>
-            <p className="text-white/80 text-sm mb-4">
-              {t('profile_partner_description')}
-            </p>
-            <button
-              onClick={handleBecomePartner}
-              className="w-full bg-jewelry-gold text-jewelry-cream py-3 rounded-lg font-semibold hover:bg-jewelry-gold-dark transition-colors shadow-lg border border-jewelry-gold-dark/30"
-            >
-              {t('profile_partner_button')} →
-            </button>
           </div>
-        </div>
+        ) : (
+          /* Плашка для тех, кто хочет стать партнером */
+          <div className="bg-gradient-to-br from-jewelry-brown-dark to-jewelry-burgundy rounded-xl p-6 shadow-xl mb-4 relative overflow-hidden border border-jewelry-gold/30">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-jewelry-gold/10 rounded-full -mr-16 -mt-16"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-jewelry-gold/10 rounded-full -ml-12 -mb-12"></div>
+            
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+                  <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <path d="M8 8H16M8 12H16M8 16H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <h3 className="font-bold text-white text-lg">
+                  {t('profile_become_partner')}
+                </h3>
+              </div>
+              <p className="text-white/80 text-sm mb-4">
+                {t('profile_partner_description')}
+              </p>
+              <button
+                onClick={handleBecomePartner}
+                className="w-full bg-jewelry-gold text-jewelry-cream py-3 rounded-lg font-semibold hover:bg-jewelry-gold-dark transition-colors shadow-lg border border-jewelry-gold-dark/30"
+              >
+                {t('profile_partner_button')} →
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Статистика */}
         <div className="bg-jewelry-cream rounded-xl p-4 shadow-lg mb-4 border border-jewelry-gold/20">

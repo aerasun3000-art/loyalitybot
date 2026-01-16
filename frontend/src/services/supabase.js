@@ -423,7 +423,7 @@ export const getPartnerInfo = async (partnerChatId) => {
   
   const { data, error } = await supabase
     .from('partners')
-    .select('chat_id, name, company_name, city, district, google_maps_link')
+    .select('chat_id, name, company_name, city, district, google_maps_link, status')
     .eq('chat_id', partnerChatId)
     .maybeSingle()
   
@@ -433,6 +433,18 @@ export const getPartnerInfo = async (partnerChatId) => {
   }
   
   return data
+}
+
+/**
+ * Проверить, является ли пользователь одобренным партнером
+ */
+export const isApprovedPartner = async (chatId) => {
+  if (!chatId) {
+    return false
+  }
+  
+  const partnerInfo = await getPartnerInfo(chatId)
+  return partnerInfo?.status === 'Approved'
 }
 
 export const getPartnersMetrics = async (partnerIds) => {
