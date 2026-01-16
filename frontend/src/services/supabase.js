@@ -423,7 +423,7 @@ export const getPartnerInfo = async (partnerChatId) => {
   
   const { data, error } = await supabase
     .from('partners')
-    .select('chat_id, name, company_name, city, district, google_maps_link, status')
+    .select('chat_id, name, company_name, city, district, google_maps_link')
     .eq('chat_id', partnerChatId)
     .maybeSingle()
   
@@ -437,14 +437,65 @@ export const getPartnerInfo = async (partnerChatId) => {
 
 /**
  * Проверить, является ли пользователь одобренным партнером
+ * Логика: 
+ * 1. Если партнер есть в таблице partners - он одобрен
+ * 2. ИЛИ если в partner_applications статус = 'Approved'
  */
 export const isApprovedPartner = async (chatId) => {
   if (!chatId) {
+    console.log('[isApprovedPartner] No chatId provided')
     return false
   }
   
-  const partnerInfo = await getPartnerInfo(chatId)
-  return partnerInfo?.status === 'Approved'
+  // Преобразуем chatId в строку для консистентности
+  const chatIdStr = String(chatId)
+  console.log('[isApprovedPartner] Checking partner status for chatId:', chatIdStr)
+  
+  try {
+    // 1. Проверяем наличие в таблице partners (если есть - партнер одобрен)
+    const { data: partner, error: partnerError } = await supabase
+      .from('partners')
+      .select('chat_id, name, company_name')
+      .eq('chat_id', chatIdStr)
+      .maybeSingle()
+    
+    if (partnerError) {
+      console.error('[isApprovedPartner] Error querying partners:', partnerError)
+    }
+    
+    if (partner) {
+      console.log('[isApprovedPartner] Partner found in partners table - APPROVED')
+      return true
+    }
+    
+    // 2. Если не найден в partners, проверяем статус в partner_applications
+    const { data: application, error: appError } = await supabase
+      .from('partner_applications')
+      .select('chat_id, status')
+      .eq('chat_id', chatIdStr)
+      .maybeSingle()
+    
+    if (appError) {
+      console.error('[isApprovedPartner] Error querying partner_applications:', appError)
+    }
+    
+    if (application) {
+      const status = application.status
+      const isApproved = status && (
+        status === 'Approved' || 
+        status === 'approved' || 
+        status.toLowerCase() === 'approved'
+      )
+      console.log('[isApprovedPartner] Found in partner_applications, status:', status, 'Is approved:', isApproved)
+      return isApproved
+    }
+    
+    console.log('[isApprovedPartner] Partner not found in both tables')
+    return false
+  } catch (error) {
+    console.error('[isApprovedPartner] Error checking partner status:', error)
+    return false
+  }
 }
 
 export const getPartnersMetrics = async (partnerIds) => {
