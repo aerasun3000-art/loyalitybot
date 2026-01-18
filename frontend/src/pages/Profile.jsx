@@ -129,13 +129,13 @@ const Profile = () => {
         {/* Плашка для партнеров или для тех, кто хочет стать партнером */}
         {isPartner ? (
           /* Плашка для одобренных партнеров */
-          <div className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl p-6 shadow-xl mb-4 relative overflow-hidden border border-green-500/30">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-green-400/10 rounded-full -mr-16 -mt-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-green-400/10 rounded-full -ml-12 -mb-12"></div>
+          <div className="bg-gradient-to-br from-jewelry-purple to-jewelry-pink-dark rounded-xl p-6 shadow-xl mb-4 relative overflow-hidden border border-jewelry-gold/30">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-jewelry-gold/10 rounded-full -mr-16 -mt-16"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-jewelry-gold/10 rounded-full -ml-12 -mb-12"></div>
             
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-3">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-green-200">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold-light">
                   <path d="M9 12L11 14L15 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
                 </svg>
@@ -148,7 +148,7 @@ const Profile = () => {
               </p>
               <button
                 onClick={handleOpenDashboard}
-                className="w-full bg-white text-green-700 py-3 rounded-lg font-semibold hover:bg-green-50 transition-colors shadow-lg border border-green-300/30"
+                className="w-full bg-white text-jewelry-purple py-3 rounded-lg font-semibold hover:bg-jewelry-lavender transition-colors shadow-lg border border-jewelry-purple/30"
               >
                 {t('profile_open_dashboard')} →
               </button>
