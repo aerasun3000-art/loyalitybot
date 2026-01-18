@@ -1,0 +1,88 @@
+{
+  "backup_date": "2026-01-18",
+  "backup_version": "1.0",
+  "description": "Backup webhook конфигурации клиентского бота перед миграцией на Cloudflare",
+  
+  "current_config": {
+    "provider": "Cloudflare Workers",
+    "method": "Webhook",
+    "url": "https://loyalitybot-client-webhook.aerasun3000.workers.dev",
+    "status": "active",
+    "setup_date": "2026-01-18",
+    "account_id": "1e573db7d6be24be4e467cc02a9b8524",
+    "worker_name": "loyalitybot-client-webhook",
+    "worker_id": "61d09aac-7ecc-49b5-ae39-3c4a8ea17d69",
+    "last_check": {
+      "date": "2026-01-18",
+      "url": "https://loyalitybot-client-webhook.aerasun3000.workers.dev",
+      "pending_update_count": 0,
+      "max_connections": 40,
+      "ip_address": "172.67.152.143",
+      "has_custom_certificate": false
+    }
+  },
+  
+  "previous_config": {
+    "provider": "Fly.io",
+    "method": "Long Polling",
+    "app_name": "loyalitybot-client",
+    "region": "ewr",
+    "status": "stopped",
+    "config_file": "fly.client.toml",
+    "command": "python client_handler.py",
+    "resources": {
+      "memory_mb": 512,
+      "cpus": 1,
+      "cpu_kind": "shared"
+    },
+    "restore_commands": [
+      "curl -X POST 'https://api.telegram.org/bot<TOKEN>/deleteWebhook?drop_pending_updates=true'",
+      "flyctl deploy --config fly.client.toml --app loyalitybot-client"
+    ]
+  },
+  
+  "secrets": {
+    "provider": "Cloudflare Workers Secrets",
+    "worker": "loyalitybot-client-webhook",
+    "configured": [
+      "TOKEN_CLIENT",
+      "SUPABASE_URL",
+      "SUPABASE_KEY",
+      "FRONTEND_URL",
+      "WELCOME_BONUS_AMOUNT"
+    ],
+    "note": "Секреты хранятся в Cloudflare, не включаются в backup для безопасности"
+  },
+  
+  "restore_instructions": {
+    "to_cloudflare_webhook": {
+      "step1": "curl -X POST 'https://api.telegram.org/bot<TOKEN>/setWebhook' -H 'Content-Type: application/json' -d '{\"url\": \"https://loyalitybot-client-webhook.aerasun3000.workers.dev\"}'",
+      "step2": "Проверить статус: curl -s 'https://api.telegram.org/bot<TOKEN>/getWebhookInfo' | python3 -m json.tool"
+    },
+    "to_fly_io_polling": {
+      "step1": "curl -X POST 'https://api.telegram.org/bot<TOKEN>/deleteWebhook?drop_pending_updates=true'",
+      "step2": "cd /Users/ghbi/Downloads/loyalitybot",
+      "step3": "flyctl deploy --config fly.client.toml --app loyalitybot-client",
+      "step4": "flyctl status --app loyalitybot-client"
+    }
+  },
+  
+  "files": {
+    "backup_file": "WEBHOOK_BACKUP.md",
+    "webhook_url_file": "CLOUDFLARE_WEBHOOK_URL.txt",
+    "fly_config": "fly.client.toml",
+    "client_handler": "client_handler.py",
+    "worker_files": [
+      "cloudflare/workers/client-webhook/index.js",
+      "cloudflare/workers/client-webhook/client.js",
+      "cloudflare/workers/client-webhook/wrangler.toml"
+    ]
+  },
+  
+  "notes": [
+    "Токен бота НЕ сохранен в backup для безопасности",
+    "Старый Long Polling бот на Fly.io можно восстановить в любой момент",
+    "Все секреты настроены через wrangler secret put",
+    "Webhook активен и работает на Cloudflare Workers"
+  ]
+}

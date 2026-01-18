@@ -1,0 +1,24 @@
+# Cloudflare Worker configuration for Partner Bot Webhook
+
+name = "loyalitybot-partner-webhook"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# Environment variables (set via wrangler secret put)
+# TOKEN_PARTNER - Telegram bot token
+# SUPABASE_URL - Supabase project URL
+# SUPABASE_KEY - Supabase API key
+# WEBHOOK_SECRET_TOKEN - Optional secret token for webhook validation
+# FRONTEND_URL - Frontend application URL
+# BOT_USERNAME - Client bot username (for referral links)
+# SENTRY_DSN - Sentry DSN for error tracking (optional)
+# SENTRY_ENVIRONMENT - Sentry environment (default: production)
+
+[env.production]
+name = "loyalitybot-partner-webhook"
+
+[env.staging]
+name = "loyalitybot-partner-webhook-staging"
+
+# Note: CPU limits are not supported on Free plan
+# Remove [limits] section for Free plan deployments

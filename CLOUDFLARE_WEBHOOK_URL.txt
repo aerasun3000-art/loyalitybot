@@ -1,0 +1,8 @@
+Cloudflare Worker URL (Client Bot):
+https://loyalitybot-client-webhook.aerasun3000.workers.dev
+
+Account: aerasun3000@gmail.com
+Account ID: 1e573db7d6be24be4e467cc02a9b8524
+Version ID: 61d09aac-7ecc-49b5-ae39-3c4a8ea17d69
+
+Дата деплоя: 2026-01-18

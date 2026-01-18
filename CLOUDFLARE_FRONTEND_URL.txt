@@ -1,0 +1,27 @@
+Cloudflare Pages URL (Frontend):
+https://loyalitybot-frontend.pages.dev
+
+Preview URL:
+https://feb3a5b2.loyalitybot-frontend.pages.dev
+
+Account: aerasun3000@gmail.com
+Account ID: 1e573db7d6be24be4e467cc02a9b8524
+Project Name: loyalitybot-frontend
+
+Дата деплоя: 2026-01-18
+
+⚠️ ВАЖНО:
+1. Переменные окружения нужно настроить через Dashboard:
+   https://dash.cloudflare.com/1e573db7d6be24be4e467cc02a9b8524/pages/view/loyalitybot-frontend/settings/configuration
+   
+2. Добавьте переменные окружения в разделе 'Environment variables':
+   - VITE_SUPABASE_URL=https://gynpvfchojnyoirosysj.supabase.co
+   - VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   - VITE_API_URL=https://loyalitybot-api.aerasun3000.workers.dev
+   - VITE_APP_NAME=LoyalityBot
+   - VITE_APP_VERSION=0.1.0
+
+3. После настройки переменных передеплойте через:
+   cd frontend && wrangler pages deploy dist --project-name=loyalitybot-frontend
+
+4. Или используйте Git интеграцию для автоматических билдов.

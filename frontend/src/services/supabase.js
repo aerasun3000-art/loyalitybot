@@ -507,9 +507,27 @@ export const updatePartnerInfo = async (partnerChatId, updateData) => {
   
   if (error) {
     console.error('Error updating partner info in partner_applications table:', error)
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    })
+    
+    // Более понятное сообщение об ошибке
+    if (error.code === '42501' || error.message?.includes('permission') || error.message?.includes('policy')) {
+      throw new Error('Недостаточно прав для обновления данных. Обратитесь к администратору.')
+    }
+    
     throw error
   }
   
+  // Проверяем, что данные действительно обновились
+  if (!data) {
+    throw new Error('Данные не были обновлены. Попробуйте еще раз.')
+  }
+  
+  console.log('Successfully updated partner_applications:', data)
   return data
 }
 

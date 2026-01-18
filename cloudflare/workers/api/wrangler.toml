@@ -1,0 +1,18 @@
+# Cloudflare Worker configuration for REST API
+
+name = "loyalitybot-api"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# Environment variables (set via wrangler secret put)
+# SUPABASE_URL - Supabase project URL
+# SUPABASE_KEY - Supabase API key
+# TOKEN_PARTNER - Partner bot token (for notifications and QR sending)
+# ADMIN_BOT_TOKEN - Admin bot token (for Sentry alerts)
+# ADMIN_CHAT_ID - Admin chat ID(s) for Sentry alerts (comma-separated)
+# OPENAI_API_KEY - OpenAI API key for translation
+# SENTRY_WEBHOOK_SECRET - Optional secret for Sentry webhook validation
+# SENTRY_DSN - Sentry DSN for error tracking (optional)
+
+# Note: CPU limits are not supported on Free plan
+# Remove [limits] section for Free plan deployments

@@ -1,0 +1,13 @@
+Cloudflare Worker URL (REST API):
+https://loyalitybot-api.aerasun3000.workers.dev
+
+Account: aerasun3000@gmail.com
+Account ID: 1e573db7d6be24be4e467cc02a9b8524
+Version ID: f78d1672-c370-456c-a7bd-94fc6135f008
+
+Дата деплоя: 2026-01-18
+
+Endpoints:
+- GET /health - Health check
+- GET /clients/:client_chat_id/balance - Get client balance
+- POST /transactions - Create transaction (accrual/spend)

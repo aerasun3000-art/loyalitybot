@@ -259,10 +259,23 @@ const PartnerAnalytics = () => {
         default_referral_commission_percent: parseFloat(editFormData.default_referral_commission_percent) || 10
       };
       
-      await updatePartnerInfo(partnerId, updateData);
+      console.log('[PartnerAnalytics] Saving partner data:', { partnerId, updateData });
+      
+      const result = await updatePartnerInfo(partnerId, updateData);
+      console.log('[PartnerAnalytics] Update result:', result);
+      
+      if (!result) {
+        throw new Error('Данные не были сохранены. Попробуйте еще раз.');
+      }
       
       // Обновляем локальные данные
       const updatedPartnerData = await getPartnerInfo(partnerId);
+      console.log('[PartnerAnalytics] Reloaded partner data:', updatedPartnerData);
+      
+      if (!updatedPartnerData) {
+        throw new Error('Не удалось загрузить обновленные данные. Обновите страницу.');
+      }
+      
       setPartnerData(updatedPartnerData);
       if (updatedPartnerData?.city) {
         setPartnerCity(updatedPartnerData.city);
@@ -280,8 +293,15 @@ const PartnerAnalytics = () => {
         setSaveSuccess(false);
       }, 3000);
     } catch (error) {
-      console.error('Error saving partner data:', error);
-      setEditErrors({ submit: error.message || 'Ошибка при сохранении данных' });
+      console.error('[PartnerAnalytics] Error saving partner data:', error);
+      const errorMessage = error?.message || error?.error?.message || 'Ошибка при сохранении данных';
+      console.error('[PartnerAnalytics] Error details:', {
+        message: errorMessage,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint
+      });
+      setEditErrors({ submit: errorMessage });
     } finally {
       setSaving(false);
     }

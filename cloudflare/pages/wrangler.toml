@@ -1,0 +1,10 @@
+name = "loyalitybot-frontend"
+compatibility_date = "2024-01-01"
+
+# Cloudflare Pages configuration
+# Variables are set via: wrangler pages secret put <KEY>
+# VITE_SUPABASE_URL - Supabase project URL
+# VITE_SUPABASE_ANON_KEY - Supabase anonymous key
+# VITE_API_URL - Backend API URL (Cloudflare Workers)
+# VITE_APP_NAME - Application name
+# VITE_APP_VERSION - Application version
