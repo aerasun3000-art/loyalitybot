@@ -138,12 +138,29 @@ const Services = () => {
   }
 
   // Группировка услуг по категории и компании
+  // ВАЖНО: Всегда используем business_type партнёра для группировки,
+  // чтобы все услуги одного партнёра были в одной группе
   const getGroupedServices = () => {
     const groupsMap = {}
     
+    // Сначала находим основную категорию для каждого партнёра
+    const partnerCategories = new Map()
     services.forEach(service => {
-      const rawCategoryCode = service.partner?.business_type || service.category || 'other'
       const partnerId = service.partner_chat_id || 'unknown'
+      if (!partnerCategories.has(partnerId)) {
+        // Приоритет: business_type партнёра > первая категория услуг
+        const category = service.partner?.business_type || service.category || 'other'
+        partnerCategories.set(partnerId, category)
+      }
+    })
+    
+    services.forEach(service => {
+      const partnerId = service.partner_chat_id || 'unknown'
+      // ВСЕГДА используем business_type партнёра или основную категорию из его услуг
+      const rawCategoryCode = service.partner?.business_type || 
+                              partnerCategories.get(partnerId) || 
+                              service.category || 
+                              'other'
       const companyName = service.partner?.company_name || service.partner?.name || t('partner_not_connected')
       const category = resolveCategory(rawCategoryCode) || {
         code: rawCategoryCode,
@@ -230,8 +247,22 @@ const Services = () => {
 
   const categoryOptions = useMemo(() => {
     const optionMap = new Map()
+    // Находим основную категорию для каждого партнёра
+    const partnerCategoriesMap = new Map()
     services.forEach(service => {
-      const rawCode = service.partner?.business_type || service.category
+      const partnerId = service.partner_chat_id || 'unknown'
+      if (!partnerCategoriesMap.has(partnerId)) {
+        const category = service.partner?.business_type || service.category
+        partnerCategoriesMap.set(partnerId, category)
+      }
+    })
+    
+    services.forEach(service => {
+      const partnerId = service.partner_chat_id || 'unknown'
+      // ВСЕГДА используем business_type партнёра или основную категорию
+      const rawCode = service.partner?.business_type || 
+                      partnerCategoriesMap.get(partnerId) || 
+                      service.category
       if (!rawCode) return
       const categoryData = resolveCategory(rawCode)
       if (!categoryData) return

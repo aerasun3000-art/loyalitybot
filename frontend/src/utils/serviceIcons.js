@@ -190,6 +190,78 @@ export const serviceCategories = {
     nameEn: 'Make-up & PMU',
     color: 'from-jewelry-burgundy to-jewelry-gold',
     emoji: '💄'
+  },
+  skincare: {
+    code: 'facial_aesthetics',
+    icon: 'facial_aesthetics',
+    name: 'Уход за кожей',
+    nameEn: 'Skincare',
+    color: 'from-jewelry-burgundy to-jewelry-brown-dark',
+    emoji: '✨'
+  },
+  cleaning: {
+    code: 'cleaning',
+    icon: 'cleaning',
+    name: 'Уборка и клининг',
+    nameEn: 'Cleaning Services',
+    color: 'from-jewelry-gold to-jewelry-brown-light',
+    emoji: '🧹'
+  },
+  repair: {
+    code: 'repair',
+    icon: 'repair',
+    name: 'Ремонт',
+    nameEn: 'Repair Services',
+    color: 'from-jewelry-brown-light to-jewelry-gold',
+    emoji: '🔧'
+  },
+  delivery: {
+    code: 'delivery',
+    icon: 'delivery',
+    name: 'Доставка',
+    nameEn: 'Delivery',
+    color: 'from-jewelry-gold-light to-jewelry-gold',
+    emoji: '🚚'
+  },
+  fitness: {
+    code: 'fitness',
+    icon: 'fitness',
+    name: 'Фитнес',
+    nameEn: 'Fitness',
+    color: 'from-jewelry-gold to-jewelry-brown-light',
+    emoji: '🏃‍♀️'
+  },
+  spa: {
+    code: 'spa',
+    icon: 'spa',
+    name: 'SPA',
+    nameEn: 'SPA',
+    color: 'from-jewelry-cream to-jewelry-gold-light',
+    emoji: '🛁'
+  },
+  yoga: {
+    code: 'yoga',
+    icon: 'yoga',
+    name: 'Йога',
+    nameEn: 'Yoga',
+    color: 'from-jewelry-brown-light to-jewelry-gold',
+    emoji: '🧘‍♀️'
+  },
+  nutrition: {
+    code: 'nutrition_coaching',
+    icon: 'nutrition_coaching',
+    name: 'Питание',
+    nameEn: 'Nutrition',
+    color: 'from-jewelry-gold-light to-jewelry-gold',
+    emoji: '🥗'
+  },
+  psychology: {
+    code: 'mindfulness_coaching',
+    icon: 'mindfulness_coaching',
+    name: 'Психолог',
+    nameEn: 'Psychology',
+    color: 'from-jewelry-brown-light to-jewelry-burgundy',
+    emoji: '🧠'
   }
 }
 

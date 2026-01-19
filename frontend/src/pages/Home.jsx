@@ -227,12 +227,14 @@ const Home = () => {
     }
 
     const servicePartnerId = service.partner_chat_id || service.partnerId
-    const serviceCategory = service.partner?.business_type || service.category || service.categoryCode
     
     // Если это сам партнер, который добавил клиента - НЕ конкурент (показываем)
     if (servicePartnerId === referralPartnerInfo.chatId) {
       return false
     }
+
+    // ВСЕГДА используем business_type партнёра для определения конкурента
+    const serviceCategory = service.partner?.business_type || service.category || service.categoryCode
 
     if (!serviceCategory || !referralPartnerInfo.businessType) {
       return false

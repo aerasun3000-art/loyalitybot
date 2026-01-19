@@ -769,10 +769,24 @@ export async function handleServiceCategorySelection(env, chatId, category) {
       return { success: false };
     }
     
+    // Получаем данные партнёра для проверки business_type
+    const partner = await getPartnerByChatId(env, chatId);
+    
+    // Используем business_type партнёра, если установлен, иначе выбранную категорию
+    // Это гарантирует, что все услуги партнёра будут в одной группе
+    let finalCategory = category;
+    if (partner?.business_type) {
+      finalCategory = partner.business_type;
+      // Если категория отличается, уведомляем партнёра
+      if (partner.business_type !== category) {
+        console.log(`[handleServiceCategorySelection] Category mismatch: partner business_type=${partner.business_type}, selected=${category}, using business_type`);
+      }
+    }
+    
     // Prepare service data
     const serviceData = {
       ...botState.data,
-      category: category,
+      category: finalCategory,  // Используем business_type партнёра или выбранную категорию
       is_active: true,
     };
     
