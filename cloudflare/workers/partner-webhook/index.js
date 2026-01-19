@@ -11,14 +11,24 @@ import {
   errorResponse,
   logError,
 } from './common.js';
+import { trackPerformance } from './sentry.js';
 
 /**
  * Main webhook handler
  */
 export default {
   async fetch(request, env, ctx) {
+    const startTime = Date.now();
+    let update = null;
+
+    console.log('[Worker] Request received:', {
+      method: request.method,
+      url: request.url,
+    });
+    
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
+      console.log('[Worker] Handling OPTIONS request');
       return new Response(null, {
         status: 204,
         headers: {
@@ -31,34 +41,81 @@ export default {
 
     // Only accept POST requests
     if (request.method !== 'POST') {
+      console.log('[Worker] Invalid method:', request.method);
       return errorResponse('Method not allowed', 405);
     }
 
     try {
+      console.log('[Worker] Processing POST request');
+      
       // Validate webhook secret token (if configured)
       const secretToken = env.WEBHOOK_SECRET_TOKEN;
-      if (secretToken && !validateTelegramWebhook(request, secretToken)) {
-        logError('Webhook validation', new Error('Invalid secret token'), {});
-        return errorResponse('Unauthorized', 401);
+      if (secretToken) {
+        console.log('[Worker] Validating webhook secret token');
+        if (!validateTelegramWebhook(request, secretToken)) {
+          console.error('[Worker] Invalid secret token');
+          await logError('Webhook validation', new Error('Invalid secret token'), {
+            url: request.url,
+            method: request.method,
+          }, request, env);
+          return errorResponse('Unauthorized', 401);
+        }
+        console.log('[Worker] Secret token validated');
+      } else {
+        console.log('[Worker] No secret token configured, skipping validation');
       }
 
       // Parse Telegram update
-      const update = await parseTelegramUpdate(request);
+      console.log('[Worker] Parsing Telegram update');
+      update = await parseTelegramUpdate(request);
+      console.log('[Worker] Update parsed:', {
+        hasCallback: !!update.callback_query,
+        hasMessage: !!update.message,
+        callbackData: update.callback_query?.data,
+        messageText: update.message?.text,
+      });
       
       // Route update to appropriate handler
+      console.log('[Worker] Routing update');
       const result = await routeUpdate(env, update);
+      console.log('[Worker] Update processed successfully:', result);
+      
+      // Track performance
+      const duration = Date.now() - startTime;
+      if (env.SENTRY_DSN) {
+        trackPerformance('webhook.partner', duration, {
+          worker: 'partner-webhook',
+          update_id: update.update_id,
+        }, env.SENTRY_DSN, env.SENTRY_ENVIRONMENT || 'production').catch(() => {});
+      }
       
       // Return success response
       return successResponse(result);
       
     } catch (error) {
-      logError('Webhook processing', error, {
+      const duration = Date.now() - startTime;
+      
+      console.error('[Worker] ERROR:', error);
+      console.error('[Worker] Error stack:', error.stack);
+      
+      // Log error with full context
+      await logError('Webhook processing', error, {
         url: request.url,
         method: request.method,
-      });
+        duration_ms: duration,
+        update_id: update?.update_id,
+      }, request, env, update);
+      
+      // Track failed request performance
+      if (env.SENTRY_DSN) {
+        trackPerformance('webhook.partner.error', duration, {
+          worker: 'partner-webhook',
+          error: error.message,
+          update_id: update?.update_id,
+        }, env.SENTRY_DSN, env.SENTRY_ENVIRONMENT || 'production').catch(() => {});
+      }
       
       // Still return 200 to Telegram to prevent retries
-      // Log error to Sentry or monitoring service
       return successResponse({ error: error.message });
     }
   },

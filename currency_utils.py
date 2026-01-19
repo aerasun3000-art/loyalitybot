@@ -1,6 +1,13 @@
 """
 Утилита для определения валюты по городу партнера
 """
+import os
+import logging
+from datetime import datetime
+from typing import Optional
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Города США (используют USD)
 US_CITIES = [
@@ -53,14 +60,32 @@ CITY_TO_CURRENCY = {
     'Казань': 'RUB',
     'Нижний Новгород': 'RUB',
     
-    # Другие страны (можно расширить)
+    # Вьетнам
+    'Nha Trang': 'VND',
+    
+    # Казахстан
+    'Almaty': 'KZT',
+    'Astana': 'KZT',
+    'Алматы': 'KZT',
+    'Астана': 'KZT',
+    
+    # Киргизия
+    'Bishkek': 'KGS',
+    'Osh': 'KGS',
+    'Бишкек': 'KGS',
+    'Ош': 'KGS',
+    
+    # ОАЭ
+    'Dubai': 'AED',
+    'Дубай': 'AED',
+    
+    # Другие страны (опционально)
     'London': 'GBP',
     'Paris': 'EUR',
     'Berlin': 'EUR',
     'Madrid': 'EUR',
     'Rome': 'EUR',
     'Amsterdam': 'EUR',
-    'Dubai': 'AED',
     'Tokyo': 'JPY',
     'Singapore': 'SGD',
     'Sydney': 'AUD',
@@ -72,9 +97,12 @@ CITY_TO_CURRENCY = {
 CURRENCY_SYMBOLS = {
     'USD': '$',
     'RUB': '₽',
+    'VND': '₫',
+    'KZT': '₸',
+    'KGS': 'сом',
+    'AED': 'د.إ',
     'EUR': '€',
     'GBP': '£',
-    'AED': 'د.إ',
     'JPY': '¥',
     'SGD': 'S$',
     'AUD': 'A$',
@@ -146,13 +174,109 @@ def format_currency(value, city=None, currency=None):
     symbol = get_currency_symbol(final_currency)
     
     # Форматируем число с разделителями тысяч
-    formatted_value = f"{value:,.2f}".rstrip('0').rstrip('.')
+    # Для VND, KZT, KGS - без десятичных знаков
+    if final_currency in ['VND', 'KZT', 'KGS']:
+        formatted_value = f"{int(value):,}".replace(',', ' ')
+    else:
+        formatted_value = f"{value:,.2f}".rstrip('0').rstrip('.')
     
     return f"{symbol}{formatted_value}"
 
 
+# Курсы валют по умолчанию (fallback, если БД недоступна)
+DEFAULT_EXCHANGE_RATES = {
+    'VND_USD': 0.0000408,  # 1 VND = 0.0000408 USD (24,500 VND = 1 USD)
+    'RUB_USD': 0.011,      # 1 RUB = 0.011 USD (~91 RUB = 1 USD)
+    'KZT_USD': 0.0021,     # 1 KZT = 0.0021 USD (~476 KZT = 1 USD)
+    'KGS_USD': 0.011,      # 1 KGS = 0.011 USD (~91 KGS = 1 USD)
+    'AED_USD': 0.272,      # 1 AED = 0.272 USD (~3.67 AED = 1 USD)
+    
+    # Обратные курсы (если нужно)
+    'USD_VND': 24500,
+    'USD_RUB': 91,
+    'USD_KZT': 476,
+    'USD_KGS': 91,
+    'USD_AED': 3.67,
+}
 
 
+def get_exchange_rate(from_currency: str, to_currency: str = 'USD', 
+                     date: Optional[datetime] = None,
+                     supabase_client=None) -> float:
+    """
+    Получает курс обмена валют
+    
+    Сначала пытается получить из БД, если не получается - использует DEFAULT_RATES
+    
+    Args:
+        from_currency: Исходная валюта (VND, RUB, etc.)
+        to_currency: Целевая валюта (по умолчанию USD)
+        date: Дата для получения исторического курса (по умолчанию сегодня)
+        supabase_client: Клиент Supabase (опционально, если None - используется DEFAULT_RATES)
+    
+    Returns:
+        float: Курс обмена (1 from_currency = rate to_currency)
+    """
+    # Если конвертируем в ту же валюту
+    if from_currency == to_currency:
+        return 1.0
+    
+    # Пытаемся получить из БД, если клиент передан
+    if supabase_client:
+        try:
+            if not date:
+                date = datetime.now()
+            
+            # Получаем курс из БД
+            result = supabase_client.table('currency_exchange_rates').select('rate').eq(
+                'from_currency', from_currency
+            ).eq('to_currency', to_currency).lte('effective_from', date.isoformat()).order(
+                'effective_from', desc=True
+            ).limit(1).execute()
+            
+            if result.data and len(result.data) > 0:
+                rate = float(result.data[0]['rate'])
+                logger.debug(f"Курс {from_currency}→{to_currency} из БД: {rate}")
+                return rate
+        except Exception as e:
+            logger.warning(f"Не удалось получить курс из БД, использую DEFAULT_RATES: {e}")
+    
+    # Fallback: используем DEFAULT_RATES
+    key = f"{from_currency}_{to_currency}"
+    rate = DEFAULT_EXCHANGE_RATES.get(key, 1.0)
+    
+    if rate == 1.0 and from_currency != to_currency:
+        logger.warning(f"Курс {key} не найден в DEFAULT_RATES, возвращаю 1.0")
+    
+    return rate
+
+
+def convert_currency(amount: float, from_currency: str, 
+                    to_currency: str = 'USD',
+                    date: Optional[datetime] = None,
+                    supabase_client=None) -> float:
+    """
+    Конвертирует сумму из одной валюты в другую
+    
+    Args:
+        amount: Сумма в исходной валюте
+        from_currency: Исходная валюта
+        to_currency: Целевая валюта (по умолчанию USD)
+        date: Дата для исторической конвертации
+        supabase_client: Клиент Supabase (опционально)
+    
+    Returns:
+        float: Сумма в целевой валюте
+    """
+    if from_currency == to_currency:
+        return float(amount)
+    
+    rate = get_exchange_rate(from_currency, to_currency, date, supabase_client)
+    converted = float(amount) * rate
+    
+    logger.debug(f"Конвертация: {amount} {from_currency} × {rate} = {converted} {to_currency}")
+    
+    return round(converted, 2)
 
 
 

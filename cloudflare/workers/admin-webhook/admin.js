@@ -5,6 +5,8 @@
 
 import { 
   supabaseRequest,
+  updateServiceApprovalStatus,
+  getServiceById,
 } from './supabase.js';
 import {
   sendTelegramMessage,
@@ -357,6 +359,17 @@ export async function handleCallbackQuery(env, update) {
       return await handlePartnerDeleteConfirm(env, callbackQuery, partnerId);
     }
     
+    // Handle service approval/rejection
+    if (data.startsWith('service_approve_')) {
+      const serviceId = data.replace('service_approve_', '');
+      return await handleServiceApproval(env, callbackQuery, serviceId, 'Approved');
+    }
+    
+    if (data.startsWith('service_reject_')) {
+      const serviceId = data.replace('service_reject_', '');
+      return await handleServiceApproval(env, callbackQuery, serviceId, 'Rejected');
+    }
+    
     // Default: show main menu
     await showMainMenu(env, chatId);
     return { success: true, handled: true, action: 'main_menu' };
@@ -654,6 +667,67 @@ async function handlePartnerDeleteConfirm(env, callbackQuery, partnerId) {
     }
   } catch (error) {
     logError('handlePartnerDeleteConfirm', error, { partnerId });
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Произошла ошибка', true);
+    throw error;
+  }
+}
+
+/**
+ * Handle service approval/rejection
+ */
+async function handleServiceApproval(env, callbackQuery, serviceId, newStatus) {
+  const chatId = String(callbackQuery.message.chat.id);
+  
+  try {
+    // Clean serviceId - remove any whitespace
+    serviceId = String(serviceId).trim();
+    console.log('[handleServiceApproval] Processing:', { serviceId, newStatus, chatId });
+    
+    const success = await updateServiceApprovalStatus(env, serviceId, newStatus);
+    
+    if (success) {
+      const resultText = newStatus === 'Approved' ? '🟢 Одобрена' : '🔴 Отклонена';
+      const originalText = callbackQuery.message.text || '';
+      const processedText = originalText.split('\n')[0];
+      
+      // Update message (remove inline keyboard)
+      await editMessageText(
+        env.ADMIN_BOT_TOKEN,
+        chatId,
+        callbackQuery.message.message_id,
+        `${processedText}\n\n**СТАТУС: ${resultText}**`,
+        { parseMode: 'Markdown' }
+      );
+      
+      // Get service info to notify partner
+      const service = await getServiceById(env, serviceId);
+      if (service && service.partner_chat_id) {
+        if (newStatus === 'Approved') {
+          await sendPartnerNotification(
+            env,
+            service.partner_chat_id,
+            `✅ **Ваша услуга одобрена!**\n\n` +
+            `Услуга "${service.title || 'N/A'}" теперь доступна клиентам.`
+          );
+        } else {
+          await sendPartnerNotification(
+            env,
+            service.partner_chat_id,
+            `❌ **Ваша услуга отклонена**\n\n` +
+            `Услуга "${service.title || 'N/A'}" была отклонена администратором.`
+          );
+        }
+      }
+      
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, resultText);
+      return { success: true, handled: true, action: 'service_updated', status: newStatus };
+    } else {
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Ошибка при обновлении статуса в БД', true);
+      return { success: false, handled: true, action: 'service_update_failed' };
+    }
+  } catch (error) {
+    console.error('[handleServiceApproval] Error:', error);
+    logError('handleServiceApproval', error, { serviceId, newStatus });
     await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Произошла ошибка', true);
     throw error;
   }

@@ -2,6 +2,8 @@
  * Common utility functions for Cloudflare Workers
  */
 
+import { sendToSentry, createSentryContext } from './sentry.js';
+
 /**
  * Validate Telegram webhook secret token
  */
@@ -93,12 +95,41 @@ export function errorResponse(message, status = 400) {
 }
 
 /**
- * Log error to console
+ * Log error to console and Sentry
+ * @param {string} context - Error context description
+ * @param {Error} error - Error object
+ * @param {Object} additionalInfo - Additional context information
+ * @param {Request} request - Original request object (optional)
+ * @param {Object} env - Environment variables (optional, for Sentry)
+ * @param {Object} update - Telegram update (optional)
  */
-export function logError(context, error, additionalInfo = {}) {
+export async function logError(context, error, additionalInfo = {}, request = null, env = null, update = null) {
+  // Always log to console
   console.error(`[ERROR] ${context}:`, {
     message: error.message,
     stack: error.stack,
     ...additionalInfo,
   });
+
+  // Send to Sentry if configured
+  if (env?.SENTRY_DSN) {
+    const sentryContext = createSentryContext(
+      request || { url: additionalInfo.url || '', method: additionalInfo.method || 'POST', headers: new Headers() },
+      'partner-webhook',
+      'partner',
+      update || additionalInfo.update
+    );
+
+    // Add additional info to Sentry context
+    sentryContext.release = env.APP_VERSION || '1.0.0';
+    Object.assign(sentryContext, additionalInfo);
+
+    // Send asynchronously (don't await to not block response)
+    sendToSentry(
+      error,
+      sentryContext,
+      env.SENTRY_DSN,
+      env.SENTRY_ENVIRONMENT || 'production'
+    ).catch(err => console.error('[Sentry] Failed to send error:', err));
+  }
 }

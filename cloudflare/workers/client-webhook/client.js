@@ -43,21 +43,28 @@ export async function handleStart(env, update) {
       // Create new user
       const welcomeBonus = parseInt(env.WELCOME_BONUS_AMOUNT || '100');
       
+      // Build name from first_name and last_name
+      const name = [message.from.first_name, message.from.last_name]
+        .filter(Boolean)
+        .join(' ') || message.from.username || null;
+      
       const userData = {
         chat_id: chatId,
-        user_id: userId,
+        name: name,
         username: message.from.username || null,
-        first_name: message.from.first_name || null,
-        last_name: message.from.last_name || null,
-        registration_date: new Date().toISOString(),
+        reg_date: new Date().toISOString(),
         balance: welcomeBonus,
         referral_source: referralId ? (text.includes('partner_') ? `partner_${referralId}` : `ref_${referralId}`) : null,
+        status: 'active',
       };
       
       user = await upsertUser(env, userData);
       
       // Send welcome message
-      const frontendUrl = env.FRONTEND_URL || 'https://your-frontend-domain.com';
+      // IMPORTANT: Always use Cloudflare Pages URL
+      const frontendUrl = env.FRONTEND_URL || 'https://loyalitybot-frontend.pages.dev';
+      console.log('[handleStart] New user - FRONTEND_URL from env:', env.FRONTEND_URL);
+      console.log('[handleStart] New user - Using URL:', frontendUrl);
       const keyboard = [[
         { text: '🚀 Открыть приложение', web_app: { url: frontendUrl } },
         { text: '📊 Мой баланс', callback_data: 'balance' }
@@ -80,7 +87,10 @@ export async function handleStart(env, update) {
       return { success: true, newUser: true };
     } else {
       // User already exists
-      const frontendUrl = env.FRONTEND_URL || 'https://your-frontend-domain.com';
+      // IMPORTANT: Always use Cloudflare Pages URL
+      const frontendUrl = env.FRONTEND_URL || 'https://loyalitybot-frontend.pages.dev';
+      console.log('[handleStart] Existing user - FRONTEND_URL from env:', env.FRONTEND_URL);
+      console.log('[handleStart] Existing user - Using URL:', frontendUrl);
       const keyboard = [[
         { text: '🚀 Открыть приложение', web_app: { url: frontendUrl } },
         { text: '📊 Мой баланс', callback_data: 'balance' }

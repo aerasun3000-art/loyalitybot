@@ -11,12 +11,16 @@ import {
   errorResponse,
   logError,
 } from './common.js';
+import { trackPerformance } from './sentry.js';
 
 /**
  * Main webhook handler
  */
 export default {
   async fetch(request, env, ctx) {
+    const startTime = Date.now();
+    let update = null;
+
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
@@ -44,7 +48,10 @@ export default {
       if (secretToken && receivedToken) {
         if (receivedToken !== secretToken) {
           console.error('[Webhook] Invalid secret token');
-          logError('Webhook validation', new Error('Invalid secret token'), {});
+          await logError('Webhook validation', new Error('Invalid secret token'), {
+            url: request.url,
+            method: request.method,
+          }, request, env);
           return errorResponse('Unauthorized', 401);
         }
         console.log('[Webhook] Secret token validated successfully');
@@ -53,22 +60,44 @@ export default {
       }
 
       // Parse Telegram update
-      const update = await parseTelegramUpdate(request);
+      update = await parseTelegramUpdate(request);
       
       // Route update to appropriate handler
       const result = await routeUpdate(env, update);
+      
+      // Track performance
+      const duration = Date.now() - startTime;
+      if (env.SENTRY_DSN) {
+        trackPerformance('webhook.admin', duration, {
+          worker: 'admin-webhook',
+          update_id: update.update_id,
+        }, env.SENTRY_DSN, env.SENTRY_ENVIRONMENT || 'production').catch(() => {});
+      }
       
       // Return success response
       return successResponse(result);
       
     } catch (error) {
-      logError('Webhook processing', error, {
+      const duration = Date.now() - startTime;
+      
+      // Log error with full context
+      await logError('Webhook processing', error, {
         url: request.url,
         method: request.method,
-      });
+        duration_ms: duration,
+        update_id: update?.update_id,
+      }, request, env, update);
+      
+      // Track failed request performance
+      if (env.SENTRY_DSN) {
+        trackPerformance('webhook.admin.error', duration, {
+          worker: 'admin-webhook',
+          error: error.message,
+          update_id: update?.update_id,
+        }, env.SENTRY_DSN, env.SENTRY_ENVIRONMENT || 'production').catch(() => {});
+      }
       
       // Still return 200 to Telegram to prevent retries
-      // Log error to Sentry or monitoring service
       return successResponse({ error: error.message });
     }
   },

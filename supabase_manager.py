@@ -136,12 +136,14 @@ class SupabaseManager:
 
         self.transaction_queue = TransactionQueue(self, os.getenv("TRANSACTION_QUEUE_PATH"))
         
-        bonus_from_env = os.getenv("WELCOME_BONUS_AMOUNT", "100") 
+        # ✅ Welcome Bonus теперь в USD эквиваленте (1 балл = $1 USD)
+        # По умолчанию: $5 USD (5 баллов)
+        bonus_from_env = os.getenv("WELCOME_BONUS_AMOUNT", "5") 
         try:
-            self._WELCOME_BONUS = int(bonus_from_env) 
+            self._WELCOME_BONUS = float(bonus_from_env)  # ✅ Теперь float для поддержки десятичных
         except ValueError:
-            self._WELCOME_BONUS = 100
-            logging.error(f"Не удалось преобразовать WELCOME_BONUS_AMOUNT '{bonus_from_env}' в число. Установлено значение 100.")
+            self._WELCOME_BONUS = 5.0  # ✅ $5 USD по умолчанию
+            logging.error(f"Не удалось преобразовать WELCOME_BONUS_AMOUNT '{bonus_from_env}' в число. Установлено значение 5.0 (≈$5 USD).")
 
         # Конфигурация реферальной системы (гибридная модель)
         self.REFERRAL_CONFIG = {
@@ -211,8 +213,9 @@ class SupabaseManager:
         if not self.client: 
             return "Ошибка инициализации базы данных.", "DB_INIT_ERROR"
             
+        # ✅ Welcome bonus теперь всегда в USD эквиваленте
         if welcome_bonus is None: 
-            welcome_bonus = self._WELCOME_BONUS
+            welcome_bonus = self._WELCOME_BONUS  # По умолчанию $5 USD (5 баллов)
         
         clean_phone = phone.replace('+', '').replace(' ', '').replace('-', '').strip()
         client_data = self.get_client_by_phone(clean_phone)
@@ -252,7 +255,9 @@ class SupabaseManager:
 
                 try:
                     self.client.from_(USER_TABLE).update(update_data).eq('chat_id', client_chat_id_original).execute()
-                    self.record_transaction(client_chat_id_for_txn, partner_id, welcome_bonus, 'enrollment_bonus', description, raw_amount=0.00)
+                    # ✅ Welcome bonus в USD эквиваленте, currency = USD
+                    welcome_currency = 'USD'  # Welcome bonus всегда в USD
+                    self.record_transaction(client_chat_id_for_txn, partner_id, float(welcome_bonus), 'enrollment_bonus', description, raw_amount=0.00, currency=welcome_currency)
                     
                     return (
                         f"Клиент **{phone}** найден и активирован. Начислен стартовый бонус: {welcome_bonus} баллов. "
@@ -282,7 +287,8 @@ class SupabaseManager:
                 
                 transaction_data = {
                     'client_chat_id': temp_chat_id, 'partner_chat_id': partner_id, 'total_amount': 0,
-                    'earned_points': welcome_bonus, 'spent_points': 0, 'operation_type': 'enrollment_bonus', 
+                    'currency': 'USD',  # ✅ Welcome bonus всегда в USD
+                    'earned_points': float(welcome_bonus), 'spent_points': 0, 'operation_type': 'enrollment_bonus', 
                     'description': 'Приветственный бонус при регистрации через Партнера',
                     'date_time': datetime.datetime.now().isoformat()
                 }
@@ -305,7 +311,9 @@ class SupabaseManager:
         """Регистрирует клиента, пришедшего по ссылке (Клиентский бот)."""
         if not self.client: return None, "DB is not initialized."
         client_chat_id = str(chat_id)
-        if welcome_bonus is None: welcome_bonus = self._WELCOME_BONUS 
+        # ✅ Welcome bonus теперь всегда в USD эквиваленте
+        if welcome_bonus is None: 
+            welcome_bonus = self._WELCOME_BONUS  # По умолчанию $5 USD (5 баллов) 
         
         if self.client_exists(client_chat_id):
              return None, "Клиент уже зарегистрирован в боте."
@@ -342,8 +350,9 @@ class SupabaseManager:
 
         try:
             transaction_data = {
-                'client_chat_id': client_chat_id, 'partner_chat_id': partner_chat_id, 'total_amount': 0, 
-                'earned_points': welcome_bonus, 'spent_points': 0, 'operation_type': 'enrollment_bonus', 
+                'client_chat_id': client_chat_id, 'partner_chat_id': partner_chat_id, 'total_amount': 0,
+                'currency': 'USD',  # ✅ Welcome bonus всегда в USD
+                'earned_points': float(welcome_bonus), 'spent_points': 0, 'operation_type': 'enrollment_bonus', 
                 'description': 'Приветственный бонус при регистрации по реферальной ссылке',
                 'date_time': datetime.datetime.now().isoformat() 
             }
@@ -373,30 +382,62 @@ class SupabaseManager:
     # III. МЕТОДЫ БАЛАНСА И ТРАНЗАКЦИЙ
     # -----------------------------------------------------------------
     
-    def get_client_balance(self, chat_id: int) -> int:
-        """Возвращает текущий баланс клиента."""
-        if not self.client: return 0
+    def get_client_balance(self, chat_id: int) -> float:
+        """
+        Возвращает текущий баланс клиента в USD эквиваленте.
+        
+        ✅ Баланс теперь в USD эквиваленте (float)
+        """
+        if not self.client: return 0.0
         try:
             response = self.client.from_(USER_TABLE).select(BALANCE_COLUMN).eq('chat_id', str(chat_id)).limit(1).execute()
             if response.data:
-                return int(response.data[0].get(BALANCE_COLUMN, 0))
-            return 0
+                balance = response.data[0].get(BALANCE_COLUMN, 0)
+                # Преобразуем в float (на случай если в БД integer)
+                return float(balance) if balance else 0.0
+            return 0.0
         except Exception:
-            return 0
+            return 0.0
 
-    def record_transaction(self, client_chat_id: int, partner_chat_id: int, points: int, transaction_type: str, description: str, raw_amount: float = 0.00) -> bool:
-        """Записывает транзакцию в таблицу 'transactions'."""
+    def record_transaction(self, client_chat_id: int, partner_chat_id: int, points: float, transaction_type: str, description: str, raw_amount: float = 0.00, currency: str = None) -> bool:
+        """
+        Записывает транзакцию в таблицу 'transactions'.
+        
+        ✅ points теперь в USD эквиваленте (float)
+        ✅ currency может быть передан явно или определяется автоматически
+        """
         if not self.client: return False
         
-        earned = points if transaction_type in ['accrual', 'enrollment_bonus'] else 0
-        spent = points if transaction_type == 'redemption' else 0
+        # ✅ points теперь float (USD эквивалент), но для совместимости с БД можем округлить
+        earned = points if transaction_type in ['accrual', 'enrollment_bonus'] else 0.0
+        spent = points if transaction_type == 'redemption' else 0.0
         amount_for_db = int(raw_amount) if raw_amount == 0.00 else raw_amount 
+        
+        # ✅ Получаем валюту (переданную или определяем автоматически)
+        if currency is None:
+            currency = 'USD'  # По умолчанию USD
+            try:
+                from currency_utils import get_currency_by_city
+                # Получаем город партнера из БД (если partner_chat_id указан)
+                if partner_chat_id:
+                    partner_response = self.client.table('partners').select('city').eq('chat_id', str(partner_chat_id)).limit(1).execute()
+                    if partner_response.data and len(partner_response.data) > 0:
+                        partner_city = partner_response.data[0].get('city')
+                        if partner_city:
+                            currency = get_currency_by_city(partner_city)
+            except Exception as e:
+                logging.warning(f"Не удалось определить валюту для партнера {partner_chat_id}: {e}. Используется USD по умолчанию.")
 
         try:
             data = {
-                "client_chat_id": str(client_chat_id), "partner_chat_id": str(partner_chat_id), 
-                "date_time": datetime.datetime.now().isoformat(), "total_amount": amount_for_db,
-                "earned_points": earned, "spent_points": spent, "operation_type": transaction_type, 
+                "client_chat_id": str(client_chat_id), 
+                "partner_chat_id": str(partner_chat_id) if partner_chat_id else None, 
+                "date_time": datetime.datetime.now().isoformat(), 
+                "total_amount": amount_for_db,
+                "currency": currency,  # ✅ Валюта транзакции (для аудита)
+                "earned_points": earned,  # ✅ В USD эквиваленте (float)
+                "spent_points": spent,    # ✅ В USD эквиваленте (float)
+                "operation_type": transaction_type, 
                 "description": description,
             }
             self.client.from_(TRANSACTION_TABLE).insert(data).execute()  
@@ -412,34 +453,71 @@ class SupabaseManager:
         if allow_queue and self.transaction_queue:
             self.transaction_queue.process_pending()
 
-        current_balance = self.get_client_balance(client_chat_id)
+        current_balance = self.get_client_balance(client_chat_id)  # Баланс в USD эквиваленте
         
-        transaction_amount_points = 0 
+        # ✅ Получаем валюту партнера
+        currency = 'USD'  # По умолчанию
+        try:
+            from currency_utils import get_currency_by_city
+            partner_response = self.client.table('partners').select('city').eq('chat_id', str(partner_chat_id)).limit(1).execute()
+            if partner_response.data and len(partner_response.data) > 0:
+                partner_city = partner_response.data[0].get('city')
+                if partner_city:
+                    currency = get_currency_by_city(partner_city)
+        except Exception as e:
+            logging.warning(f"Не удалось определить валюту для партнера {partner_chat_id}: {e}. Используется USD по умолчанию.")
+        
+        transaction_amount_points = 0.0  # В USD эквиваленте
         type_for_record = ''
         predicted_balance = current_balance
+        discount_amount_local = 0.0  # Сумма скидки в валюте партнера (для отображения)
 
         if txn_type == 'accrual':
             # V2 Logic: Используем расчет с учетом сделок
             if hasattr(self, '_calculate_accrual_points_with_deals'):
-                transaction_amount_points, deal_suffix = self._calculate_accrual_points_with_deals(client_chat_id, partner_chat_id, raw_amount)
+                transaction_amount_points, deal_suffix = self._calculate_accrual_points_with_deals(client_chat_id, partner_chat_id, raw_amount, currency)
                 description_suffix = deal_suffix
             else:
-                transaction_amount_points = self._calculate_accrual_points(partner_chat_id, raw_amount)
+                transaction_amount_points = self._calculate_accrual_points(partner_chat_id, raw_amount, currency)
                 description_suffix = ""
                 
             new_balance = current_balance + transaction_amount_points
             predicted_balance = new_balance
-            description = f"Начисление {transaction_amount_points} бонусов за чек {raw_amount} руб.{description_suffix} (Партнер: {partner_chat_id})"
+            discount_amount_local = raw_amount  # Для отображения оригинальной суммы
+            
+            # ✅ Описание с указанием валюты и USD эквивалента
+            try:
+                from currency_utils import get_currency_symbol
+                currency_symbol = get_currency_symbol(currency)
+                description = f"Начисление {transaction_amount_points:.2f} баллов (≈${transaction_amount_points:.2f} USD) за чек {currency_symbol}{raw_amount:.2f}{description_suffix} (Партнер: {partner_chat_id})"
+            except:
+                description = f"Начисление {transaction_amount_points:.2f} баллов за чек {raw_amount}{description_suffix} (Партнер: {partner_chat_id})"
             type_for_record = 'accrual'
             
         elif txn_type == 'spend':
-            transaction_amount_points = int(raw_amount)
+            # ✅ Списание: raw_amount - это баллы в USD эквиваленте
+            transaction_amount_points = float(raw_amount)
             if transaction_amount_points > current_balance:
                 return {"success": False, "error": "Недостаточно бонусов для списания.", "new_balance": current_balance}
 
+            # ✅ Конвертируем баллы (USD) → валюта партнера для скидки
+            try:
+                from currency_utils import convert_currency, get_currency_symbol
+                discount_amount_local = convert_currency(
+                    transaction_amount_points,
+                    from_currency='USD',
+                    to_currency=currency,
+                    supabase_client=self.client
+                )
+                currency_symbol = get_currency_symbol(currency)
+                description = f"Списание {transaction_amount_points:.2f} баллов (скидка {currency_symbol}{discount_amount_local:.2f}) (Партнер: {partner_chat_id})"
+            except Exception as e:
+                logging.warning(f"Ошибка конвертации при списании: {e}. Использую transaction_amount_points.")
+                discount_amount_local = transaction_amount_points
+                description = f"Списание {transaction_amount_points:.2f} баллов (Партнер: {partner_chat_id})"
+
             new_balance = current_balance - transaction_amount_points
             predicted_balance = new_balance
-            description = f"Списание {transaction_amount_points} бонусов (Партнер: {partner_chat_id})"
             type_for_record = 'redemption'
         
         else:
@@ -461,7 +539,15 @@ class SupabaseManager:
 
         try:
             self.client.from_(USER_TABLE).update({BALANCE_COLUMN: new_balance}).eq('chat_id', str(client_chat_id)).execute()
-            self.record_transaction(client_chat_id, partner_chat_id, transaction_amount_points, type_for_record, description, raw_amount=raw_amount)
+            # ✅ Для списания raw_amount = discount_amount_local (сумма в валюте партнера)
+            # ✅ Для начисления raw_amount = оригинальная сумма в валюте партнера
+            # ✅ Для списания raw_amount = discount_amount_local (сумма в валюте партнера)
+            # ✅ Для начисления raw_amount = оригинальная сумма в валюте партнера
+            if txn_type == 'spend' and 'discount_amount_local' in locals() and discount_amount_local > 0:
+                record_raw_amount = discount_amount_local
+            else:
+                record_raw_amount = raw_amount
+            self.record_transaction(client_chat_id, partner_chat_id, transaction_amount_points, type_for_record, description, raw_amount=record_raw_amount, currency=currency)
             
             # Обрабатываем реферальные бонусы при начислении баллов
             if txn_type == 'accrual' and transaction_amount_points > 0:
@@ -511,14 +597,42 @@ class SupabaseManager:
                 }
             return {"success": False, "error": f"Неизвестная ошибка: {e}", "new_balance": current_balance}
 
-    def _calculate_accrual_points(self, partner_chat_id: int, raw_amount: float) -> int:
-        """Рассчитывает количество баллов с учётом гибких правил начисления."""
+    def _calculate_accrual_points(self, partner_chat_id: int, raw_amount: float, currency: str = 'USD') -> float:
+        """
+        Рассчитывает количество баллов в USD эквиваленте с учётом гибких правил начисления.
+        
+        ✅ ВСЕ БАЛЛЫ ХРАНЯТСЯ КАК USD ЭКВИВАЛЕНТ (1 балл = $1 USD)
+        
+        Args:
+            partner_chat_id: ID партнера
+            raw_amount: Сумма в оригинальной валюте партнера
+            currency: Валюта транзакции (VND, RUB, USD, etc.)
+            
+        Returns:
+            float: Количество баллов в USD эквиваленте (например, 1.02 означает $1.02)
+        """
         if raw_amount <= 0:
-            return 0
+            return 0.0
 
+        # ✅ ШАГ 1: Конвертируем сумму в USD
+        amount_usd = raw_amount
+        if currency != 'USD':
+            try:
+                from currency_utils import convert_currency
+                amount_usd = convert_currency(
+                    raw_amount,
+                    from_currency=currency,
+                    to_currency='USD',
+                    supabase_client=self.client
+                )
+            except Exception as e:
+                logging.warning(f"Ошибка конвертации {currency}→USD для суммы {raw_amount}: {e}. Использую raw_amount.")
+                # Если конвертация не удалась, используем raw_amount (предполагаем USD)
+
+        # ✅ ШАГ 2: Рассчитываем процент кэшбэка (все правила как раньше)
         percent = max(self.CASHBACK_PERCENT, 0.0)
         multiplier = 1.0
-        min_points = 0
+        min_points = 0.0
         rounding_mode = 'floor'
 
         rules = self._get_cashback_rules()
@@ -526,12 +640,12 @@ class SupabaseManager:
             percent = self._extract_float(rules.get('default_percent'), percent)
             multiplier *= self._extract_float(rules.get('global_multiplier'), 1.0)
             rounding_mode = rules.get('rounding', rounding_mode) or rounding_mode
-            min_points = max(min_points, int(self._extract_float(rules.get('min_points'), 0)))
+            min_points = max(min_points, self._extract_float(rules.get('min_points'), 0))
 
             partner_rules = rules.get('partners', {}).get(str(partner_chat_id))
             if isinstance(partner_rules, dict):
                 percent = self._extract_float(partner_rules.get('percent'), percent)
-                min_points = max(min_points, int(self._extract_float(partner_rules.get('min_points'), min_points)))
+                min_points = max(min_points, self._extract_float(partner_rules.get('min_points', min_points)))
                 partner_multiplier = self._extract_float(partner_rules.get('multiplier'), 1.0)
                 if partner_multiplier > 0:
                     multiplier *= self._resolve_multiplier_with_expiry(partner_rules, partner_multiplier)
@@ -539,11 +653,14 @@ class SupabaseManager:
         percent = max(percent, 0.0)
         multiplier = max(multiplier, 0.0)
 
-        raw_points = raw_amount * percent * multiplier
-        raw_points = self._apply_bonus_rules(partner_chat_id, 'accrual', raw_amount, raw_points)
-        points = self._apply_rounding(raw_points, rounding_mode)
-        points = max(points, min_points)
-        return max(points, 0)
+        # ✅ ШАГ 3: Баллы = USD сумма × процент × множитель
+        raw_points_usd = amount_usd * percent * multiplier
+        raw_points_usd = self._apply_bonus_rules(partner_chat_id, 'accrual', amount_usd, raw_points_usd)
+        
+        # ✅ ШАГ 4: Применяем округление (может быть 'floor', 'ceil', 'round')
+        points_usd = self._apply_rounding_float(raw_points_usd, rounding_mode)
+        points_usd = max(points_usd, min_points)
+        return max(points_usd, 0.0)
 
     def _resolve_multiplier_with_expiry(self, rule: dict, multiplier: float) -> float:
         """Применяет множитель с учётом срока действия (если указан)."""
@@ -562,7 +679,7 @@ class SupabaseManager:
             return multiplier
 
     def _apply_rounding(self, value: float, mode: str) -> int:
-        """Применяет стратегию округления к значению."""
+        """Применяет стратегию округления к значению (возвращает int)."""
         mode = (mode or 'floor').lower()
         if mode == 'ceil':
             return int(math.ceil(value))
@@ -571,6 +688,17 @@ class SupabaseManager:
         if mode == 'truncate':
             return int(math.trunc(value))
         return int(math.floor(value))
+    
+    def _apply_rounding_float(self, value: float, mode: str) -> float:
+        """Применяет стратегию округления к значению (возвращает float с точностью до центов)."""
+        mode = (mode or 'floor').lower()
+        if mode == 'ceil':
+            return math.ceil(value * 100) / 100  # Округление до центов вверх
+        if mode == 'round':
+            return round(value, 2)  # Округление до центов
+        if mode == 'truncate':
+            return math.trunc(value * 100) / 100  # Отсечение до центов
+        return math.floor(value * 100) / 100  # Округление до центов вниз
 
     def _extract_float(self, candidate, default: float) -> float:
         """Преобразует значение к float с запасным вариантом."""
@@ -3591,12 +3719,19 @@ class SupabaseManager:
                 }).eq('chat_id', commission.user_id).execute()
                 
                 # Записываем в referral_rewards
+                # ✅ Для комиссий (L1/L2/L3) используем reward_type 'commission_l1/l2/l3' и сохраняем amount_usd
+                # commission.amount уже в USD (конвертирован в process_referral_transaction_bonuses)
+                reward_type = f'commission_{commission.type.lower()}' if commission.type in ['L1', 'L2', 'L3'] else 'transaction'
+                
                 reward_data = {
                     'referrer_chat_id': commission.user_id,
                     'referred_chat_id': user_chat_id,
-                    'reward_type': 'transaction',
+                    'reward_type': reward_type,
                     'level': 1 if commission.type == 'L1' else (2 if commission.type == 'L2' else (3 if commission.type == 'L3' else 0)),
-                    'points': int(commission.amount),
+                    'points': 0 if reward_type.startswith('commission_') else int(commission.amount),  # Для комиссий points = 0
+                    'amount_usd': float(commission.amount) if reward_type.startswith('commission_') else None,  # ✅ Сохраняем USD для комиссий
+                    'currency': 'USD',  # ✅ Комиссии всегда в USD
+                    'status': 'pending',  # ✅ Статус для отслеживания выплат
                     'transaction_id': transaction_id,
                     'description': commission.description
                 }
@@ -3650,6 +3785,42 @@ class SupabaseManager:
         # Попытка использовать новую логику
         if REFERRAL_CALCULATOR_AVAILABLE and raw_amount and raw_amount > 0 and seller_partner_id:
             try:
+                # ✅ Получаем валюту транзакции (если есть transaction_id)
+                currency = 'USD'  # По умолчанию USD
+                txn_date = datetime.datetime.now()
+                
+                if transaction_id:
+                    try:
+                        txn_data = self.client.table('transactions').select(
+                            'currency, date_time'
+                        ).eq('id', transaction_id).single().execute()
+                        
+                        if txn_data.data:
+                            currency = txn_data.data.get('currency', 'USD')
+                            txn_date_str = txn_data.data.get('date_time', '')
+                            if txn_date_str:
+                                try:
+                                    if 'T' in txn_date_str:
+                                        txn_date = datetime.datetime.fromisoformat(txn_date_str.replace('Z', '+00:00'))
+                                    else:
+                                        txn_date = datetime.datetime.strptime(txn_date_str, '%Y-%m-%d')
+                                except Exception:
+                                    pass
+                    except Exception as e:
+                        logging.warning(f"Не удалось получить валюту транзакции {transaction_id}: {e}. Используется USD")
+                
+                # ✅ Конвертируем сумму в USD для расчета комиссий
+                from currency_utils import convert_currency
+                raw_amount_usd = convert_currency(
+                    raw_amount,
+                    from_currency=currency,
+                    to_currency='USD',
+                    date=txn_date,
+                    supabase_client=self.client
+                )
+                
+                logging.debug(f"Реферальные комиссии: {raw_amount} {currency} → {raw_amount_usd} USD")
+                
                 # Получаем данные для калькулятора
                 users_dict = self._build_users_dict_for_calculator(user_chat_id)
                 if not users_dict:
@@ -3662,10 +3833,10 @@ class SupabaseManager:
                 # Создаем калькулятор
                 calculator = ReferralCalculator(users_dict, deals)
                 
-                # Рассчитываем комиссии
+                # Рассчитываем комиссии (используем USD сумму)
                 purchase = PurchaseInput(
                     user_id=user_chat_id,
-                    amount=raw_amount,
+                    amount=raw_amount_usd,  # ✅ В USD
                     seller_partner_id=seller_partner_id
                 )
                 
@@ -3820,7 +3991,8 @@ class SupabaseManager:
                 'client_chat_id': str(chat_id),
                 'partner_chat_id': None,
                 'total_amount': 0,
-                'earned_points': self._WELCOME_BONUS,
+                'currency': 'USD',  # ✅ Welcome bonus всегда в USD
+                'earned_points': float(self._WELCOME_BONUS),  # ✅ В USD эквиваленте (float)
                 'spent_points': 0,
                 'operation_type': 'enrollment_bonus',
                 'description': 'Приветственный бонус при регистрации',
@@ -5175,23 +5347,43 @@ class SupabaseManager:
         except Exception:
             return None
 
-    def _calculate_accrual_points_with_deals(self, client_chat_id: int, partner_chat_id: int, raw_amount: float) -> tuple[int, str]:
+    def _calculate_accrual_points_with_deals(self, client_chat_id: int, partner_chat_id: int, raw_amount: float, currency: str = 'USD') -> tuple[float, str]:
         """
-        Рассчитывает баллы с учетом B2B Deals.
-        Возвращает: (points, description_suffix)
+        Рассчитывает баллы с учетом B2B Deals в USD эквиваленте.
+        
+        ✅ Возвращает баллы в USD эквиваленте (float)
+        
+        Returns:
+            tuple: (points_usd, description_suffix)
         """
-        if raw_amount <= 0: return 0, ""
+        if raw_amount <= 0: 
+            return 0.0, ""
 
-        # 1. Получаем источник реферала
+        # ✅ 1. Конвертируем сумму в USD
+        amount_usd = raw_amount
+        if currency != 'USD':
+            try:
+                from currency_utils import convert_currency
+                amount_usd = convert_currency(
+                    raw_amount,
+                    from_currency=currency,
+                    to_currency='USD',
+                    supabase_client=self.client
+                )
+            except Exception as e:
+                logging.warning(f"Ошибка конвертации {currency}→USD в _calculate_accrual_points_with_deals: {e}")
+                # Используем raw_amount (предполагаем USD)
+
+        # 2. Получаем источник реферала
         source_partner_id = self._get_referral_source(str(client_chat_id))
         
-        # 2. Ищем сделку (Deal)
+        # 3. Ищем сделку (Deal)
         deal = None
         if source_partner_id and str(source_partner_id) != str(partner_chat_id):
             deal = self.get_active_deal(source_partner_id, str(partner_chat_id))
             
-        # 3. Определяем процент кэшбэка
-        percent = 0.05 # Базовый дефолт
+        # 4. Определяем процент кэшбэка
+        percent = 0.05  # Базовый дефолт 5%
         deal_info = ""
         
         if deal:
@@ -5203,9 +5395,9 @@ class SupabaseManager:
             partner_config = self.get_partner_config(str(partner_chat_id))
             percent = float(partner_config.get('default_cashback_percent', 5.0)) / 100.0
             
-        # 4. Расчет
-        points = int(raw_amount * percent)
-        return points, deal_info
+        # ✅ 5. Расчет: баллы в USD
+        points_usd = amount_usd * percent
+        return points_usd, deal_info
 
     # Переопределяем execute_transaction для использования новой логики
     def execute_transaction_v2(self, client_chat_id: int, partner_chat_id: int, txn_type: str, raw_amount: float, allow_queue: bool = True) -> dict:

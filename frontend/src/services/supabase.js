@@ -234,17 +234,27 @@ export const getApprovedServices = async () => {
   if (partners && partners.length > 0) {
     console.log('📊 Partners loaded from DB (getApprovedServices):', partners.length, 'partners')
     partners.forEach(p => {
-      partnersMap[p.chat_id] = p
-      console.log(`📋 Partner ${p.chat_id}: username=${p.username}, contact_link=${p.contact_link}`)
+      // Нормализуем chat_id к строке для корректного сравнения
+      const chatIdKey = String(p.chat_id)
+      partnersMap[chatIdKey] = p
+      console.log(`📋 Partner ${chatIdKey}: username=${p.username}, work_mode=${p.work_mode}, contact_link=${p.contact_link}`)
     })
+    
+    // Логируем партнёров, которые не были найдены
+    const foundChatIds = new Set(partners.map(p => String(p.chat_id)))
+    const missingChatIds = partnerIds.filter(id => !foundChatIds.has(String(id)))
+    if (missingChatIds.length > 0) {
+      console.warn('⚠️ Partners not found in DB (getApprovedServices):', missingChatIds)
+    }
   } else {
     console.warn('⚠️ No partners loaded or empty array')
   }
   
   // Объединяем услуги с данными партнёров
+  // Нормализуем partner_chat_id к строке для корректного сравнения
   return services.map(service => ({
     ...service,
-    partner: partnersMap[service.partner_chat_id] || null
+    partner: partnersMap[String(service.partner_chat_id)] || null
   }))
 }
 
@@ -280,33 +290,57 @@ export const getFilteredServices = async (city = null, district = null, category
   
   let partnersMap = {}
   if (partnerIds.length > 0) {
+    // Преобразуем chat_id в строки для корректного сравнения
+    const partnerIdsStr = partnerIds.map(id => String(id))
+    
     const { data: partners, error: partnersError } = await supabase
       .from('partners')
       .select('chat_id, name, company_name, city, district, business_type, username, contact_link, booking_url, google_maps_link, work_mode, category_group')
-      .in('chat_id', partnerIds)
+      .in('chat_id', partnerIdsStr)
     
     if (!partnersError && partners) {
       console.log('📊 Partners loaded from DB:', partners.length, 'partners')
       partners.forEach(p => {
-        partnersMap[p.chat_id] = p
-        console.log(`📋 Partner ${p.chat_id}: username=${p.username}, contact_link=${p.contact_link}`)
+        // Нормализуем chat_id к строке для корректного сравнения
+        const chatIdKey = String(p.chat_id)
+        partnersMap[chatIdKey] = p
+        console.log(`📋 Partner ${chatIdKey}: username=${p.username}, work_mode=${p.work_mode}, contact_link=${p.contact_link}`)
       })
+      
+      // Логируем партнёров, которые не были найдены
+      const foundChatIds = new Set(partners.map(p => String(p.chat_id)))
+      const missingChatIds = partnerIdsStr.filter(id => !foundChatIds.has(id))
+      if (missingChatIds.length > 0) {
+        console.warn('⚠️ Partners not found in DB:', missingChatIds)
+      }
     } else if (partnersError) {
       console.error('❌ Error loading partners:', partnersError)
     }
   }
   
   // Объединяем услуги с данными партнёров
+  // Нормализуем partner_chat_id к строке для корректного сравнения
   let filteredData = services.map(service => ({
     ...service,
-    partner: partnersMap[service.partner_chat_id] || null
+    partner: partnersMap[String(service.partner_chat_id)] || null
   }))
   
   // Применяем фильтры на клиентской стороне
   if (city) {
     filteredData = filteredData.filter(service => {
       const partner = service.partner
-      if (!partner) return false
+      
+      // Если партнёр не найден, показываем услугу (для обратной совместимости)
+      // Но логируем для отладки
+      if (!partner) {
+        console.warn('⚠️ Service without partner data:', {
+          serviceId: service.id,
+          partner_chat_id: service.partner_chat_id,
+          title: service.title
+        })
+        // Показываем услугу, если партнёр не найден (может быть новый партнёр)
+        return true
+      }
       
       // Логика фильтрации по work_mode:
       // - online/hybrid: показываем всем городам

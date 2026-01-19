@@ -52,14 +52,32 @@ const CITY_TO_CURRENCY = {
   'Казань': 'RUB',
   'Нижний Новгород': 'RUB',
   
-  // Другие страны (можно расширить)
+  // Вьетнам
+  'Nha Trang': 'VND',
+  
+  // Казахстан
+  'Almaty': 'KZT',
+  'Astana': 'KZT',
+  'Алматы': 'KZT',
+  'Астана': 'KZT',
+  
+  // Киргизия
+  'Bishkek': 'KGS',
+  'Osh': 'KGS',
+  'Бишкек': 'KGS',
+  'Ош': 'KGS',
+  
+  // ОАЭ
+  'Dubai': 'AED',
+  'Дубай': 'AED',
+  
+  // Другие страны (опционально)
   'London': 'GBP',
   'Paris': 'EUR',
   'Berlin': 'EUR',
   'Madrid': 'EUR',
   'Rome': 'EUR',
   'Amsterdam': 'EUR',
-  'Dubai': 'AED',
   'Tokyo': 'JPY',
   'Singapore': 'SGD',
   'Sydney': 'AUD',
@@ -71,9 +89,12 @@ const CITY_TO_CURRENCY = {
 const CURRENCY_SYMBOLS = {
   'USD': '$',
   'RUB': '₽',
+  'VND': '₫',
+  'KZT': '₸',
+  'KGS': 'сом',
+  'AED': 'د.إ',
   'EUR': '€',
   'GBP': '£',
-  'AED': 'د.إ',
   'JPY': '¥',
   'SGD': 'S$',
   'AUD': 'A$',
@@ -85,9 +106,12 @@ const CURRENCY_SYMBOLS = {
 const CURRENCY_LOCALES = {
   'USD': 'en-US',
   'RUB': 'ru-RU',
+  'VND': 'vi-VN',
+  'KZT': 'kk-KZ',
+  'KGS': 'ky-KG',
+  'AED': 'ar-AE',
   'EUR': 'de-DE',
   'GBP': 'en-GB',
-  'AED': 'ar-AE',
   'JPY': 'ja-JP',
   'SGD': 'en-SG',
   'AUD': 'en-AU',
@@ -160,12 +184,21 @@ export const formatCurrency = (value, city = null, currency = null) => {
   const finalCurrency = currency || getCurrencyByCity(city)
   const locale = getCurrencyLocale(finalCurrency)
   
-  return new Intl.NumberFormat(locale, {
+  // Специальная обработка для VND, KZT, KGS (без десятичных знаков)
+  const options = {
     style: 'currency',
     currency: finalCurrency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
-  }).format(value)
+  }
+  
+  // Для AED используем 2 десятичных знака
+  if (finalCurrency === 'AED') {
+    options.minimumFractionDigits = 2
+    options.maximumFractionDigits = 2
+  }
+  
+  return new Intl.NumberFormat(locale, options).format(value)
 }
 
 /**

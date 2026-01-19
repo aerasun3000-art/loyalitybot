@@ -170,6 +170,31 @@ export const PARTNER_CITIES = [
     name: 'Nha Trang',
     label: 'Nha Trang',
     districts: ['All']
+  },
+  {
+    name: 'Almaty',
+    label: 'Almaty / Алматы',
+    districts: ['All', 'Центральный', 'Алмалинский', 'Медеуский', 'Турксибский', 'Жетысуский', 'Ауэзовский', 'Бостандыкский']
+  },
+  {
+    name: 'Astana',
+    label: 'Astana / Астана',
+    districts: ['All', 'Алматинский', 'Есильский', 'Сарыаркинский', 'Байконур']
+  },
+  {
+    name: 'Bishkek',
+    label: 'Bishkek / Бишкек',
+    districts: ['All', 'Ленинский', 'Октябрьский', 'Первомайский', 'Свердловский']
+  },
+  {
+    name: 'Osh',
+    label: 'Osh / Ош',
+    districts: ['All']
+  },
+  {
+    name: 'Dubai',
+    label: 'Dubai / Дубай',
+    districts: ['All', 'Downtown', 'Marina', 'Business Bay', 'JBR', 'Palm Jumeirah']
   }
 ]
 

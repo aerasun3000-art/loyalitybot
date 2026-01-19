@@ -58,12 +58,13 @@ export async function getPartnerByChatId(env, chatId) {
 
 /**
  * Create or update user
+ * Uses UPSERT (INSERT ... ON CONFLICT) to handle duplicates
  */
 export async function upsertUser(env, userData) {
   return supabaseRequest(env, 'users', {
     method: 'POST',
     headers: {
-      'Prefer': 'resolution=merge-duplicates',
+      'Prefer': 'resolution=merge-duplicates,return=representation',
     },
     body: JSON.stringify(userData),
   });

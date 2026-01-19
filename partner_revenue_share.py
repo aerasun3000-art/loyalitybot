@@ -202,7 +202,8 @@ class PartnerRevenueShare:
         period_end: date
     ) -> float:
         """
-        Получает доход системы с партнера за период
+        Получает доход системы с партнера за период (в USD)
+        ✅ ВСЕ СУММЫ КОНВЕРТИРУЮТСЯ В USD
         
         Расчет: Оборот партнера × PV% (индивидуальный процент для каждого партнера)
         PV настраивается вручную в зависимости от отрасли
@@ -219,24 +220,58 @@ class PartnerRevenueShare:
             else:
                 pv_percent = float(partner_data.data.get('pv_percent', 10.0))
             
-            # Получаем транзакции партнера за период
+            # ✅ Получаем транзакции с валютами
             transactions = self.db.client.table('transactions').select(
-                'total_amount'
+                'total_amount, currency, date_time'
             ).eq('partner_chat_id', partner_chat_id).gte(
                 'date_time', period_start.isoformat()
             ).lte('date_time', period_end.isoformat()).execute()
             
-            total_turnover = sum(float(t.get('total_amount', 0)) for t in transactions.data)
+            total_turnover_usd = 0.0
             
-            # Доход системы = Оборот × PV%
-            system_revenue = total_turnover * (pv_percent / 100.0)
+            # ✅ Конвертируем каждую транзакцию в USD
+            from currency_utils import convert_currency
+            from datetime import datetime
+            
+            for txn in transactions.data:
+                amount = float(txn.get('total_amount', 0))
+                currency = txn.get('currency', 'USD')
+                txn_date_str = txn.get('date_time', '')
+                
+                try:
+                    # Парсим дату транзакции
+                    if txn_date_str:
+                        if 'T' in txn_date_str:
+                            txn_date = datetime.fromisoformat(txn_date_str.replace('Z', '+00:00'))
+                        else:
+                            txn_date = datetime.strptime(txn_date_str, '%Y-%m-%d')
+                    else:
+                        txn_date = datetime.now()
+                except Exception as e:
+                    logger.warning(f"Ошибка парсинга даты транзакции: {e}. Используется текущая дата.")
+                    txn_date = datetime.now()
+                
+                # Конвертируем в USD
+                amount_usd = convert_currency(
+                    amount, 
+                    from_currency=currency, 
+                    to_currency='USD',
+                    date=txn_date,
+                    supabase_client=self.db.client
+                )
+                
+                total_turnover_usd += amount_usd
+            
+            # Доход системы = Оборот (в USD) × PV%
+            system_revenue_usd = total_turnover_usd * (pv_percent / 100.0)
             
             logger.info(
                 f"Доход системы с партнера {partner_chat_id}: "
-                f"Оборот=${total_turnover}, PV={pv_percent}%, Доход=${system_revenue}"
+                f"Оборот=${total_turnover_usd:.2f} USD, PV={pv_percent}%, "
+                f"Доход=${system_revenue_usd:.2f} USD"
             )
             
-            return round(system_revenue, 2)
+            return round(system_revenue_usd, 2)
             
         except Exception as e:
             logger.error(f"Ошибка при получении дохода системы: {e}")
@@ -265,6 +300,8 @@ class PartnerRevenueShare:
             
             if calculation['final_amount'] > 0:
                 # Сохраняем в базу данных
+                # ✅ system_revenue уже в USD (конвертирован в _get_system_revenue)
+                # ✅ final_amount также в USD
                 self.db.client.table('partner_revenue_share').insert({
                     'partner_chat_id': partner_chat_id,
                     'source_partner_chat_id': source_partner_chat_id,
@@ -275,6 +312,7 @@ class PartnerRevenueShare:
                     'personal_income_limit': calculation['personal_income_limit'],
                     'personal_income_30_percent': calculation['personal_income_limit'],
                     'final_amount': calculation['final_amount'],
+                    'amount_usd': calculation['final_amount'],  # ✅ Сохраняем USD эквивалент
                     'period_start': period_start.isoformat(),
                     'period_end': period_end.isoformat(),
                     'status': 'pending',

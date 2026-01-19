@@ -15,20 +15,30 @@ export async function sendTelegramMessage(token, chatId, text, options = {}) {
     ...options,
   };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  try {
+    console.log('[sendTelegramMessage] Sending message:', { chatId, textLength: text.length, parseMode: payload.parse_mode });
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Telegram API error: ${response.status} - ${error}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[sendTelegramMessage] Telegram API error:', { status: response.status, error: errorText, chatId });
+      throw new Error(`Telegram API error: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('[sendTelegramMessage] Message sent successfully:', { chatId, messageId: result.result?.message_id });
+    return result;
+  } catch (error) {
+    console.error('[sendTelegramMessage] Exception:', error);
+    throw error;
   }
-
-  return response.json();
 }
 
 /**
