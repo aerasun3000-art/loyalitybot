@@ -459,7 +459,8 @@ const Services = () => {
     }, 500)
     
     return () => clearTimeout(checkTimer)
-  }, [categoryFilter, services.length, loading, isEmptyCategoryModalOpen, normalizeCategoryCode, isCompetitor])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryFilter, services.length, loading, isEmptyCategoryModalOpen])
 
   const getFilteredGroups = () => {
     if (!categoryFilter) {
@@ -691,43 +692,6 @@ const Services = () => {
   }
 
   const filteredGroups = getFilteredGroups()
-  
-  // Проверяем, нужно ли показать модальное окно о свободном месте
-  // Это происходит когда выбрана категория, но нет партнеров в ней
-  useEffect(() => {
-    if (!loading && categoryFilter && filteredGroups.length === 0 && !isEmptyCategoryModalOpen && services.length > 0) {
-      console.log('[filteredGroups check] Category filter:', categoryFilter, 'Filtered groups:', filteredGroups.length)
-      
-      // Проверяем, что это действительно категория без партнеров, а не просто результат фильтров
-      const normalizedCode = normalizeCategoryCode(categoryFilter)
-      const hasAnyPartnersInCategory = services.some(service => {
-        if (isCompetitor(service)) return false
-        const rawCode = service.partner?.business_type || service.category
-        if (!rawCode) return false
-        const serviceCategoryCode = normalizeCategoryCode(rawCode)
-        return serviceCategoryCode === normalizedCode
-      })
-      
-      console.log('[filteredGroups check] Has any partners in category:', hasAnyPartnersInCategory)
-      
-      if (!hasAnyPartnersInCategory) {
-        console.log('[filteredGroups check] No partners found, showing modal')
-        setEmptyCategoryCode(categoryFilter)
-        setIsEmptyCategoryModalOpen(true)
-      }
-    }
-  }, [loading, categoryFilter, filteredGroups.length, isEmptyCategoryModalOpen, services.length, normalizeCategoryCode, isCompetitor])
-  
-  // Debug: логируем состояние модального окна
-  useEffect(() => {
-    console.log('[Modal State]', {
-      isEmptyCategoryModalOpen,
-      emptyCategoryCode,
-      categoryFilter,
-      servicesCount: services.length,
-      loading
-    })
-  }, [isEmptyCategoryModalOpen, emptyCategoryCode, categoryFilter, services.length, loading])
 
   return (
     <div className="relative min-h-screen overflow-hidden pb-24 text-sakura-dark">
