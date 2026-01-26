@@ -54,6 +54,7 @@ const Services = () => {
   const [servicePromotions, setServicePromotions] = useState({}) // serviceId -> promotions[]
   const [isEmptyCategoryModalOpen, setIsEmptyCategoryModalOpen] = useState(false)
   const [emptyCategoryCode, setEmptyCategoryCode] = useState(null)
+  const [lastSelectedCategory, setLastSelectedCategory] = useState(null) // Защита от повторных вызовов
 
   const resolveCategory = useCallback((code) => {
     if (!code) return null
@@ -292,7 +293,13 @@ const Services = () => {
   }, [services, resolveCategory, getCategorySortValue])
 
   const handleCategorySelect = (code) => {
+    // Защита от повторных вызовов для той же категории
+    if (lastSelectedCategory === code && categoryFilter === code) {
+      return
+    }
+    
     hapticFeedback('light')
+    setLastSelectedCategory(code)
     setCategoryFilter(code)
     setExpandedItem(null)
     setIsCategoryMenuOpen(false)
@@ -302,8 +309,6 @@ const Services = () => {
     
     // Проверяем наличие партнеров в категории
     const normalizedCode = normalizeCategoryCode(code)
-    console.log('[handleCategorySelect] Checking category:', code, 'normalized:', normalizedCode)
-    console.log('[handleCategorySelect] Services count:', services.length)
     
     const hasPartnersInCategory = services.some(service => {
       // Скрываем конкурентов
@@ -315,30 +320,15 @@ const Services = () => {
       const rawCode = service.partner?.business_type || service.category
       if (!rawCode) return false
       const serviceCategoryCode = normalizeCategoryCode(rawCode)
-      const matches = serviceCategoryCode === normalizedCode
-      if (matches) {
-        console.log('[handleCategorySelect] Found matching service:', {
-          serviceTitle: service.title,
-          rawCode,
-          serviceCategoryCode,
-          normalizedCode
-        })
-      }
-      return matches
+      return serviceCategoryCode === normalizedCode
     })
-    
-    console.log('[handleCategorySelect] Has partners in category:', hasPartnersInCategory, 'for category:', code)
     
     // Если нет партнеров, показываем модальное окно после небольшой задержки
     if (!hasPartnersInCategory) {
-      console.log('[handleCategorySelect] No partners found, showing modal for category:', code)
       setTimeout(() => {
         setEmptyCategoryCode(code)
         setIsEmptyCategoryModalOpen(true)
-        console.log('[handleCategorySelect] Modal state set - code:', code, 'modal open:', true)
       }, 200)
-    } else {
-      console.log('[handleCategorySelect] Partners found, modal not needed for category:', code)
     }
   }
 
