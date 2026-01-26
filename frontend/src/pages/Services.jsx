@@ -298,6 +298,9 @@ const Services = () => {
     
     // Проверяем наличие партнеров в категории
     const normalizedCode = normalizeCategoryCode(code)
+    console.log('[handleCategorySelect] Checking category:', code, 'normalized:', normalizedCode)
+    console.log('[handleCategorySelect] Services count:', services.length)
+    
     const hasPartnersInCategory = services.some(service => {
       // Скрываем конкурентов
       if (isCompetitor(service)) {
@@ -308,14 +311,27 @@ const Services = () => {
       const rawCode = service.partner?.business_type || service.category
       if (!rawCode) return false
       const serviceCategoryCode = normalizeCategoryCode(rawCode)
-      return serviceCategoryCode === normalizedCode
+      const matches = serviceCategoryCode === normalizedCode
+      if (matches) {
+        console.log('[handleCategorySelect] Found matching service:', {
+          serviceTitle: service.title,
+          rawCode,
+          serviceCategoryCode,
+          normalizedCode
+        })
+      }
+      return matches
     })
+    
+    console.log('[handleCategorySelect] Has partners in category:', hasPartnersInCategory)
     
     // Если нет партнеров, показываем модальное окно после небольшой задержки
     if (!hasPartnersInCategory) {
+      console.log('[handleCategorySelect] No partners found, showing modal')
       setTimeout(() => {
         setEmptyCategoryCode(code)
         setIsEmptyCategoryModalOpen(true)
+        console.log('[handleCategorySelect] Modal state set:', { code, isEmptyCategoryModalOpen: true })
       }, 200)
     }
   }
@@ -393,11 +409,23 @@ const Services = () => {
 
   // Проверяем наличие партнеров в категории после загрузки данных и изменения фильтров
   useEffect(() => {
-    if (!categoryFilter || loading || services.length === 0 || isEmptyCategoryModalOpen) return
+    if (!categoryFilter || loading || services.length === 0 || isEmptyCategoryModalOpen) {
+      console.log('[useEffect check] Skipping check:', {
+        categoryFilter,
+        loading,
+        servicesLength: services.length,
+        isEmptyCategoryModalOpen
+      })
+      return
+    }
+    
+    console.log('[useEffect check] Starting check for category:', categoryFilter)
     
     // Небольшая задержка, чтобы дать время на обновление всех состояний
     const checkTimer = setTimeout(() => {
       const normalizedCode = normalizeCategoryCode(categoryFilter)
+      console.log('[useEffect check] Normalized code:', normalizedCode, 'Services:', services.length)
+      
       const hasPartnersInCategory = services.some(service => {
         // Скрываем конкурентов
         if (isCompetitor(service)) {
@@ -408,11 +436,23 @@ const Services = () => {
         const rawCode = service.partner?.business_type || service.category
         if (!rawCode) return false
         const serviceCategoryCode = normalizeCategoryCode(rawCode)
-        return serviceCategoryCode === normalizedCode
+        const matches = serviceCategoryCode === normalizedCode
+        if (matches) {
+          console.log('[useEffect check] Found matching service:', {
+            serviceTitle: service.title,
+            rawCode,
+            serviceCategoryCode,
+            normalizedCode
+          })
+        }
+        return matches
       })
+      
+      console.log('[useEffect check] Has partners in category:', hasPartnersInCategory)
       
       // Если нет партнеров в категории, показываем модальное окно
       if (!hasPartnersInCategory) {
+        console.log('[useEffect check] No partners found, showing modal')
         setEmptyCategoryCode(categoryFilter)
         setIsEmptyCategoryModalOpen(true)
       }
@@ -652,6 +692,8 @@ const Services = () => {
   // Это происходит когда выбрана категория, но нет партнеров в ней
   useEffect(() => {
     if (!loading && categoryFilter && filteredGroups.length === 0 && !isEmptyCategoryModalOpen && services.length > 0) {
+      console.log('[filteredGroups check] Category filter:', categoryFilter, 'Filtered groups:', filteredGroups.length)
+      
       // Проверяем, что это действительно категория без партнеров, а не просто результат фильтров
       const normalizedCode = normalizeCategoryCode(categoryFilter)
       const hasAnyPartnersInCategory = services.some(service => {
@@ -662,12 +704,26 @@ const Services = () => {
         return serviceCategoryCode === normalizedCode
       })
       
+      console.log('[filteredGroups check] Has any partners in category:', hasAnyPartnersInCategory)
+      
       if (!hasAnyPartnersInCategory) {
+        console.log('[filteredGroups check] No partners found, showing modal')
         setEmptyCategoryCode(categoryFilter)
         setIsEmptyCategoryModalOpen(true)
       }
     }
   }, [loading, categoryFilter, filteredGroups.length, isEmptyCategoryModalOpen, services.length, normalizeCategoryCode, isCompetitor])
+  
+  // Debug: логируем состояние модального окна
+  useEffect(() => {
+    console.log('[Modal State]', {
+      isEmptyCategoryModalOpen,
+      emptyCategoryCode,
+      categoryFilter,
+      servicesCount: services.length,
+      loading
+    })
+  }, [isEmptyCategoryModalOpen, emptyCategoryCode, categoryFilter, services.length, loading])
 
   if (loading) {
     return <Loader />
@@ -1125,7 +1181,14 @@ const Services = () => {
 
       {/* Модальное окно "Место свободно" */}
       {isEmptyCategoryModalOpen && emptyCategoryCode && (
-        <div className="fixed inset-0 z-[100]" onClick={() => setIsEmptyCategoryModalOpen(false)}>
+        <div 
+          className="fixed inset-0 z-[100]" 
+          onClick={() => {
+            console.log('[Modal] Closing modal')
+            setIsEmptyCategoryModalOpen(false)
+          }}
+          style={{ zIndex: 1000 }}
+        >
           <div className="absolute inset-0 bg-sakura-deep/50 backdrop-blur-sm" />
           <div 
             className="relative h-full flex items-center justify-center px-4 py-4"
@@ -1133,7 +1196,10 @@ const Services = () => {
           >
             <div className="relative z-10 w-full max-w-md bg-sakura-surface/95 border border-sakura-border/60 rounded-3xl shadow-2xl p-6">
               <button
-                onClick={() => setIsEmptyCategoryModalOpen(false)}
+                onClick={() => {
+                  console.log('[Modal] Close button clicked')
+                  setIsEmptyCategoryModalOpen(false)
+                }}
                 className="absolute top-4 right-4 w-10 h-10 rounded-full border border-sakura-border/40 bg-sakura-surface/20 text-sakura-dark hover:bg-sakura-surface/30 transition-colors z-20"
                 aria-label="Закрыть"
               >
@@ -1144,6 +1210,10 @@ const Services = () => {
                 <h2 className="text-2xl font-bold mb-2">
                   {language === 'ru' ? 'Место свободно!' : 'Spot Available!'}
                 </h2>
+                {/* Debug info */}
+                {process.env.NODE_ENV === 'development' && (
+                  <p className="text-xs text-gray-500">Category: {emptyCategoryCode}</p>
+                )}
                 <p className="text-sakura-dark/80 mb-6">
                   {language === 'ru' 
                     ? 'В этой категории пока нет партнеров. Станьте первым и получите преимущество!'
