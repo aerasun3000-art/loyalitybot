@@ -781,7 +781,7 @@ const Home = () => {
         </div>
 
         {/* Сетка групп категорий в стиле карточек */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-4 mb-8">
           {getAllCategoryGroups().map((group) => {
             const displayName = language === 'ru' ? group.name : group.nameEn
             const emojiToDisplay = group.emoji || '⭐'
