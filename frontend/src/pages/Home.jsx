@@ -798,25 +798,25 @@ const Home = () => {
                     params.set('category_group', group.code)
                     navigate(`/services?${params.toString()}`)
                   }}
-                  className="bg-gray-100 rounded-2xl p-4 cursor-pointer 
+                  className="bg-gray-100 rounded-2xl p-3 cursor-pointer 
                              hover:scale-105 hover:shadow-lg 
                              active:scale-95 transition-all duration-200
-                             relative h-32 flex flex-col"
+                             relative h-32 flex flex-col overflow-hidden"
                 >
                   {/* Название группы */}
-                  <h3 className="font-bold text-lg text-sakura-deep mb-2 line-clamp-2 flex-1">
+                  <h3 className="font-bold text-sm text-sakura-deep leading-tight mb-1 pr-16">
                     {displayName}
                   </h3>
                   
                   {/* Время (опционально) */}
                   {group.avgDuration && (
-                    <p className="text-sm text-gray-500 mb-2">
+                    <p className="text-xs text-gray-500 mb-1">
                       {group.avgDuration}
                     </p>
                   )}
                   
                   {/* Иконка/Emoji в правом нижнем углу */}
-                  <div className="absolute bottom-4 right-4 text-5xl">
+                  <div className="absolute bottom-3 right-3 text-4xl">
                     {emojiToDisplay}
                   </div>
                 </div>
