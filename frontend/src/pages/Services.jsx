@@ -323,16 +323,18 @@ const Services = () => {
       return matches
     })
     
-    console.log('[handleCategorySelect] Has partners in category:', hasPartnersInCategory)
+    console.log('[handleCategorySelect] Has partners in category:', hasPartnersInCategory, 'for category:', code)
     
     // Если нет партнеров, показываем модальное окно после небольшой задержки
     if (!hasPartnersInCategory) {
-      console.log('[handleCategorySelect] No partners found, showing modal')
+      console.log('[handleCategorySelect] No partners found, showing modal for category:', code)
       setTimeout(() => {
         setEmptyCategoryCode(code)
         setIsEmptyCategoryModalOpen(true)
-        console.log('[handleCategorySelect] Modal state set:', { code, isEmptyCategoryModalOpen: true })
+        console.log('[handleCategorySelect] Modal state set - code:', code, 'modal open:', true)
       }, 200)
+    } else {
+      console.log('[handleCategorySelect] Partners found, modal not needed for category:', code)
     }
   }
 
@@ -409,22 +411,28 @@ const Services = () => {
 
   // Проверяем наличие партнеров в категории после загрузки данных и изменения фильтров
   useEffect(() => {
-    if (!categoryFilter || loading || services.length === 0 || isEmptyCategoryModalOpen) {
+    if (!categoryFilter || loading || services.length === 0) {
       console.log('[useEffect check] Skipping check:', {
         categoryFilter,
         loading,
         servicesLength: services.length,
-        isEmptyCategoryModalOpen
+        reason: !categoryFilter ? 'no category' : loading ? 'still loading' : 'no services'
       })
       return
     }
     
-    console.log('[useEffect check] Starting check for category:', categoryFilter)
+    // Не показываем модальное окно, если оно уже открыто
+    if (isEmptyCategoryModalOpen) {
+      console.log('[useEffect check] Modal already open, skipping')
+      return
+    }
+    
+    console.log('[useEffect check] Starting check for category:', categoryFilter, 'Services:', services.length)
     
     // Небольшая задержка, чтобы дать время на обновление всех состояний
     const checkTimer = setTimeout(() => {
       const normalizedCode = normalizeCategoryCode(categoryFilter)
-      console.log('[useEffect check] Normalized code:', normalizedCode, 'Services:', services.length)
+      console.log('[useEffect check] Normalized code:', normalizedCode)
       
       const hasPartnersInCategory = services.some(service => {
         // Скрываем конкурентов
@@ -452,9 +460,11 @@ const Services = () => {
       
       // Если нет партнеров в категории, показываем модальное окно
       if (!hasPartnersInCategory) {
-        console.log('[useEffect check] No partners found, showing modal')
+        console.log('[useEffect check] No partners found, showing modal for category:', categoryFilter)
         setEmptyCategoryCode(categoryFilter)
         setIsEmptyCategoryModalOpen(true)
+      } else {
+        console.log('[useEffect check] Partners found, modal not needed')
       }
     }, 500)
     
