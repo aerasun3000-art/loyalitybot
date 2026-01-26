@@ -296,8 +296,7 @@ const Services = () => {
     params.set('category', code)
     setSearchParams(params)
     
-    // Проверяем, есть ли партнеры/услуги в этой категории
-    // Проверяем напрямую из массива services, так как состояние может еще не обновиться
+    // Проверяем наличие партнеров в категории
     const normalizedCode = normalizeCategoryCode(code)
     const hasPartnersInCategory = services.some(service => {
       // Скрываем конкурентов
@@ -312,9 +311,12 @@ const Services = () => {
       return serviceCategoryCode === normalizedCode
     })
     
+    // Если нет партнеров, показываем модальное окно после небольшой задержки
     if (!hasPartnersInCategory) {
-      setEmptyCategoryCode(code)
-      setIsEmptyCategoryModalOpen(true)
+      setTimeout(() => {
+        setEmptyCategoryCode(code)
+        setIsEmptyCategoryModalOpen(true)
+      }, 200)
     }
   }
 
@@ -409,7 +411,7 @@ const Services = () => {
         return serviceCategoryCode === normalizedCode
       })
       
-      // Показываем модальное окно только если нет партнеров
+      // Если нет партнеров в категории, показываем модальное окно
       if (!hasPartnersInCategory) {
         setEmptyCategoryCode(categoryFilter)
         setIsEmptyCategoryModalOpen(true)
@@ -417,7 +419,7 @@ const Services = () => {
     }, 500)
     
     return () => clearTimeout(checkTimer)
-  }, [categoryFilter, services, loading, isEmptyCategoryModalOpen, normalizeCategoryCode, isCompetitor])
+  }, [categoryFilter, services.length, loading, isEmptyCategoryModalOpen, normalizeCategoryCode, isCompetitor])
 
   const getFilteredGroups = () => {
     if (!categoryFilter) {
@@ -644,11 +646,32 @@ const Services = () => {
     hapticFeedback('medium')
   }
 
+  const filteredGroups = getFilteredGroups()
+  
+  // Проверяем, нужно ли показать модальное окно о свободном месте
+  // Это происходит когда выбрана категория, но нет партнеров в ней
+  useEffect(() => {
+    if (!loading && categoryFilter && filteredGroups.length === 0 && !isEmptyCategoryModalOpen && services.length > 0) {
+      // Проверяем, что это действительно категория без партнеров, а не просто результат фильтров
+      const normalizedCode = normalizeCategoryCode(categoryFilter)
+      const hasAnyPartnersInCategory = services.some(service => {
+        if (isCompetitor(service)) return false
+        const rawCode = service.partner?.business_type || service.category
+        if (!rawCode) return false
+        const serviceCategoryCode = normalizeCategoryCode(rawCode)
+        return serviceCategoryCode === normalizedCode
+      })
+      
+      if (!hasAnyPartnersInCategory) {
+        setEmptyCategoryCode(categoryFilter)
+        setIsEmptyCategoryModalOpen(true)
+      }
+    }
+  }, [loading, categoryFilter, filteredGroups.length, isEmptyCategoryModalOpen, services.length, normalizeCategoryCode, isCompetitor])
+
   if (loading) {
     return <Loader />
   }
-
-  const filteredGroups = getFilteredGroups()
 
   return (
     <div className="relative min-h-screen overflow-hidden pb-24 text-sakura-dark">
