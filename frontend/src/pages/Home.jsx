@@ -782,44 +782,68 @@ const Home = () => {
 
         {/* Сетка групп категорий в стиле карточек */}
         <div className="grid grid-cols-3 gap-4 mb-8">
-          {getAllCategoryGroups().map((group) => {
-            const displayName = language === 'ru' ? group.name : group.nameEn
-            const emojiToDisplay = group.emoji || '⭐'
-            
-            return (
-              <div
-                key={group.code}
-                onClick={() => {
-                  hapticFeedback('light')
-                  // Переход на страницу услуг с фильтром по группе категорий
-                  const params = new URLSearchParams()
-                  params.set('category_group', group.code)
-                  navigate(`/services?${params.toString()}`)
-                }}
-                className="bg-gray-100 rounded-2xl p-4 cursor-pointer 
-                           hover:scale-105 hover:shadow-lg 
-                           active:scale-95 transition-all duration-200
-                           relative h-32 flex flex-col"
-              >
-                {/* Название группы */}
-                <h3 className="font-bold text-lg text-sakura-deep mb-2 line-clamp-2 flex-1">
-                  {displayName}
-                </h3>
-                
-                {/* Время (опционально) */}
-                {group.avgDuration && (
-                  <p className="text-sm text-gray-500 mb-2">
-                    {group.avgDuration}
-                  </p>
-                )}
-                
-                {/* Иконка/Emoji в правом нижнем углу */}
-                <div className="absolute bottom-4 right-4 text-5xl">
-                  {emojiToDisplay}
+          {getAllCategoryGroups()
+            .filter(group => group.code !== 'travel_tourism' && group.code !== 'automotive_pets')
+            .map((group) => {
+              const displayName = language === 'ru' ? group.name : group.nameEn
+              const emojiToDisplay = group.emoji || '⭐'
+              
+              return (
+                <div
+                  key={group.code}
+                  onClick={() => {
+                    hapticFeedback('light')
+                    // Переход на страницу услуг с фильтром по группе категорий
+                    const params = new URLSearchParams()
+                    params.set('category_group', group.code)
+                    navigate(`/services?${params.toString()}`)
+                  }}
+                  className="bg-gray-100 rounded-2xl p-4 cursor-pointer 
+                             hover:scale-105 hover:shadow-lg 
+                             active:scale-95 transition-all duration-200
+                             relative h-32 flex flex-col"
+                >
+                  {/* Название группы */}
+                  <h3 className="font-bold text-lg text-sakura-deep mb-2 line-clamp-2 flex-1">
+                    {displayName}
+                  </h3>
+                  
+                  {/* Время (опционально) */}
+                  {group.avgDuration && (
+                    <p className="text-sm text-gray-500 mb-2">
+                      {group.avgDuration}
+                    </p>
+                  )}
+                  
+                  {/* Иконка/Emoji в правом нижнем углу */}
+                  <div className="absolute bottom-4 right-4 text-5xl">
+                    {emojiToDisplay}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          
+          {/* Карточка "Еще" - темная, открывает все категории */}
+          <div
+            onClick={() => {
+              hapticFeedback('light')
+              navigate('/services')
+            }}
+            className="bg-gray-900 rounded-2xl p-4 cursor-pointer 
+                       hover:scale-105 hover:shadow-lg 
+                       active:scale-95 transition-all duration-200
+                       relative h-32 flex flex-col items-center justify-center"
+          >
+            {/* Название "Еще" */}
+            <h3 className="font-bold text-xl text-white">
+              {language === 'ru' ? 'Еще' : 'More'}
+            </h3>
+            
+            {/* Стрелка вправо */}
+            <div className="absolute bottom-4 right-4 text-white text-4xl">
+              →
+            </div>
+          </div>
         </div>
 
         {/* Секция Акции */}
