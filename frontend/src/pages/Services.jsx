@@ -686,6 +686,10 @@ const Services = () => {
     hapticFeedback('medium')
   }
 
+  if (loading) {
+    return <Loader />
+  }
+
   const filteredGroups = getFilteredGroups()
   
   // Проверяем, нужно ли показать модальное окно о свободном месте
@@ -724,10 +728,6 @@ const Services = () => {
       loading
     })
   }, [isEmptyCategoryModalOpen, emptyCategoryCode, categoryFilter, services.length, loading])
-
-  if (loading) {
-    return <Loader />
-  }
 
   return (
     <div className="relative min-h-screen overflow-hidden pb-24 text-sakura-dark">
