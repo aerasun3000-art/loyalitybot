@@ -91,13 +91,17 @@ const Services = () => {
   }, [searchQuery])
 
   useEffect(() => {
-    const normalizedParam = normalizeCategoryCode(categoryParam)
-    if (normalizedParam && normalizedParam !== categoryFilter) {
-      setCategoryFilter(normalizedParam)
+    // Синхронизируем categoryFilter с URL параметром только при изменении categoryParam
+    if (categoryParam) {
+      const normalizedParam = normalizeCategoryCode(categoryParam)
+      if (normalizedParam && normalizedParam !== categoryFilter) {
+        setCategoryFilter(normalizedParam)
+      }
     } else if (!categoryParam && categoryFilter) {
       setCategoryFilter(null)
     }
-  }, [categoryParam, categoryFilter, normalizeCategoryCode])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryParam]) // Убрали categoryFilter и normalizeCategoryCode из зависимостей для предотвращения зацикливания
 
   const loadData = async () => {
     try {
@@ -409,30 +413,27 @@ const Services = () => {
     }
   }, [categoryFilter, categoryOptions])
 
-  // Проверяем наличие партнеров в категории после загрузки данных и изменения фильтров
+  // Проверяем наличие партнеров в категории после загрузки данных
+  // ВАЖНО: Этот useEffect срабатывает только когда данные загружены и категория выбрана
   useEffect(() => {
-    if (!categoryFilter || loading || services.length === 0) {
-      console.log('[useEffect check] Skipping check:', {
-        categoryFilter,
-        loading,
-        servicesLength: services.length,
-        reason: !categoryFilter ? 'no category' : loading ? 'still loading' : 'no services'
-      })
+    // Пропускаем, если еще загружается или нет данных
+    if (loading || services.length === 0) {
       return
     }
     
-    // Не показываем модальное окно, если оно уже открыто
+    // Пропускаем, если категория не выбрана
+    if (!categoryFilter) {
+      return
+    }
+    
+    // Пропускаем, если модальное окно уже открыто
     if (isEmptyCategoryModalOpen) {
-      console.log('[useEffect check] Modal already open, skipping')
       return
     }
-    
-    console.log('[useEffect check] Starting check for category:', categoryFilter, 'Services:', services.length)
     
     // Небольшая задержка, чтобы дать время на обновление всех состояний
     const checkTimer = setTimeout(() => {
       const normalizedCode = normalizeCategoryCode(categoryFilter)
-      console.log('[useEffect check] Normalized code:', normalizedCode)
       
       const hasPartnersInCategory = services.some(service => {
         // Скрываем конкурентов
@@ -444,27 +445,13 @@ const Services = () => {
         const rawCode = service.partner?.business_type || service.category
         if (!rawCode) return false
         const serviceCategoryCode = normalizeCategoryCode(rawCode)
-        const matches = serviceCategoryCode === normalizedCode
-        if (matches) {
-          console.log('[useEffect check] Found matching service:', {
-            serviceTitle: service.title,
-            rawCode,
-            serviceCategoryCode,
-            normalizedCode
-          })
-        }
-        return matches
+        return serviceCategoryCode === normalizedCode
       })
-      
-      console.log('[useEffect check] Has partners in category:', hasPartnersInCategory)
       
       // Если нет партнеров в категории, показываем модальное окно
       if (!hasPartnersInCategory) {
-        console.log('[useEffect check] No partners found, showing modal for category:', categoryFilter)
         setEmptyCategoryCode(categoryFilter)
         setIsEmptyCategoryModalOpen(true)
-      } else {
-        console.log('[useEffect check] Partners found, modal not needed')
       }
     }, 500)
     
