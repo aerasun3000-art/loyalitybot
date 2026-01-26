@@ -798,18 +798,18 @@ const Home = () => {
                     params.set('category_group', group.code)
                     navigate(`/services?${params.toString()}`)
                   }}
-                  className="bg-white rounded-2xl p-4 cursor-pointer 
+                  className="bg-white rounded-2xl p-3 md:p-4 cursor-pointer 
                              hover:scale-105 hover:shadow-lg 
                              active:scale-95 transition-all duration-200
                              relative h-32 flex flex-col overflow-hidden shadow-md"
                 >
                   {/* Название группы - вверху слева */}
-                  <h3 className="font-bold text-base text-sakura-deep leading-tight">
+                  <h3 className="font-bold text-xs md:text-sm text-sakura-deep leading-tight pr-10 md:pr-12 line-clamp-2">
                     {displayName}
                   </h3>
                   
                   {/* Иконка/Emoji в правом нижнем углу */}
-                  <div className="absolute bottom-3 right-3 text-5xl">
+                  <div className="absolute bottom-2 right-2 md:bottom-3 md:right-3 text-3xl md:text-5xl">
                     {emojiToDisplay}
                   </div>
                 </div>
