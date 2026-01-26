@@ -5,6 +5,9 @@ import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
 import { getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
+import useCurrencyStore from '../store/currencyStore'
+import { formatPriceWithPoints, fetchExchangeRates } from '../utils/currency'
+import { supabase } from '../services/supabase'
 import Loader from '../components/Loader'
 import LocationSelector from '../components/LocationSelector'
 import QRCode from 'qrcode'
@@ -26,6 +29,7 @@ const Services = () => {
   const chatId = getChatId()
   const { language } = useLanguageStore()
   const { t } = useTranslation(language)
+  const { currency, rates, setRates } = useCurrencyStore()
   
   const [loading, setLoading] = useState(true)
   const [services, setServices] = useState([])
@@ -48,6 +52,8 @@ const Services = () => {
   const [partnersMetrics, setPartnersMetrics] = useState({})
   const [referralPartnerInfo, setReferralPartnerInfo] = useState(null)
   const [servicePromotions, setServicePromotions] = useState({}) // serviceId -> promotions[]
+  const [isEmptyCategoryModalOpen, setIsEmptyCategoryModalOpen] = useState(false)
+  const [emptyCategoryCode, setEmptyCategoryCode] = useState(null)
 
   const resolveCategory = useCallback((code) => {
     if (!code) return null
@@ -72,6 +78,10 @@ const Services = () => {
 
   useEffect(() => {
     loadData()
+    // Загружаем курсы валют
+    fetchExchangeRates(supabase).then(newRates => {
+      if (newRates) setRates(newRates)
+    })
   }, [chatId, cityParam, districtParam])
 
   // debounce поискового запроса
@@ -285,6 +295,27 @@ const Services = () => {
     const params = new URLSearchParams(searchParams)
     params.set('category', code)
     setSearchParams(params)
+    
+    // Проверяем, есть ли партнеры/услуги в этой категории
+    // Проверяем напрямую из массива services, так как состояние может еще не обновиться
+    const normalizedCode = normalizeCategoryCode(code)
+    const hasPartnersInCategory = services.some(service => {
+      // Скрываем конкурентов
+      if (isCompetitor(service)) {
+        return false
+      }
+      
+      // Проверяем соответствие категории
+      const rawCode = service.partner?.business_type || service.category
+      if (!rawCode) return false
+      const serviceCategoryCode = normalizeCategoryCode(rawCode)
+      return serviceCategoryCode === normalizedCode
+    })
+    
+    if (!hasPartnersInCategory) {
+      setEmptyCategoryCode(code)
+      setIsEmptyCategoryModalOpen(true)
+    }
   }
 
   const resetCategoryFilter = () => {
@@ -357,6 +388,36 @@ const Services = () => {
       setCategoryFilter(null)
     }
   }, [categoryFilter, categoryOptions])
+
+  // Проверяем наличие партнеров в категории после загрузки данных и изменения фильтров
+  useEffect(() => {
+    if (!categoryFilter || loading || services.length === 0 || isEmptyCategoryModalOpen) return
+    
+    // Небольшая задержка, чтобы дать время на обновление всех состояний
+    const checkTimer = setTimeout(() => {
+      const normalizedCode = normalizeCategoryCode(categoryFilter)
+      const hasPartnersInCategory = services.some(service => {
+        // Скрываем конкурентов
+        if (isCompetitor(service)) {
+          return false
+        }
+        
+        // Проверяем соответствие категории
+        const rawCode = service.partner?.business_type || service.category
+        if (!rawCode) return false
+        const serviceCategoryCode = normalizeCategoryCode(rawCode)
+        return serviceCategoryCode === normalizedCode
+      })
+      
+      // Показываем модальное окно только если нет партнеров
+      if (!hasPartnersInCategory) {
+        setEmptyCategoryCode(categoryFilter)
+        setIsEmptyCategoryModalOpen(true)
+      }
+    }, 500)
+    
+    return () => clearTimeout(checkTimer)
+  }, [categoryFilter, services, loading, isEmptyCategoryModalOpen, normalizeCategoryCode, isCompetitor])
 
   const getFilteredGroups = () => {
     if (!categoryFilter) {
@@ -889,7 +950,7 @@ const Services = () => {
                           <div className="flex items-center gap-2 ml-3">
                             <span className="text-xs text-sakura-dark/80">💸</span>
                             <span className="text-sm font-bold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                              {service.price_points}
+                              {formatPriceWithPoints(service.price_points, currency, rates, true, language)}
                             </span>
                           </div>
                         </div>
@@ -946,10 +1007,10 @@ const Services = () => {
                 <span className="text-2xl">💸</span>
                 <div className="flex-1">
                   <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">
-                    {language === 'ru' ? 'Стоимость в баллах' : 'Cost in points'}
+                    {language === 'ru' ? 'Стоимость' : 'Cost'}
                   </p>
                   <p className="text-lg font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                    {selectedService.price_points}
+                    {formatPriceWithPoints(selectedService.price_points, currency, rates, true, language)}
                   </p>
                 </div>
                 <div className="text-right">
@@ -959,7 +1020,7 @@ const Services = () => {
                   <p className={`text-lg font-semibold ${
                     balance >= selectedService.price_points ? 'text-green-600' : 'text-red-500'
                   }`}>
-                    {balance}
+                    {formatPriceWithPoints(balance, currency, rates, false, language)}
                   </p>
                 </div>
               </div>
@@ -1034,6 +1095,59 @@ const Services = () => {
                 </div>
               )}
             </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно "Место свободно" */}
+      {isEmptyCategoryModalOpen && emptyCategoryCode && (
+        <div className="fixed inset-0 z-[100]" onClick={() => setIsEmptyCategoryModalOpen(false)}>
+          <div className="absolute inset-0 bg-sakura-deep/50 backdrop-blur-sm" />
+          <div 
+            className="relative h-full flex items-center justify-center px-4 py-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative z-10 w-full max-w-md bg-sakura-surface/95 border border-sakura-border/60 rounded-3xl shadow-2xl p-6">
+              <button
+                onClick={() => setIsEmptyCategoryModalOpen(false)}
+                className="absolute top-4 right-4 w-10 h-10 rounded-full border border-sakura-border/40 bg-sakura-surface/20 text-sakura-dark hover:bg-sakura-surface/30 transition-colors z-20"
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+              <div className="space-y-4 text-sakura-dark text-center">
+                <div className="text-6xl mb-4">🎯</div>
+                <h2 className="text-2xl font-bold mb-2">
+                  {language === 'ru' ? 'Место свободно!' : 'Spot Available!'}
+                </h2>
+                <p className="text-sakura-dark/80 mb-6">
+                  {language === 'ru' 
+                    ? 'В этой категории пока нет партнеров. Станьте первым и получите преимущество!'
+                    : 'There are no partners in this category yet. Be the first and get an advantage!'}
+                </p>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => {
+                      hapticFeedback('medium')
+                      navigate('/partner/apply')
+                      setIsEmptyCategoryModalOpen(false)
+                    }}
+                    className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-mid to-sakura-dark text-white font-semibold shadow-md hover:shadow-lg transition-all"
+                  >
+                    {language === 'ru' ? '🤝 Стать партнером' : '🤝 Become a Partner'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      hapticFeedback('light')
+                      setIsEmptyCategoryModalOpen(false)
+                    }}
+                    className="w-full py-3 rounded-full bg-white text-sakura-dark font-semibold shadow-md border border-sakura-border hover:bg-sakura-surface transition-colors"
+                  >
+                    {language === 'ru' ? 'Закрыть' : 'Close'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
