@@ -4,8 +4,13 @@ import App from './App.jsx'
 import './styles/index.css'
 import { initSentry } from './sentry'
 
-// Инициализация Sentry для отслеживания ошибок
-initSentry()
+// Инициализация Sentry для отслеживания ошибок (не блокирует загрузку)
+try {
+  initSentry()
+} catch (error) {
+  // Игнорируем ошибки инициализации Sentry, чтобы не блокировать загрузку приложения
+  console.debug('Sentry initialization skipped')
+}
 
 // Очистка кэша только при необходимости (не на публичных страницах)
 const isPublicPage = window.location.pathname.startsWith('/onepager/') || 
