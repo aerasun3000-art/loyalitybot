@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, getPromotionsForService } from '../services/supabase'
 import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
-import { getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
+import { getCategoryByCode, serviceCategories, getAllServiceCategories } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import useCurrencyStore from '../store/currencyStore'
@@ -398,8 +398,16 @@ const Services = () => {
   }, [referralPartnerInfo, normalizeCategoryCode])
 
   useEffect(() => {
-    if (categoryFilter && !categoryOptions.find(option => option.code === categoryFilter)) {
-      setCategoryFilter(null)
+    // Проверяем, что категория валидна - либо есть в существующих услугах, либо в списке всех возможных категорий
+    if (categoryFilter) {
+      const existsInOptions = categoryOptions.find(option => option.code === categoryFilter)
+      const existsInAllCategories = getAllServiceCategories().some(cat => cat.code === categoryFilter)
+      const existsInServiceCategories = serviceCategories[categoryFilter]
+      
+      // Сбрасываем только если категория не существует ни в одном из списков
+      if (!existsInOptions && !existsInAllCategories && !existsInServiceCategories) {
+        setCategoryFilter(null)
+      }
     }
   }, [categoryFilter, categoryOptions])
 
