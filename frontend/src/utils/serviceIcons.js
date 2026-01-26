@@ -381,5 +381,140 @@ export const getCategoryByCode = (code) => {
  */
 export const defaultServiceIcons = getMainPageCategories()
 
+/**
+ * Группы категорий услуг и товаров
+ * Используются для отображения на главной странице
+ */
+export const categoryGroups = [
+  {
+    id: 'beauty_wellness',
+    code: 'beauty_wellness',
+    name: 'Красота и здоровье',
+    nameEn: 'Beauty & Wellness',
+    emoji: '💄',
+    icon: 'beauty',
+    categories: [
+      'nail_care', 'brow_design', 'hair_salon', 'hair_removal',
+      'facial_aesthetics', 'lash_services', 'massage_therapy', 'makeup_pmu',
+      'body_wellness', 'nutrition_coaching', 'mindfulness_coaching', 'image_consulting'
+    ],
+    displayOrder: 1,
+    avgDuration: '60 min'
+  },
+  {
+    id: 'food_beverage',
+    code: 'food_beverage',
+    name: 'Еда и напитки',
+    nameEn: 'Food & Beverage',
+    emoji: '🍽️',
+    icon: 'food',
+    categories: ['restaurant', 'cafe', 'food_delivery', 'bakery', 'bar'],
+    displayOrder: 2,
+    avgDuration: '20 min'
+  },
+  {
+    id: 'education',
+    code: 'education',
+    name: 'Образование',
+    nameEn: 'Education',
+    emoji: '📚',
+    icon: 'education',
+    categories: ['education', 'language_school', 'training', 'online_education'],
+    displayOrder: 3,
+    avgDuration: '2 часа'
+  },
+  {
+    id: 'retail',
+    code: 'retail',
+    name: 'Розничная торговля',
+    nameEn: 'Retail',
+    emoji: '🛍️',
+    icon: 'retail',
+    categories: ['retail', 'fashion', 'cosmetics_shop', 'electronics', 'gift_shop'],
+    displayOrder: 4,
+    avgDuration: '15 min'
+  },
+  {
+    id: 'sports_fitness',
+    code: 'sports_fitness',
+    name: 'Спорт и фитнес',
+    nameEn: 'Sports & Fitness',
+    emoji: '🏋️',
+    icon: 'fitness',
+    categories: ['fitness', 'yoga', 'sports', 'swimming'],
+    displayOrder: 5,
+    avgDuration: '90 min'
+  },
+  {
+    id: 'entertainment',
+    code: 'entertainment',
+    name: 'Развлечения',
+    nameEn: 'Entertainment',
+    emoji: '🎬',
+    icon: 'entertainment',
+    categories: ['entertainment', 'cinema', 'events', 'gaming', 'music'],
+    displayOrder: 6,
+    avgDuration: '2 часа'
+  },
+  {
+    id: 'healthcare',
+    code: 'healthcare',
+    name: 'Здравоохранение',
+    nameEn: 'Healthcare',
+    emoji: '🏥',
+    icon: 'healthcare',
+    categories: ['healthcare', 'dental', 'veterinary', 'pharmacy'],
+    displayOrder: 7,
+    avgDuration: '30 min'
+  },
+  {
+    id: 'services',
+    code: 'services',
+    name: 'Услуги',
+    nameEn: 'Services',
+    emoji: '🧹',
+    icon: 'services',
+    categories: ['cleaning', 'repair', 'photography', 'legal', 'accounting'],
+    displayOrder: 8,
+    avgDuration: '1 час'
+  },
+  {
+    id: 'travel_tourism',
+    code: 'travel_tourism',
+    name: 'Путешествия и туризм',
+    nameEn: 'Travel & Tourism',
+    emoji: '✈️',
+    icon: 'travel',
+    categories: ['travel', 'hotel', 'tours'],
+    displayOrder: 9,
+    avgDuration: '1 день'
+  },
+  {
+    id: 'automotive_pets',
+    code: 'automotive_pets',
+    name: 'Авто и животные',
+    nameEn: 'Automotive & Pets',
+    emoji: '🚗',
+    icon: 'automotive',
+    categories: ['car_service', 'car_rental', 'pet_services'],
+    displayOrder: 10,
+    avgDuration: '2 часа'
+  }
+]
+
+/**
+ * Получить все группы категорий
+ */
+export const getAllCategoryGroups = () => {
+  return categoryGroups.sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999))
+}
+
+/**
+ * Получить группу категорий по коду
+ */
+export const getCategoryGroupByCode = (code) => {
+  return categoryGroups.find(group => group.code === code || group.id === code) || null
+}
+
 export default serviceCategories
 

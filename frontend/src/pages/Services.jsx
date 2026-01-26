@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, getPromotionsForService } from '../services/supabase'
 import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
-import { getCategoryByCode, serviceCategories, getAllServiceCategories } from '../utils/serviceIcons'
+import { getCategoryByCode, serviceCategories, getAllServiceCategories, getCategoryGroupByCode } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import useCurrencyStore from '../store/currencyStore'
@@ -26,6 +26,7 @@ const Services = () => {
   const cityParam = searchParams.get('city')
   const districtParam = searchParams.get('district')
   const categoryParam = searchParams.get('category')
+  const categoryGroupParam = searchParams.get('category_group')
   const chatId = getChatId()
   const { language } = useLanguageStore()
   const { t } = useTranslation(language)
@@ -92,17 +93,29 @@ const Services = () => {
   }, [searchQuery])
 
   useEffect(() => {
+    // Обработка category_group параметра
+    if (categoryGroupParam) {
+      const group = getCategoryGroupByCode(categoryGroupParam)
+      if (group && group.categories && group.categories.length > 0) {
+        // Устанавливаем первую категорию из группы как фильтр
+        const firstCategory = group.categories[0]
+        const normalizedParam = normalizeCategoryCode(firstCategory)
+        if (normalizedParam && normalizedParam !== categoryFilter) {
+          setCategoryFilter(normalizedParam)
+        }
+      }
+    }
     // Синхронизируем categoryFilter с URL параметром только при изменении categoryParam
-    if (categoryParam) {
+    else if (categoryParam) {
       const normalizedParam = normalizeCategoryCode(categoryParam)
       if (normalizedParam && normalizedParam !== categoryFilter) {
         setCategoryFilter(normalizedParam)
       }
-    } else if (!categoryParam && categoryFilter) {
+    } else if (!categoryParam && !categoryGroupParam && categoryFilter) {
       setCategoryFilter(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryParam]) // Убрали categoryFilter и normalizeCategoryCode из зависимостей для предотвращения зацикливания
+  }, [categoryParam, categoryGroupParam]) // Убрали categoryFilter и normalizeCategoryCode из зависимостей для предотвращения зацикливания
 
   const loadData = async () => {
     try {
@@ -458,7 +471,16 @@ const Services = () => {
   }, [categoryFilter, services.length, loading, isEmptyCategoryModalOpen])
 
   const getFilteredGroups = () => {
-    if (!categoryFilter) {
+    // Обработка category_group: фильтруем по всем категориям из группы
+    let allowedCategories = null
+    if (categoryGroupParam) {
+      const group = getCategoryGroupByCode(categoryGroupParam)
+      if (group && group.categories) {
+        allowedCategories = new Set(group.categories.map(cat => normalizeCategoryCode(cat)).filter(Boolean))
+      }
+    }
+
+    if (!categoryFilter && !allowedCategories) {
       const categoryMap = new Map()
       const query = debouncedQuery.trim().toLowerCase()
 
@@ -508,7 +530,15 @@ const Services = () => {
     }
 
     let groups = getGroupedServices()
-      .filter(group => group.categoryCode === categoryFilter)
+      .filter(group => {
+        const groupCategory = normalizeCategoryCode(group.categoryCode)
+        // Если есть category_group, фильтруем по всем категориям из группы
+        if (allowedCategories) {
+          return allowedCategories.has(groupCategory)
+        }
+        // Иначе фильтруем по выбранной категории
+        return groupCategory === categoryFilter
+      })
       // Скрываем конкурентов (партнеров с той же категорией услуг)
       // НО показываем услуги самого партнера, который добавил клиента
       .filter(group => !isCompetitor({ partner: group.partner, partner_chat_id: group.partnerId, category: group.categoryCode }))

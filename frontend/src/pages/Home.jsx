@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
 import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage, getReferralPartnerInfo } from '../services/supabase'
-import { getServiceIcon, getMainPageCategories, getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
+import { getServiceIcon, getMainPageCategories, getCategoryByCode, getAllCategoryGroups, serviceCategories } from '../utils/serviceIcons'
 import { useTranslation, translateDynamicContent, declinePoints } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
@@ -765,7 +765,7 @@ const Home = () => {
           )}
         </div>
 
-        {/* Секция Services */}
+        {/* Секция Services - Группы категорий */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-sakura-deep">
             {t('home_services')}
@@ -777,120 +777,46 @@ const Home = () => {
             <span className="text-sakura-deep font-semibold hover:opacity-80 transition-colors drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
               {t('home_see_all')}
             </span>
-            {services.length > 8 && (
-              <span className="bg-rose-accent text-white text-xs px-2 py-0.5 rounded-lg ml-1 font-semibold border border-rose-border">
-                NEW
-              </span>
-            )}
           </button>
         </div>
 
-        {/* Фильтры по категориям (category_group) */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
-          <button
-            onClick={() => {
-              hapticFeedback('light')
-              setSelectedCategoryGroup(null)
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
-              selectedCategoryGroup === null
-                ? 'bg-sakura-accent text-white shadow-md'
-                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
-            }`}
-          >
-            {language === 'ru' ? 'Все' : 'All'}
-          </button>
-          <button
-            onClick={() => {
-              hapticFeedback('light')
-              setSelectedCategoryGroup('beauty')
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
-              selectedCategoryGroup === 'beauty'
-                ? 'bg-sakura-accent text-white shadow-md'
-                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
-            }`}
-          >
-            {language === 'ru' ? '💅 Красота' : '💅 Beauty'}
-          </button>
-          <button
-            onClick={() => {
-              hapticFeedback('light')
-              setSelectedCategoryGroup('food')
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
-              selectedCategoryGroup === 'food'
-                ? 'bg-sakura-accent text-white shadow-md'
-                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
-            }`}
-          >
-            {language === 'ru' ? '🍽️ Еда' : '🍽️ Food'}
-          </button>
-          <button
-            onClick={() => {
-              hapticFeedback('light')
-              setSelectedCategoryGroup('retail')
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
-              selectedCategoryGroup === 'retail'
-                ? 'bg-sakura-accent text-white shadow-md'
-                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
-            }`}
-          >
-            {language === 'ru' ? '🛍️ Магазины' : '🛍️ Retail'}
-          </button>
-          <button
-            onClick={() => {
-              hapticFeedback('light')
-              setSelectedCategoryGroup('activity')
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
-              selectedCategoryGroup === 'activity'
-                ? 'bg-sakura-accent text-white shadow-md'
-                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
-            }`}
-          >
-            {language === 'ru' ? '🎯 Активности' : '🎯 Activity'}
-          </button>
-          <button
-            onClick={() => {
-              hapticFeedback('light')
-              setSelectedCategoryGroup('influencer')
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
-              selectedCategoryGroup === 'influencer'
-                ? 'bg-sakura-accent text-white shadow-md'
-                : 'bg-white/50 text-sakura-deep hover:bg-white/70'
-            }`}
-          >
-            {language === 'ru' ? '📱 Блогеры' : '📱 Influencers'}
-          </button>
-        </div>
-
-        {/* Сетка услуг 4x2 */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          {getServiceTiles().map((itemWrapper, index) => {
-            const categoryData = itemWrapper.data
-            const categoryCode = itemWrapper.code
-            const emojiToDisplay = categoryData.emoji || '⭐'
-            const displayName = categoryData.shortLabel || (language === 'ru' ? categoryData.name : categoryData.nameEn || categoryData.name)
-
+        {/* Сетка групп категорий в стиле карточек */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+          {getAllCategoryGroups().map((group) => {
+            const displayName = language === 'ru' ? group.name : group.nameEn
+            const emojiToDisplay = group.emoji || '⭐'
+            
             return (
               <div
-                key={categoryCode || index}
-                onClick={() => handleServiceClick(null, categoryCode)}
-                className="flex flex-col items-center cursor-pointer active:scale-[0.98] transition-transform"
+                key={group.code}
+                onClick={() => {
+                  hapticFeedback('light')
+                  // Переход на страницу услуг с фильтром по группе категорий
+                  const params = new URLSearchParams()
+                  params.set('category_group', group.code)
+                  navigate(`/services?${params.toString()}`)
+                }}
+                className="bg-gray-100 rounded-2xl p-4 cursor-pointer 
+                           hover:scale-105 hover:shadow-lg 
+                           active:scale-95 transition-all duration-200
+                           relative h-32 flex flex-col"
               >
-                <div className="w-16 h-16 bg-gradient-to-br from-white/35 to-sakura-surface/38 backdrop-blur-sm rounded-xl flex items-center justify-center mb-2 relative hover:bg-sakura-accent/10 transition-colors border border-sakura-border/50 shadow-sm active:shadow-md">
-                  <div className="flex items-center justify-center w-full h-full text-3xl">
-                    {emojiToDisplay}
-                  </div>
+                {/* Название группы */}
+                <h3 className="font-bold text-lg text-sakura-deep mb-2 line-clamp-2 flex-1">
+                  {displayName}
+                </h3>
+                
+                {/* Время (опционально) */}
+                {group.avgDuration && (
+                  <p className="text-sm text-gray-500 mb-2">
+                    {group.avgDuration}
+                  </p>
+                )}
+                
+                {/* Иконка/Emoji в правом нижнем углу */}
+                <div className="absolute bottom-4 right-4 text-5xl">
+                  {emojiToDisplay}
                 </div>
-                <span className="text-[11px] text-center text-sakura-deep leading-tight">
-                  {displayName?.length > 15
-                    ? displayName.substring(0, 15) + '...'
-                    : displayName}
-                </span>
               </div>
             )
           })}
@@ -989,7 +915,7 @@ const Home = () => {
                           { bg: 'bg-orange-400', text: 'text-orange-900' },
                           { bg: 'bg-indigo-400', text: 'text-indigo-900' }
                         ]
-                        const colors = cardColors[parseInt(promo.id) || index % cardColors.length]
+                        const colors = cardColors[(parseInt(promo.id) || index) % cardColors.length]
 
                         // Определяем, является ли это реальной карточкой (не клоном)
                         const isRealCard = basePromotions.length > 1 
