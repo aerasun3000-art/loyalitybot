@@ -1,6 +1,7 @@
 import os
 import asyncio
 import datetime
+import base64
 from dotenv import load_dotenv
 import requests
 from aiogram import Bot, Dispatcher, types, F
@@ -91,6 +92,16 @@ class NewsEditing(StatesGroup):
     selecting_field = State()
     waiting_for_new_value = State()
 
+class PartnerBroadcast(StatesGroup):
+    selecting_group_type = State()
+    selecting_city = State()
+    selecting_category = State()
+    waiting_for_message = State()
+
+class PartnerMessage(StatesGroup):
+    selecting_partner = State()
+    waiting_for_message = State()
+
 # Хелпер: список ID администраторов
 def _get_admin_ids() -> list[int]:
     return [int(i.strip()) for i in str(ADMIN_CHAT_ID).split(',') if i.strip()]
@@ -105,6 +116,21 @@ def send_partner_notification(partner_chat_id: str, text: str) -> None:
     except Exception:
         # не падаем в админке из-за уведомления
         pass
+
+async def send_partner_notification_async(partner_chat_id: str, text: str) -> bool:
+    """Асинхронная версия отправки уведомления партнёру"""
+    if not TOKEN_PARTNER:
+        return False
+    try:
+        url = f"https://api.telegram.org/bot{TOKEN_PARTNER}/sendMessage"
+        payload = {"chat_id": str(partner_chat_id), "text": text, "parse_mode": "Markdown"}
+        # Используем asyncio для неблокирующего вызова
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: requests.post(url, data=payload, timeout=5))
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send notification to partner {partner_chat_id}: {e}")
+        return False
 
 
 # --- Хелперы для проверки администратора ---
@@ -126,7 +152,10 @@ async def handle_start_admin(message: types.Message):
         return
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        # Outreach и быстрые действия
+        # Массовая рассылка (в начале для видимости)
+        [
+            InlineKeyboardButton(text="📢 Массовая рассылка партнёрам", callback_data="admin_broadcast"),
+        ],
         # Партнёры и услуги
         [
             InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners"),
@@ -156,6 +185,7 @@ async def handle_start_admin(message: types.Message):
             InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard"),
             InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers"),
             InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background"),
+            InlineKeyboardButton(text="⚙️ Настройки", callback_data="menu_settings"),
         ],
     ])
     
@@ -175,6 +205,7 @@ async def show_pending_partners(callback_query: types.CallbackQuery):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⏳ Заявки на модерацию", callback_data="admin_partners_pending")],
         [InlineKeyboardButton(text="🗑 Удалить партнера", callback_data="admin_partners_delete")],
+        [InlineKeyboardButton(text="💬 Написать партнёру", callback_data="admin_partner_message")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
     ])
     
@@ -214,6 +245,9 @@ async def show_pending_partners_list(callback_query: types.CallbackQuery):
             [
                 InlineKeyboardButton(text="🟢 Одобрить", callback_data=f"partner_approve_{partner_chat_id}"),
                 InlineKeyboardButton(text="🔴 Отклонить", callback_data=f"partner_reject_{partner_chat_id}")
+            ],
+            [
+                InlineKeyboardButton(text="💬 Написать партнёру", callback_data=f"partner_message_{partner_chat_id}")
             ]
         ])
         
@@ -875,7 +909,10 @@ async def back_to_main_menu(callback_query: types.CallbackQuery):
         return
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        # Outreach и быстрые действия
+        # Массовая рассылка (в начале для видимости)
+        [
+            InlineKeyboardButton(text="📢 Массовая рассылка партнёрам", callback_data="admin_broadcast"),
+        ],
         # Партнёры и услуги
         [
             InlineKeyboardButton(text="🤝 Заявки Партнеров", callback_data="admin_partners"),
@@ -905,6 +942,7 @@ async def back_to_main_menu(callback_query: types.CallbackQuery):
             InlineKeyboardButton(text="📈 Дашборд Админа", callback_data="admin_dashboard"),
             InlineKeyboardButton(text="📄 Одностраничники", callback_data="admin_onepagers"),
             InlineKeyboardButton(text="🎨 Смена Фона", callback_data="admin_background"),
+            InlineKeyboardButton(text="⚙️ Настройки", callback_data="menu_settings"),
         ],
     ])
     
@@ -913,6 +951,19 @@ async def back_to_main_menu(callback_query: types.CallbackQuery):
         reply_markup=keyboard
     )
     await callback_query.answer()
+
+
+@dp.callback_query(F.data == "menu_settings")
+async def show_menu_settings_soon(callback_query: types.CallbackQuery):
+    """Заглушка: Настройки будут доступны в ближайшее время."""
+    await callback_query.answer()
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+    ])
+    await callback_query.message.edit_text(
+        "⚙️ **Настройки**\n\nФункция «Настройки» будет доступна в ближайшее время.",
+        reply_markup=keyboard
+    )
 
 
 @dp.callback_query(F.data == "news_create")
@@ -4104,6 +4155,542 @@ async def cancel_schedule(callback_query: types.CallbackQuery, state: FSMContext
     """Отменяет планирование созвона"""
     await state.clear()
     await callback_query.message.edit_text("❌ Планирование отменено")
+    await callback_query.answer()
+
+# --- Массовая рассылка партнёрам ---
+
+@dp.callback_query(F.data == "admin_broadcast")
+async def start_broadcast(callback_query: types.CallbackQuery, state: FSMContext):
+    """Начинает процесс массовой рассылки партнёрам"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    await callback_query.answer("Выбор группы партнёров...")
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🌍 Все партнёры", callback_data="broadcast_all")],
+        [InlineKeyboardButton(text="🏙️ По городу", callback_data="broadcast_city")],
+        [InlineKeyboardButton(text="💼 По виду услуг", callback_data="broadcast_category")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")],
+    ])
+    
+    await callback_query.message.edit_text(
+        "📢 **Массовая рассылка партнёрам**\n\n"
+        "Выберите группу партнёров для рассылки:",
+        reply_markup=keyboard
+    )
+    await state.set_state(PartnerBroadcast.selecting_group_type)
+
+@dp.callback_query(F.data == "broadcast_all")
+async def broadcast_all_partners(callback_query: types.CallbackQuery, state: FSMContext):
+    """Выбраны все партнёры"""
+    await callback_query.answer("Все партнёры")
+    
+    await state.update_data(group_type="all")
+    
+    await callback_query.message.edit_text(
+        "📝 **Введите сообщение для рассылки**\n\n"
+        "Сообщение будет отправлено всем партнёрам.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="broadcast_cancel")]
+        ])
+    )
+    await state.set_state(PartnerBroadcast.waiting_for_message)
+
+@dp.callback_query(F.data == "broadcast_city")
+async def broadcast_select_city(callback_query: types.CallbackQuery, state: FSMContext):
+    """Выбор города для рассылки"""
+    await callback_query.answer("Выбор города...")
+    
+    try:
+        cities = db_manager.get_distinct_cities()
+        
+        if not cities:
+            await state.clear()
+            await callback_query.message.edit_text(
+                "❌ Города не найдены в базе данных.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_broadcast")]
+                ])
+            )
+            return
+        
+        keyboard_buttons = []
+        # Группируем по 2 кнопки в ряд
+        # Кодируем названия городов в base64 для безопасной передачи в callback_data
+        for i in range(0, len(cities), 2):
+            row = []
+            city1_encoded = base64.b64encode(cities[i].encode('utf-8')).decode('ascii')
+            row.append(InlineKeyboardButton(text=cities[i], callback_data=f"broadcast_city_{city1_encoded}"))
+            if i + 1 < len(cities):
+                city2_encoded = base64.b64encode(cities[i + 1].encode('utf-8')).decode('ascii')
+                row.append(InlineKeyboardButton(text=cities[i + 1], callback_data=f"broadcast_city_{city2_encoded}"))
+            keyboard_buttons.append(row)
+        
+        keyboard_buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_broadcast")])
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+        
+        await callback_query.message.edit_text(
+            "🏙️ **Выберите город**\n\n"
+            "Сообщение будет отправлено партнёрам из выбранного города:",
+            reply_markup=keyboard
+        )
+        await state.set_state(PartnerBroadcast.selecting_city)
+    except Exception as e:
+        logger.exception(f"Error selecting city for broadcast: {e}")
+        await state.clear()
+        await callback_query.answer(f"Ошибка: {str(e)}", show_alert=True)
+        await callback_query.message.edit_text(
+            "❌ Произошла ошибка при загрузке городов.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_broadcast")]
+            ])
+        )
+
+@dp.callback_query(F.data.startswith("broadcast_city_"))
+async def broadcast_city_selected(callback_query: types.CallbackQuery, state: FSMContext):
+    """Город выбран"""
+    city_encoded = callback_query.data.replace("broadcast_city_", "")
+    try:
+        city = base64.b64decode(city_encoded.encode('ascii')).decode('utf-8')
+    except Exception as e:
+        logger.error(f"Error decoding city name: {e}")
+        await state.clear()
+        await callback_query.answer("❌ Ошибка декодирования города", show_alert=True)
+        await callback_query.message.edit_text(
+            "❌ Ошибка при обработке выбранного города.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_broadcast")]
+            ])
+        )
+        return
+    await callback_query.answer(f"Город: {city}")
+    
+    await state.update_data(group_type="city", city=city)
+    
+    await callback_query.message.edit_text(
+        f"📝 **Введите сообщение для рассылки**\n\n"
+        f"Город: **{city}**\n"
+        "Сообщение будет отправлено партнёрам из этого города.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="broadcast_cancel")]
+        ])
+    )
+    await state.set_state(PartnerBroadcast.waiting_for_message)
+
+@dp.callback_query(F.data == "broadcast_category")
+async def broadcast_select_category(callback_query: types.CallbackQuery, state: FSMContext):
+    """Выбор категории услуг для рассылки"""
+    await callback_query.answer("Выбор категории...")
+    
+    # Категории услуг из справочника
+    categories = [
+        ("nail_care", "💅 Ногтевой сервис"),
+        ("brow_design", "👁️ Коррекция бровей"),
+        ("hair_salon", "💇‍♀️ Парикмахерские услуги"),
+        ("hair_removal", "⚡ Депиляция"),
+        ("facial_aesthetics", "✨ Косметология"),
+        ("lash_services", "👀 Наращивание ресниц"),
+        ("massage_therapy", "💆‍♀️ Массаж"),
+        ("makeup_pmu", "💄 Визаж и перманент"),
+        ("body_wellness", "🌸 Телесная терапия"),
+        ("nutrition_coaching", "🍎 Нутрициология"),
+        ("mindfulness_coaching", "🧠 Ментальное здоровье"),
+        ("image_consulting", "👗 Стиль"),
+    ]
+    
+    keyboard_buttons = []
+    # Группируем по 2 кнопки в ряд
+    for i in range(0, len(categories), 2):
+        row = []
+        code, name = categories[i]
+        row.append(InlineKeyboardButton(text=name, callback_data=f"broadcast_category_{code}"))
+        if i + 1 < len(categories):
+            code2, name2 = categories[i + 1]
+            row.append(InlineKeyboardButton(text=name2, callback_data=f"broadcast_category_{code2}"))
+        keyboard_buttons.append(row)
+    
+    keyboard_buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_broadcast")])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+    
+    await callback_query.message.edit_text(
+        "💼 **Выберите категорию услуг**\n\n"
+        "Сообщение будет отправлено партнёрам с выбранной категорией услуг:",
+        reply_markup=keyboard
+    )
+    await state.set_state(PartnerBroadcast.selecting_category)
+
+@dp.callback_query(F.data.startswith("broadcast_category_"))
+async def broadcast_category_selected(callback_query: types.CallbackQuery, state: FSMContext):
+    """Категория выбрана"""
+    category = callback_query.data.replace("broadcast_category_", "")
+    
+    category_names = {
+        "nail_care": "💅 Ногтевой сервис",
+        "brow_design": "👁️ Коррекция бровей",
+        "hair_salon": "💇‍♀️ Парикмахерские услуги",
+        "hair_removal": "⚡ Депиляция",
+        "facial_aesthetics": "✨ Косметология",
+        "lash_services": "👀 Наращивание ресниц",
+        "massage_therapy": "💆‍♀️ Массаж",
+        "makeup_pmu": "💄 Визаж и перманент",
+        "body_wellness": "🌸 Телесная терапия",
+        "nutrition_coaching": "🍎 Нутрициология",
+        "mindfulness_coaching": "🧠 Ментальное здоровье",
+        "image_consulting": "👗 Стиль",
+    }
+    
+    category_name = category_names.get(category, category)
+    await callback_query.answer(f"Категория: {category_name}")
+    
+    await state.update_data(group_type="category", category=category)
+    
+    await callback_query.message.edit_text(
+        f"📝 **Введите сообщение для рассылки**\n\n"
+        f"Категория: **{category_name}**\n"
+        "Сообщение будет отправлено партнёрам с этой категорией услуг.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="broadcast_cancel")]
+        ])
+    )
+    await state.set_state(PartnerBroadcast.waiting_for_message)
+
+@dp.message(PartnerBroadcast.waiting_for_message)
+async def process_broadcast_message(message: types.Message, state: FSMContext):
+    """Обработка сообщения для рассылки"""
+    if not is_admin(message.chat.id):
+        await message.answer("У вас нет прав администратора")
+        await state.clear()
+        return
+    
+    message_text = message.text
+    
+    if not message_text or len(message_text.strip()) == 0:
+        await message.answer("❌ Сообщение не может быть пустым. Попробуйте снова.")
+        return
+    
+    data = await state.get_data()
+    group_type = data.get("group_type")
+    
+    try:
+        # Получаем список партнёров в зависимости от типа группы
+        partners = []
+        
+        if group_type == "all":
+            # Все партнёры из таблицы partners
+            response = db_manager.client.from_('partners').select('chat_id, name, company_name').execute()
+            partners = response.data or []
+        elif group_type == "city":
+            city = data.get("city")
+            response = db_manager.client.from_('partners').select('chat_id, name, company_name').eq('city', city).execute()
+            partners = response.data or []
+        elif group_type == "category":
+            category = data.get("category")
+            response = db_manager.client.from_('partners').select('chat_id, name, company_name').eq('business_type', category).execute()
+            partners = response.data or []
+        
+        if not partners:
+            await message.answer(
+                "❌ Партнёры не найдены по выбранным критериям.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_broadcast")]
+                ])
+            )
+            await state.clear()
+            return
+        
+        # Отправляем сообщение каждому партнёру
+        success_count = 0
+        failed_count = 0
+        
+        status_message = await message.answer(f"📤 Отправка сообщений...\n\nОбработано: 0/{len(partners)}")
+        
+        for partner in partners:
+            partner_chat_id = partner.get('chat_id')
+            if partner_chat_id:
+                try:
+                    result = await send_partner_notification_async(str(partner_chat_id), message_text)
+                    if result:
+                        success_count += 1
+                    else:
+                        failed_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to send message to partner {partner_chat_id}: {e}")
+                    failed_count += 1
+                
+                # Обновляем статус каждые 10 сообщений
+                if (success_count + failed_count) % 10 == 0:
+                    try:
+                        await status_message.edit_text(
+                            f"📤 Отправка сообщений...\n\n"
+                            f"Обработано: {success_count + failed_count}/{len(partners)}\n"
+                            f"✅ Успешно: {success_count}\n"
+                            f"❌ Ошибок: {failed_count}"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to update status message: {e}")
+        
+        # Финальный статус
+        result_text = (
+            f"✅ **Рассылка завершена**\n\n"
+            f"📊 Всего партнёров: {len(partners)}\n"
+            f"✅ Успешно отправлено: {success_count}\n"
+            f"❌ Ошибок: {failed_count}"
+        )
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📢 Новая рассылка", callback_data="admin_broadcast")],
+            [InlineKeyboardButton(text="◀️ Главное меню", callback_data="back_to_main")],
+        ])
+        
+        await status_message.edit_text(result_text, reply_markup=keyboard)
+        await state.clear()
+        
+    except Exception as e:
+        logger.exception(f"Error processing broadcast: {e}")
+        await message.answer(
+            f"❌ Ошибка при рассылке: {str(e)}",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_broadcast")]
+            ])
+        )
+        await state.clear()
+
+@dp.callback_query(F.data == "broadcast_cancel")
+async def cancel_broadcast(callback_query: types.CallbackQuery, state: FSMContext):
+    """Отмена рассылки"""
+    await state.clear()
+    await callback_query.message.edit_text(
+        "❌ Рассылка отменена",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Главное меню", callback_data="back_to_main")]
+        ])
+    )
+    await callback_query.answer()
+
+# --- Отправка сообщения конкретному партнёру ---
+
+@dp.callback_query(F.data == "admin_partner_message")
+async def start_partner_message(callback_query: types.CallbackQuery, state: FSMContext):
+    """Начинает процесс отправки сообщения конкретному партнёру"""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    await callback_query.answer("Загрузка списка партнёров...")
+    
+    try:
+        # Получаем всех партнёров из таблицы partners
+        response = db_manager.client.from_('partners').select('chat_id, name, company_name').limit(100).execute()
+        partners = response.data or []
+        
+        if not partners:
+            await callback_query.message.edit_text(
+                "❌ Партнёры не найдены.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_partners")]
+                ])
+            )
+            return
+        
+        keyboard_buttons = []
+        # Группируем по 2 кнопки в ряд
+        for i in range(0, len(partners), 2):
+            row = []
+            p1 = partners[i]
+            name1 = p1.get('name', 'Без имени')
+            company1 = p1.get('company_name', '')[:20] or 'Без компании'
+            row.append(InlineKeyboardButton(
+                text=f"{name1} ({company1})",
+                callback_data=f"partner_message_select_{p1.get('chat_id')}"
+            ))
+            if i + 1 < len(partners):
+                p2 = partners[i + 1]
+                name2 = p2.get('name', 'Без имени')
+                company2 = p2.get('company_name', '')[:20] or 'Без компании'
+                row.append(InlineKeyboardButton(
+                    text=f"{name2} ({company2})",
+                    callback_data=f"partner_message_select_{p2.get('chat_id')}"
+                ))
+            keyboard_buttons.append(row)
+        
+        keyboard_buttons.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_partners")])
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+        
+        await callback_query.message.edit_text(
+            f"💬 **Выберите партнёра**\n\n"
+            f"Всего партнёров: {len(partners)}\n"
+            f"Выберите партнёра, которому хотите написать:",
+            reply_markup=keyboard
+        )
+        await state.set_state(PartnerMessage.selecting_partner)
+    except Exception as e:
+        logger.exception(f"Error loading partners for message: {e}")
+        await callback_query.answer(f"Ошибка: {str(e)}", show_alert=True)
+
+@dp.callback_query(F.data.startswith("partner_message_select_"))
+async def partner_selected_for_message(callback_query: types.CallbackQuery, state: FSMContext):
+    """Партнёр выбран для отправки сообщения"""
+    partner_chat_id = callback_query.data.replace("partner_message_select_", "")
+    
+    try:
+        # Получаем информацию о партнёре
+        response = db_manager.client.from_('partners').select('chat_id, name, company_name').eq('chat_id', partner_chat_id).limit(1).execute()
+        partner = response.data[0] if response.data else None
+        
+        if not partner:
+            await callback_query.answer("Партнёр не найден", show_alert=True)
+            return
+        
+        partner_name = partner.get('name', 'Партнёр')
+        partner_company = partner.get('company_name', '')
+        
+        await callback_query.answer(f"Партнёр: {partner_name}")
+        
+        await state.update_data(partner_chat_id=partner_chat_id, partner_name=partner_name, partner_company=partner_company)
+        
+        display_name = f"{partner_name}"
+        if partner_company:
+            display_name += f" ({partner_company})"
+        
+        await callback_query.message.edit_text(
+            f"📝 **Введите сообщение для партнёра**\n\n"
+            f"Партнёр: **{display_name}**\n"
+            f"Chat ID: `{partner_chat_id}`\n\n"
+            "Введите текст сообщения:",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Отмена", callback_data="partner_message_cancel")]
+            ])
+        )
+        await state.set_state(PartnerMessage.waiting_for_message)
+    except Exception as e:
+        logger.exception(f"Error selecting partner for message: {e}")
+        await callback_query.answer(f"Ошибка: {str(e)}", show_alert=True)
+
+@dp.callback_query(F.data.startswith("partner_message_"))
+async def handle_partner_message_callback(callback_query: types.CallbackQuery, state: FSMContext):
+    """Обработка callback для отправки сообщения партнёру из списка заявок"""
+    partner_chat_id = callback_query.data.replace("partner_message_", "")
+    
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    
+    try:
+        # Получаем информацию о партнёре
+        partners_df = db_manager.get_all_partners()
+        partner_info = partners_df[partners_df['chat_id'] == partner_chat_id]
+        
+        if partner_info.empty:
+            await callback_query.answer("Партнёр не найден", show_alert=True)
+            return
+        
+        partner = partner_info.iloc[0]
+        partner_name = partner.get('name', 'Партнёр')
+        partner_company = partner.get('company_name', '')
+        
+        await callback_query.answer(f"Партнёр: {partner_name}")
+        
+        await state.update_data(partner_chat_id=partner_chat_id, partner_name=partner_name, partner_company=partner_company)
+        
+        display_name = f"{partner_name}"
+        if partner_company:
+            display_name += f" ({partner_company})"
+        
+        await callback_query.message.edit_text(
+            f"📝 **Введите сообщение для партнёра**\n\n"
+            f"Партнёр: **{display_name}**\n"
+            f"Chat ID: `{partner_chat_id}`\n\n"
+            "Введите текст сообщения:",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Отмена", callback_data="partner_message_cancel")]
+            ])
+        )
+        await state.set_state(PartnerMessage.waiting_for_message)
+    except Exception as e:
+        logger.exception(f"Error handling partner message callback: {e}")
+        await callback_query.answer(f"Ошибка: {str(e)}", show_alert=True)
+
+@dp.message(PartnerMessage.waiting_for_message)
+async def process_partner_message(message: types.Message, state: FSMContext):
+    """Обработка сообщения для конкретного партнёра"""
+    if not is_admin(message.chat.id):
+        await message.answer("У вас нет прав администратора")
+        await state.clear()
+        return
+    
+    message_text = message.text
+    
+    if not message_text or len(message_text.strip()) == 0:
+        await message.answer("❌ Сообщение не может быть пустым. Попробуйте снова.")
+        return
+    
+    data = await state.get_data()
+    partner_chat_id = data.get("partner_chat_id")
+    partner_name = data.get("partner_name", "Партнёр")
+    
+    if not partner_chat_id:
+        await message.answer(
+            "❌ Ошибка: не указан партнёр.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_partners")]
+            ])
+        )
+        await state.clear()
+        return
+    
+    try:
+        # Отправляем сообщение партнёру
+        result = await send_partner_notification_async(str(partner_chat_id), message_text)
+        
+        if result:
+            success_text = (
+                f"✅ **Сообщение отправлено!**\n\n"
+                f"Партнёр: **{partner_name}**\n"
+                f"Chat ID: `{partner_chat_id}`\n\n"
+                f"Сообщение:\n_{message_text}_"
+            )
+        else:
+            success_text = (
+                f"⚠️ **Сообщение не удалось отправить**\n\n"
+                f"Партнёр: **{partner_name}**\n"
+                f"Chat ID: `{partner_chat_id}`\n\n"
+                f"Возможно, партнёр заблокировал бота или произошла ошибка.\n"
+                f"Проверьте логи для подробностей."
+            )
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="💬 Написать ещё", callback_data="admin_partner_message")],
+            [InlineKeyboardButton(text="◀️ Главное меню", callback_data="back_to_main")],
+        ])
+        
+        await message.answer(success_text, reply_markup=keyboard)
+        await state.clear()
+        
+    except Exception as e:
+        logger.exception(f"Error sending message to partner {partner_chat_id}: {e}")
+        await message.answer(
+            f"❌ Ошибка при отправке сообщения: {str(e)}",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_partners")]
+            ])
+        )
+        await state.clear()
+
+@dp.callback_query(F.data == "partner_message_cancel")
+async def cancel_partner_message(callback_query: types.CallbackQuery, state: FSMContext):
+    """Отмена отправки сообщения партнёру"""
+    await state.clear()
+    await callback_query.message.edit_text(
+        "❌ Отправка сообщения отменена",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Главное меню", callback_data="back_to_main")]
+        ])
+    )
     await callback_query.answer()
 
 # --- Запуск Бота ---

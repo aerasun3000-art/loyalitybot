@@ -186,3 +186,99 @@ export async function getServiceById(env, serviceId) {
     return null;
   }
 }
+
+/**
+ * Get bot state for a chat_id
+ */
+export async function getBotState(env, chatId) {
+  try {
+    const result = await supabaseRequest(env, `bot_states?chat_id=eq.${chatId}&select=*`);
+    if (result && result.length > 0) {
+      const state = result[0];
+      if (state.data && typeof state.data === 'string') {
+        try {
+          state.data = JSON.parse(state.data);
+        } catch (e) {
+          state.data = {};
+        }
+      }
+      return state;
+    }
+    return null;
+  } catch (error) {
+    console.error('[getBotState] Error getting bot state:', error);
+    return null;
+  }
+}
+
+/**
+ * Set bot state (create or update)
+ */
+export async function setBotState(env, chatId, state, data = {}) {
+  try {
+    const stateData = {
+      chat_id: chatId,
+      state: state,
+      data: data,
+      updated_at: new Date().toISOString(),
+    };
+    
+    console.log('[setBotState] Setting state:', { chatId, state, data });
+    
+    const result = await supabaseRequest(env, 'bot_states', {
+      method: 'POST',
+      headers: {
+        'Prefer': 'resolution=merge-duplicates,return=representation',
+      },
+      body: JSON.stringify(stateData),
+    });
+    
+    const finalResult = Array.isArray(result) ? (result[0] || result) : result;
+    console.log('[setBotState] State set successfully:', finalResult);
+    return finalResult;
+  } catch (error) {
+    console.error('[setBotState] ERROR:', error);
+    throw error;
+  }
+}
+
+/**
+ * Clear bot state (delete)
+ */
+export async function clearBotState(env, chatId) {
+  try {
+    return await supabaseRequest(env, `bot_states?chat_id=eq.${chatId}`, {
+      method: 'DELETE',
+    });
+  } catch (error) {
+    console.error('[clearBotState] Error clearing bot state:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update bot state data (merge with existing data)
+ */
+export async function updateBotStateData(env, chatId, newData) {
+  try {
+    const currentState = await getBotState(env, chatId);
+    if (!currentState) {
+      throw new Error('State not found');
+    }
+    
+    let currentData = currentState.data || {};
+    if (typeof currentData === 'string') {
+      try {
+        currentData = JSON.parse(currentData);
+      } catch (e) {
+        currentData = {};
+      }
+    }
+    
+    const mergedData = { ...currentData, ...newData };
+    return await setBotState(env, chatId, currentState.state, mergedData);
+  } catch (error) {
+    console.error('[updateBotStateData] Error updating bot state data:', error);
+    throw error;
+  }
+}
