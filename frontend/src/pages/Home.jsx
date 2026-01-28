@@ -780,11 +780,56 @@ const Home = () => {
           </button>
         </div>
 
-        {/* Сетка групп категорий в стиле карточек */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          {getAllCategoryGroups()
-            .filter(group => group.code !== 'travel_tourism' && group.code !== 'automotive_pets')
-            .map((group) => {
+        {/* Сетка групп категорий в стиле карточек - 2x3 (6 карточек) */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+          {(() => {
+            // Фильтруем категории: скрываем travel_tourism, automotive_pets, healthcare, education, retail
+            const filteredGroups = getAllCategoryGroups()
+              .filter(group => 
+                group.code !== 'travel_tourism' && 
+                group.code !== 'automotive_pets' &&
+                group.code !== 'healthcare' &&
+                group.code !== 'education' &&
+                group.code !== 'retail'
+              )
+              .slice(0, 5) // Берем первые 5 категорий
+            
+            // Добавляем черную карточку "Еще" в массив
+            const cardsToDisplay = [
+              ...filteredGroups.map(group => ({ type: 'category', group })),
+              { type: 'more' }
+            ]
+            
+            return cardsToDisplay.map((item, index) => {
+              if (item.type === 'more') {
+                // Черная карточка "Еще"
+                return (
+                  <div
+                    key="more"
+                    onClick={() => {
+                      hapticFeedback('light')
+                      navigate('/services')
+                    }}
+                    className="bg-gray-900 rounded-2xl p-3 md:p-4 cursor-pointer 
+                               hover:scale-105 hover:shadow-lg 
+                               active:scale-95 transition-all duration-200
+                               relative h-28 md:h-32 flex flex-col items-center justify-center"
+                  >
+                    {/* Название "Еще" */}
+                    <h3 className="font-bold text-lg md:text-xl text-white">
+                      {language === 'ru' ? 'Еще' : 'More'}
+                    </h3>
+                    
+                    {/* Стрелка вправо */}
+                    <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 text-white text-3xl md:text-4xl">
+                      →
+                    </div>
+                  </div>
+                )
+              }
+              
+              // Обычная карточка категории
+              const { group } = item
               const displayName = language === 'ru' ? group.name : group.nameEn
               const emojiToDisplay = group.emoji || '⭐'
               
@@ -801,42 +846,21 @@ const Home = () => {
                   className="bg-white rounded-2xl p-3 md:p-4 cursor-pointer 
                              hover:scale-105 hover:shadow-lg 
                              active:scale-95 transition-all duration-200
-                             relative h-32 flex flex-col overflow-hidden shadow-md"
+                             relative h-28 md:h-32 flex flex-col overflow-hidden shadow-md"
                 >
                   {/* Название группы - вверху слева */}
-                  <h3 className="font-bold text-xs md:text-sm text-sakura-deep leading-tight pr-10 md:pr-12 line-clamp-2">
+                  <h3 className="font-bold text-sm md:text-sm text-sakura-deep leading-tight pr-12 md:pr-12 line-clamp-2">
                     {displayName}
                   </h3>
                   
                   {/* Иконка/Emoji в правом нижнем углу */}
-                  <div className="absolute bottom-2 right-2 md:bottom-3 md:right-3 text-3xl md:text-5xl">
+                  <div className="absolute bottom-2 right-2 md:bottom-3 md:right-3 text-4xl md:text-5xl">
                     {emojiToDisplay}
                   </div>
                 </div>
               )
-            })}
-          
-          {/* Карточка "Еще" - темная, открывает все категории */}
-          <div
-            onClick={() => {
-              hapticFeedback('light')
-              navigate('/services')
-            }}
-            className="bg-gray-900 rounded-2xl p-4 cursor-pointer 
-                       hover:scale-105 hover:shadow-lg 
-                       active:scale-95 transition-all duration-200
-                       relative h-32 flex flex-col items-center justify-center"
-          >
-            {/* Название "Еще" */}
-            <h3 className="font-bold text-xl text-white">
-              {language === 'ru' ? 'Еще' : 'More'}
-            </h3>
-            
-            {/* Стрелка вправо */}
-            <div className="absolute bottom-4 right-4 text-white text-4xl">
-              →
-            </div>
-          </div>
+            })
+          })()}
         </div>
 
         {/* Секция Акции */}
@@ -860,48 +884,23 @@ const Home = () => {
 
           {translatedPromotions.length > 0 ? (
             <>
-              {/* Единая карусель всех акций (включая hero) */}
+              {/* Карусель акций с эффектом закладок - максимум 2 по горизонтали */}
               {(() => {
-                // Используем ВСЕ акции для карусели, первая акция - это hero
-                const carouselPromotions = translatedPromotions
-
-                // Создаем бесконечную карусель: дублируем карточки в начале и конце
-                const basePromotions = carouselPromotions.length < 2 
-                  ? [...carouselPromotions, ...carouselPromotions]
-                  : carouselPromotions
-                  
-                // Для бесконечной карусели дублируем карточки в начале и конце
-                const displayPromotions = basePromotions.length > 1
-                  ? [...basePromotions, ...basePromotions, ...basePromotions]
-                  : basePromotions
-
-                // Вычисляем позицию начала "реальных" карточек (после первых клонов)
-                const realStartIndex = basePromotions.length
-                const realEndIndex = realStartIndex + basePromotions.length
+                const allPromotions = translatedPromotions
+                
+                // Для бесконечной карусели дублируем карточки
+                const displayPromotions = allPromotions.length > 1
+                  ? [...allPromotions, ...allPromotions, ...allPromotions]
+                  : allPromotions
 
                 return (
-                  <div className="relative">
+                  <div className="relative -mx-4 px-4">
                     <div 
                       ref={(el) => {
                         carouselRef.current = el
-                        
-                        if (el && displayPromotions.length > 0 && basePromotions.length > 1) {
-                          // Центрируем первую реальную карточку при загрузке
-                          setTimeout(() => {
-                            const container = el
-                            const containerWidth = container.offsetWidth
-                            const cardWidth = 280
-                            const gap = 16
-                            // Прокручиваем к началу реальных карточек
-                            const scrollPosition = realStartIndex * (cardWidth + gap) + (containerWidth / 2) - (cardWidth / 2) - 16
-                            container.scrollLeft = scrollPosition
-                          }, 100)
-                        }
                       }}
-                      className="flex gap-4 overflow-x-auto scrollbar-hide"
+                      className="flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-mandatory"
                       style={{
-                        paddingLeft: '16px',
-                        paddingRight: '16px',
                         WebkitOverflowScrolling: 'touch',
                         scrollBehavior: 'smooth'
                       }}
@@ -933,33 +932,20 @@ const Home = () => {
                           { bg: 'bg-indigo-400', text: 'text-indigo-900' }
                         ]
                         const colors = cardColors[(parseInt(promo.id) || index) % cardColors.length]
-
-                        // Определяем, является ли это реальной карточкой (не клоном)
-                        const isRealCard = basePromotions.length > 1 
-                          ? (index >= realStartIndex && index < realEndIndex)
-                          : true
-                        const realIndex = basePromotions.length > 1 
-                          ? (index % basePromotions.length)
-                          : index
-                        const isRealHero = realIndex === 0 && isRealCard
                         
                         return (
                           <div
-                            key={`${promo.id}-${index}-clone`}
-                            data-index={index}
-                            data-real-index={realIndex}
-                            data-hero={isRealHero ? 'true' : 'false'}
+                            key={`${promo.id}-${index}`}
                             onClick={() => handlePromotionClick(promo.id)}
-                            className={`relative flex-shrink-0 cursor-pointer active:scale-[0.98] transition-all duration-300 ${
+                            className={`relative flex-shrink-0 cursor-pointer hover:scale-105 active:scale-[0.98] transition-all duration-300 rounded-2xl overflow-hidden shadow-lg ${
                               !promo.image_url ? colors.bg : ''
-                            } ${isRealHero ? 'ring-2 ring-yellow-400 ring-offset-2' : ''}`}
+                            }`}
                             style={{
-                              width: '280px',
-                              height: '380px',
-                              borderRadius: '20px',
-                              overflow: 'hidden',
-                              boxShadow: isRealHero ? '0 8px 12px rgba(0, 0, 0, 0.2)' : '0 4px 6px rgba(0, 0, 0, 0.1)',
-                              transform: isRealHero ? 'scale(1.02)' : 'scale(1)'
+                              width: 'calc(50vw - 20px)', // 2 карточки по горизонтали с небольшими отступами
+                              maxWidth: '280px',
+                              aspectRatio: '1 / 1.618', // Вертикальные карточки с золотым сечением
+                              marginLeft: index > 0 ? '-12px' : '0', // Эффект наложения (закладки)
+                              zIndex: allPromotions.length - (index % allPromotions.length) // Ближние карточки выше
                             }}
                           >
                             {/* Фоновое изображение с градиентным overlay */}
@@ -991,13 +977,13 @@ const Home = () => {
                             </div>
 
                             {/* Название и бренд вверху */}
-                            <div className="absolute top-0 left-0 right-0 z-10 p-5 pt-16">
+                            <div className="absolute top-0 left-0 right-0 z-10 p-4 pt-14">
                               <h3 
-                                className="text-white font-bold mb-1 drop-shadow-lg"
+                                className="text-white font-bold mb-1 drop-shadow-lg line-clamp-2"
                                 style={{
-                                  fontSize: '18px',
+                                  fontSize: '16px',
                                   fontWeight: 700,
-                                  lineHeight: '1.2',
+                                  lineHeight: '1.3',
                                   color: '#FFFFFF'
                                 }}
                               >
@@ -1005,9 +991,9 @@ const Home = () => {
                               </h3>
                               {promo.partner?.company_name && (
                                 <p 
-                                  className="text-white/90 drop-shadow-md"
+                                  className="text-white/90 drop-shadow-md line-clamp-1"
                                   style={{
-                                    fontSize: '14px',
+                                    fontSize: '12px',
                                     fontWeight: 400,
                                     opacity: 0.9
                                   }}
@@ -1020,12 +1006,12 @@ const Home = () => {
                             {/* Бейджи статуса */}
                             <div className="absolute top-3 left-3 z-20 flex flex-wrap gap-1.5">
                               {isEndingSoon && (
-                                <div className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
+                                <div className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg">
                                   🔥 {daysLeft}д
                                 </div>
                               )}
                               {isNew && !isEndingSoon && (
-                                <div className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-lg">
+                                <div className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg">
                                   ⚡ {t('promo_new')}
                                 </div>
                               )}
@@ -1036,7 +1022,7 @@ const Home = () => {
                               <div 
                                 className="text-white font-bold drop-shadow-lg"
                                 style={{
-                                  fontSize: '20px',
+                                  fontSize: '18px',
                                   fontWeight: 700,
                                   color: '#FFFFFF'
                                 }}

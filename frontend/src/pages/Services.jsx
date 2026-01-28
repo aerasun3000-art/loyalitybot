@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, getPromotionsForService } from '../services/supabase'
-import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
+import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, getPromotionsForService, notifyPartnerInterest } from '../services/supabase'
+import { getChatId, getUsername, hapticFeedback, showAlert, openTelegramLink } from '../utils/telegram'
 import { getCategoryByCode, serviceCategories, getAllServiceCategories, getCategoryGroupByCode } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
@@ -593,11 +593,26 @@ const Services = () => {
     setFilter(nextFilter)
   }
 
-  const handlePlayClick = (groupId, e) => {
+  const handlePlayClick = async (groupId, e) => {
     if (e && e.stopPropagation) {
       e.stopPropagation()
     }
     hapticFeedback('light')
+    
+    // Отправляем уведомление партнёру о заинтересованности клиента
+    if (chatId) {
+      const group = filteredGroups.find(g => g.id === groupId)
+      if (group && group.partnerId && !group.isCategoryOnly) {
+        try {
+          const clientUsername = getUsername()
+          await notifyPartnerInterest(group.partnerId, chatId, clientUsername)
+        } catch (error) {
+          // Игнорируем ошибки отправки уведомления (не критично)
+          console.warn('Не удалось отправить уведомление партнёру:', error)
+        }
+      }
+    }
+    
     setExpandedItem(expandedItem === groupId ? null : groupId)
   }
 
@@ -683,13 +698,54 @@ const Services = () => {
     const bookingUrl = selectedService.booking_url || selectedService.partner?.booking_url
     
     if (!bookingUrl) {
-      showAlert('Ссылка на бронирование не указана для этой услуги.')
+      showAlert(language === 'ru' ? 'Ссылка на бронирование не указана для этой услуги.' : 'Booking link not specified for this service.')
       return
     }
 
     // Открываем ссылку в новой вкладке
     window.open(bookingUrl, '_blank')
     hapticFeedback('medium')
+  }
+
+  const handleContactPartner = () => {
+    if (!selectedService || !chatId) {
+      showAlert(language === 'ru' ? 'Авторизуйтесь через Telegram, чтобы написать партнёру.' : 'Please authorize via Telegram to contact partner.')
+      return
+    }
+
+    const partnerChatId = selectedService.partner_chat_id
+    if (!partnerChatId) {
+      showAlert(language === 'ru' ? 'Партнёр не найден.' : 'Partner not found.')
+      return
+    }
+
+    try {
+      hapticFeedback('medium')
+      
+      // Формируем данные для отправки через бота
+      const contactData = {
+        action: 'contact_specialist',
+        partner_chat_id: partnerChatId,
+        client_chat_id: chatId,
+        service_title: selectedService.title || '',
+        service_id: selectedService.id || null,
+        message_text: language === 'ru' 
+          ? `Здравствуйте! Интересуюсь услугой "${selectedService.title}"`
+          : `Hello! I'm interested in the service "${selectedService.title}"`,
+        timestamp: Date.now()
+      }
+
+      // Кодируем в base64
+      const contactDataBase64 = btoa(JSON.stringify(contactData))
+      
+      // Открываем бота с параметром
+      const botUsername = import.meta.env.VITE_CLIENT_BOT_USERNAME || 'mindbeatybot'
+      const botLink = `https://t.me/${botUsername}?start=contact_${contactDataBase64}`
+      openTelegramLink(botLink)
+    } catch (error) {
+      console.error('Error contacting partner:', error)
+      showAlert(language === 'ru' ? 'Ошибка при открытии переписки. Попробуйте позже.' : 'Error opening conversation. Please try again later.')
+    }
   }
 
   const handleShowLocation = () => {
@@ -1140,6 +1196,12 @@ const Services = () => {
                   className="w-full py-3 rounded-full bg-sakura-deep text-white font-semibold shadow-md hover:bg-sakura-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {language === 'ru' ? 'Забронировать время' : 'Book time'}
+                </button>
+                <button
+                  onClick={handleContactPartner}
+                  className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-accent to-sakura-mid text-white font-semibold shadow-md hover:shadow-lg transition-all"
+                >
+                  {language === 'ru' ? '💬 Написать партнёру' : '💬 Contact Partner'}
                 </button>
               </div>
 

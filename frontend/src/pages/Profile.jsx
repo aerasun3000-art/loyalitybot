@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getClientAnalytics, isApprovedPartner } from '../services/supabase'
+import { getClientAnalytics, isApprovedPartner, supabase, updateUserCurrency } from '../services/supabase'
 import { getTelegramUser, getChatId, hapticFeedback, closeApp } from '../utils/telegram'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
+import useCurrencyStore from '../store/currencyStore'
+import { SUPPORTED_CURRENCIES } from '../utils/currency'
 import Loader from '../components/Loader'
 import Footer from '../components/Footer'
 
@@ -13,10 +15,12 @@ const Profile = () => {
   const chatId = getChatId()
   const { language } = useLanguageStore()
   const { t } = useTranslation(language)
+  const { currency, setCurrency } = useCurrencyStore()
   
   const [loading, setLoading] = useState(true)
   const [clientData, setClientData] = useState(null)
   const [isPartner, setIsPartner] = useState(false)
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false)
 
   useEffect(() => {
     loadProfile()
@@ -59,6 +63,25 @@ const Profile = () => {
   const handleOpenDashboard = () => {
     hapticFeedback('medium')
     navigate(`/partner/analytics?partner_id=${chatId}`)
+  }
+
+  const handleCurrencySelect = async (currencyCode) => {
+    hapticFeedback('light')
+    setCurrency(currencyCode)
+    setIsCurrencyModalOpen(false)
+    
+    // Сохраняем в Supabase (если пользователь авторизован)
+    if (chatId) {
+      try {
+        await updateUserCurrency(chatId, currencyCode)
+      } catch (error) {
+        console.error('Error saving currency preference:', error)
+      }
+    }
+  }
+
+  const getCurrentCurrencyInfo = () => {
+    return SUPPORTED_CURRENCIES.find(c => c.code === currency) || SUPPORTED_CURRENCIES[0]
   }
 
   if (loading) {
@@ -294,7 +317,7 @@ const Profile = () => {
               hapticFeedback('light')
               navigate('/about')
             }}
-            className="w-full flex items-center justify-between p-4 hover:bg-jewelry-gold/5 transition-colors"
+            className="w-full flex items-center justify-between p-4 border-b border-jewelry-gold/20 hover:bg-jewelry-gold/5 transition-colors"
           >
             <div className="flex items-center gap-3">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-jewelry-brown-dark">
@@ -311,6 +334,35 @@ const Profile = () => {
                 strokeLinecap="round"
               />
             </svg>
+          </button>
+
+          {/* Выбор валюты */}
+          <button
+            onClick={() => {
+              hapticFeedback('light')
+              setIsCurrencyModalOpen(true)
+            }}
+            className="w-full flex items-center justify-between p-4 hover:bg-jewelry-gold/5 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl">{getCurrentCurrencyInfo().flag}</span>
+              <span className="font-semibold text-jewelry-brown-dark">
+                {language === 'ru' ? 'Валюта' : 'Currency'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-jewelry-gray-elegant text-sm">
+                {getCurrentCurrencyInfo().code}
+              </span>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path
+                  d="M8 6L12 10L8 14"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
           </button>
         </div>
 
@@ -362,6 +414,69 @@ const Profile = () => {
           {t('profile_logout')}
         </button>
       </div>
+
+      {/* Модальное окно выбора валюты */}
+      {isCurrencyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setIsCurrencyModalOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-md bg-jewelry-cream rounded-t-3xl p-6 pb-8 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-jewelry-brown-dark">
+                {language === 'ru' ? 'Выберите валюту' : 'Select currency'}
+              </h3>
+              <button
+                onClick={() => setIsCurrencyModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-jewelry-gold/10 flex items-center justify-center"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-sm text-jewelry-gray-elegant mb-4">
+              {language === 'ru' 
+                ? 'Цены будут отображаться в выбранной валюте'
+                : 'Prices will be displayed in selected currency'}
+            </p>
+            <div className="space-y-2">
+              {SUPPORTED_CURRENCIES.map((curr) => (
+                <button
+                  key={curr.code}
+                  onClick={() => handleCurrencySelect(curr.code)}
+                  className={`w-full flex items-center justify-between p-4 rounded-xl transition-colors ${
+                    currency === curr.code 
+                      ? 'bg-jewelry-gold/20 border-2 border-jewelry-gold'
+                      : 'bg-white border border-jewelry-gold/20 hover:bg-jewelry-gold/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{curr.flag}</span>
+                    <div className="text-left">
+                      <div className="font-semibold text-jewelry-brown-dark">
+                        {curr.code}
+                      </div>
+                      <div className="text-xs text-jewelry-gray-elegant">
+                        {language === 'ru' ? curr.nameRu : curr.name}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg text-jewelry-gold">{curr.symbol}</span>
+                    {currency === curr.code && (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer with legal links */}
       <Footer />

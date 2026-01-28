@@ -279,6 +279,102 @@ def convert_currency(amount: float, from_currency: str,
     return round(converted, 2)
 
 
+def convert_points_to_currency(points: float, currency: str, 
+                               supabase_client=None) -> float:
+    """
+    Конвертирует баллы (= USD) в локальную валюту клиента
+    
+    Args:
+        points: Количество баллов (= USD)
+        currency: Целевая валюта (VND, RUB, KZT, USD)
+        supabase_client: Клиент Supabase (опционально)
+    
+    Returns:
+        float: Сумма в целевой валюте
+    """
+    if currency == 'USD':
+        return float(points)
+    
+    # Получаем курс USD → currency
+    rate = get_exchange_rate('USD', currency, supabase_client=supabase_client)
+    converted = float(points) * rate
+    
+    # Для VND, KZT, RUB округляем до целых
+    if currency in ['VND', 'KZT', 'RUB']:
+        return round(converted)
+    
+    return round(converted, 2)
+
+
+def format_price_with_points(points: float, currency: str, 
+                             supabase_client=None,
+                             show_points: bool = True) -> str:
+    """
+    Форматирует цену услуги: показывает в локальной валюте + баллы
+    
+    Args:
+        points: Стоимость в баллах (= USD)
+        currency: Валюта клиента (USD, VND, RUB, KZT)
+        supabase_client: Клиент Supabase (опционально)
+        show_points: Показывать ли баллы в скобках
+    
+    Returns:
+        str: Отформатированная цена
+        
+    Examples:
+        - USD: "$100 (100 баллов)" или "$100"
+        - VND: "2 500 000 ₫ (100 баллов)"
+        - RUB: "10 000 ₽ (100 баллов)"
+        - KZT: "52 000 ₸ (100 баллов)"
+    """
+    symbol = get_currency_symbol(currency)
+    
+    if currency == 'USD':
+        # Для USD цена = баллы
+        formatted_value = f"${int(points)}" if points == int(points) else f"${points:.2f}"
+        if show_points:
+            return f"{formatted_value} ({int(points)} баллов)"
+        return formatted_value
+    
+    # Конвертируем баллы в локальную валюту
+    local_amount = convert_points_to_currency(points, currency, supabase_client)
+    
+    # Форматируем с разделителями тысяч
+    if currency in ['VND', 'KZT', 'RUB']:
+        formatted_value = f"{int(local_amount):,}".replace(',', ' ')
+    else:
+        formatted_value = f"{local_amount:,.2f}".replace(',', ' ')
+    
+    # Добавляем символ валюты
+    if currency == 'VND':
+        price_str = f"{formatted_value} {symbol}"
+    elif currency == 'RUB':
+        price_str = f"{formatted_value} {symbol}"
+    elif currency == 'KZT':
+        price_str = f"{formatted_value} {symbol}"
+    else:
+        price_str = f"{symbol}{formatted_value}"
+    
+    if show_points:
+        return f"{price_str} ({int(points)} баллов)"
+    return price_str
+
+
+def get_supported_currencies() -> list:
+    """
+    Возвращает список поддерживаемых валют
+    
+    Returns:
+        list: Список словарей с информацией о валютах
+    """
+    return [
+        {'code': 'USD', 'symbol': '$', 'name': 'US Dollar', 'name_ru': 'Доллар США', 'flag': '🇺🇸'},
+        {'code': 'VND', 'symbol': '₫', 'name': 'Vietnamese Dong', 'name_ru': 'Вьетнамский донг', 'flag': '🇻🇳'},
+        {'code': 'RUB', 'symbol': '₽', 'name': 'Russian Ruble', 'name_ru': 'Российский рубль', 'flag': '🇷🇺'},
+        {'code': 'KZT', 'symbol': '₸', 'name': 'Kazakhstani Tenge', 'name_ru': 'Казахстанский тенге', 'flag': '🇰🇿'},
+    ]
+
+
 
 
 

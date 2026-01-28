@@ -149,6 +149,17 @@ class TranslationResponse(BaseModel):
     error: str | None = None
 
 
+class PartnerNotificationRequest(BaseModel):
+    partner_chat_id: str = Field(..., description="Chat ID партнёра")
+    client_chat_id: str = Field(..., description="Chat ID клиента")
+    client_username: str | None = Field(None, description="Username клиента в Telegram")
+
+
+class PartnerNotificationResponse(BaseModel):
+    success: bool
+    error: str | None = None
+
+
 class RedeemRequest(BaseModel):
     client_chat_id: str = Field(..., description="Chat ID клиента")
     service_id: str = Field(..., description="UUID услуги для обмена")
@@ -857,6 +868,118 @@ async def send_qr_to_partner(
         raise
     except Exception as e:
         logger.error(f"Ошибка обработки запроса отправки QR: {e}")
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка: {str(e)}")
+
+
+# ============================================
+# УВЕДОМЛЕНИЯ ПАРТНЁРАМ
+# ============================================
+
+@app.post(
+    "/api/notify-partner-interest",
+    response_model=PartnerNotificationResponse,
+    tags=["partners"],
+    summary="Уведомить партнёра о заинтересованности клиента",
+    description="Отправляет уведомление партнёру о том, что клиент просматривает его карточку",
+    response_description="Результат отправки уведомления",
+    responses={
+        200: {
+            "description": "Уведомление успешно отправлено",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": True
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Ошибка отправки",
+            "content": {
+                "application/json": {
+                    "example": {"success": False, "error": "Не указан chat_id партнёра"}
+                }
+            }
+        }
+    }
+)
+@limiter.limit("10/minute")
+async def notify_partner_interest(request: Request, payload: PartnerNotificationRequest):
+    """
+    Отправляет уведомление партнёру о том, что клиент просматривает его карточку.
+    
+    Rate Limit: 10 запросов/минуту
+    
+    Параметры:
+    - **partner_chat_id**: Chat ID партнёра (обязательно)
+    - **client_chat_id**: Chat ID клиента (обязательно)
+    - **client_username**: Username клиента в Telegram (опционально)
+    
+    Возвращает:
+    - **success**: Успешность операции
+    - **error**: Сообщение об ошибке (если success=false)
+    """
+    try:
+        token = os.getenv('TOKEN_PARTNER')
+        
+        if not token:
+            logger.warning("TOKEN_PARTNER не настроен")
+            raise HTTPException(status_code=500, detail="Telegram бот не настроен")
+        
+        if not payload.partner_chat_id:
+            raise HTTPException(status_code=400, detail="Не указан chat_id партнёра")
+        
+        if not payload.client_chat_id:
+            raise HTTPException(status_code=400, detail="Не указан chat_id клиента")
+        
+        # Формируем сообщение для партнёра
+        username_text = ""
+        if payload.client_username:
+            username_text = f"👤 **@{payload.client_username}**"
+        else:
+            username_text = f"🆔 **Chat ID:** `{payload.client_chat_id}`"
+        
+        message = (
+            f"👀 **Клиент просматривает вашу карточку**\n\n"
+            f"{username_text}\n\n"
+            f"Данный клиент интересовался вашими услугами."
+        )
+        
+        # Создаём inline-кнопку для ответа клиенту
+        reply_markup = {
+            'inline_keyboard': [[
+                {
+                    'text': '💬 Написать клиенту',
+                    'callback_data': f'reply_to_client_{payload.client_chat_id}'
+                }
+            ]]
+        }
+        
+        # Отправляем сообщение через Telegram API
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload_data = {
+            'chat_id': str(payload.partner_chat_id),
+            'text': message,
+            'parse_mode': 'Markdown',
+            'reply_markup': reply_markup
+        }
+        
+        response = requests.post(url, json=payload_data, timeout=10)
+        response.raise_for_status()
+        
+        logger.info(f"Уведомление отправлено партнёру {payload.partner_chat_id} о клиенте {payload.client_chat_id}")
+        return {"success": True}
+        
+    except requests.exceptions.HTTPError as e:
+        error_msg = f"HTTP ошибка: {e.response.status_code}"
+        if e.response.status_code == 403:
+            error_msg = "Партнёр заблокировал бота"
+        elif e.response.status_code == 400:
+            error_msg = "Неверный chat_id партнёра"
+        logger.error(f"Ошибка отправки уведомления партнёру {payload.partner_chat_id}: {error_msg}")
+        return {"success": False, "error": error_msg}
+    except Exception as e:
+        logger.error(f"Ошибка обработки запроса уведомления партнёру: {e}")
         raise HTTPException(status_code=500, detail=f"Внутренняя ошибка: {str(e)}")
 
 

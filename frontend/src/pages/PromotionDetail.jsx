@@ -22,6 +22,7 @@ const PromotionDetail = () => {
   const [pointsToSpend, setPointsToSpend] = useState(0)
   const [isRedeeming, setIsRedeeming] = useState(false)
   const [redeemData, setRedeemData] = useState(null)
+  const [showFullScreenQr, setShowFullScreenQr] = useState(false)
   const chatId = getChatId()
 
   useEffect(() => {
@@ -41,12 +42,8 @@ const PromotionDetail = () => {
 
     try {
       setLoading(true)
-      // ID акции - это число, конвертируем
-      const promoId = parseInt(id)
-      if (isNaN(promoId)) {
-        navigate('/promotions')
-        return
-      }
+      // ID акции - это UUID (строка)
+      const promoId = id
       
       const [promoData, balanceData] = await Promise.all([
         getPromotionById(promoId),
@@ -141,7 +138,7 @@ const PromotionDetail = () => {
       setQrError(null)
       setQrImage('')
 
-      const promoId = parseInt(id)
+      const promoId = id
       const result = await redeemPromotion(chatId, promoId, pointsToSpend)
 
       if (result.success) {
@@ -230,244 +227,368 @@ const PromotionDetail = () => {
   }
 
   const daysLeft = getDaysRemaining(promotion.end_date)
+  
+  // Рассчитываем быстрые варианты баллов
+  const pointsRate = promotion.points_to_dollar_rate || 1
+  const maxPointsAvailable = promotion.max_points_payment 
+    ? Math.min(balance, Math.floor(promotion.max_points_payment / pointsRate))
+    : balance
+  
+  const quickPointsOptions = [
+    { label: '100', value: 100 },
+    { label: '200', value: 200 },
+    { label: '500', value: 500 },
+    { label: language === 'ru' ? 'ВСЕ' : 'ALL', value: maxPointsAvailable }
+  ].filter(opt => opt.value <= maxPointsAvailable && opt.value > 0)
+
+  // Полноэкранный QR режим
+  if (showFullScreenQr && qrImage) {
+    return (
+      <div 
+        className="fixed inset-0 z-50 bg-gradient-to-br from-sakura-deep via-sakura-mid to-sakura-accent flex flex-col items-center justify-center p-6"
+        onClick={() => setShowFullScreenQr(false)}
+      >
+        <div className="text-center text-white mb-6">
+          <p className="text-lg font-semibold mb-1">
+            {promotion.partner?.company_name || promotion.partner?.name}
+          </p>
+          <h2 className="text-xl font-bold">{promotion.title}</h2>
+        </div>
+        
+        <div className="bg-white rounded-3xl p-6 shadow-2xl">
+          <img src={qrImage} alt="QR Code" className="w-64 h-64 object-contain" />
+        </div>
+        
+        {redeemData ? (
+          <div className="text-center text-white mt-6 space-y-2">
+            <p className="text-2xl font-bold">
+              -{redeemData.points_to_spend} {language === 'ru' ? 'баллов' : 'points'}
+            </p>
+            <p className="text-lg opacity-90">
+              = ${redeemData.points_value_usd?.toFixed(2)}
+            </p>
+            {redeemData.cash_payment > 0 && (
+              <p className="text-sm opacity-75">
+                {language === 'ru' ? 'Доплата:' : 'Cash:'} ${redeemData.cash_payment.toFixed(2)}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="text-center text-white mt-6">
+            <p className="text-lg font-semibold">
+              {language === 'ru' ? 'Покажите мастеру' : 'Show to specialist'}
+            </p>
+            <p className="text-sm opacity-75 mt-1">ID: {chatId}</p>
+          </div>
+        )}
+        
+        <button 
+          className="mt-8 px-8 py-3 bg-white/20 backdrop-blur-sm rounded-full text-white font-semibold border border-white/30"
+          onClick={() => setShowFullScreenQr(false)}
+        >
+          {language === 'ru' ? 'Закрыть' : 'Close'}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-sakura-surface/10 pb-24">
-      {/* Шапка с кнопкой назад */}
-      <div className="px-4 pt-6 pb-4 flex items-center bg-sakura-surface/85 border-b border-sakura-border/40">
+      {/* Шапка с кнопкой назад и избранное */}
+      <div className="px-4 pt-6 pb-4 flex items-center justify-between bg-sakura-surface/85 border-b border-sakura-border/40">
+        <div className="flex items-center">
+          <button
+            onClick={handleBack}
+            className="text-sakura-dark mr-3 p-2 -ml-2"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <span className="text-sakura-dark font-semibold">
+            {promotion.partner?.company_name || promotion.partner?.name || t('partner_not_connected')}
+          </span>
+        </div>
         <button
-          onClick={handleBack}
-          className="text-sakura-dark mr-3 p-2 -ml-2"
+          onClick={handleFavorite}
+          className="p-2"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M15 18l-6-6 6-6" />
+          <svg width="24" height="24" viewBox="0 0 24 24" fill={isFavorite ? '#e91e63' : 'none'} stroke={isFavorite ? '#e91e63' : 'currentColor'} strokeWidth="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </svg>
         </button>
-        <span className="text-sakura-dark font-semibold">
-          {promotion.partner?.company_name || promotion.partner?.name || t('partner_not_connected')}
-        </span>
       </div>
 
-      {/* Карточка акции - похожа на карточку услуги */}
+      {/* Изображение акции (hero) */}
+      {promotion.image_url && (
+        <div className="relative h-48 overflow-hidden">
+          <img
+            src={promotion.image_url}
+            alt={promotion.title}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+        </div>
+      )}
+
+      {/* Карточка баланса - всегда видна */}
+      <div className="px-4 -mt-6 relative z-10">
+        <div className="bg-gradient-to-r from-sakura-deep to-sakura-mid rounded-2xl p-4 shadow-lg">
+          <div className="flex items-center justify-between text-white">
+            <div>
+              <p className="text-xs opacity-75 uppercase tracking-wide">
+                {language === 'ru' ? 'Ваш баланс' : 'Your balance'}
+              </p>
+              <p className="text-2xl font-bold">{balance} {language === 'ru' ? 'баллов' : 'pts'}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs opacity-75">≈</p>
+              <p className="text-xl font-semibold">${(balance * pointsRate).toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Основной контент */}
       <div className="px-4 py-6">
         <div className="bg-sakura-surface/85 border border-sakura-border/60 rounded-3xl shadow-2xl p-6">
-          <div className="space-y-4 text-sakura-dark pb-8">
+          <div className="space-y-5 text-sakura-dark">
+            
+            {/* Заголовок акции */}
             <div>
-              <p className="text-sm text-sakura-dark/60 mb-1 uppercase tracking-wide">Акция</p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2 py-1 bg-sakura-accent/20 text-sakura-accent text-xs font-semibold rounded-full">
+                  {language === 'ru' ? 'АКЦИЯ' : 'PROMO'}
+                </span>
+                {daysLeft <= 3 && daysLeft > 0 && (
+                  <span className="px-2 py-1 bg-red-100 text-red-600 text-xs font-semibold rounded-full animate-pulse">
+                    🔥 {language === 'ru' ? 'Скоро закончится!' : 'Ending soon!'}
+                  </span>
+                )}
+              </div>
               <h2 className="text-xl font-bold">{promotion.title}</h2>
-              <p className="text-sm text-sakura-dark/70 mt-1">
-                {promotion.partner?.company_name || promotion.partner?.name || t('partner_not_connected')}
-              </p>
             </div>
 
-            {/* Изображение акции */}
-            {promotion.image_url && (
-              <div className="rounded-2xl overflow-hidden mb-4">
-                <img
-                  src={promotion.image_url}
-                  alt={promotion.title}
-                  className="w-full h-auto object-cover"
-                />
+            {/* Скидка/Выгода */}
+            <div className="flex items-center gap-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-4">
+              <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-white text-2xl">
+                🎁
               </div>
-            )}
-
-            {promotion.description && (
-              <p className="text-sm text-sakura-dark/80 bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-3">
-                {promotion.description}
-              </p>
-            )}
-
-            {/* Информация о стоимости/скидке */}
-            <div className="flex items-center gap-3 bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-3">
-              <span className="text-2xl">🎁</span>
               <div className="flex-1">
-                <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">Скидка / Стоимость</p>
-                <p className="text-lg font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                  {promotion.discount_value || (promotion.service_price ? `$${promotion.service_price}` : (promotion.required_points > 0 ? `${promotion.required_points} баллов` : 'Бесплатно'))}
+                <p className="text-xs text-green-700 uppercase tracking-wide font-medium">
+                  {language === 'ru' ? 'Ваша выгода' : 'Your benefit'}
+                </p>
+                <p className="text-2xl font-bold text-green-700">
+                  {promotion.discount_value || (promotion.service_price ? `$${promotion.service_price}` : (language === 'ru' ? 'Бесплатно' : 'Free'))}
                 </p>
               </div>
             </div>
 
+            {/* Описание */}
+            {promotion.description && (
+              <p className="text-sm text-sakura-dark/80 leading-relaxed">
+                {promotion.description}
+              </p>
+            )}
+
+            {/* Срок действия */}
+            <div className="flex items-center gap-3 text-sakura-dark/70 text-sm">
+              <div className="w-10 h-10 bg-sakura-surface rounded-full flex items-center justify-center">
+                ⏰
+              </div>
+              <div>
+                <p className="font-medium text-sakura-dark">
+                  {language === 'ru' ? 'До' : 'Until'} {new Date(promotion.end_date).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', {
+                    day: 'numeric',
+                    month: 'long'
+                  })}
+                </p>
+                {daysLeft > 0 && (
+                  <p className="text-xs">
+                    {language === 'ru' 
+                      ? `Осталось ${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'}`
+                      : `${daysLeft} day${daysLeft > 1 ? 's' : ''} left`}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Разделитель */}
+            <div className="border-t border-sakura-border/40 pt-5">
+              <h3 className="text-sm font-semibold text-sakura-dark/60 uppercase tracking-wide mb-4">
+                {language === 'ru' ? '📱 Как использовать' : '📱 How to use'}
+              </h3>
+
+              {/* Главная кнопка - Показать партнёру */}
+              <button
+                onClick={() => {
+                  handleActivatePromotion()
+                  hapticFeedback('medium')
+                }}
+                disabled={isQrLoading || !chatId}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-sakura-accent to-sakura-mid text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]"
+              >
+                {isQrLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    {language === 'ru' ? 'Генерируем...' : 'Generating...'}
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="text-2xl">📱</span>
+                    {language === 'ru' ? 'ПОКАЗАТЬ ПАРТНЁРУ' : 'SHOW TO PARTNER'}
+                  </span>
+                )}
+              </button>
+              
+              <p className="text-xs text-center text-sakura-dark/50 mt-2">
+                {language === 'ru' 
+                  ? 'Партнёр сканирует ваш QR и применяет скидку'
+                  : 'Partner scans your QR and applies discount'}
+              </p>
+            </div>
+
             {/* Оплата баллами (если доступна) */}
-            {promotion.max_points_payment && promotion.max_points_payment > 0 && (
-              <div className="bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">💸</span>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-sakura-dark">
-                      {language === 'ru' ? 'Оплата баллами' : 'Pay with points'}
-                    </p>
-                    <p className="text-xs text-sakura-dark/60">
-                      {language === 'ru' 
-                        ? `Можно оплатить до $${promotion.max_points_payment} баллами`
-                        : `You can pay up to $${promotion.max_points_payment} with points`}
-                    </p>
-                  </div>
+            {promotion.max_points_payment && promotion.max_points_payment > 0 && balance > 0 && (
+              <div className="border-t border-sakura-border/40 pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-sakura-dark/60 uppercase tracking-wide">
+                    {language === 'ru' ? '💸 Оплатить баллами' : '💸 Pay with points'}
+                  </h3>
+                  <span className="text-xs text-sakura-dark/50">
+                    {language === 'ru' ? `до $${promotion.max_points_payment}` : `up to $${promotion.max_points_payment}`}
+                  </span>
                 </div>
                 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm text-sakura-dark/80">
-                      {language === 'ru' ? 'Количество баллов:' : 'Points amount:'}
-                    </label>
-                    <span className="text-sm text-sakura-dark/60">
-                      {language === 'ru' ? 'Баланс:' : 'Balance:'} <strong className={balance >= pointsToSpend ? 'text-green-600' : 'text-red-500'}>{balance}</strong>
-                    </span>
-                  </div>
+                {/* Быстрый выбор баллов */}
+                <div className="flex gap-2 mb-3">
+                  {quickPointsOptions.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setPointsToSpend(opt.value)
+                        hapticFeedback('light')
+                      }}
+                      className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
+                        pointsToSpend === opt.value
+                          ? 'bg-sakura-mid text-white shadow-md'
+                          : 'bg-sakura-surface/50 text-sakura-dark border border-sakura-border/40'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Ручной ввод */}
+                <div className="flex items-center gap-3 mb-3">
                   <input
                     type="number"
                     min="0"
-                    max={Math.min(balance, Math.floor(promotion.max_points_payment / (promotion.points_to_dollar_rate || 1)))}
+                    max={maxPointsAvailable}
                     value={pointsToSpend}
                     onChange={(e) => {
-                      const value = Math.max(0, Math.min(parseInt(e.target.value) || 0, balance, Math.floor(promotion.max_points_payment / (promotion.points_to_dollar_rate || 1))))
+                      const value = Math.max(0, Math.min(parseInt(e.target.value) || 0, maxPointsAvailable))
                       setPointsToSpend(value)
                     }}
-                    className="w-full px-4 py-2 rounded-xl border-2 border-sakura-border/40 bg-white/50 text-sakura-dark focus:border-sakura-mid focus:outline-none"
+                    className="flex-1 px-4 py-3 rounded-xl border-2 border-sakura-border/40 bg-white/50 text-sakura-dark text-center text-lg font-semibold focus:border-sakura-mid focus:outline-none"
                     placeholder="0"
                   />
-                  {pointsToSpend > 0 && (
-                    <p className="text-xs text-sakura-dark/60">
-                      {language === 'ru' 
-                        ? `= $${(pointsToSpend * (promotion.points_to_dollar_rate || 1)).toFixed(2)}`
-                        : `= $${(pointsToSpend * (promotion.points_to_dollar_rate || 1)).toFixed(2)}`}
-                      {promotion.service_price && (
-                        <span className="ml-2">
-                          {language === 'ru' 
-                            ? `, доплата: $${(promotion.service_price - pointsToSpend * (promotion.points_to_dollar_rate || 1)).toFixed(2)}`
-                            : `, cash payment: $${(promotion.service_price - pointsToSpend * (promotion.points_to_dollar_rate || 1)).toFixed(2)}`}
-                        </span>
-                      )}
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-sakura-dark">
+                      = ${(pointsToSpend * pointsRate).toFixed(2)}
                     </p>
-                  )}
+                    <p className="text-xs text-green-600">
+                      {language === 'ru' ? 'экономия' : 'savings'}
+                    </p>
+                  </div>
                 </div>
                 
                 <button
                   onClick={handlePayWithPoints}
                   disabled={isRedeeming || pointsToSpend <= 0 || pointsToSpend > balance || !chatId}
-                  className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-mid to-sakura-dark text-white font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isRedeeming ? (
                     <span className="flex items-center justify-center gap-2">
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      {language === 'ru' ? 'Подготавливаем...' : 'Preparing...'}
                     </span>
                   ) : (
                     <span>
-                      {language === 'ru' 
-                        ? `💸 Оплатить ${pointsToSpend} баллов`
-                        : `💸 Pay ${pointsToSpend} points`}
+                      💸 {language === 'ru' 
+                        ? `Оплатить ${pointsToSpend} баллов`
+                        : `Pay ${pointsToSpend} points`}
                     </span>
                   )}
                 </button>
               </div>
             )}
 
-            {/* Дополнительная информация */}
-            {promotion.required_points > 0 && (
-              <div className="flex items-center gap-3 bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-3">
-                <span className="text-2xl">💸</span>
-                <div>
-                  <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">Требуется баллов</p>
-                  <p className="text-lg font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                    {promotion.required_points}
-                  </p>
+            {/* QR код (если сгенерирован) */}
+            {qrImage && (
+              <div 
+                className="bg-white rounded-2xl p-6 shadow-lg border border-sakura-border/40 cursor-pointer"
+                onClick={() => {
+                  setShowFullScreenQr(true)
+                  hapticFeedback('medium')
+                }}
+              >
+                <div className="flex flex-col items-center gap-4">
+                  <img src={qrImage} alt="QR Code" className="w-40 h-40 object-contain" />
+                  
+                  {redeemData ? (
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-sakura-dark">
+                        -{redeemData.points_to_spend} {language === 'ru' ? 'баллов' : 'points'}
+                      </p>
+                      <p className="text-sm text-sakura-dark/60">
+                        = ${redeemData.points_value_usd?.toFixed(2)}
+                        {redeemData.cash_payment > 0 && (
+                          <span> + ${redeemData.cash_payment.toFixed(2)} {language === 'ru' ? 'наличными' : 'cash'}</span>
+                        )}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-sakura-dark/60 text-center">
+                      {language === 'ru' ? 'Покажите мастеру' : 'Show to specialist'}
+                    </p>
+                  )}
+                  
+                  <button className="flex items-center gap-2 px-4 py-2 bg-sakura-surface rounded-full text-sm text-sakura-dark">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                    </svg>
+                    {language === 'ru' ? 'На весь экран' : 'Full screen'}
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Срок действия */}
-            <div className="flex items-center gap-2 text-sakura-dark/70 text-sm bg-sakura-surface/10 border border-sakura-border/20 rounded-2xl p-3">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 0C3.6 0 0 3.6 0 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6z"/>
-                <path d="M8 4v4.5l3.5 2.1.7-1.2-3-1.8V4z"/>
-              </svg>
-              <span>
-                Действует до {new Date(promotion.end_date).toLocaleDateString('ru', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric'
-                })}
-                {daysLeft > 0 && ` (осталось ${daysLeft} ${daysLeft === 1 ? 'день' : daysLeft < 5 ? 'дня' : 'дней'})`}
-              </span>
-            </div>
-
-            {/* Кнопки активации акции и бронирования */}
-            <div className="space-y-3 pt-2">
-              <button
-                onClick={handleActivatePromotion}
-                disabled={isQrLoading}
-                className="w-full py-3 rounded-full bg-sakura-accent text-white font-semibold shadow-md hover:bg-sakura-accent/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {isQrLoading ? 'Генерируем QR...' : 'Активировать акцию'}
-              </button>
-
-              <button
-                onClick={handleShowLocation}
-                className="w-full py-3 rounded-full bg-white text-sakura-dark font-semibold shadow-md border border-sakura-border hover:bg-sakura-surface transition-colors"
-              >
-                {language === 'ru' ? '📍 Показать на карте' : '📍 Show on Map'}
-              </button>
-
-              <button
-                onClick={handleBookTime}
-                disabled={!promotion.booking_url && !promotion.partner?.booking_url}
-                className="w-full py-3 rounded-full bg-sakura-deep text-white font-semibold shadow-md hover:bg-sakura-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Забронировать время
-              </button>
-            </div>
-
-            {/* Ошибка генерации QR */}
+            {/* Ошибка */}
             {qrError && (
               <div className="text-sm text-red-500 bg-red-100/60 border border-red-200 rounded-2xl p-3">
                 {qrError}
               </div>
             )}
 
-            {/* QR код */}
-            {qrImage && (
-              <div className="flex flex-col items-center gap-3 bg-white/90 border border-sakura-border/40 rounded-3xl p-4 mb-8 pb-8">
-                <img src={qrImage} alt="QR для оплаты" className="w-48 h-48 object-contain" />
-                {redeemData ? (
-                  <>
-                    <div className="text-center space-y-1">
-                      <p className="text-sm font-semibold text-sakura-dark">
-                        {language === 'ru' ? 'Оплата баллами' : 'Pay with points'}
-                      </p>
-                      <p className="text-xs text-sakura-dark/70">
-                        {language === 'ru' 
-                          ? `Списать ${redeemData.points_to_spend} баллов ($${redeemData.points_value_usd?.toFixed(2)})`
-                          : `Spend ${redeemData.points_to_spend} points ($${redeemData.points_value_usd?.toFixed(2)})`}
-                      </p>
-                      {redeemData.cash_payment > 0 && (
-                        <p className="text-xs text-sakura-dark/70 font-semibold">
-                          {language === 'ru' 
-                            ? `Доплата наличными: $${redeemData.cash_payment.toFixed(2)}`
-                            : `Cash payment: $${redeemData.cash_payment.toFixed(2)}`}
-                        </p>
-                      )}
-                    </div>
-                    <p className="text-xs text-sakura-dark/60 text-center px-2 mt-2">
-                      {language === 'ru' 
-                        ? 'Покажите QR-код мастеру. Мастер списывает баллы и начисляет новые за покупку.'
-                        : 'Show QR code to master. Master will deduct points and award new points for purchase.'}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-xs text-sakura-dark/70 text-center px-2">
-                    {language === 'ru' 
-                      ? 'Покажите этот QR специалисту чтобы начислить или списать баллы'
-                      : 'Show this QR to specialist to add or deduct points'}
-                  </p>
-                )}
-                {chatId && (
-                  <p className="text-xs text-sakura-dark/50 text-center px-2 font-mono">
-                    ID: {chatId}
-                  </p>
-                )}
-              </div>
-            )}
+            {/* Дополнительные кнопки */}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleShowLocation}
+                className="flex-1 py-3 rounded-xl bg-sakura-surface text-sakura-dark font-medium border border-sakura-border/40 flex items-center justify-center gap-2"
+              >
+                📍 {language === 'ru' ? 'На карте' : 'Map'}
+              </button>
+              
+              <button
+                onClick={handleBookTime}
+                disabled={!promotion.booking_url && !promotion.partner?.booking_url}
+                className="flex-1 py-3 rounded-xl bg-sakura-deep text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                📅 {language === 'ru' ? 'Записаться' : 'Book'}
+              </button>
+            </div>
+
           </div>
         </div>
       </div>

@@ -19,6 +19,12 @@ export const getChatId = () => {
   return user?.id?.toString() || null
 }
 
+// Получить username пользователя
+export const getUsername = () => {
+  const user = getTelegramUser()
+  return user?.username || null
+}
+
 // Получить параметры из start_param
 export const getStartParam = () => {
   const tg = getTelegramWebApp()

@@ -4233,6 +4233,49 @@ def run_bot():
     max_retries = 10
     base_delay = 5
     
+    while True:
+        try:
+            # Сбрасываем счетчик при успешном подключении
+            retry_count = 0
+            bot.polling(none_stop=True, interval=1, timeout=20)
+        except KeyboardInterrupt:
+            logger.info("Бот остановлен пользователем (KeyboardInterrupt)")
+            break
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Проверяем тип ошибки
+            if "401" in error_msg or "Unauthorized" in error_msg:
+                logger.error(f"Ошибка авторизации (401): {e}")
+                
+                # Проверяем токен перед повторной попыткой
+                try:
+                    bot_info = bot.get_me()
+                    logger.info(f"Токен валиден, бот: @{bot_info.username}")
+                except Exception as token_error:
+                    logger.critical(f"Токен невалиден! Проверьте TOKEN_PARTNER. Ошибка: {token_error}")
+                    # Увеличиваем задержку при проблемах с токеном
+                    delay = base_delay * (2 ** min(retry_count, 5))
+                    logger.warning(f"Переподключение через {delay} секунд... (попытка {retry_count + 1}/{max_retries})")
+                    time.sleep(delay)
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        logger.critical("Превышено максимальное количество попыток. Остановка бота.")
+                        break
+                    continue
+            
+            log_exception(logger, e, "Ошибка соединения с Telegram API")
+            
+            # Exponential backoff с небольшим jitter
+            delay = base_delay * (2 ** min(retry_count, 5)) + random.uniform(0, 1)
+            logger.warning(f"Переподключение через {delay:.1f} секунд... (попытка {retry_count + 1}/{max_retries})")
+            time.sleep(delay)
+            retry_count += 1
+            
+            if retry_count >= max_retries:
+                logger.critical("Превышено максимальное количество попыток. Остановка бота.")
+                break
+
 # ------------------------------------
 # B2B DEALS (Партнерство)
 # ------------------------------------
@@ -4416,53 +4459,6 @@ def process_deal_commission(message):
         TEMP_DATA.pop(chat_id, None)
     except ValueError:
         bot.send_message(chat_id, "❌ Введите корректное число.")
-
-# ------------------------------------
-# ЗАПУСК БОТА
-# ------------------------------------
-
-    while True:
-        try:
-            # Сбрасываем счетчик при успешном подключении
-            retry_count = 0
-            bot.polling(none_stop=True, interval=1, timeout=20)
-        except KeyboardInterrupt:
-            logger.info("Бот остановлен пользователем (KeyboardInterrupt)")
-            break
-        except Exception as e:
-            error_msg = str(e)
-            
-            # Проверяем тип ошибки
-            if "401" in error_msg or "Unauthorized" in error_msg:
-                logger.error(f"Ошибка авторизации (401): {e}")
-                
-                # Проверяем токен перед повторной попыткой
-                try:
-                    bot_info = bot.get_me()
-                    logger.info(f"Токен валиден, бот: @{bot_info.username}")
-                except Exception as token_error:
-                    logger.critical(f"Токен невалиден! Проверьте TOKEN_PARTNER. Ошибка: {token_error}")
-                    # Увеличиваем задержку при проблемах с токеном
-                    delay = base_delay * (2 ** min(retry_count, 5))
-                    logger.warning(f"Переподключение через {delay} секунд... (попытка {retry_count + 1}/{max_retries})")
-                    time.sleep(delay)
-                    retry_count += 1
-                    if retry_count >= max_retries:
-                        logger.critical("Превышено максимальное количество попыток. Остановка бота.")
-                        break
-                    continue
-            
-            log_exception(logger, e, "Ошибка соединения с Telegram API")
-            
-            # Exponential backoff с небольшим jitter
-            delay = base_delay * (2 ** min(retry_count, 5)) + random.uniform(0, 1)
-            logger.warning(f"Переподключение через {delay:.1f} секунд... (попытка {retry_count + 1}/{max_retries})")
-            time.sleep(delay)
-            retry_count += 1
-            
-            if retry_count >= max_retries:
-                logger.critical("Превышено максимальное количество попыток. Остановка бота.")
-                break
 
 if __name__ == '__main__':
     try:

@@ -221,6 +221,154 @@ export const formatCurrencySimple = (value, city = null, currency = null) => {
   return formatCurrency(value, city, finalCurrency)
 }
 
+// ============================================
+// Мультивалютное отображение цен
+// ============================================
+
+// Поддерживаемые валюты для выбора пользователем
+export const SUPPORTED_CURRENCIES = [
+  { code: 'USD', symbol: '$', name: 'US Dollar', nameRu: 'Доллар США', flag: '🇺🇸' },
+  { code: 'VND', symbol: '₫', name: 'Vietnamese Dong', nameRu: 'Вьетнамский донг', flag: '🇻🇳' },
+  { code: 'RUB', symbol: '₽', name: 'Russian Ruble', nameRu: 'Российский рубль', flag: '🇷🇺' },
+  { code: 'KZT', symbol: '₸', name: 'Kazakhstani Tenge', nameRu: 'Казахстанский тенге', flag: '🇰🇿' },
+]
+
+// Курсы по умолчанию (fallback, обновляются из БД)
+const DEFAULT_EXCHANGE_RATES = {
+  USD: 1,
+  VND: 25000,
+  RUB: 100,
+  KZT: 520,
+}
+
+// Кэш курсов валют
+let exchangeRatesCache = { ...DEFAULT_EXCHANGE_RATES }
+let ratesCacheTimestamp = null
+
+/**
+ * Получает курсы валют из Supabase
+ * @param {object} supabase - Клиент Supabase
+ * @returns {Promise<object>} Объект с курсами валют
+ */
+export const fetchExchangeRates = async (supabase) => {
+  try {
+    // Проверяем кэш (5 минут)
+    if (ratesCacheTimestamp && Date.now() - ratesCacheTimestamp < 5 * 60 * 1000) {
+      return exchangeRatesCache
+    }
+
+    const { data, error } = await supabase
+      .from('currency_exchange_rates')
+      .select('from_currency, to_currency, rate')
+      .eq('from_currency', 'USD')
+      .in('to_currency', ['VND', 'RUB', 'KZT'])
+      .order('effective_from', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching exchange rates:', error)
+      return exchangeRatesCache
+    }
+
+    // Обновляем кэш
+    const rates = { USD: 1 }
+    data.forEach(row => {
+      rates[row.to_currency] = parseFloat(row.rate)
+    })
+
+    exchangeRatesCache = { ...DEFAULT_EXCHANGE_RATES, ...rates }
+    ratesCacheTimestamp = Date.now()
+
+    return exchangeRatesCache
+  } catch (err) {
+    console.error('Error in fetchExchangeRates:', err)
+    return exchangeRatesCache
+  }
+}
+
+/**
+ * Конвертирует баллы (= USD) в локальную валюту
+ * @param {number} points - Количество баллов (= USD)
+ * @param {string} currency - Целевая валюта
+ * @param {object} rates - Объект с курсами валют
+ * @returns {number} Сумма в целевой валюте
+ */
+export const convertPointsToCurrency = (points, currency, rates = exchangeRatesCache) => {
+  if (currency === 'USD') {
+    return points
+  }
+  
+  const rate = rates[currency] || DEFAULT_EXCHANGE_RATES[currency] || 1
+  const converted = points * rate
+  
+  // Для VND, KZT, RUB округляем до целых
+  if (['VND', 'KZT', 'RUB'].includes(currency)) {
+    return Math.round(converted)
+  }
+  
+  return Math.round(converted * 100) / 100
+}
+
+/**
+ * Форматирует число с разделителями тысяч
+ * @param {number} value - Число
+ * @param {string} currency - Валюта
+ * @returns {string} Отформатированное число
+ */
+const formatNumber = (value, currency) => {
+  if (['VND', 'KZT', 'RUB'].includes(currency)) {
+    return Math.round(value).toLocaleString('ru-RU').replace(/,/g, ' ')
+  }
+  return value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+}
+
+/**
+ * Форматирует цену услуги: показывает в локальной валюте + баллы
+ * @param {number} points - Стоимость в баллах (= USD)
+ * @param {string} currency - Валюта клиента
+ * @param {object} rates - Курсы валют
+ * @param {boolean} showPoints - Показывать ли баллы
+ * @param {string} language - Язык (ru/en)
+ * @returns {string} Отформатированная цена
+ */
+export const formatPriceWithPoints = (points, currency, rates = exchangeRatesCache, showPoints = true, language = 'ru') => {
+  const symbol = getCurrencySymbol(currency)
+  const pointsLabel = language === 'ru' ? 'баллов' : 'points'
+  
+  if (currency === 'USD') {
+    const formatted = Number.isInteger(points) ? `$${points}` : `$${points.toFixed(2)}`
+    if (showPoints) {
+      return `${formatted} (${Math.round(points)} ${pointsLabel})`
+    }
+    return formatted
+  }
+  
+  const localAmount = convertPointsToCurrency(points, currency, rates)
+  const formattedValue = formatNumber(localAmount, currency)
+  
+  // Формат зависит от валюты
+  let priceStr
+  if (currency === 'VND') {
+    priceStr = `${formattedValue} ${symbol}`
+  } else if (currency === 'RUB') {
+    priceStr = `${formattedValue} ${symbol}`
+  } else if (currency === 'KZT') {
+    priceStr = `${formattedValue} ${symbol}`
+  } else {
+    priceStr = `${symbol}${formattedValue}`
+  }
+  
+  if (showPoints) {
+    return `${priceStr} (${Math.round(points)} ${pointsLabel})`
+  }
+  return priceStr
+}
+
+/**
+ * Получает текущие курсы из кэша
+ * @returns {object} Курсы валют
+ */
+export const getCachedRates = () => exchangeRatesCache
+
 
 
 
