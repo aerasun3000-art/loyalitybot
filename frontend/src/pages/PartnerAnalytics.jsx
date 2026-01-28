@@ -5,7 +5,7 @@ import { formatCurrencySimple } from '../utils/currency';
 import Loader from '../components/Loader';
 import { openTelegramLink } from '../utils/telegram';
 import { getPartnerCitiesList, getDistrictsByCity } from '../utils/locations';
-import { getAllServiceCategories } from '../utils/serviceIcons';
+import { getAllServiceCategories, getCategoriesByGroup } from '../utils/serviceIcons';
 
 const PartnerAnalytics = () => {
   const [searchParams] = useSearchParams();
@@ -218,9 +218,7 @@ const PartnerAnalytics = () => {
     if (!editFormData.category_group) {
       newErrors.category_group = 'Выберите тип бизнеса';
     }
-    if (editFormData.category_group === 'beauty' && !editFormData.business_type) {
-      newErrors.business_type = 'Выберите категорию услуг';
-    }
+    // business_type опционален для всех категорий
     if (editFormData.work_mode === 'offline' && !editFormData.city) {
       newErrors.city = 'Город обязателен для оффлайн режима';
     }
@@ -421,7 +419,12 @@ const PartnerAnalytics = () => {
                   <p className="text-gray-900 dark:text-white">
                     {partnerData.category_group === 'beauty' ? '💄 Красота' :
                      partnerData.category_group === 'food' ? '🍔 Еда' :
+                     partnerData.category_group === 'education' ? '📚 Образование' :
                      partnerData.category_group === 'retail' ? '🛍️ Розница' :
+                     partnerData.category_group === 'sports_fitness' ? '🏋️ Спорт и фитнес' :
+                     partnerData.category_group === 'entertainment' ? '🎬 Развлечения' :
+                     partnerData.category_group === 'healthcare' ? '🏥 Здравоохранение' :
+                     partnerData.category_group === 'services' ? '🧹 Услуги' :
                      partnerData.category_group === 'influencer' ? '🤳 Блогер' :
                      partnerData.category_group || 'Не указано'}
                   </p>
@@ -523,7 +526,7 @@ const PartnerAnalytics = () => {
                     <select
                       value={editFormData.category_group || ''}
                       onChange={(e) => {
-                        setEditFormData({ ...editFormData, category_group: e.target.value, business_type: e.target.value !== 'beauty' ? '' : editFormData.business_type });
+                        setEditFormData({ ...editFormData, category_group: e.target.value, business_type: '' });
                       }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       required
@@ -531,24 +534,28 @@ const PartnerAnalytics = () => {
                       <option value="">Выберите тип бизнеса</option>
                       <option value="beauty">💄 Красота (Салон/Мастер)</option>
                       <option value="food">🍔 Еда (Кафе/Ресторан)</option>
+                      <option value="education">📚 Образование</option>
                       <option value="retail">🛍️ Розница (Магазин)</option>
+                      <option value="sports_fitness">🏋️ Спорт и фитнес</option>
+                      <option value="entertainment">🎬 Развлечения</option>
+                      <option value="healthcare">🏥 Здравоохранение</option>
+                      <option value="services">🧹 Услуги</option>
                       <option value="influencer">🤳 Блогер/Инфлюенсер</option>
                     </select>
                     {editErrors.category_group && <p className="text-red-500 text-xs mt-1">{editErrors.category_group}</p>}
                   </div>
-                  {editFormData.category_group === 'beauty' && (
+                  {editFormData.category_group && editFormData.category_group !== 'influencer' && getCategoriesByGroup(editFormData.category_group).length > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Категория услуг *
+                        Категория услуг
                       </label>
                       <select
                         value={editFormData.business_type || ''}
                         onChange={(e) => setEditFormData({ ...editFormData, business_type: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        required
                       >
                         <option value="">Выберите категорию услуг</option>
-                        {serviceCategories.map((category) => (
+                        {getCategoriesByGroup(editFormData.category_group).map((category) => (
                           <option key={category.code} value={category.code}>
                             {category.emoji} {category.name}
                           </option>

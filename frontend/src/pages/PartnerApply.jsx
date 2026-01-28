@@ -407,7 +407,12 @@ const PartnerApply = () => {
               <option value="">{language === 'ru' ? 'Выберите тип бизнеса' : 'Select business type'}</option>
               <option value="beauty">💄 {language === 'ru' ? 'Красота (Салон/Мастер)' : 'Beauty (Salon/Master)'}</option>
               <option value="food">🍔 {language === 'ru' ? 'Еда (Кафе/Ресторан)' : 'Food (Cafe/Restaurant)'}</option>
+              <option value="education">📚 {language === 'ru' ? 'Образование' : 'Education'}</option>
               <option value="retail">🛍️ {language === 'ru' ? 'Розница (Магазин)' : 'Retail (Store)'}</option>
+              <option value="sports_fitness">🏋️ {language === 'ru' ? 'Спорт и фитнес' : 'Sports & Fitness'}</option>
+              <option value="entertainment">🎬 {language === 'ru' ? 'Развлечения' : 'Entertainment'}</option>
+              <option value="healthcare">🏥 {language === 'ru' ? 'Здравоохранение' : 'Healthcare'}</option>
+              <option value="services">🧹 {language === 'ru' ? 'Услуги' : 'Services'}</option>
               <option value="influencer">🤳 {language === 'ru' ? 'Блогер/Инфлюенсер' : 'Influencer/Blogger'}</option>
             </select>
             {errors.categoryGroup && (

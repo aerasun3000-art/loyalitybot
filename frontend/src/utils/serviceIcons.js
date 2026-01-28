@@ -262,6 +262,296 @@ export const serviceCategories = {
     nameEn: 'Psychology',
     color: 'from-jewelry-brown-light to-jewelry-burgundy',
     emoji: '🧠'
+  },
+  
+  // Категории для Education (Образование)
+  education: {
+    code: 'education',
+    icon: 'education',
+    name: 'Образование',
+    nameEn: 'Education',
+    color: 'from-blue-500 to-blue-700',
+    emoji: '📚'
+  },
+  language_school: {
+    code: 'language_school',
+    icon: 'language_school',
+    name: 'Языковая школа',
+    nameEn: 'Language School',
+    color: 'from-blue-400 to-blue-600',
+    emoji: '🌍'
+  },
+  training: {
+    code: 'training',
+    icon: 'training',
+    name: 'Тренинги и курсы',
+    nameEn: 'Training & Courses',
+    color: 'from-indigo-500 to-indigo-700',
+    emoji: '📝'
+  },
+  online_education: {
+    code: 'online_education',
+    icon: 'online_education',
+    name: 'Онлайн-образование',
+    nameEn: 'Online Education',
+    color: 'from-purple-500 to-purple-700',
+    emoji: '💻'
+  },
+  
+  // Категории для Food & Beverage (Еда и напитки)
+  restaurant: {
+    code: 'restaurant',
+    icon: 'restaurant',
+    name: 'Ресторан',
+    nameEn: 'Restaurant',
+    color: 'from-orange-500 to-orange-700',
+    emoji: '🍽️'
+  },
+  cafe: {
+    code: 'cafe',
+    icon: 'cafe',
+    name: 'Кафе',
+    nameEn: 'Cafe',
+    color: 'from-amber-500 to-amber-700',
+    emoji: '☕'
+  },
+  food_delivery: {
+    code: 'food_delivery',
+    icon: 'food_delivery',
+    name: 'Доставка еды',
+    nameEn: 'Food Delivery',
+    color: 'from-red-500 to-red-700',
+    emoji: '🍕'
+  },
+  bakery: {
+    code: 'bakery',
+    icon: 'bakery',
+    name: 'Пекарня',
+    nameEn: 'Bakery',
+    color: 'from-yellow-500 to-yellow-700',
+    emoji: '🥐'
+  },
+  bar: {
+    code: 'bar',
+    icon: 'bar',
+    name: 'Бар',
+    nameEn: 'Bar',
+    color: 'from-purple-600 to-purple-800',
+    emoji: '🍸'
+  },
+  
+  // Категории для Sports & Fitness (Спорт и фитнес)
+  sports: {
+    code: 'sports',
+    icon: 'sports',
+    name: 'Спорт',
+    nameEn: 'Sports',
+    color: 'from-green-500 to-green-700',
+    emoji: '⚽'
+  },
+  swimming: {
+    code: 'swimming',
+    icon: 'swimming',
+    name: 'Плавание',
+    nameEn: 'Swimming',
+    color: 'from-cyan-500 to-cyan-700',
+    emoji: '🏊'
+  },
+  
+  // Категории для Entertainment (Развлечения)
+  entertainment: {
+    code: 'entertainment',
+    icon: 'entertainment',
+    name: 'Развлечения',
+    nameEn: 'Entertainment',
+    color: 'from-pink-500 to-pink-700',
+    emoji: '🎉'
+  },
+  cinema: {
+    code: 'cinema',
+    icon: 'cinema',
+    name: 'Кино',
+    nameEn: 'Cinema',
+    color: 'from-gray-600 to-gray-800',
+    emoji: '🎬'
+  },
+  events: {
+    code: 'events',
+    icon: 'events',
+    name: 'Мероприятия',
+    nameEn: 'Events',
+    color: 'from-violet-500 to-violet-700',
+    emoji: '🎭'
+  },
+  gaming: {
+    code: 'gaming',
+    icon: 'gaming',
+    name: 'Игры',
+    nameEn: 'Gaming',
+    color: 'from-emerald-500 to-emerald-700',
+    emoji: '🎮'
+  },
+  music: {
+    code: 'music',
+    icon: 'music',
+    name: 'Музыка',
+    nameEn: 'Music',
+    color: 'from-rose-500 to-rose-700',
+    emoji: '🎵'
+  },
+  
+  // Категории для Retail (Розничная торговля)
+  retail: {
+    code: 'retail',
+    icon: 'retail',
+    name: 'Розничная торговля',
+    nameEn: 'Retail',
+    color: 'from-teal-500 to-teal-700',
+    emoji: '🛍️'
+  },
+  fashion: {
+    code: 'fashion',
+    icon: 'fashion',
+    name: 'Мода и одежда',
+    nameEn: 'Fashion',
+    color: 'from-fuchsia-500 to-fuchsia-700',
+    emoji: '👗'
+  },
+  cosmetics_shop: {
+    code: 'cosmetics_shop',
+    icon: 'cosmetics_shop',
+    name: 'Магазин косметики',
+    nameEn: 'Cosmetics Shop',
+    color: 'from-pink-400 to-pink-600',
+    emoji: '💄'
+  },
+  electronics: {
+    code: 'electronics',
+    icon: 'electronics',
+    name: 'Электроника',
+    nameEn: 'Electronics',
+    color: 'from-slate-500 to-slate-700',
+    emoji: '📱'
+  },
+  gift_shop: {
+    code: 'gift_shop',
+    icon: 'gift_shop',
+    name: 'Подарки',
+    nameEn: 'Gift Shop',
+    color: 'from-red-400 to-red-600',
+    emoji: '🎁'
+  },
+  
+  // Категории для Healthcare (Здравоохранение)
+  healthcare: {
+    code: 'healthcare',
+    icon: 'healthcare',
+    name: 'Здравоохранение',
+    nameEn: 'Healthcare',
+    color: 'from-sky-500 to-sky-700',
+    emoji: '🏥'
+  },
+  dental: {
+    code: 'dental',
+    icon: 'dental',
+    name: 'Стоматология',
+    nameEn: 'Dental',
+    color: 'from-cyan-400 to-cyan-600',
+    emoji: '🦷'
+  },
+  veterinary: {
+    code: 'veterinary',
+    icon: 'veterinary',
+    name: 'Ветеринария',
+    nameEn: 'Veterinary',
+    color: 'from-lime-500 to-lime-700',
+    emoji: '🐾'
+  },
+  pharmacy: {
+    code: 'pharmacy',
+    icon: 'pharmacy',
+    name: 'Аптека',
+    nameEn: 'Pharmacy',
+    color: 'from-green-400 to-green-600',
+    emoji: '💊'
+  },
+  
+  // Категории для Services (Услуги)
+  photography: {
+    code: 'photography',
+    icon: 'photography',
+    name: 'Фотография',
+    nameEn: 'Photography',
+    color: 'from-gray-500 to-gray-700',
+    emoji: '📷'
+  },
+  legal: {
+    code: 'legal',
+    icon: 'legal',
+    name: 'Юридические услуги',
+    nameEn: 'Legal Services',
+    color: 'from-blue-600 to-blue-800',
+    emoji: '⚖️'
+  },
+  accounting: {
+    code: 'accounting',
+    icon: 'accounting',
+    name: 'Бухгалтерские услуги',
+    nameEn: 'Accounting',
+    color: 'from-emerald-600 to-emerald-800',
+    emoji: '📊'
+  },
+  
+  // Категории для Travel & Tourism (Путешествия)
+  travel: {
+    code: 'travel',
+    icon: 'travel',
+    name: 'Путешествия',
+    nameEn: 'Travel',
+    color: 'from-sky-400 to-sky-600',
+    emoji: '✈️'
+  },
+  hotel: {
+    code: 'hotel',
+    icon: 'hotel',
+    name: 'Отель',
+    nameEn: 'Hotel',
+    color: 'from-amber-600 to-amber-800',
+    emoji: '🏨'
+  },
+  tours: {
+    code: 'tours',
+    icon: 'tours',
+    name: 'Туры',
+    nameEn: 'Tours',
+    color: 'from-green-600 to-green-800',
+    emoji: '🗺️'
+  },
+  
+  // Категории для Automotive & Pets (Авто и животные)
+  car_service: {
+    code: 'car_service',
+    icon: 'car_service',
+    name: 'Автосервис',
+    nameEn: 'Car Service',
+    color: 'from-gray-600 to-gray-800',
+    emoji: '🔧'
+  },
+  car_rental: {
+    code: 'car_rental',
+    icon: 'car_rental',
+    name: 'Аренда авто',
+    nameEn: 'Car Rental',
+    color: 'from-blue-500 to-blue-700',
+    emoji: '🚗'
+  },
+  pet_services: {
+    code: 'pet_services',
+    icon: 'pet_services',
+    name: 'Услуги для животных',
+    nameEn: 'Pet Services',
+    color: 'from-orange-400 to-orange-600',
+    emoji: '🐶'
   }
 }
 
@@ -514,6 +804,37 @@ export const getAllCategoryGroups = () => {
  */
 export const getCategoryGroupByCode = (code) => {
   return categoryGroups.find(group => group.code === code || group.id === code) || null
+}
+
+/**
+ * Получить категории по группе
+ * @param {string} groupCode - код группы (beauty, food, education, retail, sports_fitness, entertainment, healthcare, services)
+ * @returns {Array} массив категорий для этой группы
+ */
+export const getCategoriesByGroup = (groupCode) => {
+  // Маппинг из упрощенных кодов партнерской формы в коды categoryGroups
+  const groupMapping = {
+    'beauty': 'beauty_wellness',
+    'food': 'food_beverage',
+    'education': 'education',
+    'retail': 'retail',
+    'sports_fitness': 'sports_fitness',
+    'entertainment': 'entertainment',
+    'healthcare': 'healthcare',
+    'services': 'services',
+    'travel': 'travel_tourism',
+    'automotive': 'automotive_pets'
+  }
+  
+  const mappedCode = groupMapping[groupCode] || groupCode
+  const group = categoryGroups.find(g => g.code === mappedCode || g.id === mappedCode)
+  
+  if (!group) return []
+  
+  // Возвращаем категории из serviceCategories по кодам из группы
+  return group.categories
+    .map(code => serviceCategories[code])
+    .filter(Boolean)
 }
 
 export default serviceCategories

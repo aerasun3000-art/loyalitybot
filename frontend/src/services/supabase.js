@@ -59,6 +59,20 @@ export const getClientBalance = async (chatId) => {
 }
 
 /**
+ * Обновить предпочитаемую валюту пользователя
+ * @param {string} chatId - Chat ID пользователя
+ * @param {string} currencyCode - Код валюты (USD, VND, RUB, KZT)
+ */
+export const updateUserCurrency = async (chatId, currencyCode) => {
+  if (!chatId) return
+  const { error } = await supabase
+    .from('users')
+    .update({ preferred_currency: currencyCode })
+    .eq('chat_id', chatId)
+  if (error) throw error
+}
+
+/**
  * Получить историю транзакций клиента
  */
 export const getClientTransactions = async (chatId, limit = 50) => {
@@ -457,9 +471,10 @@ export const getPartnerInfo = async (partnerChatId) => {
   }
   
   // Сначала пытаемся получить данные из таблицы partners (одобренные партнеры)
+  // Примечание: phone нет в таблице partners, он только в partner_applications
   const { data: partnerData, error: partnerError } = await supabase
     .from('partners')
-    .select('chat_id, name, phone, company_name, city, district, google_maps_link, username, booking_url, category_group, work_mode, default_referral_commission_percent, business_type')
+    .select('chat_id, name, company_name, city, district, google_maps_link, username, booking_url, category_group, work_mode, default_referral_commission_percent, business_type')
     .eq('chat_id', partnerChatId)
     .maybeSingle()
   
@@ -1659,6 +1674,31 @@ const getApiBaseUrl = () => {
   // Fallback: пустая строка
   console.warn('⚠️ VITE_API_URL не установлен! Установите переменную окружения.')
   return ''
+}
+
+/**
+ * Уведомить партнёра о заинтересованности клиента (просмотр карточки)
+ * @param {string} partnerChatId - Chat ID партнёра
+ * @param {string} clientChatId - Chat ID клиента
+ * @param {string} [clientUsername] - Username клиента в Telegram
+ */
+export const notifyPartnerInterest = async (partnerChatId, clientChatId, clientUsername) => {
+  const apiBaseUrl = getApiBaseUrl()
+  if (!apiBaseUrl) return
+  try {
+    const res = await fetch(`${apiBaseUrl}/api/notify-partner-interest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        partner_chat_id: String(partnerChatId),
+        client_chat_id: String(clientChatId),
+        client_username: clientUsername || null
+      })
+    })
+    if (!res.ok) throw new Error(await res.text())
+  } catch (e) {
+    throw e
+  }
 }
 
 /**

@@ -30,6 +30,11 @@ import {
   getRevenueShareHistory,
   getPartnerNetwork,
   getPartnerB2BDeals,
+  getPartnerConversations,
+  getClientDetailsForPartner,
+  getConversation,
+  saveMessage,
+  markMessageAsRead,
 } from './supabase.js';
 import {
   sendTelegramMessage,
@@ -1564,6 +1569,389 @@ export async function handleServiceDeleteExecute(env, chatId, serviceId) {
 }
 
 /**
+ * Handle partner messages menu
+ */
+export async function handlePartnerMessages(env, chatId) {
+  try {
+    const conversations = await getPartnerConversations(env, chatId);
+    
+    if (!conversations || conversations.length === 0) {
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER,
+        chatId,
+        '📭 **У вас пока нет сообщений**\n\n' +
+        'Клиенты смогут написать вам через приложение, и их сообщения появятся здесь.',
+        { parseMode: 'Markdown' }
+      );
+      return { success: true };
+    }
+    
+    // Sort by last message date
+    conversations.sort((a, b) => {
+      const dateA = new Date(a.last_message?.created_at || 0);
+      const dateB = new Date(b.last_message?.created_at || 0);
+      return dateB - dateA;
+    });
+    
+    const messageText = '💬 **Мои сообщения**\n\n' +
+      `Всего переписок: ${conversations.length}\n\n` +
+      'Выберите переписку для просмотра:\n\n';
+    
+    const keyboard = [];
+    
+    for (let idx = 0; idx < Math.min(conversations.length, 10); idx++) {
+      const conv = conversations[idx];
+      const clientId = conv.client_chat_id;
+      const lastMsg = conv.last_message;
+      const unreadCount = conv.unread_count || 0;
+      
+      // Get client info
+      let clientName = 'Неизвестный клиент';
+      try {
+        const clientData = await getClientDetailsForPartner(env, clientId);
+        if (clientData) {
+          clientName = clientData.name || 'Не указано';
+        }
+      } catch (error) {
+        console.error('[handlePartnerMessages] Error getting client details:', error);
+      }
+      
+      // Format button text
+      const unreadBadge = unreadCount > 0 ? ` (${unreadCount})` : '';
+      let buttonText = `${idx + 1}. ${clientName}${unreadBadge}`;
+      
+      if (lastMsg?.service_title) {
+        const serviceShort = lastMsg.service_title.length > 20 
+          ? lastMsg.service_title.substring(0, 20) + '...' 
+          : lastMsg.service_title;
+        buttonText += ` | ${serviceShort}`;
+      }
+      
+      keyboard.push([{
+        text: buttonText,
+        callback_data: `view_conversation_${clientId}`
+      }]);
+    }
+    
+    keyboard.push([{ text: '⬅️ Назад', callback_data: 'more_menu' }]);
+    
+    await sendTelegramMessageWithKeyboard(
+      env.TOKEN_PARTNER,
+      chatId,
+      messageText,
+      keyboard,
+      { parseMode: 'Markdown' }
+    );
+    
+    return { success: true };
+  } catch (error) {
+    logError('handlePartnerMessages', error, { chatId });
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '❌ Произошла ошибка при загрузке сообщений. Попробуйте позже.'
+    );
+    return { success: false };
+  }
+}
+
+/**
+ * Handle view conversation with specific client
+ */
+export async function handleViewConversation(env, chatId, clientChatId) {
+  try {
+    // Get client info
+    let clientName = 'Неизвестный клиент';
+    let clientPhone = 'Не указан';
+    
+    try {
+      const clientData = await getClientDetailsForPartner(env, clientChatId);
+      if (clientData) {
+        clientName = clientData.name || 'Не указано';
+        clientPhone = clientData.phone || 'Не указан';
+      }
+    } catch (error) {
+      console.error('[handleViewConversation] Error getting client details:', error);
+    }
+    
+    // Get conversation messages
+    const messages = await getConversation(env, clientChatId, chatId, 50);
+    
+    if (!messages || messages.length === 0) {
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER,
+        chatId,
+        '❌ Переписка не найдена.'
+      );
+      return { success: false };
+    }
+    
+    // Format conversation history
+    let conversationText = `💬 **Переписка с ${clientName}**\n\n`;
+    conversationText += `📞 Телефон: ${clientPhone}\n\n`;
+    conversationText += '**История сообщений:**\n\n';
+    
+    for (const msg of messages) {
+      const sender = msg.sender_type === 'client' ? '👤 Клиент' : '🏢 Вы';
+      const timestamp = new Date(msg.created_at).toLocaleString('ru-RU');
+      const msgType = msg.message_type || 'text';
+      
+      let msgContent = '';
+      if (msgType === 'qr_code') {
+        msgContent = '📱 QR-код';
+      } else if (msg.message_text) {
+        msgContent = msg.message_text;
+      } else {
+        msgContent = `📎 ${msgType}`;
+      }
+      
+      conversationText += `${sender} (${timestamp}):\n${msgContent}\n\n`;
+    }
+    
+    const keyboard = [
+      [{ text: '💬 Написать ответ', callback_data: `reply_to_client_${clientChatId}` }],
+      [{ text: '⬅️ Назад к сообщениям', callback_data: 'menu_messages' }]
+    ];
+    
+    await sendTelegramMessageWithKeyboard(
+      env.TOKEN_PARTNER,
+      chatId,
+      conversationText,
+      keyboard,
+      { parseMode: 'Markdown' }
+    );
+    
+    return { success: true };
+  } catch (error) {
+    logError('handleViewConversation', error, { chatId, clientChatId });
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '❌ Произошла ошибка при загрузке переписки.'
+    );
+    return { success: false };
+  }
+}
+
+/**
+ * Handle reply to client - set state for replying
+ */
+export async function handleReplyToClient(env, chatId, clientChatId) {
+  try {
+    await setBotState(env, chatId, `replying_to_client_${clientChatId}`, {
+      client_chat_id: clientChatId
+    });
+    
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '💬 **Ответ клиенту**\n\nВведите ваше сообщение для клиента:',
+      { parseMode: 'Markdown' }
+    );
+    
+    return { success: true };
+  } catch (error) {
+    logError('handleReplyToClient', error, { chatId, clientChatId });
+    return { success: false };
+  }
+}
+
+/**
+ * Handle partner reply message to client
+ */
+export async function handlePartnerReplyMessage(env, update, botState) {
+  const message = update.message;
+  const chatId = String(message.chat.id);
+  const replyText = message.text || '';
+  
+  if (!replyText || !replyText.trim()) {
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '❌ Сообщение не может быть пустым. Введите сообщение или отмените ответ.'
+    );
+    return { success: true };
+  }
+  
+  const clientChatId = botState.state.replace('replying_to_client_', '') || botState.data?.client_chat_id;
+  
+  if (!clientChatId) {
+    await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка: не указан клиент');
+    await clearBotState(env, chatId);
+    await showPartnerMainMenu(env, chatId);
+    return { success: false };
+  }
+  
+  try {
+    // Get partner info
+    const partner = await getPartnerByChatId(env, chatId);
+    const partnerName = partner?.name || 'Специалист';
+    const partnerCompany = partner?.company_name || '';
+    
+    // Save message to database
+    const messageData = {
+      client_chat_id: String(clientChatId),
+      partner_chat_id: String(chatId),
+      sender_type: 'partner',
+      message_text: replyText,
+      message_type: 'text',
+      is_read: false,
+    };
+    
+    const savedMessage = await saveMessage(env, messageData);
+    
+    // Format message for client
+    let clientMessage = '💬 **Ответ от специалиста**\n\n';
+    if (partnerCompany) {
+      clientMessage += `🏢 ${partnerCompany}\n`;
+    }
+    clientMessage += `👤 ${partnerName}\n\n`;
+    clientMessage += `_${replyText}_`;
+    
+    // Send to client via client bot (if TOKEN_CLIENT is available)
+    if (env.TOKEN_CLIENT) {
+      try {
+        await sendTelegramMessage(
+          env.TOKEN_CLIENT,
+          String(clientChatId),
+          clientMessage,
+          { parseMode: 'Markdown' }
+        );
+        
+        // Mark as read if sent successfully
+        if (savedMessage?.id) {
+          await markMessageAsRead(env, savedMessage.id);
+        }
+      } catch (sendError) {
+        console.error('[handlePartnerReplyMessage] Failed to send to client:', sendError);
+        // Message is saved in DB, client will see it later
+      }
+    }
+    
+    // Confirm to partner
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '✅ **Сообщение отправлено клиенту**\n\n' +
+      `Ваш ответ: ${replyText}`,
+      { parseMode: 'Markdown' }
+    );
+    
+    // Clear state
+    await clearBotState(env, chatId);
+    
+    return { success: true };
+  } catch (error) {
+    logError('handlePartnerReplyMessage', error, { chatId, clientChatId });
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '❌ Произошла ошибка при отправке сообщения. Попробуйте позже.'
+    );
+    await clearBotState(env, chatId);
+    return { success: false };
+  }
+}
+
+/**
+ * Start reply flow to admin from partner
+ */
+export async function handleReplyToAdmin(env, chatId) {
+  try {
+    await setBotState(env, chatId, 'replying_to_admin', {});
+
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '💬 **Ответ администратору**\n\nВведите ваше сообщение:',
+      { parseMode: 'Markdown' }
+    );
+
+    return { success: true };
+  } catch (error) {
+    logError('handleReplyToAdmin', error, { chatId });
+    return { success: false };
+  }
+}
+
+/**
+ * Handle partner reply message to admin
+ */
+export async function handlePartnerReplyToAdmin(env, update, botState) {
+  const message = update.message;
+  const chatId = String(message.chat.id);
+  const replyText = message.text || '';
+
+  if (!replyText || !replyText.trim()) {
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '❌ Сообщение не может быть пустым. Введите сообщение или отмените ответ.'
+    );
+    return { success: true };
+  }
+
+  try {
+    // Информация о партнёре
+    const partner = await getPartnerByChatId(env, chatId);
+    const partnerName = partner?.name || 'Партнёр';
+    const partnerCompany = partner?.company_name || '';
+
+    // Сообщение для админа
+    let adminMessage = '💬 **Сообщение от партнёра**\n\n';
+    if (partnerCompany) {
+      adminMessage += `🏢 ${partnerCompany}\n`;
+    }
+    adminMessage += `👤 ${partnerName}\n`;
+    adminMessage += `ID: \`${chatId}\`\n\n`;
+    adminMessage += `_${replyText}_`;
+
+    const adminIds = (env.ADMIN_CHAT_ID || '')
+      .split(',')
+      .map(id => id.trim())
+      .filter(Boolean);
+
+    if (env.ADMIN_BOT_TOKEN && adminIds.length > 0) {
+      for (const adminId of adminIds) {
+        try {
+          await sendTelegramMessage(
+            env.ADMIN_BOT_TOKEN,
+            String(adminId),
+            adminMessage,
+            { parseMode: 'Markdown' }
+          );
+        } catch (error) {
+          console.error('[handlePartnerReplyToAdmin] Failed to send to admin:', {
+            adminId,
+            error,
+          });
+        }
+      }
+    }
+
+    await clearBotState(env, chatId);
+
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '✅ **Сообщение отправлено администратору**\n\nВаш ответ будет рассмотрен.',
+      { parseMode: 'Markdown' }
+    );
+
+    return { success: true };
+  } catch (error) {
+    logError('handlePartnerReplyToAdmin', error, { chatId });
+    await clearBotState(env, chatId);
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '❌ Произошла ошибка при отправке сообщения администратору. Попробуйте позже.'
+    );
+    return { success: false };
+  }
+}
+
+/**
  * Handle callback queries
  */
 export async function handleCallback(env, update) {
@@ -1782,6 +2170,24 @@ export async function handleCallback(env, update) {
     
     if (callbackData === 'more_menu') {
       return await handleMoreMenu(env, chatId);
+    }
+    
+    if (callbackData === 'menu_messages') {
+      return await handlePartnerMessages(env, chatId);
+    }
+    
+    if (callbackData.startsWith('view_conversation_')) {
+      const clientChatId = callbackData.replace('view_conversation_', '');
+      return await handleViewConversation(env, chatId, clientChatId);
+    }
+    
+    if (callbackData.startsWith('reply_to_client_')) {
+      const clientChatId = callbackData.replace('reply_to_client_', '');
+      return await handleReplyToClient(env, chatId, clientChatId);
+    }
+
+    if (callbackData === 'reply_to_admin') {
+      return await handleReplyToAdmin(env, chatId);
     }
     
     // ==================== END B2B PARTNERSHIP CALLBACKS ====================
@@ -2040,6 +2446,16 @@ export async function routeUpdate(env, update) {
     
     // Check for active state AFTER commands/menu buttons
     const botState = await getBotState(env, chatId);
+    if (botState && botState.state.startsWith('replying_to_client_')) {
+      // Partner is replying to a client
+      return await handlePartnerReplyMessage(env, update, botState);
+    }
+
+    if (botState && botState.state === 'replying_to_admin') {
+      // Partner is replying to admin
+      return await handlePartnerReplyToAdmin(env, update, botState);
+    }
+    
     if (botState && (
       botState.state.startsWith('awaiting_') || 
       botState.state.startsWith('editing_service_') ||
@@ -2237,26 +2653,79 @@ export async function handleStateBasedMessage(env, update, botState) {
         price_points: price,
       });
       
-      // Show category selection keyboard (шаг 4 только если нет business_type)
-      const categories = [
-        ['💅', 'manicure', 'Маникюр'],
-        ['💇‍♀️', 'hairstyle', 'Прически'],
-        ['💆‍♀️', 'massage', 'Массаж'],
-        ['🧴', 'cosmetologist', 'Косметолог'],
-        ['✨', 'eyebrows', 'Брови'],
-        ['👁️', 'eyelashes', 'Ресницы'],
-        ['💫', 'laser', 'Лазерная эпиляция'],
-        ['💄', 'makeup', 'Визажист'],
-        ['🌸', 'skincare', 'Уход за кожей'],
-        ['🧹', 'cleaning', 'Уборка'],
-        ['🔧', 'repair', 'Ремонт'],
-        ['🚗', 'delivery', 'Доставка'],
-        ['🏃‍♀️', 'fitness', 'Фитнес'],
-        ['🛁', 'spa', 'SPA'],
-        ['🧘‍♀️', 'yoga', 'Йога'],
-        ['🥗', 'nutrition', 'Питание'],
-        ['🧠', 'psychology', 'Психолог'],
-      ];
+      // Получаем данные партнёра для определения category_group (используем уже загруженные данные)
+      const categoryGroup = partner?.category_group || 'beauty';
+      
+      // Маппинг старых кодов на новые (канонические)
+      const mapOldCategoryToNew = (oldCode) => {
+        const mapping = {
+          'manicure': 'nail_care',
+          'hairstyle': 'hair_salon',
+          'massage': 'massage_therapy',
+          'cosmetologist': 'facial_aesthetics',
+          'eyebrows': 'brow_design',
+          'eyelashes': 'lash_services',
+          'laser': 'hair_removal',
+          'makeup': 'makeup_pmu',
+          'skincare': 'facial_aesthetics',
+          'nutrition': 'nutrition_coaching',
+          'psychology': 'mindfulness_coaching'
+        };
+        return mapping[oldCode] || oldCode;
+      };
+      
+      // Категории по группам бизнеса
+      const getCategoriesByGroup = (group) => {
+        const categoriesMap = {
+          beauty: [
+            ['💅', 'nail_care', 'Ногтевой сервис'],
+            ['👁️', 'brow_design', 'Коррекция бровей'],
+            ['💇‍♀️', 'hair_salon', 'Парикмахерские услуги'],
+            ['⚡', 'hair_removal', 'Депиляция'],
+            ['✨', 'facial_aesthetics', 'Косметология'],
+            ['👀', 'lash_services', 'Наращивание ресниц'],
+            ['💆‍♀️', 'massage_therapy', 'Массаж'],
+            ['💄', 'makeup_pmu', 'Визаж и перманент'],
+            ['🌸', 'body_wellness', 'Телесная терапия'],
+            ['🍎', 'nutrition_coaching', 'Нутрициология'],
+            ['🧠', 'mindfulness_coaching', 'Ментальное здоровье'],
+            ['👗', 'image_consulting', 'Стиль']
+          ],
+          food: [
+            ['🍽️', 'restaurant', 'Рестораны'],
+            ['☕', 'cafe', 'Кафе и кофейни'],
+            ['🚚', 'food_delivery', 'Доставка еды'],
+            ['🥖', 'bakery', 'Пекарни'],
+            ['🍸', 'bar', 'Бары и пабы']
+          ],
+          retail: [
+            ['🛍️', 'retail', 'Магазины'],
+            ['👔', 'fashion', 'Мода и одежда'],
+            ['💄', 'cosmetics_shop', 'Косметика'],
+            ['📱', 'electronics', 'Электроника'],
+            ['🎁', 'gift_shop', 'Подарки']
+          ],
+          influencer: [
+            ['💄', 'beauty_influencer', 'Бьюти-блогер'],
+            ['🍔', 'food_influencer', 'Фуд-блогер'],
+            ['📸', 'lifestyle_influencer', 'Лайфстайл'],
+            ['👗', 'fashion_influencer', 'Фэшн-блогер'],
+            ['✈️', 'travel_influencer', 'Тревел-блогер']
+          ],
+          b2b: [
+            ['⚖️', 'legal', 'Юридические услуги'],
+            ['📊', 'accounting', 'Бухгалтерия'],
+            ['💼', 'consulting', 'Консалтинг'],
+            ['📈', 'marketing', 'Маркетинг'],
+            ['💻', 'it_services', 'IT-услуги'],
+            ['🚛', 'logistics', 'Логистика'],
+            ['👥', 'hr_services', 'HR-услуги']
+          ]
+        };
+        return categoriesMap[group] || categoriesMap.beauty;
+      };
+      
+      const categories = getCategoriesByGroup(categoryGroup);
       
       const keyboard = [];
       for (let i = 0; i < categories.length; i += 2) {
@@ -2808,17 +3277,52 @@ export async function handleServiceCategorySelection(env, chatId, category) {
       return { success: false };
     }
     
-    // Получаем данные партнёра для проверки business_type
+    // Маппинг старых кодов на новые (канонические)
+    const mapOldCategoryToNew = (oldCode) => {
+      const mapping = {
+        'manicure': 'nail_care',
+        'hairstyle': 'hair_salon',
+        'massage': 'massage_therapy',
+        'cosmetologist': 'facial_aesthetics',
+        'eyebrows': 'brow_design',
+        'eyelashes': 'lash_services',
+        'laser': 'hair_removal',
+        'makeup': 'makeup_pmu',
+        'skincare': 'facial_aesthetics',
+        'nutrition': 'nutrition_coaching',
+        'psychology': 'mindfulness_coaching'
+      };
+      return mapping[oldCode] || oldCode;
+    };
+    
+    // Преобразуем старый код в новый (если нужно)
+    const canonicalCategory = mapOldCategoryToNew(category);
+    
+    // Получаем данные партнёра для проверки business_type и category_group
     const partner = await getPartnerByChatId(env, chatId);
     
     // Используем business_type партнёра, если установлен, иначе выбранную категорию
-    // Это гарантирует, что все услуги партнёра будут в одной группе
-    let finalCategory = category;
-    if (partner?.business_type) {
-      finalCategory = partner.business_type;
-      // Если категория отличается, уведомляем партнёра
-      if (partner.business_type !== category) {
-        console.log(`[handleServiceCategorySelection] Category mismatch: partner business_type=${partner.business_type}, selected=${category}, using business_type`);
+    // Для мультикатегорий: если у партнера есть категории в partner_categories, используем их
+    let finalCategory = canonicalCategory;
+    
+    // Проверяем мультикатегории партнера
+    try {
+      const categoriesResult = await supabaseRequest(env, `partner_categories?partner_chat_id=eq.${chatId}&select=business_type,is_primary&order=is_primary.desc`);
+      if (categoriesResult && categoriesResult.length > 0) {
+        // Используем основную категорию партнера
+        const primaryCategory = categoriesResult.find(c => c.is_primary) || categoriesResult[0];
+        finalCategory = primaryCategory.business_type;
+        console.log(`[handleServiceCategorySelection] Using primary category from partner_categories: ${finalCategory}`);
+      } else if (partner?.business_type) {
+        // Обратная совместимость: используем business_type из partners
+        finalCategory = mapOldCategoryToNew(partner.business_type);
+        console.log(`[handleServiceCategorySelection] Using business_type from partners: ${finalCategory}`);
+      }
+    } catch (error) {
+      console.error('[handleServiceCategorySelection] Error fetching partner categories:', error);
+      // Fallback на business_type партнера
+      if (partner?.business_type) {
+        finalCategory = mapOldCategoryToNew(partner.business_type);
       }
     }
     

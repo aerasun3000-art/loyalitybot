@@ -77,13 +77,43 @@ export async function getPartnerByChatId(env, chatId) {
   // First check approved partners
   const approved = await supabaseRequest(env, `partners?chat_id=eq.${chatId}&select=*`);
   if (approved && approved.length > 0) {
-    return { ...approved[0], status: 'Approved' };
+    const partner = { ...approved[0], status: 'Approved' };
+    
+    // Загружаем мультикатегории из partner_categories
+    try {
+      const categories = await supabaseRequest(env, `partner_categories?partner_chat_id=eq.${chatId}&select=business_type,is_primary&order=is_primary.desc`);
+      if (categories && categories.length > 0) {
+        partner.categories = categories.map(c => c.business_type);
+        // Для обратной совместимости: основная категория в business_type
+        const primaryCategory = categories.find(c => c.is_primary) || categories[0];
+        partner.business_type = primaryCategory.business_type;
+      }
+    } catch (error) {
+      console.error('[getPartnerByChatId] Error loading categories:', error);
+    }
+    
+    return partner;
   }
   
   // If not found, check partner_applications
   const application = await supabaseRequest(env, `partner_applications?chat_id=eq.${chatId}&select=*`);
   if (application && application.length > 0) {
-    return { ...application[0], status: application[0].status || 'Pending' };
+    const app = { ...application[0], status: application[0].status || 'Pending' };
+    
+    // Загружаем мультикатегории из partner_categories
+    try {
+      const categories = await supabaseRequest(env, `partner_categories?partner_chat_id=eq.${chatId}&select=business_type,is_primary&order=is_primary.desc`);
+      if (categories && categories.length > 0) {
+        app.categories = categories.map(c => c.business_type);
+        // Для обратной совместимости: основная категория в business_type
+        const primaryCategory = categories.find(c => c.is_primary) || categories[0];
+        app.business_type = primaryCategory.business_type;
+      }
+    } catch (error) {
+      console.error('[getPartnerByChatId] Error loading categories:', error);
+    }
+    
+    return app;
   }
   
   return null;
@@ -278,6 +308,63 @@ export async function ensurePartnerRecord(env, partnerChatId, serviceCategory = 
 }
 
 /**
+ * Get all services for a partner
+ */
+export async function getServicesByPartner(env, partnerChatId) {
+  try {
+    const result = await supabaseRequest(env, `services?partner_chat_id=eq.${partnerChatId}&select=*&order=created_at.desc`);
+    return result || [];
+  } catch (error) {
+    console.error('[getServicesByPartner] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get service by ID
+ */
+export async function getServiceById(env, serviceId) {
+  try {
+    const result = await supabaseRequest(env, `services?id=eq.${serviceId}&select=*`);
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[getServiceById] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Update service
+ */
+export async function updateService(env, serviceId, updateData) {
+  try {
+    const result = await supabaseRequest(env, `services?id=eq.${serviceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updateData),
+    });
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[updateService] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete service
+ */
+export async function deleteService(env, serviceId) {
+  try {
+    await supabaseRequest(env, `services?id=eq.${serviceId}`, {
+      method: 'DELETE',
+    });
+    return true;
+  } catch (error) {
+    console.error('[deleteService] Error:', error);
+    throw error;
+  }
+}
+
+/**
  * Add service to database
  */
 export async function addService(env, serviceData) {
@@ -333,5 +420,622 @@ export async function addService(env, serviceData) {
     console.error('[addService] Error adding service:', error);
     console.error('[addService] Service data was:', JSON.stringify(serviceData));
     throw error;
+  }
+}
+
+// ==================== PROMOTIONS ====================
+
+/**
+ * Get promotions by partner chat_id
+ */
+export async function getPromotionsByPartner(env, partnerChatId) {
+  try {
+    const result = await supabaseRequest(env, `promotions?partner_chat_id=eq.${partnerChatId}&order=created_at.desc`);
+    return result || [];
+  } catch (error) {
+    console.error('[getPromotionsByPartner] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get promotion by ID
+ */
+export async function getPromotionById(env, promotionId) {
+  try {
+    console.log('[getPromotionById] Fetching promotion:', promotionId);
+    const result = await supabaseRequest(env, `promotions?id=eq.${promotionId}&select=*`);
+    console.log('[getPromotionById] Result:', result);
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[getPromotionById] Error:', error);
+    return null; // Return null instead of throwing to avoid crashing
+  }
+}
+
+/**
+ * Add new promotion
+ */
+export async function addPromotion(env, promotionData) {
+  try {
+    // Set defaults
+    if (promotionData.is_active === undefined) {
+      promotionData.is_active = true;
+    }
+    
+    // Set start_date to today if not provided
+    if (!promotionData.start_date) {
+      promotionData.start_date = new Date().toISOString().split('T')[0];
+    }
+    
+    console.log('[addPromotion] Adding promotion:', JSON.stringify(promotionData));
+    
+    const result = await supabaseRequest(env, 'promotions', {
+      method: 'POST',
+      body: JSON.stringify(promotionData),
+    });
+    
+    const finalResult = Array.isArray(result) ? (result[0] || result) : result;
+    console.log('[addPromotion] Result:', JSON.stringify(finalResult));
+    return finalResult;
+  } catch (error) {
+    console.error('[addPromotion] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update promotion
+ */
+export async function updatePromotion(env, promotionId, updateData) {
+  try {
+    const result = await supabaseRequest(env, `promotions?id=eq.${promotionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updateData),
+    });
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[updatePromotion] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete promotion
+ */
+export async function deletePromotion(env, promotionId) {
+  try {
+    await supabaseRequest(env, `promotions?id=eq.${promotionId}`, {
+      method: 'DELETE',
+    });
+    return true;
+  } catch (error) {
+    console.error('[deletePromotion] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Toggle promotion active status
+ */
+export async function togglePromotionStatus(env, promotionId, isActive) {
+  try {
+    const result = await supabaseRequest(env, `promotions?id=eq.${promotionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_active: isActive }),
+    });
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[togglePromotionStatus] Error:', error);
+    throw error;
+  }
+}
+
+// ==================== CLIENT & TRANSACTION FUNCTIONS ====================
+
+/**
+ * Find client by chat_id or phone number
+ */
+export async function findClientByIdOrPhone(env, searchQuery) {
+  try {
+    const query = String(searchQuery).trim();
+    
+    // First try exact chat_id match
+    let result = await supabaseRequest(env, `users?chat_id=eq.${query}&select=*`);
+    if (result && result.length > 0) {
+      return result[0];
+    }
+    
+    // Try phone number (with or without + prefix)
+    const phoneQuery = query.startsWith('+') ? query : `+${query}`;
+    const phoneQueryWithout = query.replace(/^\+/, '');
+    
+    result = await supabaseRequest(env, `users?or=(phone.eq.${encodeURIComponent(phoneQuery)},phone.eq.${encodeURIComponent(phoneQueryWithout)})&select=*`);
+    if (result && result.length > 0) {
+      return result[0];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('[findClientByIdOrPhone] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Get client balance
+ */
+export async function getClientBalance(env, clientChatId) {
+  try {
+    const result = await supabaseRequest(env, `users?chat_id=eq.${clientChatId}&select=balance`);
+    if (result && result.length > 0) {
+      return result[0].balance || 0;
+    }
+    return 0;
+  } catch (error) {
+    console.error('[getClientBalance] Error:', error);
+    return 0;
+  }
+}
+
+/**
+ * Execute transaction (accrual or spend)
+ * @param {Object} env - Environment variables
+ * @param {string} clientChatId - Client's chat ID
+ * @param {string} partnerChatId - Partner's chat ID
+ * @param {string} txnType - 'accrual' or 'spend'
+ * @param {number} amount - Amount (in dollars for accrual, in points for spend)
+ * @returns {Object} - { success: boolean, points?: number, new_balance?: number, error?: string }
+ */
+export async function executeTransaction(env, clientChatId, partnerChatId, txnType, amount) {
+  try {
+    console.log('[executeTransaction] Starting:', { clientChatId, partnerChatId, txnType, amount });
+    
+    // Get current client balance
+    const client = await getUserByChatId(env, clientChatId);
+    if (!client) {
+      return { success: false, error: 'Клиент не найден' };
+    }
+    
+    const currentBalance = client.balance || 0;
+    let newBalance = currentBalance;
+    let points = 0;
+    
+    if (txnType === 'accrual') {
+      // Calculate points from dollar amount (1 USD = 1 point by default, can be configured)
+      const pointsPerDollar = parseFloat(env.POINTS_PER_DOLLAR) || 1;
+      points = Math.round(amount * pointsPerDollar);
+      newBalance = currentBalance + points;
+    } else if (txnType === 'spend') {
+      points = Math.round(amount);
+      if (points > currentBalance) {
+        return { success: false, error: `Недостаточно баллов. Баланс: ${currentBalance}` };
+      }
+      newBalance = currentBalance - points;
+    } else {
+      return { success: false, error: 'Неизвестный тип операции' };
+    }
+    
+    // Update client balance
+    await supabaseRequest(env, `users?chat_id=eq.${clientChatId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ balance: newBalance }),
+    });
+    
+    // Create transaction record
+    const transactionData = {
+      user_chat_id: clientChatId,
+      partner_chat_id: partnerChatId,
+      type: txnType,
+      amount: amount,
+      points: points,
+      balance_after: newBalance,
+      created_at: new Date().toISOString(),
+    };
+    
+    await createTransaction(env, transactionData);
+    
+    console.log('[executeTransaction] Success:', { points, newBalance });
+    
+    return {
+      success: true,
+      points: points,
+      new_balance: newBalance,
+    };
+  } catch (error) {
+    console.error('[executeTransaction] Error:', error);
+    return { success: false, error: error.message || 'Ошибка выполнения транзакции' };
+  }
+}
+
+/**
+ * Get pending transactions (queue) for a partner
+ */
+export async function getPendingTransactions(env, partnerChatId) {
+  try {
+    const result = await supabaseRequest(env, `transaction_queue?partner_chat_id=eq.${partnerChatId}&status=eq.pending&order=created_at.desc&limit=10`);
+    return result || [];
+  } catch (error) {
+    console.error('[getPendingTransactions] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get partner's revenue share data
+ */
+export async function getPartnerRevenueShare(env, partnerChatId) {
+  try {
+    // Get partner data
+    const partners = await supabaseRequest(
+      env, 
+      `partners?chat_id=eq.${partnerChatId}&select=is_revenue_share_active,revenue_share_monthly,total_revenue_share_earned,personal_income_monthly,client_base_count`
+    );
+    
+    const partner = partners && partners[0];
+    
+    // Get pending payouts
+    const pendingPayouts = await supabaseRequest(
+      env,
+      `partner_revenue_share?partner_chat_id=eq.${partnerChatId}&status=eq.pending&select=final_amount`
+    );
+    
+    // Get paid payouts count
+    const paidPayouts = await supabaseRequest(
+      env,
+      `partner_revenue_share?partner_chat_id=eq.${partnerChatId}&status=eq.paid&select=id`
+    );
+    
+    const pendingAmount = (pendingPayouts || []).reduce((sum, p) => sum + (parseFloat(p.final_amount) || 0), 0);
+    
+    return {
+      isActive: partner?.is_revenue_share_active || false,
+      monthlyEarned: parseFloat(partner?.revenue_share_monthly) || 0,
+      totalEarned: parseFloat(partner?.total_revenue_share_earned) || 0,
+      personalIncome: parseFloat(partner?.personal_income_monthly) || 0,
+      clientCount: parseInt(partner?.client_base_count) || 0,
+      pendingAmount,
+      payoutsCount: (paidPayouts || []).length
+    };
+  } catch (error) {
+    console.error('[getPartnerRevenueShare] Error:', error);
+    return {
+      isActive: false,
+      monthlyEarned: 0,
+      totalEarned: 0,
+      personalIncome: 0,
+      clientCount: 0,
+      pendingAmount: 0,
+      payoutsCount: 0
+    };
+  }
+}
+
+/**
+ * Get revenue share history for partner
+ */
+export async function getRevenueShareHistory(env, partnerChatId, limit = 10) {
+  try {
+    const history = await supabaseRequest(
+      env,
+      `partner_revenue_share?partner_chat_id=eq.${partnerChatId}&order=created_at.desc&limit=${limit}&select=*`
+    );
+    return history || [];
+  } catch (error) {
+    console.error('[getRevenueShareHistory] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get partner's referral network
+ */
+export async function getPartnerNetwork(env, partnerChatId) {
+  try {
+    // Get direct referrals (level 1)
+    const directReferrals = await supabaseRequest(
+      env,
+      `partners?referred_by_chat_id=eq.${partnerChatId}&select=chat_id,name,company_name,is_revenue_share_active,personal_income_monthly`
+    );
+    
+    // Get level 2 referrals (with referrer info)
+    const level2Referrals = [];
+    for (const ref of (directReferrals || [])) {
+      const referrerName = ref.company_name || ref.name || 'партнёр';
+      const l2 = await supabaseRequest(
+        env,
+        `partners?referred_by_chat_id=eq.${ref.chat_id}&select=chat_id,name,company_name,is_revenue_share_active`
+      );
+      // Add referrer name to each level 2 partner
+      for (const p of (l2 || [])) {
+        level2Referrals.push({ ...p, referrer_name: referrerName });
+      }
+    }
+    
+    // Get level 3 referrals (with referrer info)
+    const level3Referrals = [];
+    for (const ref of level2Referrals) {
+      const referrerName = ref.company_name || ref.name || 'партнёр';
+      const l3 = await supabaseRequest(
+        env,
+        `partners?referred_by_chat_id=eq.${ref.chat_id}&select=chat_id,name,company_name,is_revenue_share_active`
+      );
+      // Add referrer name to each level 3 partner
+      for (const p of (l3 || [])) {
+        level3Referrals.push({ ...p, referrer_name: referrerName });
+      }
+    }
+    
+    return {
+      level1: directReferrals || [],
+      level2: level2Referrals,
+      level3: level3Referrals,
+      totalCount: (directReferrals || []).length + level2Referrals.length + level3Referrals.length
+    };
+  } catch (error) {
+    console.error('[getPartnerNetwork] Error:', error);
+    return { level1: [], level2: [], level3: [], totalCount: 0 };
+  }
+}
+
+/**
+ * Get partner's B2B deals
+ */
+export async function getPartnerB2BDeals(env, partnerChatId) {
+  try {
+    // Get deals where partner is source (bringing clients)
+    const asSource = await supabaseRequest(
+      env,
+      `partner_deals?source_partner_chat_id=eq.${partnerChatId}&status=eq.active&select=*`
+    );
+    
+    // Get deals where partner is target (receiving clients)
+    const asTarget = await supabaseRequest(
+      env,
+      `partner_deals?target_partner_chat_id=eq.${partnerChatId}&status=eq.active&select=*`
+    );
+    
+    // Get partner names for display
+    const enrichedAsSource = [];
+    for (const deal of (asSource || [])) {
+      const targetPartner = await supabaseRequest(
+        env,
+        `partners?chat_id=eq.${deal.target_partner_chat_id}&select=name,company_name`
+      );
+      enrichedAsSource.push({
+        ...deal,
+        partner_name: targetPartner?.[0]?.company_name || targetPartner?.[0]?.name || 'Партнёр'
+      });
+    }
+    
+    const enrichedAsTarget = [];
+    for (const deal of (asTarget || [])) {
+      const sourcePartner = await supabaseRequest(
+        env,
+        `partners?chat_id=eq.${deal.source_partner_chat_id}&select=name,company_name`
+      );
+      enrichedAsTarget.push({
+        ...deal,
+        partner_name: sourcePartner?.[0]?.company_name || sourcePartner?.[0]?.name || 'Партнёр'
+      });
+    }
+    
+    return {
+      asSource: enrichedAsSource,
+      asTarget: enrichedAsTarget,
+      totalCount: enrichedAsSource.length + enrichedAsTarget.length
+    };
+  } catch (error) {
+    console.error('[getPartnerB2BDeals] Error:', error);
+    return { asSource: [], asTarget: [], totalCount: 0 };
+  }
+}
+
+/**
+ * Get partner statistics
+ */
+export async function getPartnerStats(env, partnerChatId) {
+  try {
+    // Get all transactions for this partner
+    const transactions = await supabaseRequest(
+      env, 
+      `transactions?partner_chat_id=eq.${partnerChatId}&select=*`
+    );
+    
+    // Calculate statistics
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    let totalTurnover = 0;
+    let totalPointsIssued = 0;
+    let totalPointsSpent = 0;
+    let last30DaysTransactions = 0;
+    let last30DaysTurnover = 0;
+    const uniqueClients = new Set();
+    const last30DaysClients = new Set();
+    
+    for (const txn of (transactions || [])) {
+      const txnDate = new Date(txn.created_at || txn.date_time);
+      const amount = parseFloat(txn.amount) || parseFloat(txn.check_amount) || 0;
+      const points = parseInt(txn.points) || parseInt(txn.points_change) || 0;
+      
+      if (txn.type === 'accrual' || txn.transaction_type === 'accrual') {
+        totalTurnover += amount;
+        totalPointsIssued += Math.abs(points);
+      } else {
+        totalPointsSpent += Math.abs(points);
+      }
+      
+      if (txn.user_chat_id) {
+        uniqueClients.add(txn.user_chat_id);
+      }
+      
+      if (txnDate >= thirtyDaysAgo) {
+        last30DaysTransactions++;
+        if (txn.type === 'accrual' || txn.transaction_type === 'accrual') {
+          last30DaysTurnover += amount;
+        }
+        if (txn.user_chat_id) {
+          last30DaysClients.add(txn.user_chat_id);
+        }
+      }
+    }
+    
+    // Get new clients count (users who registered with this partner in last 30 days)
+    let last30DaysNewClients = 0;
+    try {
+      const newUsers = await supabaseRequest(
+        env,
+        `users?referral_source=eq.partner_${partnerChatId}&reg_date=gte.${thirtyDaysAgo.toISOString().split('T')[0]}&select=chat_id`
+      );
+      last30DaysNewClients = (newUsers || []).length;
+    } catch (e) {
+      console.error('[getPartnerStats] Error getting new clients:', e);
+    }
+    
+    return {
+      totalClients: uniqueClients.size,
+      totalTurnover,
+      totalTransactions: (transactions || []).length,
+      totalPointsIssued,
+      totalPointsSpent,
+      last30DaysTransactions,
+      last30DaysTurnover,
+      last30DaysNewClients
+    };
+  } catch (error) {
+    console.error('[getPartnerStats] Error:', error);
+    return {
+      totalClients: 0,
+      totalTurnover: 0,
+      totalTransactions: 0,
+      totalPointsIssued: 0,
+      totalPointsSpent: 0,
+      last30DaysTransactions: 0,
+      last30DaysTurnover: 0,
+      last30DaysNewClients: 0
+    };
+  }
+}
+
+/**
+ * Get partner conversations (list of clients with messages)
+ */
+export async function getPartnerConversations(env, partnerChatId) {
+  try {
+    // Get all unique clients with messages
+    const messages = await supabaseRequest(env, `messages?partner_chat_id=eq.${partnerChatId}&select=client_chat_id`);
+    
+    if (!messages || messages.length === 0) {
+      return [];
+    }
+    
+    const clientIds = [...new Set(messages.map(msg => msg.client_chat_id).filter(id => id))];
+    
+    const conversations = [];
+    
+    for (const clientId of clientIds) {
+      // Get last message
+      const lastMessages = await supabaseRequest(env, 
+        `messages?client_chat_id=eq.${clientId}&partner_chat_id=eq.${partnerChatId}&order=created_at.desc&limit=1`
+      );
+      
+      if (lastMessages && lastMessages.length > 0) {
+        const lastMsg = lastMessages[0];
+        
+        // Get unread count
+        const unreadMessages = await supabaseRequest(env,
+          `messages?client_chat_id=eq.${clientId}&partner_chat_id=eq.${partnerChatId}&sender_type=eq.client&is_read=eq.false&select=id`
+        );
+        
+        const unreadCount = unreadMessages ? unreadMessages.length : 0;
+        
+        conversations.push({
+          client_chat_id: clientId,
+          last_message: lastMsg,
+          unread_count: unreadCount
+        });
+      }
+    }
+    
+    return conversations;
+  } catch (error) {
+    console.error('[getPartnerConversations] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get client details for partner
+ */
+export async function getClientDetailsForPartner(env, clientChatId) {
+  try {
+    const user = await getUserByChatId(env, clientChatId);
+    if (!user) {
+      return null;
+    }
+    
+    return {
+      chat_id: user.chat_id,
+      name: user.name || 'Не указано',
+      balance: user.balance || 0,
+      status: user.status || 'Bronze',
+      phone: user.phone || 'Не указан',
+    };
+  } catch (error) {
+    console.error('[getClientDetailsForPartner] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Get conversation messages between client and partner
+ */
+export async function getConversation(env, clientChatId, partnerChatId, limit = 50) {
+  try {
+    const messages = await supabaseRequest(env,
+      `messages?client_chat_id=eq.${clientChatId}&partner_chat_id=eq.${partnerChatId}&order=created_at.desc&limit=${limit}`
+    );
+    
+    return messages ? messages.reverse() : [];
+  } catch (error) {
+    console.error('[getConversation] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Save message to database
+ */
+export async function saveMessage(env, messageData) {
+  try {
+    const result = await supabaseRequest(env, 'messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...messageData,
+        created_at: new Date().toISOString(),
+      }),
+    });
+    
+    return Array.isArray(result) ? (result[0] || result) : result;
+  } catch (error) {
+    console.error('[saveMessage] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Mark message as read
+ */
+export async function markMessageAsRead(env, messageId) {
+  try {
+    await supabaseRequest(env, `messages?id=eq.${messageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_read: true }),
+    });
+    return true;
+  } catch (error) {
+    console.error('[markMessageAsRead] Error:', error);
+    return false;
   }
 }
