@@ -414,6 +414,7 @@ const PartnerApply = () => {
               <option value="healthcare">🏥 {language === 'ru' ? 'Здравоохранение' : 'Healthcare'}</option>
               <option value="services">🧹 {language === 'ru' ? 'Услуги' : 'Services'}</option>
               <option value="influencer">🤳 {language === 'ru' ? 'Блогер/Инфлюенсер' : 'Influencer/Blogger'}</option>
+              <option value="b2b">🏢 B2B</option>
             </select>
             {errors.categoryGroup && (
               <p className="text-red-500 text-sm mt-1">{errors.categoryGroup}</p>

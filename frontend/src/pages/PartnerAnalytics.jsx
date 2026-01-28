@@ -417,7 +417,7 @@ const PartnerAnalytics = () => {
                 <div>
                   <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Тип бизнеса</label>
                   <p className="text-gray-900 dark:text-white">
-                    {partnerData.category_group === 'beauty' ? '💄 Красота' :
+                    {partnerData.category_group === 'beauty' ? '💄 Красота и здоровье' :
                      partnerData.category_group === 'food' ? '🍔 Еда' :
                      partnerData.category_group === 'education' ? '📚 Образование' :
                      partnerData.category_group === 'retail' ? '🛍️ Розница' :
@@ -426,6 +426,7 @@ const PartnerAnalytics = () => {
                      partnerData.category_group === 'healthcare' ? '🏥 Здравоохранение' :
                      partnerData.category_group === 'services' ? '🧹 Услуги' :
                      partnerData.category_group === 'influencer' ? '🤳 Блогер' :
+                     partnerData.category_group === 'b2b' ? '🏢 B2B' :
                      partnerData.category_group || 'Не указано'}
                   </p>
                 </div>
@@ -532,7 +533,7 @@ const PartnerAnalytics = () => {
                       required
                     >
                       <option value="">Выберите тип бизнеса</option>
-                      <option value="beauty">💄 Красота (Салон/Мастер)</option>
+                      <option value="beauty">💄 Красота и здоровье</option>
                       <option value="food">🍔 Еда (Кафе/Ресторан)</option>
                       <option value="education">📚 Образование</option>
                       <option value="retail">🛍️ Розница (Магазин)</option>
@@ -541,6 +542,7 @@ const PartnerAnalytics = () => {
                       <option value="healthcare">🏥 Здравоохранение</option>
                       <option value="services">🧹 Услуги</option>
                       <option value="influencer">🤳 Блогер/Инфлюенсер</option>
+                      <option value="b2b">🏢 B2B</option>
                     </select>
                     {editErrors.category_group && <p className="text-red-500 text-xs mt-1">{editErrors.category_group}</p>}
                   </div>

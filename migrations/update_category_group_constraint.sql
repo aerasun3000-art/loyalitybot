@@ -9,7 +9,7 @@ DROP CONSTRAINT IF EXISTS partners_category_group_check;
 ALTER TABLE partners
 ADD CONSTRAINT partners_category_group_check 
 CHECK (category_group IN (
-    'beauty',           -- Красота (Салон/Мастер)
+    'beauty',           -- Красота и здоровье
     'food',             -- Еда (Кафе/Ресторан)
     'education',        -- Образование
     'retail',           -- Розница (Магазин)
@@ -18,7 +18,8 @@ CHECK (category_group IN (
     'healthcare',       -- Здравоохранение
     'services',         -- Услуги
     'activity',         -- Активности (legacy)
-    'influencer'        -- Блогер/Инфлюенсер
+    'influencer',       -- Блогер/Инфлюенсер
+    'b2b'               -- B2B
 ));
 
 -- Также обновляем constraint для partner_applications если он существует
@@ -37,7 +38,8 @@ CHECK (category_group IS NULL OR category_group IN (
     'healthcare',
     'services',
     'activity',
-    'influencer'
+    'influencer',
+    'b2b'
 ));
 
 -- Комментарий
