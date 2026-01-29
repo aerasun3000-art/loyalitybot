@@ -1,0 +1,15 @@
+# Cloudflare Worker configuration for Exchange Rates Cron
+# Обновляет курсы валют раз в день
+
+name = "loyalitybot-exchange-rates-cron"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# Cron Triggers - запуск раз в день в 00:00 UTC
+[triggers]
+crons = ["0 0 * * *"]
+
+# Environment variables (set via wrangler secret put)
+# SUPABASE_URL - Supabase project URL
+# SUPABASE_KEY - Supabase API key (service role key for writes)
+# EXCHANGE_RATE_API_KEY - API key for exchange rate service (optional)

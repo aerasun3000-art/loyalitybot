@@ -581,6 +581,116 @@ export const updatePartnerInfo = async (partnerChatId, updateData) => {
 }
 
 /**
+ * Получить настройки реактивации партнёра (Churn Prevention)
+ */
+export const getPartnerReactivationSettings = async (partnerChatId) => {
+  const defaults = {
+    enabled: true,
+    min_days: 7,
+    coefficient: 2.0,
+    cooldown_days: 14,
+    message_template: ''
+  }
+  
+  if (!partnerChatId) return defaults
+  
+  try {
+    const { data, error } = await supabase
+      .from('partners')
+      .select('reactivation_enabled, reactivation_min_days, reactivation_coefficient, reactivation_cooldown_days, reactivation_message_template')
+      .eq('chat_id', partnerChatId)
+      .maybeSingle()
+    
+    if (error) {
+      console.error('Error fetching reactivation settings:', error)
+      return defaults
+    }
+    
+    if (!data) return defaults
+    
+    return {
+      enabled: data.reactivation_enabled ?? defaults.enabled,
+      min_days: data.reactivation_min_days ?? defaults.min_days,
+      coefficient: parseFloat(data.reactivation_coefficient) || defaults.coefficient,
+      cooldown_days: data.reactivation_cooldown_days ?? defaults.cooldown_days,
+      message_template: data.reactivation_message_template ?? defaults.message_template
+    }
+  } catch (err) {
+    console.error('Error in getPartnerReactivationSettings:', err)
+    return defaults
+  }
+}
+
+/**
+ * Обновить настройки реактивации партнёра (Churn Prevention)
+ */
+export const updatePartnerReactivationSettings = async (partnerChatId, settings) => {
+  if (!partnerChatId) {
+    throw new Error('Partner chat ID is required')
+  }
+  
+  const updateData = {}
+  if (settings.enabled !== undefined) updateData.reactivation_enabled = settings.enabled
+  if (settings.min_days !== undefined) updateData.reactivation_min_days = settings.min_days
+  if (settings.coefficient !== undefined) updateData.reactivation_coefficient = settings.coefficient
+  if (settings.cooldown_days !== undefined) updateData.reactivation_cooldown_days = settings.cooldown_days
+  if (settings.message_template !== undefined) updateData.reactivation_message_template = settings.message_template
+  
+  const { data, error } = await supabase
+    .from('partners')
+    .update(updateData)
+    .eq('chat_id', partnerChatId)
+    .select()
+    .single()
+  
+  if (error) {
+    console.error('Error updating reactivation settings:', error)
+    throw error
+  }
+  
+  return data
+}
+
+/**
+ * Получить статистику реактивации партнёра за последние N дней (Churn Prevention)
+ */
+export const getReactivationStats = async (partnerChatId, days = 30) => {
+  const result = { sent: 0, failed: 0, total: 0 }
+  
+  if (!partnerChatId) return result
+  
+  try {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - days)
+    
+    const { data, error } = await supabase
+      .from('reactivation_events')
+      .select('status')
+      .eq('partner_chat_id', partnerChatId)
+      .gte('sent_at', cutoff.toISOString())
+    
+    if (error) {
+      console.error('Error fetching reactivation stats:', error)
+      return result
+    }
+    
+    for (const row of data || []) {
+      result.total++
+      if (row.status === 'sent') {
+        result.sent++
+      } else {
+        result.failed++
+      }
+    }
+    
+    return result
+  } catch (err) {
+    console.error('Error in getReactivationStats:', err)
+    return result
+  }
+}
+
+/**
  * Проверить, является ли пользователь одобренным партнером
  * Логика: 
  * 1. Если партнер есть в таблице partners - он одобрен

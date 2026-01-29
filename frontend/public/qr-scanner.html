@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>QR Scanner</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--tg-theme-bg-color, #1a1a2e);
+      color: var(--tg-theme-text-color, #ffffff);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+    
+    p {
+      font-size: 14px;
+      color: var(--tg-theme-hint-color, #888);
+      margin-bottom: 24px;
+    }
+    
+    .scan-btn {
+      background: var(--tg-theme-button-color, #5288c1);
+      color: var(--tg-theme-button-text-color, #ffffff);
+      border: none;
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      max-width: 300px;
+      margin-bottom: 16px;
+      transition: opacity 0.2s;
+    }
+    
+    .scan-btn:active {
+      opacity: 0.8;
+    }
+    
+    .scan-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .result {
+      margin-top: 24px;
+      padding: 16px;
+      background: var(--tg-theme-secondary-bg-color, #2a2a4a);
+      border-radius: 12px;
+      display: none;
+    }
+    
+    .result.show {
+      display: block;
+    }
+    
+    .result-label {
+      font-size: 12px;
+      color: var(--tg-theme-hint-color, #888);
+      margin-bottom: 8px;
+    }
+    
+    .result-value {
+      font-size: 20px;
+      font-weight: 600;
+      word-break: break-all;
+    }
+    
+    .error {
+      color: #ff6b6b;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+    
+    .manual-input {
+      margin-top: 24px;
+      width: 100%;
+    }
+    
+    .manual-input input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid var(--tg-theme-hint-color, #444);
+      border-radius: 12px;
+      background: var(--tg-theme-secondary-bg-color, #2a2a4a);
+      color: var(--tg-theme-text-color, #fff);
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+    
+    .manual-input input::placeholder {
+      color: var(--tg-theme-hint-color, #888);
+    }
+    
+    .send-btn {
+      background: var(--tg-theme-button-color, #5288c1);
+      color: var(--tg-theme-button-text-color, #ffffff);
+      border: none;
+      padding: 14px 24px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+    }
+    
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 24px 0;
+      color: var(--tg-theme-hint-color, #888);
+      font-size: 14px;
+    }
+    
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--tg-theme-hint-color, #444);
+    }
+    
+    .divider span {
+      padding: 0 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📷 Сканер QR-кода</h1>
+    <p>Отсканируйте QR-код клиента для быстрого ввода ID</p>
+    
+    <button class="scan-btn" id="scanBtn" onclick="startScan()">
+      🔍 Сканировать QR-код
+    </button>
+    
+    <div class="result" id="result">
+      <div class="result-label">ID клиента:</div>
+      <div class="result-value" id="resultValue"></div>
+    </div>
+    
+    <div class="error" id="error"></div>
+    
+    <div class="divider">
+      <span>или</span>
+    </div>
+    
+    <div class="manual-input">
+      <input type="text" id="manualInput" placeholder="Введите ID вручную" inputmode="numeric">
+      <button class="send-btn" onclick="sendManual()">Отправить</button>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    
+    // Initialize Telegram Web App
+    tg.ready();
+    tg.expand();
+    
+    // Get operation type from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const operation = urlParams.get('op') || 'add'; // 'add' or 'sub'
+    
+    function startScan() {
+      const scanBtn = document.getElementById('scanBtn');
+      const errorEl = document.getElementById('error');
+      
+      errorEl.textContent = '';
+      
+      // Check if QR scanner is available
+      if (!tg.showScanQrPopup) {
+        errorEl.textContent = 'QR-сканер недоступен в этой версии Telegram. Используйте ручной ввод.';
+        return;
+      }
+      
+      scanBtn.disabled = true;
+      scanBtn.textContent = '⏳ Открытие камеры...';
+      
+      try {
+        tg.showScanQrPopup({
+          text: 'Наведите камеру на QR-код клиента'
+        }, (data) => {
+          scanBtn.disabled = false;
+          scanBtn.textContent = '🔍 Сканировать QR-код';
+          
+          if (data) {
+            handleQrResult(data);
+            return true; // Close popup
+          }
+          return false; // Keep popup open
+        });
+      } catch (e) {
+        scanBtn.disabled = false;
+        scanBtn.textContent = '🔍 Сканировать QR-код';
+        errorEl.textContent = 'Ошибка открытия сканера: ' + e.message;
+      }
+    }
+    
+    function handleQrResult(data) {
+      const resultEl = document.getElementById('result');
+      const resultValue = document.getElementById('resultValue');
+      const errorEl = document.getElementById('error');
+      
+      console.log('QR data:', data);
+      
+      // Parse QR data - could be:
+      // - Plain chat_id: "123456789"
+      // - CLIENT_ID format: "CLIENT_ID:123456789"
+      // - Full URL: "https://t.me/bot?start=client_123456789"
+      
+      let clientId = null;
+      
+      if (data.startsWith('CLIENT_ID:')) {
+        clientId = data.replace('CLIENT_ID:', '').trim();
+      } else if (data.includes('client_')) {
+        const match = data.match(/client_(\d+)/);
+        if (match) {
+          clientId = match[1];
+        }
+      } else if (/^\d+$/.test(data.trim())) {
+        clientId = data.trim();
+      } else {
+        // Try to extract any number sequence
+        const numbers = data.match(/\d{5,}/);
+        if (numbers) {
+          clientId = numbers[0];
+        }
+      }
+      
+      if (clientId) {
+        resultEl.classList.add('show');
+        resultValue.textContent = clientId;
+        
+        // Send to bot
+        sendClientId(clientId);
+      } else {
+        errorEl.textContent = 'Не удалось распознать ID клиента в QR-коде';
+      }
+    }
+    
+    function sendManual() {
+      const input = document.getElementById('manualInput');
+      const value = input.value.trim();
+      
+      if (!value) {
+        document.getElementById('error').textContent = 'Введите ID клиента';
+        return;
+      }
+      
+      sendClientId(value);
+    }
+    
+    function sendClientId(clientId) {
+      // Send data back to bot
+      tg.sendData(JSON.stringify({
+        action: 'client_id',
+        client_id: clientId,
+        operation: operation
+      }));
+      
+      // Close the Web App
+      tg.close();
+    }
+    
+    // Handle Enter key in input
+    document.getElementById('manualInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendManual();
+      }
+    });
+    
+    // Set main button
+    tg.MainButton.setParams({
+      text: 'Закрыть',
+      is_visible: true
+    });
+    
+    tg.MainButton.onClick(() => {
+      tg.close();
+    });
+  </script>
+</body>
+</html>

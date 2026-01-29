@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { supabase, getPartnerInfo, updatePartnerInfo } from '../services/supabase';
+import { supabase, getPartnerInfo, updatePartnerInfo, getPartnerReactivationSettings, updatePartnerReactivationSettings, getReactivationStats } from '../services/supabase';
 import { formatCurrencySimple } from '../utils/currency';
 import Loader from '../components/Loader';
 import { openTelegramLink } from '../utils/telegram';
@@ -26,6 +26,26 @@ const PartnerAnalytics = () => {
   const [cities] = useState(getPartnerCitiesList());
   const [districts, setDistricts] = useState([]);
   const [serviceCategories] = useState(getAllServiceCategories());
+  
+  // Churn Prevention / Reactivation settings
+  const [reactivationSettings, setReactivationSettings] = useState({
+    enabled: true,
+    min_days: 7,
+    coefficient: 2.0,
+    cooldown_days: 14,
+    message_template: ''
+  });
+  const [reactivationStats, setReactivationStats] = useState({
+    sent: 0,
+    failed: 0,
+    total: 0,
+    returned_clients: 0,
+    return_visits: 0,
+  });
+  const [isEditingReactivation, setIsEditingReactivation] = useState(false);
+  const [reactivationFormData, setReactivationFormData] = useState({});
+  const [savingReactivation, setSavingReactivation] = useState(false);
+  const [reactivationSaveSuccess, setReactivationSaveSuccess] = useState(false);
 
   useEffect(() => {
     if (partnerId) {
@@ -53,6 +73,14 @@ const PartnerAnalytics = () => {
       } else {
         console.warn('[PartnerAnalytics] No partner data found for partnerId:', partnerId);
       }
+      
+      // Загружаем настройки реактивации (Churn Prevention)
+      const reactivationSettingsData = await getPartnerReactivationSettings(partnerId);
+      setReactivationSettings(reactivationSettingsData);
+      
+      // Загружаем статистику реактивации за выбранный период
+      const reactivationStatsData = await getReactivationStats(partnerId, period);
+      setReactivationStats(reactivationStatsData);
       
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - period);
@@ -127,6 +155,51 @@ const PartnerAnalytics = () => {
         if (!promotersError && promoters) {
           totalPromoters = promoters.length;
         }
+      }
+
+      // Эффективность реактивации: возвраты после сообщений
+      try {
+        const { data: reactivationEvents, error: reError } = await supabase
+          .from('reactivation_events')
+          .select('client_chat_id, sent_at, status')
+          .eq('partner_chat_id', partnerId)
+          .gte('sent_at', startDate.toISOString());
+
+        if (!reError && reactivationEvents && reactivationEvents.length > 0) {
+          const lastSentByClient = {};
+          reactivationEvents.forEach(ev => {
+            if (ev.status !== 'sent' || !ev.client_chat_id || !ev.sent_at) return;
+            const cid = ev.client_chat_id;
+            const sentAt = new Date(ev.sent_at);
+            if (!lastSentByClient[cid] || sentAt > lastSentByClient[cid]) {
+              lastSentByClient[cid] = sentAt;
+            }
+          });
+
+          const returnedClientsSet = new Set();
+          let returnVisits = 0;
+          const txs = transactions || [];
+
+          Object.entries(lastSentByClient).forEach(([cid, sentAt]) => {
+            txs.forEach(t => {
+              if (t.client_chat_id === cid && t.date_time) {
+                const txnDate = new Date(t.date_time);
+                if (txnDate > sentAt) {
+                  returnedClientsSet.add(cid);
+                  returnVisits += 1;
+                }
+              }
+            });
+          });
+
+          setReactivationStats(prev => ({
+            ...prev,
+            returned_clients: returnedClientsSet.size,
+            return_visits: returnVisits,
+          }));
+        }
+      } catch (e) {
+        console.error('Ошибка расчёта эффективности реактивации:', e);
       }
 
       // Вычисляем метрики
@@ -857,6 +930,199 @@ const PartnerAnalytics = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Churn Prevention / Реактивация */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              🔄 Авто-реактивация (Churn Prevention)
+            </h2>
+            {!isEditingReactivation && (
+              <button
+                onClick={() => {
+                  setIsEditingReactivation(true);
+                  setReactivationFormData({ ...reactivationSettings });
+                  setReactivationSaveSuccess(false);
+                }}
+                className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors shadow-md hover:shadow-lg font-medium"
+              >
+                ⚙️ Настроить
+              </button>
+            )}
+          </div>
+          
+          {/* Статистика реактивации */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <MetricCard
+              icon="📤"
+              title="Отправлено"
+              value={reactivationStats.sent}
+              subtitle={`За ${period} дней`}
+            />
+            <MetricCard
+              icon="❌"
+              title="Ошибки"
+              value={reactivationStats.failed}
+              subtitle={`За ${period} дней`}
+            />
+            <MetricCard
+              icon="📊"
+              title="Всего попыток"
+              value={reactivationStats.total}
+              subtitle={`За ${period} дней`}
+            />
+          </div>
+          {typeof reactivationStats.returned_clients === 'number' && (
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Клиентов, вернувшихся после реактивации: {reactivationStats.returned_clients} (визитов: {reactivationStats.return_visits || 0})
+            </p>
+          )}
+          
+          {/* Текущие настройки или форма редактирования */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            {!isEditingReactivation ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Статус</label>
+                  <p className="text-gray-900 dark:text-white">
+                    {reactivationSettings.enabled ? '✅ Включено' : '⏸️ Выключено'}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Минимум дней без визита</label>
+                  <p className="text-gray-900 dark:text-white">{reactivationSettings.min_days} дней</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Коэффициент превышения</label>
+                  <p className="text-gray-900 dark:text-white">×{reactivationSettings.coefficient}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Cooldown между сообщениями</label>
+                  <p className="text-gray-900 dark:text-white">{reactivationSettings.cooldown_days} дней</p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Шаблон сообщения</label>
+                  <p className="text-gray-900 dark:text-white whitespace-pre-wrap mt-1">
+                    {reactivationSettings.message_template || 'Используется шаблон по умолчанию'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setSavingReactivation(true);
+                try {
+                  await updatePartnerReactivationSettings(partnerId, reactivationFormData);
+                  setReactivationSettings(reactivationFormData);
+                  setIsEditingReactivation(false);
+                  setReactivationSaveSuccess(true);
+                } catch (err) {
+                  console.error('Error saving reactivation settings:', err);
+                } finally {
+                  setSavingReactivation(false);
+                }
+              }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Авто-реактивация
+                    </label>
+                    <select
+                      value={reactivationFormData.enabled ? 'true' : 'false'}
+                      onChange={(e) => setReactivationFormData({...reactivationFormData, enabled: e.target.value === 'true'})}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="true">✅ Включено</option>
+                      <option value="false">⏸️ Выключено</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Минимум дней без визита
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={reactivationFormData.min_days || ''}
+                      onChange={(e) => setReactivationFormData({...reactivationFormData, min_days: parseInt(e.target.value) || 7})}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Клиент не получит сообщение раньше этого срока</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Коэффициент превышения
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      step="0.1"
+                      value={reactivationFormData.coefficient || ''}
+                      onChange={(e) => setReactivationFormData({...reactivationFormData, coefficient: parseFloat(e.target.value) || 2.0})}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Например, 2.0 = сообщение, если клиент отсутствует в 2 раза дольше обычного</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Cooldown (дней)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={reactivationFormData.cooldown_days || ''}
+                      onChange={(e) => setReactivationFormData({...reactivationFormData, cooldown_days: parseInt(e.target.value) || 14})}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Минимальный интервал между повторными сообщениями одному клиенту</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Шаблон сообщения
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={reactivationFormData.message_template ?? ''}
+                      onChange={(e) => setReactivationFormData({...reactivationFormData, message_template: e.target.value})}
+                      placeholder="Оставьте пустым для шаблона по умолчанию"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Плейсхолдеры: {'{client_name}'}, {'{partner_name}'}, {'{offer_text}'}, {'{partner_contact_link}'}. Поддерживается Markdown.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <button
+                    type="submit"
+                    disabled={savingReactivation}
+                    className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50"
+                  >
+                    {savingReactivation ? 'Сохранение...' : '💾 Сохранить'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingReactivation(false);
+                      setReactivationFormData({});
+                    }}
+                    className="px-6 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </form>
+            )}
+            {reactivationSaveSuccess && !isEditingReactivation && (
+              <div className="mt-4 p-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg">
+                ✅ Настройки реактивации сохранены
+              </div>
+            )}
           </div>
         </div>
 

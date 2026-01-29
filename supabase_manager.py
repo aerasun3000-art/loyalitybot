@@ -440,11 +440,349 @@ class SupabaseManager:
                 "operation_type": transaction_type, 
                 "description": description,
             }
-            self.client.from_(TRANSACTION_TABLE).insert(data).execute()  
+            self.client.from_(TRANSACTION_TABLE).insert(data).execute()
+            # Churn Prevention: обновляем last_visit при реальном визите (accrual/redemption)
+            if transaction_type in ('accrual', 'redemption'):
+                try:
+                    self.client.from_(USER_TABLE).update({'last_visit': data['date_time']}).eq('chat_id', str(client_chat_id)).execute()
+                except Exception as e_visit:
+                    logging.warning(f"Error updating last_visit for client {client_chat_id}: {e_visit}")
             return True
         except Exception as e:
             logging.error(f"Error recording transaction: {e}")
             return False
+
+    def compute_client_visit_stats(self, partner_chat_id: Optional[str] = None, min_visits: int = 2) -> int:
+        """
+        Churn Prevention, шаг 2: считает средний интервал в днях между визитами (accrual/redemption)
+        по парам (client, partner) и записывает в client_visit_stats.
+        :param partner_chat_id: если задан — только этот партнёр; иначе все партнёры
+        :param min_visits: минимум визитов для расчёта интервала (нужно >= 2)
+        :return: число обновлённых пар (client, partner)
+        """
+        if not self.client:
+            return 0
+        try:
+            query = (
+                self.client.from_(TRANSACTION_TABLE)
+                .select("client_chat_id, partner_chat_id, date_time")
+                .in_("operation_type", ["accrual", "redemption"])
+            )
+            if partner_chat_id:
+                query = query.eq("partner_chat_id", str(partner_chat_id))
+            response = query.order("date_time", desc=False).execute()
+            rows = response.data or []
+            # Группируем по (client_chat_id, partner_chat_id), пропускаем без partner
+            groups: Dict[tuple, List[str]] = {}
+            for r in rows:
+                pid = r.get("partner_chat_id")
+                if not pid:
+                    continue
+                key = (str(r["client_chat_id"]), str(pid))
+                if key not in groups:
+                    groups[key] = []
+                dt = r.get("date_time")
+                if dt:
+                    groups[key].append(dt)
+            # Сортируем даты в каждой группе, считаем интервалы
+            to_upsert = []
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            for (cid, pid), dates in groups.items():
+                if len(dates) < min_visits:
+                    continue
+                try:
+                    parsed = sorted([parser.parse(d) for d in dates])
+                except Exception:
+                    continue
+                deltas = []
+                for i in range(len(parsed) - 1):
+                    delta = (parsed[i + 1] - parsed[i]).total_seconds() / 86400.0
+                    if delta >= 0:
+                        deltas.append(delta)
+                if not deltas:
+                    continue
+                avg_days = round(sum(deltas) / len(deltas), 2)
+                last_dt = parsed[-1]
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=datetime.timezone.utc)
+                last_visit_at = last_dt.isoformat()
+                to_upsert.append({
+                    "client_chat_id": cid,
+                    "partner_chat_id": pid,
+                    "visit_count": len(parsed),
+                    "avg_interval_days": avg_days,
+                    "last_visit_at": last_visit_at,
+                    "last_computed_at": now_iso,
+                })
+            if not to_upsert:
+                return 0
+            self.client.from_("client_visit_stats").upsert(to_upsert, on_conflict="client_chat_id,partner_chat_id").execute()
+            return len(to_upsert)
+        except Exception as e:
+            logging.error(f"Error computing client_visit_stats: {e}")
+            return 0
+
+    def get_churn_candidates(
+        self,
+        partner_chat_id: Optional[str] = None,
+        min_days_threshold: int = 7,
+        coefficient_k: float = 2.0,
+        reactivation_cooldown_days: int = 14,
+        use_partner_settings: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """
+        Churn Prevention, шаг 3+5: возвращает список кандидатов на реактивацию.
+        Критерий: (now - last_visit_at) > max(min_days, avg_interval_days * coefficient).
+        Исключаются: пары с недавней реактивацией, партнёры с отключённой реактивацией.
+        Если use_partner_settings=True — использует настройки каждого партнёра вместо глобальных параметров.
+        """
+        if not self.client:
+            return []
+        try:
+            query = self.client.from_("client_visit_stats").select("client_chat_id, partner_chat_id, last_visit_at, avg_interval_days")
+            if partner_chat_id:
+                query = query.eq("partner_chat_id", str(partner_chat_id))
+            response = query.execute()
+            rows = response.data or []
+            now = datetime.datetime.now(datetime.timezone.utc)
+            # Загружаем настройки партнёров
+            partner_settings_map: Dict[str, Dict[str, Any]] = {}
+            if use_partner_settings:
+                partner_ids = list(set(str(r["partner_chat_id"]) for r in rows if r.get("partner_chat_id")))
+                if partner_ids:
+                    settings_resp = self.client.from_("partners").select(
+                        "chat_id, reactivation_enabled, reactivation_min_days, reactivation_coefficient, reactivation_cooldown_days"
+                    ).in_("chat_id", partner_ids).execute()
+                    for p in (settings_resp.data or []):
+                        partner_settings_map[str(p["chat_id"])] = {
+                            "enabled": p.get("reactivation_enabled") if p.get("reactivation_enabled") is not None else True,
+                            "min_days": p.get("reactivation_min_days") if p.get("reactivation_min_days") is not None else min_days_threshold,
+                            "coefficient": float(p.get("reactivation_coefficient")) if p.get("reactivation_coefficient") is not None else coefficient_k,
+                            "cooldown_days": p.get("reactivation_cooldown_days") if p.get("reactivation_cooldown_days") is not None else reactivation_cooldown_days,
+                        }
+            # Собираем cooldown по каждому партнёру (может быть разный cooldown)
+            # Для простоты берём максимальный cooldown и фильтруем по нему, потом уточняем
+            max_cooldown = reactivation_cooldown_days
+            if partner_settings_map:
+                max_cooldown = max(s["cooldown_days"] for s in partner_settings_map.values())
+            cooldown_start = now - datetime.timedelta(days=max_cooldown)
+            cooldown_start_iso = cooldown_start.isoformat()
+            recent = self.client.from_("reactivation_events").select("client_chat_id, partner_chat_id, sent_at").eq("status", "sent").gte("sent_at", cooldown_start_iso).execute()
+            # Для каждой пары сохраняем дату последней отправки
+            last_sent: Dict[tuple, datetime.datetime] = {}
+            for r in (recent.data or []):
+                key = (str(r["client_chat_id"]), str(r["partner_chat_id"]))
+                try:
+                    sent_dt = parser.parse(r["sent_at"])
+                    if sent_dt.tzinfo is None:
+                        sent_dt = sent_dt.replace(tzinfo=datetime.timezone.utc)
+                    if key not in last_sent or sent_dt > last_sent[key]:
+                        last_sent[key] = sent_dt
+                except Exception:
+                    pass
+            candidates = []
+            for r in rows:
+                cid = str(r["client_chat_id"])
+                pid = str(r["partner_chat_id"])
+                # Настройки партнёра
+                ps = partner_settings_map.get(pid, {
+                    "enabled": True,
+                    "min_days": min_days_threshold,
+                    "coefficient": coefficient_k,
+                    "cooldown_days": reactivation_cooldown_days,
+                })
+                if not ps["enabled"]:
+                    continue
+                # Проверка cooldown для этой пары
+                key = (cid, pid)
+                if key in last_sent:
+                    cooldown_end = last_sent[key] + datetime.timedelta(days=ps["cooldown_days"])
+                    if now < cooldown_end:
+                        continue
+                last_at = r.get("last_visit_at")
+                if not last_at:
+                    continue
+                try:
+                    last_dt = parser.parse(last_at)
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=datetime.timezone.utc)
+                except Exception:
+                    continue
+                avg_days = float(r.get("avg_interval_days") or 0)
+                if avg_days <= 0:
+                    continue
+                days_since = (now - last_dt).days
+                threshold = max(ps["min_days"], int(math.ceil(avg_days * ps["coefficient"])))
+                if days_since < threshold:
+                    continue
+                candidates.append({
+                    "client_chat_id": cid,
+                    "partner_chat_id": pid,
+                    "trigger_reason": "churn",
+                    "days_since_last": days_since,
+                    "avg_interval_days": avg_days,
+                })
+            return candidates
+        except Exception as e:
+            logging.error(f"Error get_churn_candidates: {e}")
+            return []
+
+    def get_reactivation_offer_data(self, client_chat_id: str, partner_chat_id: str) -> Dict[str, Any]:
+        """
+        Churn Prevention, шаг 4: собирает данные для персонализированного оффера.
+        Возвращает: client_name, partner_name, partner_contact_link, partner_booking_url, offer_text.
+        """
+        result = {
+            "client_name": "дорогой клиент",
+            "partner_name": "партнёр",
+            "partner_contact_link": "",
+            "partner_booking_url": "",
+            "offer_text": "специальное предложение",
+        }
+        if not self.client:
+            return result
+        try:
+            # Клиент
+            client_resp = self.client.from_(USER_TABLE).select("name").eq("chat_id", str(client_chat_id)).limit(1).execute()
+            if client_resp.data:
+                result["client_name"] = client_resp.data[0].get("name") or result["client_name"]
+            # Партнёр
+            partner_resp = self.client.from_("partners").select("name, company_name, username, contact_link, booking_url, reactivation_message_template").eq("chat_id", str(partner_chat_id)).limit(1).execute()
+            if partner_resp.data:
+                p = partner_resp.data[0]
+                result["partner_name"] = p.get("company_name") or p.get("name") or result["partner_name"]
+                if p.get("reactivation_message_template"):
+                    result["message_template"] = p["reactivation_message_template"]
+                username = p.get("username")
+                contact_link = p.get("contact_link")
+                booking_url = p.get("booking_url")
+                if booking_url:
+                    result["partner_booking_url"] = booking_url
+                    result["partner_contact_link"] = booking_url
+                elif contact_link:
+                    result["partner_contact_link"] = contact_link
+                elif username:
+                    result["partner_contact_link"] = f"https://t.me/{username.lstrip('@')}"
+            # Активные акции
+            today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+            promo_resp = self.client.from_("promotions").select("title, description").eq("partner_chat_id", str(partner_chat_id)).eq("is_active", True).gte("end_date", today).limit(1).execute()
+            if promo_resp.data:
+                promo = promo_resp.data[0]
+                result["offer_text"] = promo.get("title") or promo.get("description") or result["offer_text"]
+            else:
+                # Если нет акций — берём первую услугу
+                svc_resp = self.client.from_("services").select("title").eq("partner_chat_id", str(partner_chat_id)).eq("is_active", True).limit(1).execute()
+                if svc_resp.data:
+                    result["offer_text"] = svc_resp.data[0].get("title") or result["offer_text"]
+        except Exception as e:
+            logging.error(f"Error get_reactivation_offer_data: {e}")
+        return result
+
+    def log_reactivation_event(
+        self,
+        client_chat_id: str,
+        partner_chat_id: str,
+        status: str,
+        trigger_reason: str,
+        message_text: Optional[str] = None,
+        error_message: Optional[str] = None,
+    ) -> bool:
+        """Записывает событие реактивации в reactivation_events."""
+        if not self.client:
+            return False
+        try:
+            data = {
+                "client_chat_id": str(client_chat_id),
+                "partner_chat_id": str(partner_chat_id),
+                "sent_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "status": status,
+                "trigger_reason": trigger_reason,
+                "message_text_snapshot": (message_text[:2000] if message_text else None),
+                "error_message": error_message,
+            }
+            self.client.from_("reactivation_events").insert(data).execute()
+            return True
+        except Exception as e:
+            logging.error(f"Error log_reactivation_event: {e}")
+            return False
+
+    def get_partner_reactivation_settings(self, partner_chat_id: str) -> Dict[str, Any]:
+        """
+        Churn Prevention, шаг 5: возвращает настройки реактивации партнёра.
+        Если партнёр не найден или поля не заданы — возвращает дефолты.
+        """
+        defaults = {
+            "enabled": True,
+            "min_days": 7,
+            "coefficient": 2.0,
+            "cooldown_days": 14,
+        }
+        if not self.client:
+            return defaults
+        try:
+            resp = self.client.from_("partners").select(
+                "reactivation_enabled, reactivation_min_days, reactivation_coefficient, reactivation_cooldown_days"
+            ).eq("chat_id", str(partner_chat_id)).limit(1).execute()
+            if resp.data:
+                p = resp.data[0]
+                return {
+                    "enabled": p.get("reactivation_enabled") if p.get("reactivation_enabled") is not None else defaults["enabled"],
+                    "min_days": p.get("reactivation_min_days") if p.get("reactivation_min_days") is not None else defaults["min_days"],
+                    "coefficient": float(p.get("reactivation_coefficient")) if p.get("reactivation_coefficient") is not None else defaults["coefficient"],
+                    "cooldown_days": p.get("reactivation_cooldown_days") if p.get("reactivation_cooldown_days") is not None else defaults["cooldown_days"],
+                }
+        except Exception as e:
+            logging.error(f"Error get_partner_reactivation_settings: {e}")
+        return defaults
+
+    def update_partner_reactivation_settings(
+        self,
+        partner_chat_id: str,
+        enabled: Optional[bool] = None,
+        min_days: Optional[int] = None,
+        coefficient: Optional[float] = None,
+        cooldown_days: Optional[int] = None,
+    ) -> bool:
+        """Обновляет настройки реактивации партнёра."""
+        if not self.client:
+            return False
+        try:
+            update_data = {}
+            if enabled is not None:
+                update_data["reactivation_enabled"] = enabled
+            if min_days is not None:
+                update_data["reactivation_min_days"] = min_days
+            if coefficient is not None:
+                update_data["reactivation_coefficient"] = coefficient
+            if cooldown_days is not None:
+                update_data["reactivation_cooldown_days"] = cooldown_days
+            if not update_data:
+                return True
+            self.client.from_("partners").update(update_data).eq("chat_id", str(partner_chat_id)).execute()
+            return True
+        except Exception as e:
+            logging.error(f"Error update_partner_reactivation_settings: {e}")
+            return False
+
+    def get_reactivation_stats(self, partner_chat_id: str, days: int = 30) -> Dict[str, int]:
+        """
+        Возвращает статистику реактиваций партнёра за последние N дней.
+        """
+        result = {"sent": 0, "failed": 0, "total": 0}
+        if not self.client:
+            return result
+        try:
+            cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)).isoformat()
+            resp = self.client.from_("reactivation_events").select("status").eq("partner_chat_id", str(partner_chat_id)).gte("sent_at", cutoff).execute()
+            for r in (resp.data or []):
+                result["total"] += 1
+                if r.get("status") == "sent":
+                    result["sent"] += 1
+                else:
+                    result["failed"] += 1
+        except Exception as e:
+            logging.error(f"Error get_reactivation_stats: {e}")
+        return result
 
     def execute_transaction(self, client_chat_id: int, partner_chat_id: int, txn_type: str, raw_amount: float, allow_queue: bool = True) -> dict:
         """Выполняет атомарное начисление или списание баллов."""
