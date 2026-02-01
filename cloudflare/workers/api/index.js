@@ -7,6 +7,55 @@ import { supabaseRequest } from './supabase.js';
 import { logError } from './common.js';
 
 /**
+ * Generate unique referral code (6 chars), check uniqueness in DB
+ */
+async function generateReferralCode(env, chatId) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const base = `${chatId}_${Date.now()}_${attempt}_${Math.random()}`;
+    const enc = new TextEncoder().encode(base);
+    const hash = await crypto.subtle.digest('SHA-256', enc);
+    const hex = Array.from(new Uint8Array(hash))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+      .slice(0, 6)
+      .toUpperCase();
+    try {
+      const existing = await supabaseRequest(env, `users?referral_code=eq.${encodeURIComponent(hex)}&select=chat_id`);
+      if (!existing || existing.length === 0) return hex;
+    } catch (_) {
+      return hex;
+    }
+  }
+  return 'REF' + String(chatId).slice(-6).replace(/-/g, '').toUpperCase();
+}
+
+/**
+ * Get or create referral code for user (for web app link)
+ */
+async function getOrCreateReferralCode(env, chatId) {
+  try {
+    const userRows = await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(chatId)}&select=referral_code`);
+    if (userRows && userRows.length > 0 && userRows[0].referral_code) {
+      return userRows[0].referral_code;
+    }
+    const code = await generateReferralCode(env, chatId);
+    await fetch(`${env.SUPABASE_URL}/rest/v1/users?chat_id=eq.${encodeURIComponent(chatId)}`, {
+      method: 'PATCH',
+      headers: {
+        apikey: env.SUPABASE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ referral_code: code }),
+    });
+    return code;
+  } catch (error) {
+    logError('getOrCreateReferralCode', error, { chatId });
+    return null;
+  }
+}
+
+/**
  * Get client balance
  */
 async function getClientBalance(env, clientChatId) {
@@ -841,6 +890,17 @@ export default {
         const city = urlParams.get('city') || 'New York';
         const result = await getDistrictAvailability(env, city);
         return jsonResponse(result);
+      }
+      
+      // Get or create referral code: GET /api/referral-code/:chat_id
+      const referralCodeMatch = path.match(/^\/api\/referral-code\/([^/]+)$/);
+      if (referralCodeMatch && request.method === 'GET') {
+        const chatId = referralCodeMatch[1];
+        const code = await getOrCreateReferralCode(env, chatId);
+        if (!code) {
+          return jsonResponse({ error: 'Не удалось получить или создать реферальный код' }, 400);
+        }
+        return jsonResponse({ referral_code: code });
       }
       
       // 404 for unknown routes
