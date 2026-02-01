@@ -113,6 +113,15 @@ except ValueError:
 USER_STATE = {}
 TEMP_DATA = {}
 
+def get_client_bot_username():
+    """Username клиентского бота для реферальных ссылок."""
+    if client_bot:
+        try:
+            return client_bot.get_me().username or os.environ.get("CLIENT_BOT_USERNAME", "mindbeatybot")
+        except Exception:
+            pass
+    return os.environ.get("CLIENT_BOT_USERNAME", "mindbeatybot")
+
 
 # --- УВЕДОМЛЕНИЕ ДЛЯ КЛИЕНТСКОГО БОТА (имитация) ---
 try:
@@ -535,14 +544,15 @@ def handle_invite_start(message):
         bot.send_message(chat_id, "У вас нет прав для выполнения этой операции.")
         return
 
-    # Меню с реферальной ссылкой
+    # Меню с реферальной ссылкой и рассылкой
     markup = types.InlineKeyboardMarkup(row_width=1)
     btn_link = types.InlineKeyboardButton("🔗 Получить реферальную ссылку", callback_data="invite_by_link")
-    markup.add(btn_link)
+    btn_broadcast = types.InlineKeyboardButton("📢 Разослать всем моим клиентам", callback_data="invite_broadcast_start")
+    markup.add(btn_link, btn_broadcast)
 
     bot.send_message(
         chat_id,
-        "Получите реферальную ссылку для приглашения клиентов:",
+        "Получите реферальную ссылку для приглашения клиентов или разошлите сообщение о программе лояльности своей базе:",
         reply_markup=markup
     )
 
@@ -556,15 +566,19 @@ def handle_invite_callbacks(call):
 
     if call.data == 'invite_by_link':
         partner_id = str(chat_id)
-        # Ссылка на клиентский бот @mindbeatybot
-        link = f"https://t.me/mindbeatybot?start=partner_{partner_id}"
+        client_username = get_client_bot_username()
+        ref_code = (sm.get_or_create_referral_code(partner_id) if sm else None) or partner_id
+        if ref_code == partner_id and sm:
+            logger.warning(f"[referral] Partner {partner_id}: referral_code отсутствует, используется fallback ref_{partner_id}")
+        link = f"https://t.me/{client_username}?start=ref_{ref_code}"
         
         # Создаем кнопки для действий со ссылкой
         markup = types.InlineKeyboardMarkup(row_width=1)
         btn_copy = types.InlineKeyboardButton("📋 Копировать ссылку", callback_data="invite_copy_link")
         btn_send = types.InlineKeyboardButton("📤 Отправить клиенту", callback_data="invite_send_to_client")
         btn_qr = types.InlineKeyboardButton("📱 Получить QR-код", callback_data="invite_get_qr")
-        markup.add(btn_copy, btn_send, btn_qr)
+        btn_promo = types.InlineKeyboardButton("📥 Скачать промо (QR)", callback_data="invite_download_promo")
+        markup.add(btn_copy, btn_send, btn_qr, btn_promo)
         
         bot.send_message(
             chat_id,
@@ -575,7 +589,8 @@ def handle_invite_callbacks(call):
         
     elif call.data == 'invite_copy_link':
         partner_id = str(chat_id)
-        link = f"https://t.me/mindbeatybot?start=partner_{partner_id}"
+        ref_code = (sm.get_or_create_referral_code(partner_id) if sm else None) or partner_id
+        link = f"https://t.me/{get_client_bot_username()}?start=ref_{ref_code}"
         # Отправляем ссылку как текст для копирования
         bot.send_message(
             chat_id,
@@ -598,7 +613,8 @@ def handle_invite_callbacks(call):
         
     elif call.data == 'invite_get_qr':
         partner_id = str(chat_id)
-        link = f"https://t.me/mindbeatybot?start=partner_{partner_id}"
+        ref_code = (sm.get_or_create_referral_code(partner_id) if sm else None) or partner_id
+        link = f"https://t.me/{get_client_bot_username()}?start=ref_{ref_code}"
         
         try:
             # Генерируем QR-код
@@ -622,8 +638,104 @@ def handle_invite_callbacks(call):
             log_exception(logger, e, f"Ошибка генерации QR-кода для партнера {chat_id}")
             bot.answer_callback_query(call.id, "Ошибка при генерации QR-кода")
             bot.send_message(chat_id, "❌ Произошла ошибка при генерации QR-кода. Попробуйте позже.")
-        
 
+    elif call.data == 'invite_download_promo':
+        partner_id = str(chat_id)
+        ref_code = (sm.get_or_create_referral_code(partner_id) if sm else None) or partner_id
+        link = f"https://t.me/{get_client_bot_username()}?start=ref_{ref_code}"
+        try:
+            qr_image = generate_qr_code(link)
+            bot.send_photo(
+                chat_id,
+                qr_image,
+                caption=(
+                    "📥 *Промо-материал*\n\n"
+                    "Сохраните изображение и используйте в соцсетях, на визитках или на стойке ресепшена.\n\n"
+                    f"🔗 Ссылка: `{link}`"
+                ),
+                parse_mode='Markdown'
+            )
+            bot.answer_callback_query(call.id, "Промо отправлено")
+        except Exception as e:
+            log_exception(logger, e, f"Ошибка генерации промо QR для партнера {chat_id}")
+            bot.answer_callback_query(call.id, "Ошибка")
+            bot.send_message(chat_id, "❌ Не удалось сгенерировать промо. Попробуйте позже.")
+
+    elif call.data == 'invite_broadcast_start':
+        partner_id = str(chat_id)
+        if not sm.can_partner_run_broadcast(partner_id):
+            bot.send_message(chat_id, "⚠️ Рассылка возможна не чаще одного раза в сутки. Попробуйте завтра.")
+            bot.answer_callback_query(call.id)
+            return
+        recipient_ids = sm.get_partner_client_chat_ids_for_broadcast(partner_id, limit=500)
+        if not recipient_ids:
+            bot.send_message(chat_id, "У вас пока нет активированных клиентов для рассылки. Сначала пригласите клиентов по реферальной ссылке.")
+            bot.answer_callback_query(call.id)
+            return
+        ref_code = (sm.get_or_create_referral_code(partner_id) if sm else None) or partner_id
+        ref_link = f"https://t.me/{get_client_bot_username()}?start=ref_{ref_code}"
+        partner_name = "Специалист"
+        try:
+            pr = sm.client.from_('partners').select('name, company_name').eq('chat_id', partner_id).single().execute()
+            if pr.data:
+                partner_name = pr.data.get('company_name') or pr.data.get('name') or partner_name
+        except Exception:
+            pass
+        template_text = (
+            f"👋 Здравствуйте!\n\n"
+            f"{partner_name} приглашает вас в программу лояльности.\n\n"
+            f"Теперь вы можете получать вознаграждение за рекомендации на постоянной основе — "
+            f"для этого нужна ваша реферальная ссылка и индивидуальный регламент B2B deals.\n\n"
+            f"Перейдите по ссылке и получите приветственные баллы:\n{ref_link}"
+        )
+        TEMP_DATA[chat_id] = {'broadcast_recipients': recipient_ids, 'broadcast_template': template_text, 'broadcast_partner_id': partner_id}
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(types.InlineKeyboardButton("✅ Разослать", callback_data="invite_broadcast_confirm"))
+        markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data="invite_broadcast_cancel"))
+        bot.send_message(
+            chat_id,
+            f"📢 *Рассылка по вашей базе*\n\nПолучателей: *{len(recipient_ids)}*\n\n*Предпросмотр сообщения:*\n\n{template_text[:400]}{'...' if len(template_text) > 400 else ''}",
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    elif call.data == 'invite_broadcast_confirm':
+        partner_id = str(chat_id)
+        data = TEMP_DATA.get(chat_id, {})
+        recipient_ids = data.get('broadcast_recipients', [])
+        template_text = data.get('broadcast_template', '')
+        if not recipient_ids or not template_text:
+            bot.send_message(chat_id, "❌ Данные рассылки устарели. Начните заново: «👥 Пригласить клиента» → «Разослать всем».")
+            bot.answer_callback_query(call.id)
+            return
+        campaign_id = sm.create_broadcast_campaign(partner_id, 'referral_program', len(recipient_ids))
+        if not campaign_id:
+            bot.send_message(chat_id, "❌ Не удалось создать кампанию. Попробуйте позже.")
+            bot.answer_callback_query(call.id)
+            return
+        bot.send_message(chat_id, f"📤 Отправка сообщений {len(recipient_ids)} клиентам… Не закрывайте бота.")
+        bot.answer_callback_query(call.id)
+        sent = 0
+        err_msg = None
+        for cid in recipient_ids:
+            try:
+                if client_bot:
+                    client_bot.send_message(int(cid), template_text)
+                sent += 1
+                time.sleep(0.05)
+            except Exception as e:
+                logger.warning(f"Broadcast to {cid} failed: {e}")
+                if not err_msg:
+                    err_msg = str(e)[:200]
+        sm.update_broadcast_campaign_finished(campaign_id, sent, 'completed', err_msg)
+        TEMP_DATA.pop(chat_id, None)
+        bot.send_message(chat_id, f"✅ Рассылка завершена. Отправлено: *{sent}* из {len(recipient_ids)}.", parse_mode='Markdown')
+
+    elif call.data == 'invite_broadcast_cancel':
+        TEMP_DATA.pop(chat_id, None)
+        bot.send_message(chat_id, "Рассылка отменена.")
+        bot.answer_callback_query(call.id)
 
 
 # ------------------------------------
@@ -1388,8 +1500,12 @@ def process_send_invite_to_client(message):
         partner_main_menu(chat_id)
         return
     
-    # Формируем реферальную ссылку
-    link = f"https://t.me/mindbeatybot?start=partner_{partner_id}"
+    # Формируем реферальную ссылку (единый формат ref_)
+    ref_code = (sm.get_or_create_referral_code(partner_id) if sm else None) or partner_id
+    if ref_code == partner_id and sm:
+        logger.warning(f"[referral] Partner {partner_id}: referral_code отсутствует, fallback ref_{partner_id}")
+    client_username = get_client_bot_username()
+    link = f"https://t.me/{client_username}?start=ref_{ref_code}"
     
     try:
         # Создаем кнопку с прямой ссылкой для клиента
@@ -1424,8 +1540,8 @@ def process_send_invite_to_client(message):
             bot.send_message(
                 chat_id,
                 f"❌ **Не удалось отправить сообщение клиенту**\n\n"
-                f"Клиент с Chat ID `{client_id_input}` не начал диалог с ботом @mindbeatybot.\n\n"
-                f"💡 *Попросите клиента сначала написать боту @mindbeatybot, а затем попробуйте снова.*",
+                f"Клиент с Chat ID `{client_id_input}` не начал диалог с клиентским ботом.\n\n"
+                f"💡 *Попросите клиента сначала написать боту @{get_client_bot_username()}, а затем попробуйте снова.*",
                 parse_mode='Markdown'
             )
         elif e.error_code == 400:
@@ -4303,32 +4419,26 @@ def show_incoming_deals(chat_id):
     try:
         # Получаем входящие сделки (где target = текущий партнер)
         deals = sm.client.from_('partner_deals').select('*').eq('target_partner_chat_id', str(chat_id)).eq('status', 'pending').execute()
-        
+
         if not deals.data or len(deals.data) == 0:
             bot.send_message(chat_id, "📭 У вас нет входящих предложений.")
             return
-        
+
         for deal in deals.data:
             source_id = deal.get('source_partner_chat_id')
             cashback = deal.get('client_cashback_percent', 5)
             commission = deal.get('referral_commission_percent', 10)
-            
+
             # Получаем имя партнера-источника
             partner_info = sm.client.from_('partners').select('name, company_name').eq('chat_id', source_id).single().execute()
             partner_name = partner_info.data.get('company_name') or partner_info.data.get('name') if partner_info.data else f"Партнер {source_id}"
-            
-            markup = types.InlineKeyboardMarkup(row_width=2)
-            btn_accept = types.InlineKeyboardButton("✅ Принять", callback_data=f"deal_accept_{deal['id']}")
-            btn_reject = types.InlineKeyboardButton("❌ Отклонить", callback_data=f"deal_reject_{deal['id']}")
-            markup.add(btn_accept, btn_reject)
-            
+
             bot.send_message(chat_id,
                 f"📥 *Входящее предложение*\n\n"
                 f"От: {partner_name}\n"
                 f"Кэшбэк клиентам: {cashback}%\n"
                 f"Ваша комиссия: {commission}%\n\n"
-                f"Принять предложение?",
-                reply_markup=markup,
+                f"Сделка ожидает одобрения администратора и пока не активна.",
                 parse_mode='Markdown'
             )
     except Exception as e:
@@ -4338,26 +4448,50 @@ def show_incoming_deals(chat_id):
 def show_my_deals(chat_id):
     """Показывает активные сделки партнера."""
     try:
-        # Получаем сделки, где source = текущий партнер
-        deals = sm.client.from_('partner_deals').select('*').eq('source_partner_chat_id', str(chat_id)).eq('status', 'active').execute()
-        
-        if not deals.data or len(deals.data) == 0:
-            bot.send_message(chat_id, "📋 У вас нет активных сделок.")
+        # Активные сделки, где source = текущий партнер
+        active_deals = sm.client.from_('partner_deals').select('*').eq('source_partner_chat_id', str(chat_id)).eq('status', 'active').execute()
+
+        # Заявки, ожидающие одобрения администратора
+        pending_deals = sm.client.from_('partner_deals').select('*').eq('source_partner_chat_id', str(chat_id)).eq('status', 'pending').execute()
+
+        if (not active_deals.data or len(active_deals.data) == 0) and (not pending_deals.data or len(pending_deals.data) == 0):
+            bot.send_message(chat_id, "📋 У вас нет активных сделок и заявок.")
             return
-        
-        text = "📋 *Ваши активные сделки:*\n\n"
-        for deal in deals.data:
-            target_id = deal.get('target_partner_chat_id')
-            cashback = deal.get('client_cashback_percent', 5)
-            commission = deal.get('referral_commission_percent', 10)
-            
-            partner_info = sm.client.from_('partners').select('name, company_name').eq('chat_id', target_id).single().execute()
-            partner_name = partner_info.data.get('company_name') or partner_info.data.get('name') if partner_info.data else f"Партнер {target_id}"
-            
-            text += f"• {partner_name}\n"
-            text += f"  Кэшбэк: {cashback}% | Комиссия: {commission}%\n\n"
-        
-        bot.send_message(chat_id, text, parse_mode='Markdown')
+
+        text_parts = []
+
+        if pending_deals.data and len(pending_deals.data) > 0:
+            text = "🕒 *Ваши заявки (ожидают одобрения администратора):*\n\n"
+            for deal in pending_deals.data:
+                target_id = deal.get('target_partner_chat_id')
+                cashback = deal.get('client_cashback_percent', 0) * 100
+                commission = deal.get('referral_commission_percent', 0) * 100
+
+                partner_info = sm.client.from_('partners').select('name, company_name').eq('chat_id', target_id).single().execute()
+                partner_name = partner_info.data.get('company_name') or partner_info.data.get('name') if partner_info.data else f"Партнер {target_id}"
+
+                text += f"• {partner_name}\n"
+                text += f"  Кэшбэк: {cashback:.1f}% | Комиссия: {commission:.1f}%\n\n"
+
+            text_parts.append(text)
+
+        if active_deals.data and len(active_deals.data) > 0:
+            text = "📋 *Ваши активные сделки:*\n\n"
+            for deal in active_deals.data:
+                target_id = deal.get('target_partner_chat_id')
+                cashback = deal.get('client_cashback_percent', 0) * 100
+                commission = deal.get('referral_commission_percent', 0) * 100
+
+                partner_info = sm.client.from_('partners').select('name, company_name').eq('chat_id', target_id).single().execute()
+                partner_name = partner_info.data.get('company_name') or partner_info.data.get('name') if partner_info.data else f"Партнер {target_id}"
+
+                text += f"• {partner_name}\n"
+                text += f"  Кэшбэк: {cashback:.1f}% | Комиссия: {commission:.1f}%\n\n"
+
+            text_parts.append(text)
+
+        full_text = "\n".join(text_parts)
+        bot.send_message(chat_id, full_text, parse_mode='Markdown')
     except Exception as e:
         logger.error(f"Ошибка при получении сделок: {e}")
         bot.send_message(chat_id, "❌ Ошибка при загрузке сделок.")
@@ -4424,37 +4558,86 @@ def process_deal_commission(message):
         if commission < 0 or commission > 100:
             bot.send_message(chat_id, "❌ Процент должен быть от 0 до 100.")
             return
-        
+
         data = TEMP_DATA.get(chat_id, {})
         target_id = data.get('deal_target')
         cashback = data.get('deal_cashback')
-        
+
         if not target_id or cashback is None:
             bot.send_message(chat_id, "❌ Ошибка: данные не найдены. Начните заново.")
             USER_STATE.pop(chat_id, None)
             TEMP_DATA.pop(chat_id, None)
             return
-        
-        # Создаем сделку
-        deal = sm.create_partner_deal(
-            source_partner_chat_id=str(chat_id),
-            target_partner_chat_id=str(target_id),
-            client_cashback_percent=cashback,
-            referral_commission_percent=commission
-        )
-        
-        if deal:
-            bot.send_message(chat_id, 
-                f"✅ *Сделка создана!*\n\n"
-                f"Партнер: {target_id}\n"
-                f"Кэшбэк клиентам: {cashback}%\n"
-                f"Комиссия: {commission}%\n\n"
-                f"Ожидайте подтверждения от партнера.",
-                parse_mode='Markdown'
+
+        # Проверяем, нет ли уже активной или ожидающей сделки для этой пары партнеров
+        if not sm.client:
+            bot.send_message(chat_id, "❌ База данных недоступна.")
+            USER_STATE.pop(chat_id, None)
+            TEMP_DATA.pop(chat_id, None)
+            return
+
+        try:
+            existing = sm.client.from_('partner_deals').select('id, status').match({
+                'source_partner_chat_id': str(chat_id),
+                'target_partner_chat_id': str(target_id)
+            }).in_('status', ['pending', 'active']).execute()
+        except Exception as e:
+            logger.error(f"Ошибка при проверке существующих B2B сделок для партнера {chat_id}: {e}")
+            existing = None
+
+        if existing and existing.data and len(existing.data) > 0:
+            bot.send_message(
+                chat_id,
+                "⚠️ У вас уже есть сделка или заявка с этим партнером.\n"
+                "Сначала завершите или измените существующую сделку перед созданием новой."
             )
-        else:
-            bot.send_message(chat_id, "❌ Ошибка при создании сделки.")
-        
+            USER_STATE.pop(chat_id, None)
+            TEMP_DATA.pop(chat_id, None)
+            return
+
+        # Создаем сделку в статусе 'pending' (ожидает одобрения администратора)
+        try:
+            deal_data = {
+                'source_partner_chat_id': str(chat_id),
+                'target_partner_chat_id': str(target_id),
+                # Храним проценты в виде долей (0.10 = 10%)
+                'referral_commission_percent': commission / 100.0,
+                'client_cashback_percent': cashback / 100.0,
+                'status': 'pending'
+            }
+
+            response = sm.client.from_('partner_deals').insert(deal_data).execute()
+
+            if response.data:
+                bot.send_message(chat_id,
+                    f"✅ *Заявка на B2B сделку создана!*\n\n"
+                    f"Партнер: {target_id}\n"
+                    f"Кэшбэк клиентам: {cashback}%\n"
+                    f"Комиссия: {commission}%\n\n"
+                    f"Сделка отправлена на одобрение администратору.\n"
+                    f"После активации условия автоматически начнут применяться к новым транзакциям.",
+                    parse_mode='Markdown'
+                )
+                # Уведомляем целевого партнера о новой заявке
+                try:
+                    bot.send_message(
+                        int(target_id),
+                        "📥 *Новая заявка на B2B сделку*\n\n"
+                        f"Партнер: {chat_id}\n"
+                        f"Предложенный кэшбэк клиентам: {cashback}%\n"
+                        f"Ваша комиссия: {commission}%\n\n"
+                        "Заявка отправлена администратору на одобрение.\n"
+                        "После активации вы увидите сделку в разделе \"🤝 B2B Сделки\".",
+                        parse_mode='Markdown'
+                    )
+                except Exception as notify_err:
+                    logger.warning(f"Не удалось отправить уведомление целевому партнеру {target_id} о заявке: {notify_err}")
+            else:
+                bot.send_message(chat_id, "❌ Ошибка при создании сделки.")
+        except Exception as e:
+            logger.error(f"Ошибка при создании B2B сделки партнером {chat_id}: {e}")
+            bot.send_message(chat_id, "❌ Ошибка при создании сделки. Попробуйте позже или свяжитесь с администратором.")
+
         USER_STATE.pop(chat_id, None)
         TEMP_DATA.pop(chat_id, None)
     except ValueError:

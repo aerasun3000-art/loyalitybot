@@ -67,9 +67,10 @@ if not BASE_DOMAIN:
     BASE_DOMAIN = 'https://your-frontend-domain.com'  # Замените на ваш реальный домен
 
 # Регулярное выражение для парсинга реферальной ссылки
-# Ожидаемый формат: /start partner_<ID> или /start ref_<CODE>
+# Единый формат ref_XXX: клиент (referral_code) или партнёр (chat_id при ref_ только цифры — обратная совместимость)
+# partner_<ID> оставлен для обратной совместимости со старыми ссылками
 REFERRAL_PATTERN = re.compile(r'partner_(\d+)', re.IGNORECASE)
-CLIENT_REFERRAL_PATTERN = re.compile(r'ref_([A-Z0-9]{6})', re.IGNORECASE)
+REF_UNIFIED = re.compile(r'ref_([A-Z0-9]+)', re.IGNORECASE)
 
 # --- ГЛОБАЛЬНОЕ ХРАНИЛИЩЕ ДЛЯ NPS ---
 # Ключ: chat_id клиента (str), Значение: chat_id партнера (str)
@@ -684,19 +685,30 @@ def handle_new_user_start(message):
     
     logger.info(f"Клиент {chat_id} запустил бота с текстом: {text}")
 
-    # --- 1. ПАРСИНГ РЕФЕРАЛЬНОЙ ССЫЛКИ ---
+    # --- 1. ПАРСИНГ РЕФЕРАЛЬНОЙ ССЫЛКИ (единый формат ref_ + обратная совместимость partner_) ---
     partner_id = None
     client_referral_code = None
-    # Ищем совпадение в тексте сообщения, пропуская '/start '
     partner_match = REFERRAL_PATTERN.search(text)
-    client_match = CLIENT_REFERRAL_PATTERN.search(text)
+    ref_match = REF_UNIFIED.search(text)
     
     if partner_match:
         partner_id = partner_match.group(1)
-        logger.info(f"Обнаружен partner_id из реферальной ссылки: {partner_id}")
-    elif client_match:
-        client_referral_code = client_match.group(1).upper()
-        logger.info(f"Обнаружен реферальный код клиента: {client_referral_code}")
+        logger.info(f"Обнаружен partner_id из ссылки partner_: {partner_id}")
+    elif ref_match:
+        ref_payload = ref_match.group(1).upper().strip()
+        inviter_chat_id = sm.get_chat_id_by_referral_code(ref_payload)
+        if inviter_chat_id and sm.is_approved_partner(inviter_chat_id):
+            partner_id = inviter_chat_id
+            logger.info(f"Обнаружен одобренный партнёр по ref_ (referral_code → chat_id): {partner_id}")
+        elif inviter_chat_id:
+            client_referral_code = ref_payload
+            logger.info(f"Обнаружен реферальный код клиента: {client_referral_code}")
+        elif ref_payload.isdigit():
+            partner_id = ref_payload
+            logger.info(f"Обнаружен partner_id по ref_ (обратная совместимость): {partner_id}")
+        else:
+            client_referral_code = ref_payload
+            logger.info(f"Обнаружен реферальный код клиента: {client_referral_code}")
 
     try:
         client_exists = sm.client_exists(chat_id)

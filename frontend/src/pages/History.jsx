@@ -21,6 +21,7 @@ const History = () => {
   const [ratingModal, setRatingModal] = useState({ open: false, transaction: null })
   const [ratingForm, setRatingForm] = useState({ rating: 0, feedback: '' })
   const [ratingSubmitting, setRatingSubmitting] = useState(false)
+  const [ratingError, setRatingError] = useState(null)
 
   useEffect(() => {
     loadTransactions()
@@ -157,12 +158,14 @@ const History = () => {
 
   const closeRatingModal = () => {
     setRatingModal({ open: false, transaction: null })
+    setRatingError(null)
   }
 
   const submitRating = async () => {
     const { transaction } = ratingModal
     if (!transaction || !chatId || !transaction.partner_chat_id || ratingForm.rating < 0 || ratingForm.rating > 10) return
     setRatingSubmitting(true)
+    setRatingError(null)
     try {
       await upsertNpsRating(
         chatId,
@@ -175,6 +178,7 @@ const History = () => {
       closeRatingModal()
     } catch (err) {
       console.error('Error saving NPS rating:', err)
+      setRatingError(err?.message || t('error_something_wrong'))
     } finally {
       setRatingSubmitting(false)
     }
@@ -434,6 +438,9 @@ const History = () => {
                   placeholder={language === 'ru' ? 'По желанию' : 'Optional'}
                 />
               </div>
+              {ratingError && (
+                <p className="text-sm text-red-600" role="alert">{ratingError}</p>
+              )}
               <div className="flex gap-2">
                 <button
                   type="button"

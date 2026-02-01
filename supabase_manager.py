@@ -2103,13 +2103,29 @@ class SupabaseManager:
     # -----------------------------------------------------------------
 
     def partner_exists(self, chat_id: int) -> bool:
-        """Проверяет, существует ли партнер по Chat ID."""
+        """Проверяет, существует ли партнер по Chat ID (любая запись в partner_applications)."""
         if not self.client: return False
         try:
             response = self.client.from_('partner_applications').select('chat_id').eq('chat_id', str(chat_id)).limit(1).execute()
             return bool(response.data)
         except Exception as e:
             logging.error(f"Error checking partner existence: {e}")
+            return False
+
+    def is_approved_partner(self, chat_id) -> bool:
+        """Проверяет, является ли пользователь одобренным партнёром (partners или status=Approved)."""
+        if not self.client: return False
+        try:
+            r = self.client.from_('partners').select('chat_id').eq('chat_id', str(chat_id)).limit(1).execute()
+            if r.data:
+                return True
+            app = self.client.from_('partner_applications').select('status').eq('chat_id', str(chat_id)).limit(1).execute()
+            if app.data:
+                s = (app.data[0].get('status') or '').strip().lower()
+                return s == 'approved'
+            return False
+        except Exception as e:
+            logging.error(f"Error checking approved partner: {e}")
             return False
 
     def get_partner_status(self, chat_id: int) -> str:
@@ -2123,6 +2139,84 @@ class SupabaseManager:
         except Exception as e:
             logging.error(f"Error getting partner status: {e}")
             return 'Unknown'
+
+    def get_partner_client_chat_ids_for_broadcast(self, partner_chat_id: str, limit: int = 500) -> List[str]:
+        """
+        Возвращает chat_id клиентов партнёра, пригодных для рассылки (активированные, не VIA_PARTNER_*).
+        """
+        if not self.client:
+            return []
+        try:
+            response = self.client.from_(USER_TABLE).select('chat_id').eq(
+                PARTNER_ID_COLUMN, str(partner_chat_id)
+            ).limit(limit * 2).execute()
+            chat_ids = []
+            for row in (response.data or []):
+                cid = row.get('chat_id')
+                if not cid:
+                    continue
+                cid_str = str(cid)
+                if cid_str.startswith('VIA_PARTNER_'):
+                    continue
+                try:
+                    int(cid)
+                except (ValueError, TypeError):
+                    continue
+                chat_ids.append(cid_str)
+                if len(chat_ids) >= limit:
+                    break
+            return chat_ids
+        except Exception as e:
+            logging.error(f"Error get_partner_client_chat_ids_for_broadcast: {e}")
+            return []
+
+    def can_partner_run_broadcast(self, partner_chat_id: str, max_per_day: int = 1) -> bool:
+        """Проверяет, может ли партнёр запустить рассылку (лимит 1 раз в сутки)."""
+        if not self.client:
+            return False
+        try:
+            today_start = datetime.datetime.now(datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            response = self.client.from_('partner_broadcast_campaigns').select('id').eq(
+                'partner_chat_id', str(partner_chat_id)
+            ).gte('started_at', today_start.isoformat()).in_('status', ['running', 'completed']).execute()
+            count = len(response.data or [])
+            return count < max_per_day
+        except Exception as e:
+            logging.error(f"Error can_partner_run_broadcast: {e}")
+            return False
+
+    def create_broadcast_campaign(self, partner_chat_id: str, template_id: str, recipient_count: int) -> Optional[int]:
+        """Создаёт запись кампании рассылки, возвращает id."""
+        if not self.client:
+            return None
+        try:
+            r = self.client.from_('partner_broadcast_campaigns').insert({
+                'partner_chat_id': str(partner_chat_id),
+                'template_id': template_id,
+                'recipient_count': recipient_count,
+                'sent_count': 0,
+                'status': 'running'
+            }).execute()
+            if r.data and len(r.data) > 0:
+                return r.data[0].get('id')
+            return None
+        except Exception as e:
+            logging.error(f"Error create_broadcast_campaign: {e}")
+            return None
+
+    def update_broadcast_campaign_finished(self, campaign_id: int, sent_count: int, status: str = 'completed', error_message: Optional[str] = None) -> bool:
+        """Обновляет кампанию по завершении рассылки."""
+        if not self.client:
+            return False
+        try:
+            payload = {'sent_count': sent_count, 'status': status, 'finished_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+            if error_message:
+                payload['error_message'] = error_message
+            self.client.from_('partner_broadcast_campaigns').update(payload).eq('id', campaign_id).execute()
+            return True
+        except Exception as e:
+            logging.error(f"Error update_broadcast_campaign_finished: {e}")
+            return False
 
     def approve_partner(self, chat_id: int) -> bool:
         """Одобряет заявку партнера."""
@@ -2368,7 +2462,8 @@ class SupabaseManager:
         return [
             'nail_care', 'brow_design', 'hair_salon', 'hair_removal',
             'facial_aesthetics', 'lash_services', 'massage_therapy', 'makeup_pmu',
-            'body_wellness', 'nutrition_coaching', 'mindfulness_coaching', 'image_consulting'
+            'body_wellness', 'nutrition_coaching', 'mindfulness_coaching', 'image_consulting',
+            'astrology', 'numerology', 'psychology_coaching', 'meditation_spirituality'
         ]
 
     def get_distinct_cities(self) -> list[str]:
@@ -3778,6 +3873,19 @@ class SupabaseManager:
             logging.error(f"Error getting/creating referral code: {e}")
             return None
 
+    def get_chat_id_by_referral_code(self, referral_code: str) -> Optional[str]:
+        """Возвращает chat_id пользователя по реферальному коду (для единой ссылки ref_: клиент или партнёр)."""
+        if not self.client or not referral_code:
+            return None
+        try:
+            r = self.client.from_(USER_TABLE).select('chat_id').eq('referral_code', referral_code.upper().strip()).limit(1).execute()
+            if r.data and len(r.data) > 0:
+                return str(r.data[0].get('chat_id'))
+            return None
+        except Exception as e:
+            logging.error(f"Error get_chat_id_by_referral_code: {e}")
+            return None
+
     def _create_referral_tree_links(self, new_user_chat_id: str, direct_referrer_chat_id: str):
         """Создаёт связи в referral_tree для всех уровней (до 3 уровней вверх)."""
         if not self.client:
@@ -3956,6 +4064,17 @@ class SupabaseManager:
             logging.error(f"Error getting partner data for calculator: {e}")
             return None
 
+    def get_influencer_partner_chat_ids(self) -> set:
+        """Возвращает множество chat_id партнёров с category_group = 'influencer' (блогеры)."""
+        if not self.client:
+            return set()
+        try:
+            response = self.client.from_('partners').select('chat_id').eq('category_group', 'influencer').execute()
+            return {str(r['chat_id']) for r in (response.data or []) if r.get('chat_id')}
+        except Exception as e:
+            logging.error(f"Error get_influencer_partner_chat_ids: {e}")
+            return set()
+
     def _get_active_b2b_deals_for_calculator(self) -> List[B2BDeal]:
         """Получает список активных B2B сделок для калькулятора."""
         if not self.client or not REFERRAL_CALCULATOR_AVAILABLE:
@@ -4003,15 +4122,17 @@ class SupabaseManager:
                     continue
                 visited.add(current_id)
                 
-                # Получаем данные пользователя
+                # Получаем данные пользователя (referral_source = партнёр, пригласивший клиента)
                 user_data = self.client.from_(USER_TABLE).select(
-                    'chat_id, referred_by_chat_id, commission_balance'
+                    f'chat_id, referred_by_chat_id, {PARTNER_ID_COLUMN}, commission_balance'
                 ).eq('chat_id', str(current_id)).limit(1).execute()
                 
                 if user_data.data:
                     user_row = user_data.data[0]
                     user_id = str(user_row['chat_id'])
                     referrer_id = user_row.get('referred_by_chat_id')
+                    if not referrer_id and user_row.get(PARTNER_ID_COLUMN):
+                        referrer_id = user_row.get(PARTNER_ID_COLUMN)
                     
                     users_dict[user_id] = CalcUser(
                         id=user_id,
@@ -4167,9 +4288,10 @@ class SupabaseManager:
                 
                 deals = self._get_active_b2b_deals_for_calculator()
                 seller_data = self._get_partner_data_for_calculator(seller_partner_id)
+                influencer_ids = self.get_influencer_partner_chat_ids()
                 
-                # Создаем калькулятор
-                calculator = ReferralCalculator(users_dict, deals)
+                # Создаем калькулятор (с поддержкой режима блогер/инфлюенсер)
+                calculator = ReferralCalculator(users_dict, deals, partner_influencer_ids=influencer_ids)
                 
                 # Рассчитываем комиссии (используем USD сумму)
                 purchase = PurchaseInput(
@@ -5746,3 +5868,328 @@ class SupabaseManager:
         # Для минимизации изменений в огромном файле, я предложу заменить тело execute_transaction
         pass
 
+    # -------------------------------------------------------------------------
+    # Платформенные продукты (кросс-абонементы)
+    # -------------------------------------------------------------------------
+
+    def get_platform_products_list(self, city: Optional[str] = None, active_only: bool = True) -> List[dict]:
+        """Список продуктов платформы. По city — фильтр по городу (None = все)."""
+        if not self.client:
+            return []
+        try:
+            q = self.client.from_('platform_products').select('*')
+            if active_only:
+                q = q.eq('is_active', True)
+            if city is not None:
+                q = q.eq('city', city)
+            r = q.order('id').execute()
+            return list(r.data) if r.data else []
+        except Exception as e:
+            logging.error(f"get_platform_products_list: {e}")
+            return []
+
+    def get_platform_product(self, product_id: int) -> Optional[dict]:
+        """Один продукт по id."""
+        if not self.client:
+            return None
+        try:
+            r = self.client.from_('platform_products').select('*').eq('id', product_id).limit(1).execute()
+            return r.data[0] if r.data else None
+        except Exception as e:
+            logging.error(f"get_platform_product: {e}")
+            return None
+
+    def get_platform_product_partners(self, product_id: int, active_only: bool = True) -> List[dict]:
+        """Партнёры, входящие в продукт (с payout_per_visit и лимитами)."""
+        if not self.client:
+            return []
+        try:
+            q = self.client.from_('platform_product_partners').select('*').eq('product_id', product_id)
+            if active_only:
+                q = q.eq('is_active', True)
+            r = q.execute()
+            return list(r.data) if r.data else []
+        except Exception as e:
+            logging.error(f"get_platform_product_partners: {e}")
+            return []
+
+    def check_platform_product_visit_allowed(
+        self,
+        client_chat_id: str,
+        partner_chat_id: str,
+        product_id: int,
+    ) -> dict:
+        """
+        Проверяет, может ли клиент пройти к партнёру по продукту (кросс-абонемент).
+        Returns: {
+            'allowed': bool,
+            'subscription': dict | None,
+            'error': str (если not allowed)
+        }
+        """
+        if not self.client:
+            return {"allowed": False, "subscription": None, "error": "DB is not initialized."}
+        try:
+            now = datetime.datetime.now(datetime.timezone.utc)
+            # Активная подписка по этому продукту у клиента
+            sub_r = (
+                self.client.from_('client_product_subscriptions')
+                .select('*')
+                .eq('client_chat_id', str(client_chat_id))
+                .eq('product_id', product_id)
+                .eq('status', 'active')
+                .gte('valid_until', now.isoformat())
+                .order('valid_until', desc=True)
+                .limit(1)
+                .execute()
+            )
+            if not sub_r.data:
+                return {"allowed": False, "subscription": None, "error": "Нет активного абонемента по этому продукту."}
+            sub = sub_r.data[0]
+            # Партнёр входит в продукт
+            pp_r = (
+                self.client.from_('platform_product_partners')
+                .select('*')
+                .eq('product_id', product_id)
+                .eq('partner_chat_id', str(partner_chat_id))
+                .eq('is_active', True)
+                .limit(1)
+                .execute()
+            )
+            if not pp_r.data:
+                return {"allowed": False, "subscription": sub, "error": "Эта студия не входит в ваш абонемент."}
+            pp = pp_r.data[0]
+            product = self.get_platform_product(product_id)
+            if not product:
+                return {"allowed": False, "subscription": sub, "error": "Продукт не найден."}
+            # Лимит общих визитов по подписке
+            max_total = product.get('max_visits_total')
+            if max_total is not None and sub.get('visits_total_used', 0) >= max_total:
+                return {"allowed": False, "subscription": sub, "error": "Исчерпан лимит визитов по абонементу."}
+            # Лимит визитов к этому партнёру по подписке
+            limit_per_partner = pp.get('visit_limit_per_client')
+            if limit_per_partner is not None:
+                count_r = (
+                    self.client.from_('product_visits')
+                    .select('id')
+                    .eq('subscription_id', sub['id'])
+                    .eq('partner_chat_id', str(partner_chat_id))
+                    .eq('status', 'confirmed')
+                    .execute()
+                )
+                count = len(count_r.data or [])
+                if count >= limit_per_partner:
+                    return {"allowed": False, "subscription": sub, "error": f"Лимит визитов в эту студию ({limit_per_partner}) исчерпан."}
+            return {"allowed": True, "subscription": sub, "error": None}
+        except Exception as e:
+            logging.error(f"check_platform_product_visit_allowed: {e}", exc_info=True)
+            return {"allowed": False, "subscription": None, "error": str(e)}
+
+    def record_platform_product_visit(
+        self,
+        client_chat_id: str,
+        partner_chat_id: str,
+        product_id: int,
+        source: str = 'bot_manual',
+    ) -> dict:
+        """
+        Проверяет право и записывает визит по кросс-абонементу. Начисляет payout в product_visits.
+        Returns: {
+            'success': bool,
+            'visit': dict | None,
+            'error': str (если success=False)
+        }
+        """
+        if not self.client:
+            return {"success": False, "visit": None, "error": "DB is not initialized."}
+        try:
+            check = self.check_platform_product_visit_allowed(client_chat_id, partner_chat_id, product_id)
+            if not check["allowed"]:
+                return {"success": False, "visit": None, "error": check.get("error", "Визит не разрешён.")}
+            sub = check["subscription"]
+            pp_list = self.get_platform_product_partners(product_id)
+            pp = next((p for p in pp_list if str(p.get('partner_chat_id')) == str(partner_chat_id)), None)
+            if not pp:
+                return {"success": False, "visit": None, "error": "Партнёр не найден в продукте."}
+            payout_amount = float(pp.get('payout_per_visit', 0))
+            payout_currency = 'RUB'
+            visit_row = {
+                'subscription_id': sub['id'],
+                'product_id': product_id,
+                'client_chat_id': str(client_chat_id),
+                'partner_chat_id': str(partner_chat_id),
+                'source': source,
+                'status': 'confirmed',
+                'payout_amount': payout_amount,
+                'payout_currency': payout_currency,
+                'payout_status': 'not_processed',
+            }
+            ins = self.client.from_('product_visits').insert(visit_row).execute()
+            if not ins.data:
+                return {"success": False, "visit": None, "error": "Не удалось создать запись визита."}
+            visit = ins.data[0]
+            # Увеличить visits_total_used у подписки
+            new_used = (sub.get('visits_total_used') or 0) + 1
+            self.client.from_('client_product_subscriptions').update({
+                'visits_total_used': new_used,
+            }).eq('id', sub['id']).execute()
+            return {"success": True, "visit": visit, "error": None}
+        except Exception as e:
+            logging.error(f"record_platform_product_visit: {e}", exc_info=True)
+            return {"success": False, "visit": None, "error": str(e)}
+
+    def get_client_active_platform_subscriptions(self, client_chat_id: str) -> List[dict]:
+        """Активные подписки клиента на продукты платформы."""
+        if not self.client:
+            return []
+        try:
+            now = datetime.datetime.now(datetime.timezone.utc)
+            r = (
+                self.client.from_('client_product_subscriptions')
+                .select('*, platform_products(name, description, product_type, duration_days, max_visits_total)')
+                .eq('client_chat_id', str(client_chat_id))
+                .eq('status', 'active')
+                .gte('valid_until', now.isoformat())
+                .order('valid_until')
+                .execute()
+            )
+            return list(r.data) if r.data else []
+        except Exception as e:
+            logging.error(f"get_client_active_platform_subscriptions: {e}")
+            return []
+
+    def create_client_product_subscription(
+        self,
+        client_chat_id: str,
+        product_id: int,
+        purchase_amount: Optional[float] = None,
+        purchase_currency: Optional[str] = None,
+        valid_from: Optional[datetime.datetime] = None,
+        metadata: Optional[dict] = None,
+    ) -> dict:
+        """
+        Создаёт подписку клиента на продукт (после оплаты).
+        valid_from/valid_until считаются по product.duration_days если не переданы.
+        Returns: {'success': bool, 'subscription': dict | None, 'error': str}
+        """
+        if not self.client:
+            return {"success": False, "subscription": None, "error": "DB is not initialized."}
+        try:
+            product = self.get_platform_product(product_id)
+            if not product or not product.get('is_active'):
+                return {"success": False, "subscription": None, "error": "Продукт не найден или неактивен."}
+            now = datetime.datetime.now(datetime.timezone.utc)
+            start = valid_from if valid_from is not None else now
+            if getattr(start, 'tzinfo', None) is None and hasattr(start, 'replace'):
+                start = start.replace(tzinfo=datetime.timezone.utc)
+            duration_days = product.get('duration_days') or 30
+            end = start + datetime.timedelta(days=duration_days)
+            row = {
+                'client_chat_id': str(client_chat_id),
+                'product_id': product_id,
+                'purchase_amount': purchase_amount,
+                'purchase_currency': purchase_currency or product.get('price_currency', 'RUB'),
+                'valid_from': start.isoformat() if hasattr(start, 'isoformat') else str(start),
+                'valid_until': end.isoformat() if hasattr(end, 'isoformat') else str(end),
+                'status': 'active',
+                'visits_total_used': 0,
+                'metadata': metadata or {},
+            }
+            ins = self.client.from_('client_product_subscriptions').insert(row).execute()
+            if not ins.data:
+                return {"success": False, "subscription": None, "error": "Не удалось создать подписку."}
+            return {"success": True, "subscription": ins.data[0], "error": None}
+        except Exception as e:
+            logging.error(f"create_client_product_subscription: {e}", exc_info=True)
+            return {"success": False, "subscription": None, "error": str(e)}
+
+    def get_partner_product_visits_summary(
+        self,
+        partner_chat_id: str,
+        period_start: Optional[datetime.date] = None,
+        period_end: Optional[datetime.date] = None,
+    ) -> dict:
+        """
+        Сводка по визитам и выплатам партнёра за период (для партнёрского кабинета).
+        Returns: {'total_visits': int, 'total_payout': float, 'currency': str, 'visits': list}
+        """
+        if not self.client:
+            return {"total_visits": 0, "total_payout": 0.0, "currency": "RUB", "visits": []}
+        try:
+            q = (
+                self.client.from_('product_visits')
+                .select('*')
+                .eq('partner_chat_id', str(partner_chat_id))
+                .eq('status', 'confirmed')
+            )
+            if period_start:
+                q = q.gte('visited_at', period_start.isoformat())
+            if period_end:
+                q = q.lte('visited_at', period_end.isoformat())
+            r = q.order('visited_at', desc=True).execute()
+            visits = list(r.data) if r.data else []
+            total_payout = sum(float(v.get('payout_amount', 0)) for v in visits)
+            currency = visits[0].get('payout_currency', 'RUB') if visits else 'RUB'
+            return {"total_visits": len(visits), "total_payout": total_payout, "currency": currency, "visits": visits}
+        except Exception as e:
+            logging.error(f"get_partner_product_visits_summary: {e}")
+            return {"total_visits": 0, "total_payout": 0.0, "currency": "RUB", "visits": []}
+
+    def aggregate_platform_product_payouts(
+        self,
+        period_start: datetime.date,
+        period_end: datetime.date,
+    ) -> dict:
+        """
+        Собирает визиты с payout_status='not_processed' за период, создаёт batch и items,
+        обновляет product_visits.payout_batch_id и payout_status.
+        Returns: {'success': bool, 'batch_id': int | None, 'items_count': int, 'error': str}
+        """
+        if not self.client:
+            return {"success": False, "batch_id": None, "items_count": 0, "error": "DB is not initialized."}
+        try:
+            start_iso = period_start.isoformat()
+            end_iso = period_end.isoformat()
+            r = (
+                self.client.from_('product_visits')
+                .select('id, partner_chat_id, payout_amount, payout_currency')
+                .eq('payout_status', 'not_processed')
+                .eq('status', 'confirmed')
+                .gte('visited_at', start_iso)
+                .lte('visited_at', end_iso)
+                .execute()
+            )
+            visits = list(r.data) if r.data else []
+            if not visits:
+                return {"success": True, "batch_id": None, "items_count": 0, "error": None}
+            batch_row = {'period_start': start_iso, 'period_end': end_iso, 'status': 'draft'}
+            batch_ins = self.client.from_('partner_payout_batches').insert(batch_row).execute()
+            if not batch_ins.data:
+                return {"success": False, "batch_id": None, "items_count": 0, "error": "Не удалось создать batch."}
+            batch_id = batch_ins.data[0]['id']
+            by_partner: Dict[str, Dict[str, Any]] = {}
+            for v in visits:
+                pid = str(v['partner_chat_id'])
+                if pid not in by_partner:
+                    by_partner[pid] = {'total_visits': 0, 'total_payout_amount': 0, 'currency': v.get('payout_currency', 'RUB')}
+                by_partner[pid]['total_visits'] += 1
+                by_partner[pid]['total_payout_amount'] += float(v.get('payout_amount', 0))
+            for pid, agg in by_partner.items():
+                self.client.from_('partner_payout_items').insert({
+                    'batch_id': batch_id,
+                    'partner_chat_id': pid,
+                    'total_visits': agg['total_visits'],
+                    'total_payout_amount': round(agg['total_payout_amount'], 2),
+                    'currency': agg['currency'],
+                    'status': 'pending',
+                }).execute()
+            visit_ids = [v['id'] for v in visits]
+            for vid in visit_ids:
+                self.client.from_('product_visits').update({
+                    'payout_status': 'included_in_batch',
+                    'payout_batch_id': batch_id,
+                }).eq('id', vid).execute()
+            return {"success": True, "batch_id": batch_id, "items_count": len(by_partner), "error": None}
+        except Exception as e:
+            logging.error(f"aggregate_platform_product_payouts: {e}", exc_info=True)
+            return {"success": False, "batch_id": None, "items_count": 0, "error": str(e)}

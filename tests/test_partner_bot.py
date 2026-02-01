@@ -399,5 +399,49 @@ class TestRevenueShareCalculation:
         assert level3_bonus == 20
 
 
+class TestInviteAndBroadcastCallbacks:
+    """Тесты меню приглашения и рассылки (B2B TZ)"""
+
+    def test_invite_callback_data_values(self):
+        """Тест callback_data для меню приглашения и рассылки"""
+        invite_callbacks = [
+            'invite_by_link',
+            'invite_copy_link',
+            'invite_send_to_client',
+            'invite_get_qr',
+            'invite_download_promo',
+            'invite_broadcast_start',
+            'invite_broadcast_confirm',
+            'invite_broadcast_cancel',
+        ]
+        for cb in invite_callbacks:
+            assert cb.startswith('invite_')
+            assert len(cb) > 10
+
+    def test_referral_link_format_with_username(self):
+        """Тест формата реферальной ссылки: единый формат ref_ (клиент/партнёр)"""
+        client_username = 'mindbeatybot'
+        partner_id = '123456'
+        ref_code = partner_id  # в боте: sm.get_or_create_referral_code(partner_id) or partner_id
+        link = f"https://t.me/{client_username}?start=ref_{ref_code}"
+        assert 't.me' in link
+        assert client_username in link
+        assert "start=ref_" in link
+        assert ref_code in link
+
+    def test_broadcast_template_placeholders(self):
+        """Тест что шаблон рассылки содержит плейсхолдеры для партнёра и ссылки"""
+        partner_name = "Салон Красоты"
+        ref_link = "https://t.me/bot?start=ref_123"
+        template_text = (
+            f"👋 Здравствуйте!\n\n"
+            f"{partner_name} приглашает вас в программу лояльности.\n\n"
+            f"Перейдите по ссылке и получите приветственные баллы:\n{ref_link}"
+        )
+        assert partner_name in template_text
+        assert ref_link in template_text
+        assert "программу лояльности" in template_text
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

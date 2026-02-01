@@ -149,7 +149,33 @@ class TestPartnerMethods:
         
         result = manager.partner_exists('partner_1')
         assert result is True
-    
+
+    def test_is_approved_partner_true_from_partners(self, manager, mock_supabase):
+        """is_approved_partner: True если запись в таблице partners"""
+        mock_supabase.from_().select().eq().limit().execute.return_value = Mock(data=[{'chat_id': '123'}])
+        assert manager.is_approved_partner('123') is True
+
+    def test_is_approved_partner_true_from_applications_approved(self, manager, mock_supabase):
+        """is_approved_partner: True если в partner_applications status=Approved"""
+        mock_supabase.from_().select().eq().limit().execute.side_effect = [
+            Mock(data=[]),
+            Mock(data=[{'status': 'Approved'}])
+        ]
+        assert manager.is_approved_partner('456') is True
+
+    def test_is_approved_partner_false_pending(self, manager, mock_supabase):
+        """is_approved_partner: False если в partner_applications status не Approved"""
+        mock_supabase.from_().select().eq().limit().execute.side_effect = [
+            Mock(data=[]),
+            Mock(data=[{'status': 'Pending'}])
+        ]
+        assert manager.is_approved_partner('789') is False
+
+    def test_is_approved_partner_false_not_found(self, manager, mock_supabase):
+        """is_approved_partner: False если нет в partners и нет в partner_applications"""
+        mock_supabase.from_().select().eq().limit().execute.return_value = Mock(data=[])
+        assert manager.is_approved_partner('999') is False
+
     def test_get_partner_status(self, manager, mock_supabase):
         """Тест получения статуса партнёра"""
         mock_response = Mock()
@@ -285,6 +311,76 @@ class TestWelcomeBonusConfiguration:
             except ValueError:
                 bonus = 100
             assert bonus == 100
+
+
+class TestPartnerBroadcastAndInfluencer:
+    """Тесты рассылки партнёра и режима блогер/инфлюенсер (B2B TZ)"""
+
+    def test_get_partner_client_chat_ids_for_broadcast_empty(self, manager, mock_supabase):
+        """get_partner_client_chat_ids_for_broadcast: нет клиентов — пустой список"""
+        mock_response = Mock()
+        mock_response.data = []
+        mock_supabase.from_().select().eq().limit().execute.return_value = mock_response
+        result = manager.get_partner_client_chat_ids_for_broadcast('123456')
+        assert result == []
+
+    def test_get_partner_client_chat_ids_for_broadcast_filters_via_partner(self, manager, mock_supabase):
+        """get_partner_client_chat_ids_for_broadcast: отфильтровывает VIA_PARTNER_* и оставляет только числовые chat_id"""
+        mock_response = Mock()
+        mock_response.data = [
+            {'chat_id': '111'},
+            {'chat_id': 'VIA_PARTNER_79991234567'},
+            {'chat_id': '222'},
+        ]
+        mock_supabase.from_().select().eq().limit().execute.return_value = mock_response
+        result = manager.get_partner_client_chat_ids_for_broadcast('123456', limit=500)
+        assert '111' in result
+        assert '222' in result
+        assert 'VIA_PARTNER_79991234567' not in result
+
+    def test_can_partner_run_broadcast_true_when_no_campaigns_today(self, manager, mock_supabase):
+        """can_partner_run_broadcast: True если сегодня рассылок не было"""
+        mock_response = Mock()
+        mock_response.data = []
+        mock_supabase.from_().select().eq().gte().in_().execute.return_value = mock_response
+        result = manager.can_partner_run_broadcast('123456')
+        assert result is True
+
+    def test_can_partner_run_broadcast_false_when_limit_reached(self, manager, mock_supabase):
+        """can_partner_run_broadcast: False если уже была рассылка сегодня"""
+        mock_response = Mock()
+        mock_response.data = [{'id': 1}]
+        mock_supabase.from_().select().eq().gte().in_().execute.return_value = mock_response
+        result = manager.can_partner_run_broadcast('123456', max_per_day=1)
+        assert result is False
+
+    def test_create_broadcast_campaign_returns_id(self, manager, mock_supabase):
+        """create_broadcast_campaign: возвращает id созданной кампании"""
+        mock_response = Mock()
+        mock_response.data = [{'id': 42}]
+        mock_supabase.from_().insert().execute.return_value = mock_response
+        result = manager.create_broadcast_campaign('123456', 'referral_program', 10)
+        assert result == 42
+
+    def test_create_broadcast_campaign_no_client_returns_none(self, manager):
+        """create_broadcast_campaign: без клиента БД возвращает None"""
+        manager.client = None
+        result = manager.create_broadcast_campaign('123456', 'referral_program', 10)
+        assert result is None
+
+    def test_get_influencer_partner_chat_ids_returns_set(self, manager, mock_supabase):
+        """get_influencer_partner_chat_ids: возвращает множество chat_id партнёров influencer"""
+        mock_response = Mock()
+        mock_response.data = [{'chat_id': '111'}, {'chat_id': '222'}]
+        mock_supabase.from_().select().eq().execute.return_value = mock_response
+        result = manager.get_influencer_partner_chat_ids()
+        assert result == {'111', '222'}
+
+    def test_get_influencer_partner_chat_ids_no_client_returns_empty_set(self, manager):
+        """get_influencer_partner_chat_ids: без клиента БД возвращает пустое множество"""
+        manager.client = None
+        result = manager.get_influencer_partner_chat_ids()
+        assert result == set()
 
 
 if __name__ == '__main__':
