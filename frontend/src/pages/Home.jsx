@@ -55,15 +55,35 @@ const Home = () => {
   const carouselRef = useRef(null)
   const isScrollingRef = useRef(false)
 
+  const onboardingSeenKey = 'loyalitybot_onboarding_seen'
+  const onboardingSeenKeyLegacy = 'onboarding_seen'
+
   useEffect(() => {
-    const seen = typeof localStorage !== 'undefined' && localStorage.getItem('onboarding_seen')
+    let seen = false
+    try {
+      if (typeof localStorage !== 'undefined') {
+        seen = !!localStorage.getItem(onboardingSeenKey) || !!localStorage.getItem(onboardingSeenKeyLegacy)
+      }
+      if (!seen && typeof sessionStorage !== 'undefined') {
+        seen = !!sessionStorage.getItem(onboardingSeenKey) || !!sessionStorage.getItem(onboardingSeenKeyLegacy)
+      }
+    } catch (_) {}
     if (!seen) setShowOnboarding(true)
   }, [])
 
   const dismissOnboarding = () => {
-    if (typeof localStorage !== 'undefined') localStorage.setItem('onboarding_seen', '1')
     setShowOnboarding(false)
     setOnboardingStep(1)
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(onboardingSeenKey, '1')
+        localStorage.setItem(onboardingSeenKeyLegacy, '1')
+      }
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(onboardingSeenKey, '1')
+        sessionStorage.setItem(onboardingSeenKeyLegacy, '1')
+      }
+    } catch (_) {}
   }
   const nextOnboardingStep = () => {
     if (onboardingStep < 2) setOnboardingStep(2)
