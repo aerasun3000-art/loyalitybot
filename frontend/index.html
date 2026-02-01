@@ -58,6 +58,24 @@
     
     <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      // Dev mock: ?dev=1 на localhost — подставляет тестового пользователя для проверки реферальных блоков
+      (function() {
+        const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(window.location.href)
+        const hasDevParam = window.location.search.includes('dev=1')
+        if (isLocalhost && hasDevParam && window.Telegram?.WebApp) {
+          if (!window.Telegram.WebApp.initDataUnsafe?.user) {
+            window.Telegram.WebApp.initDataUnsafe = window.Telegram.WebApp.initDataUnsafe || {}
+            window.Telegram.WebApp.initDataUnsafe.user = {
+              id: 123456789,
+              first_name: 'Test',
+              username: 'testuser'
+            }
+            console.log('🧪 Dev mock: test user injected for referral block testing')
+          }
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root">
