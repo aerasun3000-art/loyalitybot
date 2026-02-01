@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, getPromotionsForService, notifyPartnerInterest } from '../services/supabase'
+import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, getPromotionsForService, notifyPartnerInterest, upsertNpsRating } from '../services/supabase'
 import { getChatId, getUsername, hapticFeedback, showAlert, openTelegramLink } from '../utils/telegram'
 import { getCategoryByCode, serviceCategories, getAllServiceCategories, getCategoryGroupByCode } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
@@ -10,6 +10,8 @@ import { formatPriceWithPoints, fetchExchangeRates } from '../utils/currency'
 import { supabase } from '../services/supabase'
 import Loader from '../components/Loader'
 import LocationSelector from '../components/LocationSelector'
+import { PartnerCardSkeleton } from '../components/SkeletonCard'
+import ServicesFilterBar from '../components/ServicesFilterBar'
 import QRCode from 'qrcode'
 
 const CATEGORY_PRIORITY = {
@@ -56,6 +58,13 @@ const Services = () => {
   const [isEmptyCategoryModalOpen, setIsEmptyCategoryModalOpen] = useState(false)
   const [emptyCategoryCode, setEmptyCategoryCode] = useState(null)
   const [lastSelectedCategory, setLastSelectedCategory] = useState(null) // Защита от повторных вызовов
+  const [sortBy, setSortBy] = useState('default') // default | rating | nps
+  const [quickRatingModal, setQuickRatingModal] = useState({ open: false, group: null, rating: 0 })
+  const [quickRatingSubmitting, setQuickRatingSubmitting] = useState(false)
+  const [pullRefreshing, setPullRefreshing] = useState(false)
+  const serviceModalRef = useRef(null)
+  const pullStartY = useRef(0)
+  const listContainerRef = useRef(null)
 
   const resolveCategory = useCallback((code) => {
     if (!code) return null
@@ -568,6 +577,40 @@ const Services = () => {
     return groups
   }
 
+  const filteredGroups = useMemo(() => getFilteredGroups(), [
+    services,
+    filter,
+    categoryFilter,
+    selectedCity,
+    selectedDistrict,
+    favoritePartnerIds,
+    debouncedQuery,
+    categoryGroupParam,
+    partnersMetrics,
+    referralPartnerInfo,
+    favoritePartnerIdsSet,
+    normalizeCategoryCode,
+    getCategorySortValue,
+    resolveCategory,
+    isCompetitor
+  ])
+
+  const sortedGroups = useMemo(() => {
+    if (sortBy === 'rating') {
+      return [...filteredGroups].sort((a, b) => {
+        if (a.isCategoryOnly || b.isCategoryOnly) return 0
+        return (b.rating || 0) - (a.rating || 0)
+      })
+    }
+    if (sortBy === 'nps') {
+      return [...filteredGroups].sort((a, b) => {
+        if (a.isCategoryOnly || b.isCategoryOnly) return 0
+        return (b.npsScore || 0) - (a.npsScore || 0)
+      })
+    }
+    return filteredGroups
+  }, [filteredGroups, sortBy])
+
   const handleFilterChange = (newFilter) => {
     hapticFeedback('light')
 
@@ -640,6 +683,17 @@ const Services = () => {
     setQrImage('')
     setQrError(null)
   }
+
+  useEffect(() => {
+    if (!isServiceModalOpen) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') handleCloseServiceModal()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    const firstFocusable = serviceModalRef.current?.querySelector('button:not([disabled]), [href], input')
+    if (firstFocusable) firstFocusable.focus?.()
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isServiceModalOpen])
 
   const handleRedeemViaPromotion = () => {
     if (!selectedService) return
@@ -768,11 +822,58 @@ const Services = () => {
     hapticFeedback('medium')
   }
 
-  if (loading) {
-    return <Loader />
+  const handleRefresh = useCallback(async () => {
+    setPullRefreshing(true)
+    await loadData()
+    setPullRefreshing(false)
+  }, [])
+
+  const handleQuickRatingSubmit = async () => {
+    const { group } = quickRatingModal
+    if (!group || !chatId || quickRatingModal.rating < 1 || quickRatingModal.rating > 10) return
+    setQuickRatingSubmitting(true)
+    try {
+      await upsertNpsRating(chatId, group.partnerId, quickRatingModal.rating, '', group.companyName || '')
+      const rated = await getClientRatedPartners(chatId)
+      setFavoritePartnerIds(rated || [])
+      setQuickRatingModal({ open: false, group: null, rating: 0 })
+      hapticFeedback('medium')
+    } catch (err) {
+      console.error('Quick rating error:', err)
+      showAlert(language === 'ru' ? 'Не удалось сохранить оценку' : 'Failed to save rating')
+    } finally {
+      setQuickRatingSubmitting(false)
+    }
   }
 
-  const filteredGroups = getFilteredGroups()
+  const handlePullRefresh = useCallback(() => {
+    if (loading || pullRefreshing) return
+    handleRefresh()
+  }, [loading, pullRefreshing, handleRefresh])
+
+  if (loading && !pullRefreshing) {
+    return (
+      <div className="relative min-h-screen overflow-hidden pb-24 text-sakura-dark">
+        <div className="absolute inset-0 -z-20">
+          <img src="/bg/sakura.jpg" alt="" className="w-full h-full object-cover opacity-85" />
+        </div>
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
+        <div className="sticky top-0 z-20 px-4 pt-6 pb-4 bg-sakura-surface/15 backdrop-blur-xl border-b border-sakura-border/40">
+          <div className="h-12 mb-4 bg-sakura-surface/20 rounded-xl animate-pulse w-3/4 mx-auto" />
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex-shrink-0 h-10 w-24 bg-sakura-surface/20 rounded-full animate-pulse" />
+            ))}
+          </div>
+        </div>
+        <div className="relative z-10 px-4 py-6 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <PartnerCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden pb-24 text-sakura-dark">
@@ -859,79 +960,65 @@ const Services = () => {
           </div>
         </div>
 
-        {/* Фильтры */}
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-          <button
-            onClick={() => handleFilterChange('all')}
-            className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition-all ${
-              filter === 'all'
-                ? 'bg-sakura-accent text-white'
-                : 'bg-sakura-surface/40 text-sakura-dark border border-sakura-border/50'
-            }`}
-          >
-            Все районы
-          </button>
-          <button
-            onClick={() => handleFilterChange('my_district')}
-            className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition-all ${
-              filter === 'my_district'
-                ? 'bg-sakura-accent text-white'
-                : 'bg-sakura-surface/40 text-sakura-dark border border-sakura-border/50'
-            }`}
-          >
-            Мой район
-          </button>
-          <button
-            onClick={() => handleFilterChange('favorites')}
-            className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition-all ${
-              filter === 'favorites'
-                ? 'bg-sakura-accent text-white'
-                : 'bg-sakura-surface/40 text-sakura-dark border border-sakura-border/50'
-            }`}
-          >
-            Любимые
-          </button>
-          <button
-            onClick={() => handleFilterChange('search')}
-            className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap transition-all ${
-              filter === 'search'
-                ? 'bg-sakura-accent text-white'
-                : 'bg-sakura-surface/40 text-sakura-dark border border-sakura-border/50'
-            }`}
-          >
-            Поиск по услуге
-          </button>
-        </div>
-
-        {/* Поле поиска (показывается только при выборе фильтра "Поиск по услуге") */}
-        {filter === 'search' && (
-          <div className="mt-3">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Введите название услуги..."
-              className="w-full px-4 py-2 rounded-lg bg-sakura-surface/20 text-sakura-dark border border-sakura-border/40 placeholder-sakura-dark/60 outline-none focus:border-sakura-accent"
-              autoFocus
-            />
-          </div>
-        )}
+        <ServicesFilterBar
+          filter={filter}
+          handleFilterChange={handleFilterChange}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+          sortedGroupsLength={sortedGroups.length}
+          language={language}
+        />
       </div>
 
       {/* Список категорий/компаний */}
-      <div className="relative z-10 px-4 py-6 space-y-3">
-        {filteredGroups.length === 0 ? (
+      {pullRefreshing && (
+        <div className="relative z-10 px-4 pt-2 text-center">
+          <span className="text-sm text-sakura-dark/70">{language === 'ru' ? 'Обновление...' : 'Refreshing...'}</span>
+        </div>
+      )}
+      <div
+        ref={listContainerRef}
+        className="relative z-10 px-4 py-6 space-y-3"
+        onTouchStart={(e) => {
+          const el = listContainerRef.current
+          if (el?.scrollTop === 0) pullStartY.current = e.touches[0]?.clientY ?? 0
+        }}
+        onTouchEnd={(e) => {
+          const el = listContainerRef.current
+          if (!el || el.scrollTop !== 0) return
+          const endY = e.changedTouches?.[0]?.clientY ?? 0
+          if (endY - pullStartY.current > 80) handlePullRefresh()
+        }}
+        style={{ touchAction: 'pan-y' }}
+      >
+        {sortedGroups.length === 0 ? (
           <div className="bg-sakura-surface/10 backdrop-blur-xl rounded-3xl p-8 text-center border border-sakura-border/40 shadow-xl">
             <span className="text-6xl leading-none mx-auto mb-4 block">🌸</span>
             <h3 className="text-xl font-bold mb-2">Мастера не найдены</h3>
-            <p className="text-sm text-sakura-dark/80">
+            <p className="text-sm text-sakura-dark/80 mb-4">
               {filter === 'search' && searchQuery
-                ? 'Попробуйте изменить поисковый запрос'
-                : 'Попробуйте изменить фильтры или выбрать другую локацию'}
+                ? (language === 'ru' ? 'Попробуйте изменить поисковый запрос' : 'Try changing your search')
+                : (language === 'ru' ? 'Попробуйте изменить фильтры или выбрать другую локацию' : 'Try changing filters or location')}
             </p>
+            <div className="flex flex-col gap-2 max-w-xs mx-auto">
+              <button
+                onClick={() => { hapticFeedback('medium'); setFilter('all') }}
+                className="w-full py-2.5 rounded-full bg-sakura-accent text-white font-semibold text-sm"
+              >
+                {language === 'ru' ? 'Показать онлайн-мастеров' : 'Show online masters'}
+              </button>
+              <button
+                onClick={() => { hapticFeedback('light'); setFilter('none'); setSearchQuery(''); resetCategoryFilter() }}
+                className="w-full py-2.5 rounded-full bg-sakura-surface/40 text-sakura-dark border border-sakura-border/50 font-semibold text-sm"
+              >
+                {language === 'ru' ? 'Сбросить фильтры' : 'Reset filters'}
+              </button>
+            </div>
           </div>
         ) : (
-          filteredGroups.map((group) => {
+          sortedGroups.map((group) => {
             const isExpanded = !group.isCategoryOnly && expandedItem === group.id
             
             return (
@@ -997,6 +1084,31 @@ const Services = () => {
                       </>
                     )}
                   </div>
+
+                  {/* Любимые (оценённые) — только для карточки партнёра */}
+                  {!group.isCategoryOnly && group.partnerId && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (favoritePartnerIdsSet.has(group.partnerId)) return
+                        hapticFeedback('light')
+                        setQuickRatingModal({ open: true, group, rating: 0 })
+                      }}
+                      className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sakura-dark/80 hover:bg-sakura-surface/30 transition-colors"
+                      title={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'Уже в любимых' : 'Already in favorites') : (language === 'ru' ? 'Оценить и добавить в любимые' : 'Rate and add to favorites')}
+                      aria-label={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'В любимых' : 'In favorites') : (language === 'ru' ? 'Добавить в любимые' : 'Add to favorites')}
+                    >
+                      {favoritePartnerIdsSet.has(group.partnerId) ? (
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="text-red-500">
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                        </svg>
+                      ) : (
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
 
                   {/* Кнопка play */}
                   <button
@@ -1088,6 +1200,49 @@ const Services = () => {
         )}
       </div>
 
+      {/* Модалка быстрой оценки (добавить в любимые) */}
+      {quickRatingModal.open && quickRatingModal.group && (
+        <div className="fixed inset-0 z-[99]" onClick={() => setQuickRatingModal({ open: false, group: null, rating: 0 })}>
+          <div className="absolute inset-0 bg-sakura-deep/50 backdrop-blur-sm" />
+          <div className="relative h-full flex items-center justify-center px-4" onClick={(e) => e.stopPropagation()}>
+            <div className="relative z-10 w-full max-w-sm bg-sakura-surface/95 border border-sakura-border/60 rounded-3xl shadow-2xl p-6">
+              <h3 className="text-lg font-bold text-sakura-dark mb-2 text-center">
+                {language === 'ru' ? 'Оцените мастера' : 'Rate this master'}
+              </h3>
+              <p className="text-sm text-sakura-dark/70 text-center mb-4">{quickRatingModal.group.companyName}</p>
+              <div className="flex flex-wrap justify-center gap-2 mb-4">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setQuickRatingModal(prev => ({ ...prev, rating: n }))}
+                    className={`w-10 h-10 rounded-full font-bold text-sm transition-all ${
+                      quickRatingModal.rating === n ? 'bg-sakura-accent text-white' : 'bg-sakura-surface/30 text-sakura-dark'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setQuickRatingModal({ open: false, group: null, rating: 0 })}
+                  className="flex-1 py-2.5 rounded-full bg-sakura-surface/30 text-sakura-dark font-semibold"
+                >
+                  {language === 'ru' ? 'Отмена' : 'Cancel'}
+                </button>
+                <button
+                  onClick={handleQuickRatingSubmit}
+                  disabled={quickRatingModal.rating < 1 || quickRatingSubmitting}
+                  className="flex-1 py-2.5 rounded-full bg-sakura-accent text-white font-semibold disabled:opacity-50"
+                >
+                  {quickRatingSubmitting ? (language === 'ru' ? 'Сохранение...' : 'Saving...') : (language === 'ru' ? 'Отправить' : 'Submit')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Модальное окно выбора локации */}
       <LocationSelector
         isOpen={isLocationSelectorOpen}
@@ -1096,7 +1251,7 @@ const Services = () => {
       />
 
       {isServiceModalOpen && selectedService && (
-        <div className="fixed inset-0 z-[100]" onClick={handleCloseServiceModal}>
+        <div className="fixed inset-0 z-[100]" onClick={handleCloseServiceModal} role="dialog" aria-modal="true" aria-labelledby="service-modal-title">
           <div className="absolute inset-0 bg-sakura-deep/50 backdrop-blur-sm" />
           <div 
             className="relative h-full flex items-center justify-center px-4 py-4"
@@ -1104,6 +1259,7 @@ const Services = () => {
             style={{ paddingBottom: '80px', maxHeight: '100vh', overflow: 'hidden' }}
           >
             <div 
+              ref={serviceModalRef}
               className="relative z-10 w-full max-w-md bg-sakura-surface/85 border border-sakura-border/60 rounded-3xl shadow-2xl p-6 max-h-[calc(100vh-8rem)] overflow-y-auto"
               style={{ maxHeight: 'calc(100vh - 8rem)', WebkitOverflowScrolling: 'touch' }}
             >
@@ -1117,7 +1273,7 @@ const Services = () => {
             <div className="space-y-4 text-sakura-dark pb-8">
               <div>
                 <p className="text-sm text-sakura-dark/60 mb-1 uppercase tracking-wide">Услуга</p>
-                <h2 className="text-xl font-bold">{selectedService.title}</h2>
+                <h2 id="service-modal-title" className="text-xl font-bold">{selectedService.title}</h2>
                 <p className="text-sm text-sakura-dark/70 mt-1">
                   {selectedService.partner?.company_name || selectedService.partner?.name || t('partner_not_connected')}
                 </p>
@@ -1194,8 +1350,11 @@ const Services = () => {
                   onClick={handleBookTime}
                   disabled={!selectedService.booking_url && !selectedService.partner?.booking_url}
                   className="w-full py-3 rounded-full bg-sakura-deep text-white font-semibold shadow-md hover:bg-sakura-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={(!selectedService.booking_url && !selectedService.partner?.booking_url) ? (language === 'ru' ? 'Ссылка уточняется' : 'Link TBD') : ''}
                 >
-                  {language === 'ru' ? 'Забронировать время' : 'Book time'}
+                  {(!selectedService.booking_url && !selectedService.partner?.booking_url)
+                    ? (language === 'ru' ? 'Забронировать (ссылка уточняется)' : 'Book (link TBD)')
+                    : (language === 'ru' ? 'Забронировать время' : 'Book time')}
                 </button>
                 <button
                   onClick={handleContactPartner}
@@ -1215,7 +1374,7 @@ const Services = () => {
                 <div className="flex flex-col items-center gap-3 bg-white/90 border border-sakura-border/40 rounded-3xl p-4 mb-8 pb-8">
                   <img src={qrImage} alt="QR для начисления" className="w-48 h-48 object-contain" />
                   <p className="text-xs text-sakura-dark/70 text-center px-2">
-                    Партнёр сканирует QR-код и подтверждает начисление баллов.
+                    {language === 'ru' ? 'Покажите код мастеру при оплате — он подтвердит начисление баллов.' : 'Show this code to the master at payment — they will confirm points.'}
                   </p>
                   {chatId && (
                     <p className="text-xs text-sakura-dark/50 text-center px-2 font-mono">
