@@ -49,9 +49,26 @@ const Home = () => {
   const [referralCode, setReferralCode] = useState(null)
   const [referralToast, setReferralToast] = useState(null)
   const [referralLoading, setReferralLoading] = useState(false)
-  const [selectedCategoryGroup, setSelectedCategoryGroup] = useState(null) // Фильтр по category_group
+  const [selectedCategoryGroup, setSelectedCategoryGroup] = useState(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [onboardingStep, setOnboardingStep] = useState(1)
   const carouselRef = useRef(null)
   const isScrollingRef = useRef(false)
+
+  useEffect(() => {
+    const seen = typeof localStorage !== 'undefined' && localStorage.getItem('onboarding_seen')
+    if (!seen) setShowOnboarding(true)
+  }, [])
+
+  const dismissOnboarding = () => {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('onboarding_seen', '1')
+    setShowOnboarding(false)
+    setOnboardingStep(1)
+  }
+  const nextOnboardingStep = () => {
+    if (onboardingStep < 2) setOnboardingStep(2)
+    else dismissOnboarding()
+  }
 
   useEffect(() => {
     loadData()
@@ -630,6 +647,11 @@ const Home = () => {
           <div className="mt-4 bg-gradient-to-br from-white/30 to-sakura-surface/28 backdrop-blur-sm rounded-xl p-4 shadow-xl border border-sakura-border/40">
             <h3 className="font-bold text-sakura-deep text-sm mb-1">{t('home_referral_title')}</h3>
             <p className="text-sakura-mid text-xs mb-3">{t('home_referral_subtitle')}</p>
+            {(referralStats?.total_referrals ?? 0) === 0 && (
+              <p className="text-sakura-mid text-xs mb-3 rounded-lg bg-sakura-mid/10 p-2 border border-sakura-border/30">
+                {t('referral_empty_state')}
+              </p>
+            )}
             {referralStats && (
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-lg">{(() => {
@@ -1166,6 +1188,48 @@ const Home = () => {
           )}
         </div>
       </div>
+
+      {/* Онбординг при первом заходе */}
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-sakura-deep/90 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[85vh] overflow-y-auto p-6">
+            <h2 className="text-xl font-bold text-sakura-deep mb-4">
+              {onboardingStep === 1 ? t('onboarding_screen1_title') : t('home_referral_title')}
+            </h2>
+            <p className="text-sakura-mid text-sm mb-6 whitespace-pre-line">
+              {onboardingStep === 1 ? t('onboarding_screen1_text') : t('onboarding_screen2_text')}
+            </p>
+            <div className="flex gap-2">
+              {onboardingStep === 2 ? (
+                <button
+                  type="button"
+                  onClick={dismissOnboarding}
+                  className="flex-1 py-3 rounded-xl bg-sakura-accent text-white font-semibold"
+                >
+                  {t('onboarding_start')}
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={nextOnboardingStep}
+                    className="flex-1 py-3 rounded-xl bg-sakura-accent text-white font-semibold"
+                  >
+                    {language === 'ru' ? 'Далее' : 'Next'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={dismissOnboarding}
+                    className="py-3 px-4 rounded-xl border border-sakura-border text-sakura-deep font-medium"
+                  >
+                    {t('onboarding_start')}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Модальное окно выбора локации */}
       <LocationSelector

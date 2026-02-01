@@ -416,6 +416,78 @@ export const getClientRatedPartners = async (clientChatId) => {
 }
 
 /**
+ * Получить оценки NPS клиента по партнёрам (для отображения в History: «Оценено: N»)
+ * @returns {Promise<Object>} Объект { [partner_chat_id]: { rating, feedback } }
+ */
+export const getClientNpsRatings = async (clientChatId) => {
+  if (!clientChatId) return {}
+  try {
+    const { data, error } = await supabase
+      .from('nps_ratings')
+      .select('partner_chat_id, rating, feedback')
+      .eq('client_chat_id', clientChatId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching client NPS ratings:', error)
+      return {}
+    }
+    const map = {}
+    ;(data || []).forEach(row => {
+      if (row.partner_chat_id && map[row.partner_chat_id] === undefined) {
+        map[row.partner_chat_id] = { rating: row.rating, feedback: row.feedback || '' }
+      }
+    })
+    return map
+  } catch (err) {
+    console.error('Unexpected error fetching client NPS ratings:', err)
+    return {}
+  }
+}
+
+/**
+ * Сохранить или обновить оценку NPS (одна оценка на пару client, partner)
+ */
+export const upsertNpsRating = async (clientChatId, partnerChatId, rating, feedback = '', masterName = '') => {
+  if (!clientChatId || !partnerChatId) {
+    throw new Error('client_chat_id and partner_chat_id are required')
+  }
+  const { data: existingRow } = await supabase
+    .from('nps_ratings')
+    .select('id')
+    .eq('client_chat_id', clientChatId)
+    .eq('partner_chat_id', partnerChatId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+  const existing = Array.isArray(existingRow) ? existingRow[0] : existingRow
+
+  const payload = {
+    client_chat_id: clientChatId,
+    partner_chat_id: partnerChatId,
+    rating: Number(rating),
+    feedback: feedback || null,
+    master_name: masterName || null
+  }
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from('nps_ratings')
+      .update({ rating: payload.rating, feedback: payload.feedback, master_name: payload.master_name })
+      .eq('id', existing.id)
+    if (error) throw error
+    return { updated: true, id: existing.id }
+  }
+
+  const { data: inserted, error } = await supabase
+    .from('nps_ratings')
+    .insert(payload)
+    .select('id')
+    .single()
+  if (error) throw error
+  return { updated: false, id: inserted?.id }
+}
+
+/**
  * Получить информацию о партнере, который добавил клиента (через приветственный бонус)
  */
 export const getReferralPartnerInfo = async (clientChatId) => {

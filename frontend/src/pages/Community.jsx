@@ -173,6 +173,12 @@ function Community() {
             </svg>
             <h2 className="text-lg font-bold text-jewelry-brown-dark">{t('referral_your_link')}</h2>
           </div>
+
+          {(referralStats?.total_referrals ?? 0) === 0 && (
+            <p className="text-sm text-jewelry-gray-elegant mb-4 rounded-lg bg-jewelry-gold/10 p-3 border border-jewelry-gold/20">
+              {t('referral_empty_state')}
+            </p>
+          )}
           
           {referralCode ? (
             <>

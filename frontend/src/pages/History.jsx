@@ -1,22 +1,39 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getClientTransactions, getClientBalance } from '../services/supabase'
+import { getClientTransactions, getClientBalance, getClientNpsRatings, upsertNpsRating } from '../services/supabase'
 import { getChatId, hapticFeedback } from '../utils/telegram'
 import { formatCurrencySimple } from '../utils/currency'
-// import LuxuryIcon from '../components/LuxuryIcons'
+import { useTranslation } from '../utils/i18n'
+import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 
 const History = () => {
   const navigate = useNavigate()
   const chatId = getChatId()
+  const { language } = useLanguageStore()
+  const { t } = useTranslation(language)
   
   const [loading, setLoading] = useState(true)
   const [transactions, setTransactions] = useState([])
   const [currentBalance, setCurrentBalance] = useState(0)
-  const [filter, setFilter] = useState('all') // all, accrual, redemption
+  const [filter, setFilter] = useState('all')
+  const [npsRatings, setNpsRatings] = useState({})
+  const [ratingModal, setRatingModal] = useState({ open: false, transaction: null })
+  const [ratingForm, setRatingForm] = useState({ rating: 0, feedback: '' })
+  const [ratingSubmitting, setRatingSubmitting] = useState(false)
 
   useEffect(() => {
     loadTransactions()
+  }, [chatId])
+
+  const loadNpsRatings = async () => {
+    if (!chatId) return
+    const ratings = await getClientNpsRatings(chatId)
+    setNpsRatings(ratings)
+  }
+
+  useEffect(() => {
+    loadNpsRatings()
   }, [chatId])
 
   const annotateTransactions = (txs, balanceValue) => {
@@ -91,17 +108,21 @@ const History = () => {
     }
   }
 
-  const getTransactionTitle = (transaction) => {
-    switch (transaction.operation_type) {
+  const getTransactionTypeLabel = (operationType) => {
+    switch (operationType) {
       case 'accrual':
-        return `Покупка у ${transaction.partner?.company_name || transaction.partner?.name || 'партнёра, который пока не подключен к системе'}`
+        return t('history_type_accrual')
       case 'enrollment_bonus':
-        return 'Бонус за регистрацию'
+        return t('history_type_enrollment_bonus')
       case 'redemption':
-        return 'Обмен баллов на услугу'
+        return t('history_type_redemption')
       default:
-        return 'Операция'
+        return t('history_operation')
     }
+  }
+
+  const getPartnerDisplayName = (transaction) => {
+    return transaction.partner?.company_name || transaction.partner?.name || t('history_partner')
   }
 
   const formatDate = (dateString) => {
@@ -109,13 +130,13 @@ const History = () => {
     const today = new Date()
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
-
+    const locale = language === 'ru' ? 'ru' : 'en-US'
     if (date.toDateString() === today.toDateString()) {
-      return `Сегодня, ${date.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`
+      return `${t('history_today')}, ${date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return `Вчера, ${date.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}`
+      return `${t('history_yesterday')}, ${date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`
     } else {
-      return date.toLocaleDateString('ru', {
+      return date.toLocaleDateString(locale, {
         day: 'numeric',
         month: 'short',
         hour: '2-digit',
@@ -124,25 +145,58 @@ const History = () => {
     }
   }
 
-  // Группировка транзакций по дням
-  const groupByDate = (transactions) => {
+  const openRatingModal = (transaction) => {
+    const pid = transaction.partner_chat_id
+    const existing = pid ? npsRatings[pid] : null
+    setRatingForm({
+      rating: existing?.rating ?? 0,
+      feedback: existing?.feedback ?? ''
+    })
+    setRatingModal({ open: true, transaction })
+  }
+
+  const closeRatingModal = () => {
+    setRatingModal({ open: false, transaction: null })
+  }
+
+  const submitRating = async () => {
+    const { transaction } = ratingModal
+    if (!transaction || !chatId || !transaction.partner_chat_id || ratingForm.rating < 0 || ratingForm.rating > 10) return
+    setRatingSubmitting(true)
+    try {
+      await upsertNpsRating(
+        chatId,
+        transaction.partner_chat_id,
+        ratingForm.rating,
+        ratingForm.feedback || '',
+        getPartnerDisplayName(transaction)
+      )
+      await loadNpsRatings()
+      closeRatingModal()
+    } catch (err) {
+      console.error('Error saving NPS rating:', err)
+    } finally {
+      setRatingSubmitting(false)
+    }
+  }
+
+  const groupByDate = (txs) => {
     const groups = {}
-    transactions.forEach(t => {
-      const date = new Date(t.date_time).toLocaleDateString('ru', {
+    const locale = language === 'ru' ? 'ru' : 'en-US'
+    txs.forEach(t => {
+      const date = new Date(t.date_time).toLocaleDateString(locale, {
         day: 'numeric',
         month: 'long',
         year: 'numeric'
       })
-      if (!groups[date]) {
-        groups[date] = []
-      }
+      if (!groups[date]) groups[date] = []
       groups[date].push(t)
     })
     return groups
   }
 
   if (loading) {
-    return <Loader text="Загрузка истории..." />
+    return <Loader text={t('loading_history')} />
   }
 
   const filteredTransactions = getFilteredTransactions()
@@ -175,7 +229,7 @@ const History = () => {
               />
             </svg>
           </button>
-          <h1 className="text-2xl font-bold text-white">История</h1>
+          <h1 className="text-2xl font-bold text-white">{t('history_title')}</h1>
         </div>
 
         {/* Статистика */}
@@ -183,22 +237,22 @@ const History = () => {
           <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-2xl">📈</span>
-              <span className="text-white/80 text-sm">Начислено</span>
+              <span className="text-white/80 text-sm">{t('history_earned')}</span>
             </div>
             <span className="text-white font-bold text-2xl">+{totalEarned}</span>
           </div>
           <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-2xl">📉</span>
-              <span className="text-white/80 text-sm">Потрачено</span>
+              <span className="text-white/80 text-sm">{t('history_spent')}</span>
             </div>
             <span className="text-white font-bold text-2xl">-{totalSpent}</span>
           </div>
         </div>
 
       <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4 mb-4">
-        <span className="text-white/80 text-sm block">Текущий баланс</span>
-        <span className="text-white font-bold text-2xl">{currentBalance} баллов</span>
+        <span className="text-white/80 text-sm block">{t('profile_balance')}</span>
+        <span className="text-white font-bold text-2xl">{currentBalance} {language === 'ru' ? 'баллов' : 'points'}</span>
       </div>
 
         {/* Фильтры */}
@@ -211,7 +265,7 @@ const History = () => {
                 : 'bg-white/20 text-white'
             }`}
           >
-            Все ({transactions.length})
+            {t('history_all')} ({transactions.length})
           </button>
           <button
             onClick={() => handleFilterChange('accrual')}
@@ -221,7 +275,7 @@ const History = () => {
                 : 'bg-white/20 text-white'
             }`}
           >
-            Начисления
+            {t('history_accruals')}
           </button>
           <button
             onClick={() => handleFilterChange('redemption')}
@@ -231,7 +285,7 @@ const History = () => {
                 : 'bg-white/20 text-white'
             }`}
           >
-            Списания
+            {t('history_redemptions')}
           </button>
         </div>
       </div>
@@ -241,7 +295,7 @@ const History = () => {
         {filteredTransactions.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
             <span className="text-6xl leading-none mx-auto mb-4 block text-jewelry-gray-elegant">🚫</span>
-            <p className="text-gray-600">История транзакций пуста</p>
+            <p className="text-gray-600">{t('history_no_items')}</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -254,6 +308,8 @@ const History = () => {
                   {dayTransactions.map((transaction, index) => {
                     const isAccrual = transaction.operation_type === 'accrual' || 
                                      transaction.operation_type === 'enrollment_bonus'
+                    const showRate = (transaction.operation_type === 'accrual' || transaction.operation_type === 'redemption') && transaction.partner_chat_id
+                    const partnerRating = showRate ? npsRatings[transaction.partner_chat_id] : null
                     
                     return (
                       <div
@@ -274,15 +330,46 @@ const History = () => {
                         {/* Информация */}
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-gray-800 text-sm mb-0.5 truncate">
-                            {getTransactionTitle(transaction)}
+                            {getTransactionTypeLabel(transaction.operation_type)}
                           </h3>
+                          {(transaction.operation_type === 'accrual' || transaction.operation_type === 'redemption') && (
+                            <p className="text-xs text-gray-600 truncate">
+                              {getPartnerDisplayName(transaction)}
+                            </p>
+                          )}
                           <p className="text-xs text-gray-500">
                             {formatDate(transaction.date_time)}
                           </p>
                           {typeof transaction.balance_after === 'number' && (
                             <p className="text-xs text-gray-400 mt-1">
-                              Баланс после операции: {transaction.balance_after} баллов
+                              {t('history_balance_after')}: {transaction.balance_after} {language === 'ru' ? 'баллов' : 'points'}
                             </p>
+                          )}
+                          {showRate && (
+                            <div className="mt-2 flex items-center gap-2">
+                              {partnerRating ? (
+                                <>
+                                  <span className="text-xs text-gray-600">
+                                    {t('history_rated', { rating: partnerRating.rating })}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openRatingModal(transaction)}
+                                    className="text-xs text-orange-500 font-medium hover:underline"
+                                  >
+                                    {t('history_change_rating')}
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openRatingModal(transaction)}
+                                  className="text-xs text-orange-500 font-semibold hover:underline"
+                                >
+                                  {t('history_rate')}
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
 
@@ -309,6 +396,65 @@ const History = () => {
           </div>
         )}
       </div>
+
+      {/* Модалка оценки NPS */}
+      {ratingModal.open && ratingModal.transaction && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={closeRatingModal}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-gray-100">
+              <h3 className="font-bold text-gray-800">{t('history_rate')}</h3>
+              <p className="text-sm text-gray-500 mt-0.5">{getPartnerDisplayName(ratingModal.transaction)}</p>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">0–10 (NPS)</p>
+                <div className="flex flex-wrap gap-2">
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setRatingForm(prev => ({ ...prev, rating: n }))}
+                      className={`w-9 h-9 rounded-lg font-semibold text-sm ${
+                        ratingForm.rating === n
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('history_rating_comment')}</label>
+                <textarea
+                  value={ratingForm.feedback}
+                  onChange={e => setRatingForm(prev => ({ ...prev, feedback: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg p-2 text-sm min-h-[80px]"
+                  placeholder={language === 'ru' ? 'По желанию' : 'Optional'}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeRatingModal}
+                  className="flex-1 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium"
+                >
+                  {t('services_cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={submitRating}
+                  disabled={ratingSubmitting || (ratingForm.rating < 0 || ratingForm.rating > 10)}
+                  className="flex-1 py-2.5 rounded-lg bg-orange-500 text-white font-semibold disabled:opacity-50"
+                >
+                  {ratingSubmitting ? (language === 'ru' ? 'Сохранение...' : 'Saving...') : t('history_rating_submit')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .scrollbar-hide::-webkit-scrollbar {

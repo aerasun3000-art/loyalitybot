@@ -63,10 +63,10 @@ const Navigation = () => {
         </svg>
       )
     },
-    // Community -> новости
+    // Заработок (реферальная страница /community)
     {
-      path: '/news',
-      labelKey: 'nav_community',
+      path: '/community',
+      labelKey: 'nav_earn',
       icon: (active) => (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <path

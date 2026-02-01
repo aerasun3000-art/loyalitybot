@@ -8,6 +8,7 @@ const translations = {
     nav_home: 'Главная',
     nav_activity: 'Активность',
     nav_community: 'Сообщество',
+    nav_earn: 'Заработок',
     nav_message: 'Сообщения',
     nav_promotions: 'Акции',
     nav_services: 'Услуги',
@@ -73,6 +74,25 @@ const translations = {
     history_operation: 'Операция',
     history_today: 'Сегодня',
     history_yesterday: 'Вчера',
+    history_type_accrual: 'Начисление',
+    history_type_redemption: 'Списание',
+    history_type_enrollment_bonus: 'Бонус за регистрацию',
+    history_partner: 'Партнёр',
+    history_rate: 'Оценить',
+    history_rated: 'Оценено: {rating}',
+    history_change_rating: 'Изменить',
+    history_rating_submit: 'Отправить',
+    history_rating_comment: 'Комментарий',
+    history_balance_after: 'Баланс после операции',
+    
+    // Onboarding
+    onboarding_screen1_title: 'Копи баллы и зарабатывай',
+    onboarding_screen1_text: 'Копи баллы за покупки у партнёров и получай баллы с покупок друзей по своей ссылке. Достигай уровни — открой возможность стать партнёром и выводить доход.',
+    onboarding_screen2_text: 'Поделись ссылкой из раздела «Заработок» — когда друзья зарегистрируются и совершат покупку, ты получишь баллы.',
+    onboarding_start: 'Понятно',
+    
+    // Referral empty state
+    referral_empty_state: 'Поделись ссылкой с друзьями — когда они зарегистрируются и совершат покупку у партнёра, ты получишь баллы. Скопируй ссылку ниже и отправь другу.',
     
     // Profile Page
     profile_title: 'Профиль',
@@ -293,6 +313,7 @@ const translations = {
     nav_home: 'Home',
     nav_activity: 'Activity',
     nav_community: 'Community',
+    nav_earn: 'Earn',
     nav_message: 'Message',
     nav_promotions: 'Promotions',
     nav_services: 'Services',
@@ -358,6 +379,25 @@ const translations = {
     history_operation: 'Operation',
     history_today: 'Today',
     history_yesterday: 'Yesterday',
+    history_type_accrual: 'Accrual',
+    history_type_redemption: 'Redemption',
+    history_type_enrollment_bonus: 'Welcome bonus',
+    history_partner: 'Partner',
+    history_rate: 'Rate',
+    history_rated: 'Rated: {rating}',
+    history_change_rating: 'Change',
+    history_rating_submit: 'Submit',
+    history_rating_comment: 'Comment',
+    history_balance_after: 'Balance after',
+    
+    // Onboarding
+    onboarding_screen1_title: 'Earn points and rewards',
+    onboarding_screen1_text: 'Earn points from partner purchases and from friends\' purchases via your link. Reach new levels — unlock the option to become a partner and withdraw earnings.',
+    onboarding_screen2_text: 'Share your link from the «Earn» section — when friends register and make a purchase, you\'ll get points.',
+    onboarding_start: 'Got it',
+    
+    // Referral empty state
+    referral_empty_state: 'Share your link with friends — when they register and make a purchase at a partner, you\'ll earn points. Copy the link below and send it to a friend.',
     
     // Profile Page
     profile_title: 'Profile',
