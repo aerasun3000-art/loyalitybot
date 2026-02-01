@@ -1199,33 +1199,42 @@ const Home = () => {
             <p className="text-sakura-mid text-sm mb-6 whitespace-pre-line">
               {onboardingStep === 1 ? t('onboarding_screen1_text') : t('onboarding_screen2_text')}
             </p>
-            <div className="flex gap-2">
-              {onboardingStep === 2 ? (
-                <button
-                  type="button"
-                  onClick={dismissOnboarding}
-                  className="flex-1 py-3 rounded-xl bg-sakura-accent text-white font-semibold"
-                >
-                  {t('onboarding_start')}
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={nextOnboardingStep}
-                    className="flex-1 py-3 rounded-xl bg-sakura-accent text-white font-semibold"
-                  >
-                    {language === 'ru' ? 'Далее' : 'Next'}
-                  </button>
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                {onboardingStep === 2 ? (
                   <button
                     type="button"
                     onClick={dismissOnboarding}
-                    className="py-3 px-4 rounded-xl border border-sakura-border text-sakura-deep font-medium"
+                    className="flex-1 py-3 rounded-xl bg-sakura-accent text-white font-semibold"
                   >
                     {t('onboarding_start')}
                   </button>
-                </>
-              )}
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={nextOnboardingStep}
+                      className="flex-1 py-3 rounded-xl bg-sakura-accent text-white font-semibold"
+                    >
+                      {language === 'ru' ? 'Далее' : 'Next'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={dismissOnboarding}
+                      className="py-3 px-4 rounded-xl border border-sakura-border text-sakura-deep font-medium"
+                    >
+                      {t('onboarding_start')}
+                    </button>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={dismissOnboarding}
+                className="mt-2 text-xs text-sakura-mid hover:underline"
+              >
+                {t('onboarding_dont_show_again')}
+              </button>
             </div>
           </div>
         </div>

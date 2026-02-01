@@ -1235,8 +1235,8 @@ const Services = () => {
         <div 
           className="fixed inset-0 z-[100]" 
           onClick={() => {
-            console.log('[Modal] Closing modal')
             setIsEmptyCategoryModalOpen(false)
+            navigate('/')
           }}
           style={{ zIndex: 1000 }}
         >
@@ -1248,8 +1248,8 @@ const Services = () => {
             <div className="relative z-10 w-full max-w-md bg-sakura-surface/95 border border-sakura-border/60 rounded-3xl shadow-2xl p-6">
               <button
                 onClick={() => {
-                  console.log('[Modal] Close button clicked')
                   setIsEmptyCategoryModalOpen(false)
+                  navigate('/')
                 }}
                 className="absolute top-4 right-4 w-10 h-10 rounded-full border border-sakura-border/40 bg-sakura-surface/20 text-sakura-dark hover:bg-sakura-surface/30 transition-colors z-20"
                 aria-label="Закрыть"
@@ -1285,6 +1285,17 @@ const Services = () => {
                     onClick={() => {
                       hapticFeedback('light')
                       setIsEmptyCategoryModalOpen(false)
+                      navigate('/community')
+                    }}
+                    className="w-full py-3 rounded-full bg-sakura-accent/90 text-white font-semibold shadow-md border border-sakura-border hover:bg-sakura-accent transition-colors"
+                  >
+                    {t('spot_recommend_place')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      hapticFeedback('light')
+                      setIsEmptyCategoryModalOpen(false)
+                      navigate('/')
                     }}
                     className="w-full py-3 rounded-full bg-white text-sakura-dark font-semibold shadow-md border border-sakura-border hover:bg-sakura-surface transition-colors"
                   >

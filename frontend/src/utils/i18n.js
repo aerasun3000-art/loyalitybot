@@ -90,7 +90,8 @@ const translations = {
     onboarding_screen1_text: 'Копи баллы за покупки у партнёров и получай баллы с покупок друзей по своей ссылке. Достигай уровни — открой возможность стать партнёром и выводить доход.',
     onboarding_screen2_text: 'Поделись ссылкой из раздела «Заработок» — когда друзья зарегистрируются и совершат покупку, ты получишь баллы.',
     onboarding_start: 'Понятно',
-    
+    onboarding_dont_show_again: 'Больше не показывать',
+
     // Referral empty state
     referral_empty_state: 'Поделись ссылкой с друзьями — когда они зарегистрируются и совершат покупку у партнёра, ты получишь баллы. Скопируй ссылку ниже и отправь другу.',
     
@@ -170,6 +171,7 @@ const translations = {
     profile_referral_block_desc: 'Поделись ссылкой с друзьями — получай баллы с их покупок у партнёров. Денежных выплат у обычных пользователей нет; баллы можно тратить у партнёров или стать партнёром и выводить доход.',
     toast_link_copied: 'Ссылка скопирована',
     toast_copy_failed: 'Не удалось скопировать',
+    spot_recommend_place: 'Порекомендовать свое место',
     
     // News Page
     nav_news: 'Новости',
@@ -395,6 +397,7 @@ const translations = {
     onboarding_screen1_text: 'Earn points from partner purchases and from friends\' purchases via your link. Reach new levels — unlock the option to become a partner and withdraw earnings.',
     onboarding_screen2_text: 'Share your link from the «Earn» section — when friends register and make a purchase, you\'ll get points.',
     onboarding_start: 'Got it',
+    onboarding_dont_show_again: "Don't show again",
     
     // Referral empty state
     referral_empty_state: 'Share your link with friends — when they register and make a purchase at a partner, you\'ll earn points. Copy the link below and send it to a friend.',
@@ -475,6 +478,7 @@ const translations = {
     profile_referral_block_desc: 'Share your link with friends — earn points from their purchases at partners. No cash payouts for regular users; spend points at partners or become a partner to withdraw earnings.',
     toast_link_copied: 'Link copied',
     toast_copy_failed: 'Copy failed',
+    spot_recommend_place: 'Recommend your place',
     
     // News Page
     nav_news: 'News',
