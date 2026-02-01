@@ -328,7 +328,7 @@ const Promotions = () => {
 
       {/* Search Bar */}
       <div className="sticky top-[70px] z-10 px-4 pt-4 pb-2 bg-sakura-deep/90 backdrop-blur-xl">
-        <div className="flex items-center gap-3 h-12 px-4 bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)]">
+        <div className="flex items-center gap-3 h-12 px-4 bg-white/85 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.06)] border border-sakura-border/20">
           <svg
             width="20"
             height="20"
@@ -347,7 +347,7 @@ const Promotions = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('promo_search')}
-            className="flex-1 text-base text-[#111827] placeholder:text-[#9CA3AF] outline-none bg-transparent"
+            className="flex-1 text-base text-sakura-deep/95 placeholder:text-sakura-mid outline-none bg-transparent"
           />
           <button
             onClick={() => setSearchQuery('')}
@@ -382,7 +382,7 @@ const Promotions = () => {
               key={cat.id}
               onClick={() => handleFilterChange(cat.id)}
               className={`flex-shrink-0 h-10 px-4 rounded-[20px] text-sm font-medium transition-all duration-200 ${
-                filter === cat.id ? 'bg-sakura-accent text-white' : 'bg-white text-[#6B7280]'
+                filter === cat.id ? 'bg-sakura-accent/90 text-white' : 'bg-white/80 text-sakura-deep/90'
               }`}
             >
               {cat.label}
@@ -393,7 +393,7 @@ const Promotions = () => {
 
       <div className="relative z-10 pt-6 pb-6">
         {filteredPromotions.length === 0 ? (
-          <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 text-center border border-sakura-border/40 shadow-xl mx-4">
+          <div className="bg-white/20 backdrop-blur-xl rounded-3xl p-8 text-center border border-sakura-border/30 shadow-lg mx-4">
             <span className="text-6xl leading-none mx-auto mb-4 block">🌸</span>
             <h3 className="text-xl font-bold mb-2 text-[#111827]">{t('promo_no_items')}</h3>
             <p className="text-sm text-[#6B7280]">
@@ -420,7 +420,7 @@ const Promotions = () => {
                     <div
                       key={item.id}
                       onClick={() => navigate(`/promotions/${item.id}`)}
-                      className="flex-shrink-0 bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.1)] overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.98]"
+                      className="flex-shrink-0 bg-white/90 backdrop-blur-sm rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-sakura-border/20 overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.98]"
                       style={{
                         scrollSnapAlign: 'start',
                         minWidth: '85%',
@@ -435,25 +435,25 @@ const Promotions = () => {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-sakura-accent/70 via-sakura-mid/60 to-sakura-deep/70 flex items-center justify-center">
-                            <span className="text-6xl text-white/30">🎁</span>
+                          <div className="w-full h-full bg-gradient-to-br from-sakura-accent/45 via-sakura-mid/35 to-sakura-deep/45 flex items-center justify-center">
+                            <span className="text-6xl text-white/40">🎁</span>
                           </div>
                         )}
                       </div>
 
                       <div style={{ padding: '16px' }}>
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs text-[#6B7280] leading-[1.4] font-normal">
+                          <span className="text-xs text-sakura-mid leading-[1.4] font-normal">
                             {t('promo_until')} {formatShortDate(item.end_date)}
                           </span>
                         </div>
 
-                        <h3 className="text-lg font-bold text-[#111827] leading-[1.4] line-clamp-3">
+                        <h3 className="text-lg font-bold text-sakura-deep/95 leading-[1.4] line-clamp-3">
                           {item.title}
                         </h3>
 
                         {item.description && (
-                          <p className="text-sm text-[#6B7280] leading-[1.5] mt-2 line-clamp-2">
+                          <p className="text-sm text-sakura-mid leading-[1.5] mt-2 line-clamp-2">
                             {item.description}
                           </p>
                         )}
@@ -468,33 +468,33 @@ const Promotions = () => {
             {listPromotions.length > 0 && (
               <div className="px-4 mt-6">
                 <div className="mb-4">
-                  <h2 className="text-[20px] font-bold text-[#111827] leading-[1.3]">
+                  <h2 className="text-[20px] font-bold text-sakura-deep/95 leading-[1.3]">
                     {t('promo_all_promotions')}
                   </h2>
                 </div>
-                <div className="bg-white rounded-xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+                <div className="bg-white/90 backdrop-blur-sm rounded-xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-sakura-border/20">
                   {listPromotions.map((item, index) => (
                     <div
                       key={item.id}
                       onClick={() => navigate(`/promotions/${item.id}`)}
-                      className="flex items-start cursor-pointer transition-all duration-200 hover:bg-gray-50 active:bg-gray-100"
+                      className="flex items-start cursor-pointer transition-all duration-200 hover:bg-white/70 active:bg-white/80"
                       style={{
                         padding: '16px',
                         gap: '16px',
-                        borderBottom: index < listPromotions.length - 1 ? '1px solid #E5E7EB' : 'none',
+                        borderBottom: index < listPromotions.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none',
                         minHeight: '100px'
                       }}
                     >
                       <div className="flex-1 min-w-0" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <p className="text-sm font-medium text-[#111827] leading-[1.5]" style={{ fontSize: '14px', fontWeight: 500 }}>
+                        <p className="text-sm font-medium text-sakura-deep/90 leading-[1.5]" style={{ fontSize: '14px', fontWeight: 500 }}>
                           {item.partner?.company_name || t('promo_promotion')}
                         </p>
 
-                        <h3 className="text-base font-semibold text-[#111827] leading-[1.5] line-clamp-2" style={{ fontSize: '16px', fontWeight: 600 }}>
+                        <h3 className="text-base font-semibold text-sakura-deep/95 leading-[1.5] line-clamp-2" style={{ fontSize: '16px', fontWeight: 600 }}>
                           {item.title}
                         </h3>
 
-                        <p className="text-xs text-[#6B7280] leading-[1.4]" style={{ fontSize: '12px', fontWeight: 400 }}>
+                        <p className="text-xs text-sakura-mid leading-[1.4]" style={{ fontSize: '12px', fontWeight: 400 }}>
                           {`${t('promo_until')} ${formatShortDate(item.end_date)}`}
                         </p>
                       </div>
@@ -513,14 +513,14 @@ const Promotions = () => {
                           />
                         ) : (
                           <div
-                            className="bg-gradient-to-br from-sakura-accent/70 via-sakura-mid/60 to-sakura-deep/70 flex items-center justify-center"
+                            className="bg-gradient-to-br from-sakura-accent/45 via-sakura-mid/35 to-sakura-deep/45 flex items-center justify-center"
                             style={{
                               width: '80px',
                               height: '80px',
                               borderRadius: '8px'
                             }}
                           >
-                            <span className="text-2xl text-white/30">🎁</span>
+                            <span className="text-2xl text-white/40">🎁</span>
                           </div>
                         )}
                       </div>

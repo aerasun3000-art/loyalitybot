@@ -8,6 +8,7 @@ import Home from './pages/Home'
 import Promotions from './pages/Promotions'
 import PromotionDetail from './pages/PromotionDetail'
 import Services from './pages/Services'
+import AllCategories from './pages/AllCategories'
 import History from './pages/History'
 import Profile from './pages/Profile'
 import News from './pages/News'
@@ -82,6 +83,7 @@ function AppContent() {
           <Route path="/promotions" element={<Promotions />} />
           <Route path="/promotions/:id" element={<PromotionDetail />} />
           <Route path="/services" element={<Services />} />
+          <Route path="/categories" element={<AllCategories />} />
           <Route path="/news" element={<News />} />
           <Route path="/news/:id" element={<NewsDetail />} />
           <Route path="/history" element={<History />} />

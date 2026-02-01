@@ -25,6 +25,7 @@ const translations = {
     home_points_ready: 'Баллов достаточно для обмена — выберите услугу!',
     home_services: 'Рейтинги',
     home_see_all: 'Все',
+    categories_page_title: 'Все категории',
     home_rewards: 'Награды',
     home_more: 'Ещё ...',
     
@@ -332,6 +333,7 @@ const translations = {
     home_points_ready: 'Enough points for a reward — pick a service!',
     home_services: 'Ratings',
     home_see_all: 'See all',
+    categories_page_title: 'All categories',
     home_rewards: 'Rewards',
     home_more: 'More ...',
     

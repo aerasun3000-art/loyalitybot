@@ -951,7 +951,7 @@ const Home = () => {
                     key="more"
                     onClick={() => {
                       hapticFeedback('light')
-                      navigate('/services')
+                      navigate('/categories')
                     }}
                     className="bg-gray-900 rounded-2xl p-3 md:p-4 cursor-pointer 
                                hover:scale-105 hover:shadow-lg 
