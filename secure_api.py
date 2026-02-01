@@ -252,6 +252,22 @@ def get_client_balance(request: Request, client_chat_id: str):
     return {"client_chat_id": client_chat_id, "balance": balance}
 
 
+@app.get(
+    "/api/referral-code/{chat_id}",
+    tags=["clients"],
+    summary="Получить или создать реферальный код",
+    description="Возвращает реферальный код пользователя; при отсутствии создаёт и сохраняет в БД (для отображения ссылки в веб-приложении)",
+    response_description="Реферальный код"
+)
+@limiter.limit("30/minute")
+def get_or_create_referral_code(request: Request, chat_id: str):
+    """Получение или создание реферального кода для пользователя (клиент или партнёр)."""
+    code = manager.get_or_create_referral_code(chat_id)
+    if not code:
+        raise HTTPException(status_code=400, detail="Не удалось получить или создать реферальный код")
+    return {"referral_code": code}
+
+
 @app.post(
     "/transactions",
     response_model=TransactionResponse,

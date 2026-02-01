@@ -1830,8 +1830,15 @@ export const getOrCreateReferralCode = async (chatId) => {
       return userData.referral_code
     }
 
-    // Если кода нет, создаём его через RPC функцию или просто возвращаем null
-    // (код должен создаваться на бэкенде при первом использовании)
+    // Если кода нет, запрашиваем создание на бэкенде (для веб-приложения)
+    const apiBaseUrl = getApiBaseUrl()
+    if (apiBaseUrl) {
+      const res = await fetch(`${apiBaseUrl}/api/referral-code/${encodeURIComponent(chatId)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.referral_code) return data.referral_code
+      }
+    }
     return null
   } catch (error) {
     console.error('Error in getOrCreateReferralCode:', error)
