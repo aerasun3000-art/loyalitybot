@@ -22,7 +22,7 @@ const AllCategories = () => {
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
 
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-sakura-deep/90 backdrop-blur-xl border-b border-sakura-border/40">
+      <div className="sticky top-0 z-20 bg-sakura-deep/15 backdrop-blur-xl border-b border-sakura-border/40">
         <div className="px-4 pt-14 pb-4 flex items-center gap-3">
           <button
             onClick={() => {
