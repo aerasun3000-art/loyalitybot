@@ -584,7 +584,7 @@ const Home = () => {
         {/* Карточка с балансом и прогрессом */}
         <div className="bg-gradient-to-br from-white/30 to-sakura-surface/28 backdrop-blur-sm rounded-xl p-4 shadow-xl border border-sakura-border/40 transition-shadow hover:shadow-2xl">
           <p className="text-sakura-deep font-bold text-base mb-3">
-            {t('home_balance_text')}
+            {t('home_value_title')}
           </p>
           
           {/* Баланс */}
@@ -619,6 +619,10 @@ const Home = () => {
 
           {/* Прогресс-бар статуса лояльности */}
           <LoyaltyProgress balance={balance} />
+
+          <p className="text-sakura-mid text-xs mt-3">
+            {t('home_balance_slogan')}
+          </p>
         </div>
 
         {/* Блок «Зарабатывай баллами на рекомендациях» */}

@@ -17,6 +17,8 @@ const translations = {
     // Home Page
     home_greeting: 'Привет',
     home_balance_text: 'Используйте баллы для получения услуг и скидок!',
+    home_value_title: 'Копи баллы и зарабатывай на любимых местах',
+    home_balance_slogan: 'Баллы за покупки и с покупок друзей по твоей ссылке',
     home_points: 'баллов',
     home_points_to_next_reward: 'До следующего вознаграждения осталось {points} {pointsWord}',
     home_points_ready: 'Баллов достаточно для обмена — выберите услугу!',
@@ -300,6 +302,8 @@ const translations = {
     // Home Page
     home_greeting: 'Hi',
     home_balance_text: 'Use points to get services and discounts!',
+    home_value_title: 'Earn points from your purchases and from friends\' purchases',
+    home_balance_slogan: 'Points from your purchases and friends\' purchases via your link',
     home_points: 'points',
     home_points_to_next_reward: '{points} points to the next reward',
     home_points_ready: 'Enough points for a reward — pick a service!',
