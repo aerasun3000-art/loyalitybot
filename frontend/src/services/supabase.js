@@ -234,7 +234,7 @@ export const getApprovedServices = async () => {
   // Получаем данные партнёров отдельным запросом
   const { data: partners, error: partnersError } = await supabase
     .from('partners')
-    .select('chat_id, name, company_name, city, district, business_type, username, contact_link, google_maps_link, work_mode, category_group, hero_image_url, image_url, photo_url')
+    .select('chat_id, name, company_name, city, district, business_type, username, contact_link, google_maps_link, work_mode, category_group, photo_url')
     .in('chat_id', partnerIds)
   
   if (partnersError) {
@@ -309,7 +309,7 @@ export const getFilteredServices = async (city = null, district = null, category
     
     const { data: partners, error: partnersError } = await supabase
       .from('partners')
-      .select('chat_id, name, company_name, city, district, business_type, username, contact_link, booking_url, google_maps_link, work_mode, category_group, hero_image_url, image_url, photo_url')
+      .select('chat_id, name, company_name, city, district, business_type, username, contact_link, booking_url, google_maps_link, work_mode, category_group, photo_url')
       .in('chat_id', partnerIdsStr)
     
     if (!partnersError && partners) {

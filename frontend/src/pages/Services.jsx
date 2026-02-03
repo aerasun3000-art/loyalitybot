@@ -37,7 +37,7 @@ const Services = () => {
   const [loading, setLoading] = useState(true)
   const [services, setServices] = useState([])
   const [balance, setBalance] = useState(0)
-  const [filter, setFilter] = useState('none') // none, all, my_district, favorites, search
+  const [filter, setFilter] = useState('all') // none, all, my_district, favorites, search
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [expandedItem, setExpandedItem] = useState(null) // ID раскрытого элемента
@@ -259,29 +259,6 @@ const Services = () => {
 
   const favoritePartnerIdsSet = useMemo(() => new Set(favoritePartnerIds), [favoritePartnerIds])
 
-  const doesServiceMatchCurrentFilter = (service) => {
-    const partner = service.partner
-    const partnerId = service.partner_chat_id
-    const mockGroup = { partner, partnerId }
-
-    if (filter === 'my_district') {
-      return matchesDistrict(mockGroup)
-    }
-
-    if (filter === 'favorites') {
-      if (!partnerId || !favoritePartnerIdsSet.has(partnerId)) {
-        return false
-      }
-      return matchesCity(mockGroup)
-    }
-
-    if (filter === 'all') {
-      return isOnlinePartner(partner)
-    }
-
-    return matchesCity(mockGroup)
-  }
-
   const categoryOptions = useMemo(() => {
     const optionMap = new Map()
     // Находим основную категорию для каждого партнёра
@@ -358,7 +335,7 @@ const Services = () => {
     hapticFeedback('light')
     setCategoryFilter(null)
     setExpandedItem(null)
-    setFilter('none')
+    setFilter('all')
     setIsCategoryMenuOpen(false)
     const params = new URLSearchParams(searchParams)
     params.delete('category')
@@ -480,77 +457,31 @@ const Services = () => {
   }, [categoryFilter, services.length, loading, isEmptyCategoryModalOpen])
 
   const getFilteredGroups = () => {
+    let groups = getGroupedServices()
+
     // Обработка category_group: фильтруем по всем категориям из группы
-    let allowedCategories = null
     if (categoryGroupParam) {
       const group = getCategoryGroupByCode(categoryGroupParam)
       if (group && group.categories) {
-        allowedCategories = new Set(group.categories.map(cat => normalizeCategoryCode(cat)).filter(Boolean))
+        const allowedCategories = new Set(
+          group.categories.map(cat => normalizeCategoryCode(cat)).filter(Boolean)
+        )
+        groups = groups.filter(g => allowedCategories.has(normalizeCategoryCode(g.categoryCode)))
       }
     }
 
-    if (!categoryFilter && !allowedCategories) {
-      const categoryMap = new Map()
-      const query = debouncedQuery.trim().toLowerCase()
-
-      services.forEach(service => {
-        const rawCode = service.partner?.business_type || service.category
-        if (!rawCode) return
-
-        // Скрываем конкурентов (партнеров с той же категорией услуг, что и партнер, который добавил клиента)
-        // НО показываем услуги самого партнера, который добавил клиента
-        if (isCompetitor(service)) {
-          return
-        }
-
-        if (!doesServiceMatchCurrentFilter(service)) {
-          return
-        }
-
-        const canonicalCode = normalizeCategoryCode(rawCode)
-        if (!canonicalCode) return
-        const categoryData = resolveCategory(canonicalCode)
-        if (!categoryData) return
-
-        if (filter === 'search' && query) {
-          const categoryNameRu = (categoryData.name || '').toLowerCase()
-          const categoryNameEn = (categoryData.nameEn || '').toLowerCase()
-          const serviceTitle = (service.title || '').toLowerCase()
-          if (!categoryNameRu.includes(query) && !categoryNameEn.includes(query) && !serviceTitle.includes(query)) {
-            return
-          }
-        }
-
-        if (!categoryMap.has(canonicalCode)) {
-          categoryMap.set(canonicalCode, {
-            id: canonicalCode,
-            categoryCode: canonicalCode,
-            categoryName: categoryData.name,
-            categoryEmoji: categoryData.emoji || '⭐',
-            displayOrder: categoryData.displayOrder || 999,
-            isCategoryOnly: true
-          })
-        }
-      })
-
-      return Array.from(categoryMap.values()).sort(
-        (a, b) => getCategorySortValue(a.categoryCode) - getCategorySortValue(b.categoryCode)
-      )
+    // Фильтр по конкретной категории
+    if (categoryFilter) {
+      const canonical = normalizeCategoryCode(categoryFilter)
+      groups = groups.filter(group => normalizeCategoryCode(group.categoryCode) === canonical)
     }
 
-    let groups = getGroupedServices()
-      .filter(group => {
-        const groupCategory = normalizeCategoryCode(group.categoryCode)
-        // Если есть category_group, фильтруем по всем категориям из группы
-        if (allowedCategories) {
-          return allowedCategories.has(groupCategory)
-        }
-        // Иначе фильтруем по выбранной категории
-        return groupCategory === categoryFilter
-      })
-      // Скрываем конкурентов (партнеров с той же категорией услуг)
-      // НО показываем услуги самого партнера, который добавил клиента
-      .filter(group => !isCompetitor({ partner: group.partner, partner_chat_id: group.partnerId, category: group.categoryCode }))
+    // Скрываем конкурентов (кроме партнёра, который добавил клиента)
+    groups = groups.filter(group => !isCompetitor({
+      partner: group.partner,
+      partner_chat_id: group.partnerId,
+      category: group.categoryCode
+    }))
 
     if (filter === 'my_district') {
       groups = groups.filter(matchesDistrict)
@@ -598,26 +529,59 @@ const Services = () => {
   const sortedGroups = useMemo(() => {
     if (sortBy === 'rating') {
       return [...filteredGroups].sort((a, b) => {
-        if (a.isCategoryOnly || b.isCategoryOnly) return 0
         return (b.rating || 0) - (a.rating || 0)
       })
     }
     if (sortBy === 'nps') {
       return [...filteredGroups].sort((a, b) => {
-        if (a.isCategoryOnly || b.isCategoryOnly) return 0
         return (b.npsScore || 0) - (a.npsScore || 0)
       })
     }
     return filteredGroups
   }, [filteredGroups, sortBy])
 
+  const rankingMap = useMemo(() => {
+    const map = new Map()
+    sortedGroups.forEach((group, index) => {
+      if (group?.id) {
+        map.set(group.id, index + 1)
+      }
+    })
+    return map
+  }, [sortedGroups])
+
+  const topHighlightIds = useMemo(() => {
+    return new Set(sortedGroups.slice(0, 3).map(group => group.id))
+  }, [sortedGroups])
+
+  const groupedSections = useMemo(() => {
+    const sectionMap = new Map()
+
+    sortedGroups.forEach(group => {
+      if (!group) return
+      const canonical = normalizeCategoryCode(group.categoryCode) || group.categoryCode || 'other'
+      if (!sectionMap.has(canonical)) {
+        sectionMap.set(canonical, {
+          key: canonical,
+          title: group.categoryName,
+          emoji: group.categoryEmoji || '⭐',
+          order: getCategorySortValue(group.categoryCode),
+          items: []
+        })
+      }
+      sectionMap.get(canonical).items.push(group)
+    })
+
+    return Array.from(sectionMap.values())
+      .sort((a, b) => a.order - b.order)
+      .map(section => ({
+        ...section,
+        items: section.items
+      }))
+  }, [sortedGroups, normalizeCategoryCode, getCategorySortValue])
+
   const handleFilterChange = (newFilter) => {
     hapticFeedback('light')
-
-    if (newFilter === 'all' && !categoryFilter) {
-      setIsCategoryMenuOpen(true)
-      return
-    }
 
     const nextFilter = filter === newFilter ? 'none' : newFilter
 
@@ -645,7 +609,7 @@ const Services = () => {
     // Отправляем уведомление партнёру о заинтересованности клиента
     if (chatId) {
       const group = filteredGroups.find(g => g.id === groupId)
-      if (group && group.partnerId && !group.isCategoryOnly) {
+      if (group && group.partnerId) {
         try {
           const clientUsername = getUsername()
           await notifyPartnerInterest(group.partnerId, chatId, clientUsername)
@@ -1007,7 +971,7 @@ const Services = () => {
                 onClick={() => { hapticFeedback('medium'); setFilter('all') }}
                 className="w-full py-2.5 rounded-full bg-sakura-accent text-white font-semibold text-sm"
               >
-                {language === 'ru' ? 'Показать онлайн-мастеров' : 'Show online masters'}
+                {language === 'ru' ? 'Показать мировой ТОП' : 'Show world TOP'}
               </button>
               <button
                 onClick={() => { hapticFeedback('light'); setFilter('none'); setSearchQuery(''); resetCategoryFilter() }}
@@ -1018,198 +982,194 @@ const Services = () => {
             </div>
           </div>
         ) : (
-          sortedGroups.map((group) => {
-            const isExpanded = !group.isCategoryOnly && expandedItem === group.id
-            
-            return (
-              <div
-                key={group.id}
-                className="bg-sakura-surface/5 backdrop-blur-lg rounded-2xl border border-sakura-border/40 shadow-lg overflow-hidden"
-              >
-                {/* Основная строка */}
-                <div 
-                  className="flex items-center gap-4 p-4 cursor-pointer hover:bg-sakura-surface/10 transition-colors"
-                  onClick={(e) => {
-                    if (group.isCategoryOnly) {
-                      handleCategorySelect(group.categoryCode)
-                      return
-                    }
-                    // Не раскрываем, если клик был на кнопке play (она обработает сама)
-                    if (e.target.closest('button')) {
-                      return
-                    }
-                    handlePlayClick(group.id, e)
-                  }}
-                >
-                  {/* Фото партнёра или иконка категории */}
-                  {(() => {
-                    const photoUrl = group.partner?.hero_image_url || group.partner?.image_url || group.partner?.photo_url
-                    return (
-                      <div className="flex-shrink-0 w-16 h-16 rounded-full overflow-hidden bg-sakura-surface/10 flex items-center justify-center border border-sakura-border/40">
-                        {photoUrl ? (
-                          <img
-                            src={photoUrl}
-                            alt={group.companyName}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-3xl leading-none">{group.categoryEmoji}</span>
-                        )}
-                      </div>
-                    )
-                  })()}
+          groupedSections.map((section) => (
+            <div key={section.key} className="space-y-3">
+              <div className="flex items-center gap-2 px-1 pt-4">
+                <span className="text-2xl">{section.emoji}</span>
+                <h2 className="text-lg font-bold text-sakura-dark/80 tracking-wide uppercase">
+                  {section.title}
+                </h2>
+              </div>
+              <div className="space-y-2">
+                {section.items.map((group) => {
+                  const isExpanded = expandedItem === group.id
+                  const rank = rankingMap.get(group.id) || sortedGroups.indexOf(group) + 1
+                  const ratingDisplay = group.ratingsCount > 0 ? group.rating.toFixed(1) : '—'
 
-                  {/* Текстовая информация */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-sakura-dark mb-1 adaptive-text">
-                      {group.categoryName}
-                    </h3>
-                    {!group.isCategoryOnly && (
-                      <>
-                        <p className="text-sm text-sakura-dark/70 mb-1 adaptive-subtext">
-                          {group.companyName}
-                        </p>
-                        <div className="flex items-center gap-3 text-xs text-sakura-dark/60">
-                          {/* Средняя оценка */}
-                          {group.ratingsCount > 0 && (
-                            <div className="flex items-center gap-1">
-                              <span>⭐</span>
-                              <span className="font-semibold">{group.rating.toFixed(1)}</span>
-                              <span className="text-sakura-dark/50">({group.ratingsCount})</span>
-                            </div>
-                          )}
-                          {/* NPS Score */}
-                          {group.ratingsCount > 0 && group.npsScore !== 0 && (
-                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
-                              group.npsScore >= 50 ? 'bg-green-100/80 text-green-700' :
-                              group.npsScore >= 0 ? 'bg-yellow-100/80 text-yellow-700' :
-                              'bg-red-100/80 text-red-700'
-                            }`}>
-                              <span className="font-semibold">NPS</span>
-                              <span className="font-bold">{group.npsScore > 0 ? '+' : ''}{group.npsScore}</span>
-                            </div>
-                          )}
-                          {/* Если нет отзывов */}
-                          {group.ratingsCount === 0 && (
-                            <span className="text-sakura-dark/40 italic">Нет отзывов</span>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  let containerHighlight = 'bg-sakura-surface/15 border-sakura-border/40'
+                  let rankBadge = 'bg-sakura-surface/40 text-sakura-dark/70'
+                  if (rank === 1) {
+                    containerHighlight = 'bg-gradient-to-r from-amber-200/80 to-amber-100/60 border-amber-300/70 shadow-xl'
+                    rankBadge = 'bg-amber-500 text-white'
+                  } else if (rank === 2) {
+                    containerHighlight = 'bg-gradient-to-r from-sky-200/80 to-sky-100/60 border-sky-300/70 shadow-xl'
+                    rankBadge = 'bg-sky-500 text-white'
+                  } else if (rank === 3) {
+                    containerHighlight = 'bg-gradient-to-r from-violet-200/80 to-violet-100/60 border-violet-300/70 shadow-xl'
+                    rankBadge = 'bg-violet-500 text-white'
+                  }
 
-                  {/* Любимые (оценённые) — только для карточки партнёра */}
-                  {!group.isCategoryOnly && group.partnerId && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (favoritePartnerIdsSet.has(group.partnerId)) return
-                        hapticFeedback('light')
-                        setQuickRatingModal({ open: true, group, rating: 0 })
-                      }}
-                      className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sakura-dark/80 hover:bg-sakura-surface/30 transition-colors"
-                      title={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'Уже в любимых' : 'Already in favorites') : (language === 'ru' ? 'Оценить и добавить в любимые' : 'Rate and add to favorites')}
-                      aria-label={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'В любимых' : 'In favorites') : (language === 'ru' ? 'Добавить в любимые' : 'Add to favorites')}
+                  let npsClass = 'bg-sakura-surface/40 text-sakura-dark/70'
+                  if (group.npsScore >= 50) {
+                    npsClass = 'bg-green-100 text-green-700'
+                  } else if (group.npsScore > 0) {
+                    npsClass = 'bg-yellow-100 text-yellow-700'
+                  } else if (group.npsScore < 0) {
+                    npsClass = 'bg-red-100 text-red-700'
+                  }
+
+                  const photoUrl = group.partner?.photo_url
+
+                  return (
+                    <div
+                      key={group.id}
+                      className={`backdrop-blur-lg rounded-3xl border transition-all duration-300 overflow-hidden ${containerHighlight}`}
                     >
-                      {favoritePartnerIdsSet.has(group.partnerId) ? (
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" className="text-red-500">
-                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                        </svg>
-                      ) : (
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                        </svg>
-                      )}
-                    </button>
-                  )}
-
-                  {/* Кнопка play */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (group.isCategoryOnly) {
-                        handleCategorySelect(group.categoryCode)
-                        return
-                      }
-                      handlePlayClick(group.id, e)
-                    }}
-                    className="flex-shrink-0 w-10 h-10 rounded-full bg-sakura-surface/50 border border-sakura-border/60 flex items-center justify-center text-sakura-dark hover:bg-sakura-surface/60 transition-colors"
-                  >
-                    {group.isCategoryOnly ? (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
+                      <div
+                        className="flex items-center gap-4 p-4 cursor-pointer"
+                        onClick={(e) => {
+                          if (e.target.closest('button')) {
+                            return
+                          }
+                          handlePlayClick(group.id, e)
+                        }}
                       >
-                        <path d="M9 6l6 6-6 6" />
-                      </svg>
-                    ) : isExpanded ? (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                      >
-                        <path d="M6 9l6 6 6-6" />
-                      </svg>
-                    ) : (
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-
-                {/* Раскрывающееся меню со списком услуг */}
-                {!group.isCategoryOnly && isExpanded && (
-                  <div 
-                    className="border-t border-sakura-border/40 bg-sakura-surface/10"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
-                      {group.services.map((service) => (
-                        <div
-                          key={service.id}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleServiceClick(service)
-                          }}
-                          className="flex items-center justify-between p-3 rounded-lg bg-sakura-surface/5 border border-sakura-border/20 hover:bg-sakura-surface/10 cursor-pointer transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-semibold text-sakura-dark mb-1">
-                              {service.title}
-                            </h4>
-                            {service.description && (
-                              <p className="text-xs text-sakura-dark/60 line-clamp-1">
-                                {service.description}
-                              </p>
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <div className={`flex flex-col items-center justify-center w-10 shrink-0 text-xs font-bold uppercase ${rank <= 3 ? 'text-sakura-deep' : 'text-sakura-dark/60'}`}>
+                            <span className={`px-2 py-1 rounded-full ${rankBadge}`}>#{rank}</span>
+                          </div>
+                          <div className="relative w-14 h-14 shrink-0 rounded-full overflow-hidden border border-white/40 bg-sakura-surface/40 shadow-inner">
+                            {photoUrl ? (
+                              <img
+                                src={photoUrl}
+                                alt={group.companyName}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-2xl">
+                                {group.categoryEmoji || '⭐'}
+                              </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 ml-3">
-                            <span className="text-xs text-sakura-dark/80">💸</span>
-                            <span className="text-sm font-bold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                              {formatPriceWithPoints(service.price_points, currency, rates, true, language)}
-                            </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-lg font-semibold text-sakura-dark/90 truncate">
+                                {group.companyName}
+                              </h3>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-white/60 text-sakura-dark/70">
+                                {group.categoryName}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex items-center gap-3 text-xs text-sakura-dark/70 flex-wrap">
+                              {group.ratingsCount > 0 ? (
+                                <span>⭐ {group.rating.toFixed(1)} ({group.ratingsCount})</span>
+                              ) : (
+                                <span className="italic text-sakura-dark/50">{language === 'ru' ? 'Нет отзывов' : 'No reviews yet'}</span>
+                              )}
+                              <span className="text-sakura-dark/40">•</span>
+                              <span className="text-sakura-dark/70">
+                                {language === 'ru' ? `${group.services.length} услуг` : `${group.services.length} services`}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      ))}
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <span className={`text-2xl font-extrabold ${group.ratingsCount > 0 ? 'text-sakura-deep drop-shadow-[0_1px_4px_rgba(255,255,255,0.6)]' : 'text-sakura-dark/40'}`}>
+                            {ratingDisplay}
+                          </span>
+                          {group.npsScore !== 0 && (
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${npsClass}`}>
+                              NPS {group.npsScore > 0 ? `+${group.npsScore}` : group.npsScore}
+                            </span>
+                          )}
+                          <div className="flex items-center gap-2">
+                            {group.partnerId && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (favoritePartnerIdsSet.has(group.partnerId)) return
+                                  hapticFeedback('light')
+                                  setQuickRatingModal({ open: true, group, rating: 0 })
+                                }}
+                                className={`p-2 rounded-full border transition-colors ${favoritePartnerIdsSet.has(group.partnerId) ? 'border-red-300 bg-red-100 text-red-600' : 'border-sakura-border/60 bg-white/70 text-sakura-dark/70 hover:border-sakura-accent'}`}
+                                title={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'Уже в любимых' : 'Already in favorites') : (language === 'ru' ? 'Оценить и добавить в любимые' : 'Rate and add to favorites')}
+                                aria-label={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'В любимых' : 'In favorites') : (language === 'ru' ? 'Добавить в любимые' : 'Add to favorites')}
+                              >
+                                {favoritePartnerIdsSet.has(group.partnerId) ? (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                                  </svg>
+                                ) : (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                                  </svg>
+                                )}
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handlePlayClick(group.id, e)
+                              }}
+                              className="p-2 rounded-full border border-sakura-border/60 bg-white/70 text-sakura-dark hover:border-sakura-accent transition-colors"
+                              aria-label={isExpanded ? (language === 'ru' ? 'Свернуть' : 'Collapse') : (language === 'ru' ? 'Подробнее' : 'Details')}
+                            >
+                              {isExpanded ? (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M6 15l6-6 6 6" />
+                                </svg>
+                              ) : (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M6 9l6 6 6-6" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div 
+                          className="border-t border-sakura-border/30 bg-white/60"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
+                            {group.services.map((service) => (
+                              <div
+                                key={service.id}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleServiceClick(service)
+                                }}
+                                className="flex items-center justify-between p-3 rounded-xl bg-sakura-surface/10 border border-sakura-border/20 hover:bg-sakura-surface/20 cursor-pointer transition-colors"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-sm font-semibold text-sakura-dark mb-1">
+                                    {service.title}
+                                  </h4>
+                                  {service.description && (
+                                    <p className="text-xs text-sakura-dark/60 line-clamp-1">
+                                      {service.description}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 ml-3">
+                                  <span className="text-xs text-sakura-dark/80">💸</span>
+                                  <span className="text-sm font-bold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+                                    {formatPriceWithPoints(service.price_points, currency, rates, true, language)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  )
+                })}
               </div>
-            )
-          })
+            </div>
+          ))
         )}
       </div>
 

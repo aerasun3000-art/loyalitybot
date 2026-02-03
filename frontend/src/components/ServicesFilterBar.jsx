@@ -26,7 +26,7 @@ export default function ServicesFilterBar({
               : 'bg-sakura-surface/40 text-sakura-dark border border-sakura-border/50'
           }`}
         >
-          {language === 'ru' ? 'Онлайн' : 'Online'}
+          {language === 'ru' ? 'Мировой ТОП' : 'World TOP'}
         </button>
         <button
           onClick={() => handleFilterChange('my_district')}
@@ -36,7 +36,7 @@ export default function ServicesFilterBar({
               : 'bg-sakura-surface/40 text-sakura-dark border border-sakura-border/50'
           }`}
         >
-          {language === 'ru' ? 'Мой район' : 'My district'}
+          {language === 'ru' ? 'ТОП моего города' : 'Top in my city'}
         </button>
         <button
           onClick={() => handleFilterChange('favorites')}
@@ -46,7 +46,7 @@ export default function ServicesFilterBar({
               : 'bg-sakura-surface/40 text-sakura-dark border border-sakura-border/50'
           }`}
         >
-          {language === 'ru' ? 'Любимые' : 'Favorites'}
+          {language === 'ru' ? 'Мои любимые' : 'My favorites'}
         </button>
         <button
           onClick={() => handleFilterChange('search')}
@@ -56,7 +56,7 @@ export default function ServicesFilterBar({
               : 'bg-sakura-surface/40 text-sakura-dark border border-sakura-border/50'
           }`}
         >
-          {language === 'ru' ? 'Поиск по услуге' : 'Search'}
+          {language === 'ru' ? 'Поиск по услуге' : 'Service search'}
         </button>
       </div>
 
@@ -64,10 +64,10 @@ export default function ServicesFilterBar({
       {filter !== 'none' && (
         <p className="text-xs text-sakura-dark/70 mt-1">
           {language === 'ru' ? 'Сейчас: ' : 'Active: '}
-          {filter === 'all' && (language === 'ru' ? 'Онлайн' : 'Online')}
-          {filter === 'my_district' && (language === 'ru' ? 'Мой район' : 'My district')}
-          {filter === 'favorites' && (language === 'ru' ? 'Любимые' : 'Favorites')}
-          {filter === 'search' && (language === 'ru' ? 'Поиск по услуге' : 'Search')}
+          {filter === 'all' && (language === 'ru' ? 'Мировой ТОП' : 'World TOP')}
+          {filter === 'my_district' && (language === 'ru' ? 'ТОП моего города' : 'Top in my city')}
+          {filter === 'favorites' && (language === 'ru' ? 'Мои любимые' : 'My favorites')}
+          {filter === 'search' && (language === 'ru' ? 'Поиск по услуге' : 'Service search')}
         </p>
       )}
 
