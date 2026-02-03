@@ -1041,10 +1041,23 @@ const Services = () => {
                     handlePlayClick(group.id, e)
                   }}
                 >
-                  {/* Иконка категории */}
-                  <div className="flex-shrink-0 w-16 h-16 rounded-xl bg-sakura-surface/10 flex items-center justify-center border border-sakura-border/40">
-                    <span className="text-3xl leading-none">{group.categoryEmoji}</span>
-                  </div>
+                  {/* Фото партнёра или иконка категории */}
+                  {(() => {
+                    const photoUrl = group.partner?.hero_image_url || group.partner?.image_url || group.partner?.photo_url
+                    return (
+                      <div className="flex-shrink-0 w-16 h-16 rounded-full overflow-hidden bg-sakura-surface/10 flex items-center justify-center border border-sakura-border/40">
+                        {photoUrl ? (
+                          <img
+                            src={photoUrl}
+                            alt={group.companyName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-3xl leading-none">{group.categoryEmoji}</span>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   {/* Текстовая информация */}
                   <div className="flex-1 min-w-0">

@@ -327,6 +327,7 @@ const PartnerAnalytics = () => {
         district: editFormData.work_mode === 'online' ? 'All' : (editFormData.district || 'All'),
         username: editFormData.username?.replace('@', '').trim() || null,
         booking_url: editFormData.booking_url?.trim() || null,
+        photo_url: editFormData.photo_url?.trim() || null,
         default_referral_commission_percent: parseFloat(editFormData.default_referral_commission_percent) || 10
       };
       
@@ -454,6 +455,7 @@ const PartnerAnalytics = () => {
                       district: partnerData.district || '',
                       username: partnerData.username || '',
                       booking_url: partnerData.booking_url || '',
+                      photo_url: partnerData.photo_url || '',
                       category_group: partnerData.category_group || '',
                       business_type: partnerData.business_type || '',
                       work_mode: partnerData.work_mode || 'offline',
@@ -498,6 +500,7 @@ const PartnerAnalytics = () => {
                      partnerData.category_group === 'entertainment' ? '🎬 Развлечения' :
                      partnerData.category_group === 'healthcare' ? '🏥 Здравоохранение' :
                      partnerData.category_group === 'services' ? '🧹 Услуги' :
+                     partnerData.category_group === 'self_discovery' ? '🔮 Самопознание' :
                      partnerData.category_group === 'influencer' ? '🤳 Блогер' :
                      partnerData.category_group === 'b2b' ? '🏢 B2B' :
                      partnerData.category_group || 'Не указано'}
@@ -544,6 +547,18 @@ const PartnerAnalytics = () => {
                         {partnerData.booking_url}
                       </a>
                     </p>
+                  </div>
+                )}
+                {partnerData.photo_url && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Фото для карточек</label>
+                    <div className="mt-1">
+                      <img
+                        src={partnerData.photo_url}
+                        alt={partnerData.company_name || 'Фото партнёра'}
+                        className="w-16 h-16 rounded-full object-cover border border-gray-200 dark:border-gray-600"
+                      />
+                    </div>
                   </div>
                 )}
                 <div>
@@ -614,6 +629,7 @@ const PartnerAnalytics = () => {
                       <option value="entertainment">🎬 Развлечения</option>
                       <option value="healthcare">🏥 Здравоохранение</option>
                       <option value="services">🧹 Услуги</option>
+                      <option value="self_discovery">🔮 Самопознание</option>
                       <option value="influencer">🤳 Блогер/Инфлюенсер</option>
                       <option value="b2b">🏢 B2B</option>
                     </select>
@@ -738,6 +754,20 @@ const PartnerAnalytics = () => {
                       placeholder="https://example.com/booking"
                     />
                     {editErrors.booking_url && <p className="text-red-500 text-xs mt-1">{editErrors.booking_url}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      URL фото для карточек (необязательно)
+                    </label>
+                    <input
+                      type="url"
+                      value={editFormData.photo_url || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, photo_url: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="https://example.com/photo.jpg"
+                    />
+                    <p className="text-gray-500 text-xs mt-1">Ссылка на фото. Будет показано в каталоге услуг вместо иконки категории.</p>
+                    {editErrors.photo_url && <p className="text-red-500 text-xs mt-1">{editErrors.photo_url}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
