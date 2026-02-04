@@ -990,10 +990,11 @@ const Services = () => {
                   {section.title}
                 </h2>
               </div>
-              <div className="space-y-2">
-                {section.items.map((group) => {
+              <div className="space-y-1.5">
+                {section.items.map((group, index) => {
                   const isExpanded = expandedItem === group.id
-                  const rank = rankingMap.get(group.id) || sortedGroups.indexOf(group) + 1
+                  // Ранг внутри секции (каждая категория начинается с #1)
+                  const rank = index + 1
                   const ratingDisplay = group.ratingsCount > 0 ? group.rating.toFixed(1) : '—'
 
                   let containerHighlight = 'bg-sakura-surface/15 border-sakura-border/40'
@@ -1026,7 +1027,7 @@ const Services = () => {
                       className={`backdrop-blur-lg rounded-3xl border transition-all duration-300 overflow-hidden ${containerHighlight}`}
                     >
                       <div
-                        className="flex items-center gap-4 p-4 cursor-pointer"
+                        className="flex items-center gap-3 px-4 py-3 cursor-pointer"
                         onClick={(e) => {
                           if (e.target.closest('button')) {
                             return
@@ -1034,11 +1035,11 @@ const Services = () => {
                           handlePlayClick(group.id, e)
                         }}
                       >
-                        <div className="flex items-center gap-4 flex-1 min-w-0">
-                          <div className={`flex flex-col items-center justify-center w-10 shrink-0 text-xs font-bold uppercase ${rank <= 3 ? 'text-sakura-deep' : 'text-sakura-dark/60'}`}>
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className={`flex flex-col items-center justify-center w-9 shrink-0 text-xs font-bold uppercase ${rank <= 3 ? 'text-sakura-deep' : 'text-sakura-dark/60'}`}>
                             <span className={`px-2 py-1 rounded-full ${rankBadge}`}>#{rank}</span>
                           </div>
-                          <div className="relative w-14 h-14 shrink-0 rounded-full overflow-hidden border border-white/40 bg-sakura-surface/40 shadow-inner">
+                          <div className="relative w-12 h-12 shrink-0 rounded-full overflow-hidden border border-white/40 bg-sakura-surface/40 shadow-inner">
                             {photoUrl ? (
                               <img
                                 src={photoUrl}
