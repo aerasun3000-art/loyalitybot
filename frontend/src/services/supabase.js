@@ -273,6 +273,52 @@ export const getApprovedServices = async () => {
 }
 
 /**
+ * Получить все услуги всех партнёров для модератора (без фильтра по approval_status и is_active)
+ */
+export const getAllServicesForModerator = async () => {
+  const { data: services, error: servicesError } = await supabase
+    .from('services')
+    .select('*')
+    .order('price_points', { ascending: true })
+
+  if (servicesError) {
+    console.error('Error fetching services for moderator:', servicesError)
+    return []
+  }
+
+  if (!services || services.length === 0) {
+    return []
+  }
+
+  const partnerIds = [...new Set(services.map(s => s.partner_chat_id).filter(Boolean))]
+  if (partnerIds.length === 0) {
+    return services.map(s => ({ ...s, partner: null }))
+  }
+
+  const { data: partners, error: partnersError } = await supabase
+    .from('partners')
+    .select('chat_id, name, company_name, city, district, business_type, username, contact_link, google_maps_link, work_mode, category_group, photo_url')
+    .in('chat_id', partnerIds)
+
+  if (partnersError) {
+    console.error('Error fetching partners for moderator:', partnersError)
+    return services.map(s => ({ ...s, partner: null }))
+  }
+
+  const partnersMap = {}
+  if (partners && partners.length > 0) {
+    partners.forEach(p => {
+      partnersMap[String(p.chat_id)] = p
+    })
+  }
+
+  return services.map(service => ({
+    ...service,
+    partner: partnersMap[String(service.partner_chat_id)] || null
+  }))
+}
+
+/**
  * Получить услуги с фильтрацией по городу и району
  */
 export const getFilteredServices = async (city = null, district = null, category = null) => {
@@ -577,6 +623,32 @@ export const getPartnerInfo = async (partnerChatId) => {
   }
   
   return null
+}
+
+/**
+ * Получить роль пользователя из app_roles (moderator, admin).
+ * Роль модератора первичнее пригласившего партнёра.
+ */
+export const getUserRole = async (chatId) => {
+  if (!chatId) return null
+  const { data, error } = await supabase
+    .from('app_roles')
+    .select('role')
+    .eq('chat_id', String(chatId))
+    .maybeSingle()
+  if (error) {
+    console.error('Error fetching user role:', error)
+    return null
+  }
+  return data?.role ?? null
+}
+
+/**
+ * Проверить, является ли пользователь модератором или админом (доступ к просмотру всех услуг)
+ */
+export const isModerator = async (chatId) => {
+  const role = await getUserRole(chatId)
+  return role === 'moderator' || role === 'admin'
 }
 
 /**

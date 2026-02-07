@@ -20,6 +20,7 @@ import TermsOfService from './pages/TermsOfService'
 import Analytics from './pages/Analytics'
 import PartnerAnalytics from './pages/PartnerAnalytics'
 import AdminAnalytics from './pages/AdminAnalytics'
+import ModeratorServices from './pages/ModeratorServices'
 import OnePagerPartner from './pages/OnePagerPartner'
 import OnePagerClient from './pages/OnePagerClient'
 import OnePagerInvestor from './pages/OnePagerInvestor'
@@ -45,6 +46,7 @@ const PUBLIC_ROUTES = [
   '/partner/beauty-presentation',
   '/partner/analytics',
   '/admin/analytics',
+  '/moderator/services',
   '/partner/apply',
   '/availability-map',
   '/privacy',
@@ -100,6 +102,7 @@ function AppContent() {
           {/* Публичные роуты для дашбордов и одностраничников */}
           <Route path="/partner/analytics" element={<PartnerAnalytics />} />
           <Route path="/admin/analytics" element={<AdminAnalytics />} />
+          <Route path="/moderator/services" element={<ModeratorServices />} />
           <Route path="/onepager/partner" element={<OnePagerPartner />} />
           <Route path="/onepager/client" element={<OnePagerClient />} />
           <Route path="/onepager/investor" element={<OnePagerInvestor />} />
