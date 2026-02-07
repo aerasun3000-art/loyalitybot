@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
-import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage, getReferralPartnerInfo, getReferralStats, getOrCreateReferralCode, getOnboardingSeen, setOnboardingSeen } from '../services/supabase'
+import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage, getReferralPartnerInfo, getReferralStats, getOrCreateReferralCode, getOnboardingSeen, setOnboardingSeen, isApprovedPartner } from '../services/supabase'
 import { getServiceIcon, getMainPageCategories, getCategoryByCode, getAllCategoryGroups, serviceCategories } from '../utils/serviceIcons'
 import { shareReferralLink, buildReferralLink } from '../utils/referralShare'
 import { useTranslation, translateDynamicContent, declinePoints } from '../utils/i18n'
@@ -243,8 +243,11 @@ const Home = () => {
     try {
       setLoading(true)
       
-      // Получаем информацию о партнере, который добавил клиента
-      const partnerInfo = await getReferralPartnerInfo(chatId)
+      // Получаем информацию о партнере, который добавил клиента и проверяем, является ли текущий пользователь партнёром
+      const [partnerInfo, isPartnerUser] = await Promise.all([
+        getReferralPartnerInfo(chatId),
+        chatId ? isApprovedPartner(chatId) : Promise.resolve(false)
+      ])
       setReferralPartnerInfo(partnerInfo)
       
       // Загружаем данные параллельно
@@ -268,8 +271,8 @@ const Home = () => {
       }
       setPopularCategories(categories || [])
       
-      // Фильтруем конкурентов перед сортировкой
-      const filteredServices = filterCompetitors(servicesData, partnerInfo)
+      // Фильтруем конкурентов перед сортировкой (для партнёров ограничения не применяем — показываем все услуги)
+      const filteredServices = filterCompetitors(servicesData, isPartnerUser ? null : partnerInfo)
       
       // Сортируем услуги по популярности категорий
       const sortedServices = sortServicesByPopularity(filteredServices, categories)

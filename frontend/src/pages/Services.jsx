@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, getPromotionsForService, notifyPartnerInterest, upsertNpsRating } from '../services/supabase'
+import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, getPromotionsForService, notifyPartnerInterest, upsertNpsRating, isApprovedPartner } from '../services/supabase'
 import { getChatId, getUsername, hapticFeedback, showAlert, openTelegramLink } from '../utils/telegram'
 import { getCategoryByCode, serviceCategories, getAllServiceCategories, getCategoryGroupByCode } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
@@ -54,6 +54,7 @@ const Services = () => {
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false)
   const [partnersMetrics, setPartnersMetrics] = useState({})
   const [referralPartnerInfo, setReferralPartnerInfo] = useState(null)
+  const [isPartnerUser, setIsPartnerUser] = useState(false)
   const [servicePromotions, setServicePromotions] = useState({}) // serviceId -> promotions[]
   const [isEmptyCategoryModalOpen, setIsEmptyCategoryModalOpen] = useState(false)
   const [emptyCategoryCode, setEmptyCategoryCode] = useState(null)
@@ -130,9 +131,13 @@ const Services = () => {
     try {
       setLoading(true)
       
-      // Получаем информацию о партнере, который добавил клиента через приветственный бонус
-      const partnerInfo = await getReferralPartnerInfo(chatId)
+      // Получаем информацию о партнере, который добавил клиента и проверяем, является ли текущий пользователь партнёром
+      const [partnerInfo, approvedPartner] = await Promise.all([
+        getReferralPartnerInfo(chatId),
+        chatId ? isApprovedPartner(chatId) : Promise.resolve(false)
+      ])
       setReferralPartnerInfo(partnerInfo)
+      setIsPartnerUser(!!approvedPartner)
       
       const [servicesData, balanceData, ratedPartners] = await Promise.all([
         getFilteredServices(cityParam || null, null),
@@ -371,6 +376,10 @@ const Services = () => {
 
   // Функция для проверки, является ли партнер конкурентом
   const isCompetitor = useCallback((service) => {
+    // Партнёры видят все услуги без клиентских ограничений (в т.ч. конкурентов)
+    if (isPartnerUser) {
+      return false
+    }
     // Если у клиента нет партнера, который его добавил, не скрываем никого
     if (!referralPartnerInfo) {
       return false
@@ -394,7 +403,7 @@ const Services = () => {
 
     // Если категории совпадают - это конкурент (скрываем)
     return referralCategory === serviceCategoryNormalized
-  }, [referralPartnerInfo, normalizeCategoryCode])
+  }, [isPartnerUser, referralPartnerInfo, normalizeCategoryCode])
 
   useEffect(() => {
     // Проверяем, что категория валидна - либо есть в существующих услугах, либо в списке всех возможных категорий
