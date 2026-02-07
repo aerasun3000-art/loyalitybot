@@ -59,6 +59,38 @@ export const getClientBalance = async (chatId) => {
 }
 
 /**
+ * Проверить, что пользователь уже закрыл онбординг («Больше не показывать»)
+ * @param {string} chatId - Chat ID пользователя
+ * @returns {Promise<boolean>}
+ */
+export const getOnboardingSeen = async (chatId) => {
+  if (!chatId) return false
+  const { data, error } = await supabase
+    .from('users')
+    .select('onboarding_seen')
+    .eq('chat_id', chatId)
+    .maybeSingle()
+  if (error) {
+    console.warn('getOnboardingSeen:', error)
+    return false
+  }
+  return !!data?.onboarding_seen
+}
+
+/**
+ * Сохранить на сервере, что пользователь нажал «Больше не показывать»
+ * @param {string} chatId - Chat ID пользователя
+ */
+export const setOnboardingSeen = async (chatId) => {
+  if (!chatId) return
+  const { error } = await supabase
+    .from('users')
+    .update({ onboarding_seen: true })
+    .eq('chat_id', chatId)
+  if (error) console.warn('setOnboardingSeen:', error)
+}
+
+/**
  * Обновить предпочитаемую валюту пользователя
  * @param {string} chatId - Chat ID пользователя
  * @param {string} currencyCode - Код валюты (USD, VND, RUB, KZT)

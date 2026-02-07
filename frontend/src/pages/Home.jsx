@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
-import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage, getReferralPartnerInfo, getReferralStats, getOrCreateReferralCode } from '../services/supabase'
+import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage, getReferralPartnerInfo, getReferralStats, getOrCreateReferralCode, getOnboardingSeen, setOnboardingSeen } from '../services/supabase'
 import { getServiceIcon, getMainPageCategories, getCategoryByCode, getAllCategoryGroups, serviceCategories } from '../utils/serviceIcons'
 import { shareReferralLink, buildReferralLink } from '../utils/referralShare'
 import { useTranslation, translateDynamicContent, declinePoints } from '../utils/i18n'
@@ -59,21 +59,34 @@ const Home = () => {
   const onboardingSeenKeyLegacy = 'onboarding_seen'
 
   useEffect(() => {
-    let seen = false
-    try {
-      if (typeof localStorage !== 'undefined') {
-        seen = !!localStorage.getItem(onboardingSeenKey) || !!localStorage.getItem(onboardingSeenKeyLegacy)
+    let cancelled = false
+    const run = async () => {
+      let seen = false
+      if (chatId) {
+        try {
+          seen = await getOnboardingSeen(chatId)
+        } catch (_) {}
       }
-      if (!seen && typeof sessionStorage !== 'undefined') {
-        seen = !!sessionStorage.getItem(onboardingSeenKey) || !!sessionStorage.getItem(onboardingSeenKeyLegacy)
+      if (!cancelled && !seen) {
+        try {
+          if (typeof localStorage !== 'undefined') {
+            seen = !!localStorage.getItem(onboardingSeenKey) || !!localStorage.getItem(onboardingSeenKeyLegacy)
+          }
+          if (!seen && typeof sessionStorage !== 'undefined') {
+            seen = !!sessionStorage.getItem(onboardingSeenKey) || !!sessionStorage.getItem(onboardingSeenKeyLegacy)
+          }
+        } catch (_) {}
       }
-    } catch (_) {}
-    if (!seen) setShowOnboarding(true)
-  }, [])
+      if (!cancelled && !seen) setShowOnboarding(true)
+    }
+    run()
+    return () => { cancelled = true }
+  }, [chatId])
 
   const dismissOnboarding = () => {
     setShowOnboarding(false)
     setOnboardingStep(1)
+    if (chatId) setOnboardingSeen(chatId).catch(() => {})
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(onboardingSeenKey, '1')
