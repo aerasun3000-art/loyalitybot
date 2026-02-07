@@ -105,14 +105,15 @@ const Services = () => {
   useEffect(() => {
     // Обработка category_group параметра
     if (categoryGroupParam) {
-      const group = getCategoryGroupByCode(categoryGroupParam)
-      if (group && group.categories && group.categories.length > 0) {
-        // Устанавливаем первую категорию из группы как фильтр
-        const firstCategory = group.categories[0]
-        const normalizedParam = normalizeCategoryCode(firstCategory)
+      // При переходе по группе с явной категорией в URL — синхронизируем фильтр
+      if (categoryParam) {
+        const normalizedParam = normalizeCategoryCode(categoryParam)
         if (normalizedParam && normalizedParam !== categoryFilter) {
           setCategoryFilter(normalizedParam)
         }
+      } else {
+        // Без category в URL — показываем все категории группы по умолчанию
+        if (categoryFilter) setCategoryFilter(null)
       }
     }
     // Синхронизируем categoryFilter с URL параметром только при изменении categoryParam
