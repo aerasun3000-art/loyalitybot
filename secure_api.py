@@ -994,6 +994,8 @@ async def notify_partner_interest(request: Request, payload: PartnerNotification
             error_msg = "Неверный chat_id партнёра"
         logger.error(f"Ошибка отправки уведомления партнёру {payload.partner_chat_id}: {error_msg}")
         return {"success": False, "error": error_msg}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Ошибка обработки запроса уведомления партнёру: {e}")
         raise HTTPException(status_code=500, detail=f"Внутренняя ошибка: {str(e)}")

@@ -568,6 +568,19 @@ async def handle_service_approval(callback_query: types.CallbackQuery):
              await callback_query.message.edit_text(f"{processed_text}\n\n**СТАТУС: {result_text}**")
         else:
             await callback_query.message.edit_text(f"Услуга ID {service_id}: {result_text}")
+
+        # Уведомляем партнёра об одобрении/отклонении услуги
+        try:
+            service_res = db_manager.client.from_('services').select('partner_chat_id, title').eq('id', service_id).limit(1).execute()
+            if service_res.data and service_res.data[0].get('partner_chat_id'):
+                svc = service_res.data[0]
+                title = svc.get('title') or 'N/A'
+                if new_status == 'Approved':
+                    send_partner_notification(str(svc['partner_chat_id']), f"✅ **Ваша услуга одобрена!**\n\nУслуга \"{title}\" теперь доступна клиентам.")
+                else:
+                    send_partner_notification(str(svc['partner_chat_id']), f"❌ **Ваша услуга отклонена**\n\nУслуга \"{title}\" была отклонена администратором.")
+        except Exception as e:
+            logger.warning(f"Не удалось отправить уведомление партнёру об услуге {service_id}: {e}")
             
     else:
         await callback_query.answer("Ошибка при обновлении статуса услуги в БД.")
@@ -1622,6 +1635,7 @@ async def show_b2b_deals_menu(callback_query: types.CallbackQuery):
     await callback_query.answer("Загрузка меню...")
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📥 Новые заявки", callback_data="b2b_list_pending")],
         [InlineKeyboardButton(text="📋 Все активные сделки", callback_data="b2b_list_all")],
         [InlineKeyboardButton(text="➕ Создать сделку", callback_data="b2b_create")],
         [InlineKeyboardButton(text="🔍 Найти сделку по партнерам", callback_data="b2b_find")],
@@ -1719,6 +1733,187 @@ async def list_all_b2b_deals(callback_query: types.CallbackQuery):
     except Exception as e:
         logging.error(f"Error listing B2B deals: {e}")
         await callback_query.message.edit_text("❌ Ошибка при получении списка сделок.")
+
+
+@dp.callback_query(F.data == "b2b_list_pending")
+async def list_pending_b2b_deals(callback_query: types.CallbackQuery):
+    """Показывает список заявок на B2B сделки, ожидающих одобрения администратора."""
+    await callback_query.answer("Загрузка заявок...")
+
+    try:
+        if not db_manager.client:
+            await callback_query.message.edit_text("❌ База данных недоступна.")
+            return
+
+        response = db_manager.client.table('partner_deals').select('*').eq('status', 'pending').execute()
+        deals = response.data or []
+
+        if not deals:
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_b2b_deals")]
+            ])
+            await callback_query.message.edit_text(
+                "📥 **Новых заявок нет.**\n\n"
+                "Партнеры могут создавать заявки из своего бота, после чего они появятся здесь для одобрения.",
+                reply_markup=keyboard
+            )
+            return
+
+        text = f"📥 **Заявки на B2B сделки (ожидают одобрения)**\n\n*Всего заявок: {len(deals)}*\n\n"
+        keyboard_rows = []
+
+        for i, deal in enumerate(deals[:20], 1):
+            deal_id = deal.get('id', '')
+            source_id = deal.get('source_partner_chat_id', 'N/A')
+            target_id = deal.get('target_partner_chat_id', 'N/A')
+            seller_pays = float(deal.get('referral_commission_percent', 0) or 0) * 100
+            buyer_gets = float(deal.get('client_cashback_percent', 0) or 0) * 100
+
+            text += (
+                f"*{i}. Заявка ID: {deal_id[:8]}...*\n"
+                f"Источник (привел): `{source_id}`\n"
+                f"Цель (куда): `{target_id}`\n"
+                f"Продавец платит: {seller_pays:.1f}%\n"
+                f"Покупатель получает: {buyer_gets:.1f}% кэшбэк\n\n"
+            )
+
+            keyboard_rows.append([
+                InlineKeyboardButton(text=f"✅ Одобрить {i}", callback_data=f"b2b_pending_accept_{deal_id}"),
+                InlineKeyboardButton(text=f"❌ Отклонить {i}", callback_data=f"b2b_pending_reject_{deal_id}")
+            ])
+
+        if len(deals) > 20:
+            text += f"... и еще {len(deals) - 20} заявок\n\n"
+
+        keyboard_rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data="admin_b2b_deals")])
+        keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_rows)
+
+        await callback_query.message.edit_text(text, reply_markup=keyboard, parse_mode='Markdown')
+
+    except Exception as e:
+        logging.error(f"Error listing pending B2B deals: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при получении списка заявок.")
+
+
+@dp.callback_query(F.data.startswith("b2b_pending_accept_"))
+async def approve_pending_b2b_deal(callback_query: types.CallbackQuery):
+    """Одобряет заявку на B2B сделку (pending → active)."""
+    await callback_query.answer("Одобрение сделки...")
+
+    deal_id = callback_query.data.replace("b2b_pending_accept_", "")
+
+    try:
+        if not db_manager.client:
+            await callback_query.message.edit_text("❌ База данных недоступна.")
+            return
+
+        # Получаем сделку, чтобы знать партнеров и проценты
+        deal_resp = db_manager.client.table('partner_deals').select('*').eq('id', deal_id).single().execute()
+        deal = deal_resp.data if deal_resp and deal_resp.data else None
+
+        if not deal or deal.get('status') != 'pending':
+            await callback_query.message.edit_text(
+                "⚠️ Сделка уже была обработана или не найдена.",
+                parse_mode='Markdown'
+            )
+            return
+
+        db_manager.client.table('partner_deals').update({'status': 'active'}).match({
+            'id': deal_id,
+            'status': 'pending'
+        }).execute()
+
+        await callback_query.message.edit_text(
+            f"✅ Сделка `{deal_id[:8]}...` одобрена и активирована.",
+            parse_mode='Markdown'
+        )
+
+        # Уведомляем участвующих партнеров
+        source_id = deal.get('source_partner_chat_id')
+        target_id = deal.get('target_partner_chat_id')
+        seller_pays = float(deal.get('referral_commission_percent', 0) or 0) * 100
+        buyer_gets = float(deal.get('client_cashback_percent', 0) or 0) * 100
+
+        text_for_source = (
+            "✅ *Ваша B2B сделка одобрена администратором!*\n\n"
+            f"Партнер: {target_id}\n"
+            f"Кэшбэк клиентам: {buyer_gets:.1f}%\n"
+            f"Комиссия: {seller_pays:.1f}%\n\n"
+            "Условия уже применяются к новым транзакциям."
+        )
+        text_for_target = (
+            "✅ *Новая B2B сделка активирована администратором!*\n\n"
+            f"Партнер: {source_id}\n"
+            f"Кэшбэк клиентам: {buyer_gets:.1f}%\n"
+            f"Ваша комиссия: {seller_pays:.1f}%\n\n"
+            "Условия уже применяются к новым транзакциям."
+        )
+
+        try:
+            await bot.send_message(int(source_id), text_for_source, parse_mode='Markdown')
+        except Exception as notify_err:
+            logging.warning(f"Не удалось отправить уведомление источнику {source_id} об одобрении сделки {deal_id}: {notify_err}")
+
+        try:
+            await bot.send_message(int(target_id), text_for_target, parse_mode='Markdown')
+        except Exception as notify_err:
+            logging.warning(f"Не удалось отправить уведомление цели {target_id} об одобрении сделки {deal_id}: {notify_err}")
+
+    except Exception as e:
+        logging.error(f"Error approving pending B2B deal {deal_id}: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при одобрении сделки.")
+
+
+@dp.callback_query(F.data.startswith("b2b_pending_reject_"))
+async def reject_pending_b2b_deal(callback_query: types.CallbackQuery):
+    """Отклоняет заявку на B2B сделку (pending → rejected)."""
+    await callback_query.answer("Отклонение сделки...")
+
+    deal_id = callback_query.data.replace("b2b_pending_reject_", "")
+
+    try:
+        if not db_manager.client:
+            await callback_query.message.edit_text("❌ База данных недоступна.")
+            return
+
+        # Получаем сделку, чтобы уведомить инициатора
+        deal_resp = db_manager.client.table('partner_deals').select('*').eq('id', deal_id).single().execute()
+        deal = deal_resp.data if deal_resp and deal_resp.data else None
+
+        if not deal or deal.get('status') != 'pending':
+            await callback_query.message.edit_text(
+                "⚠️ Сделка уже была обработана или не найдена.",
+                parse_mode='Markdown'
+            )
+            return
+
+        db_manager.client.table('partner_deals').update({'status': 'rejected'}).match({
+            'id': deal_id,
+            'status': 'pending'
+        }).execute()
+
+        await callback_query.message.edit_text(
+            f"❌ Сделка `{deal_id[:8]}...` отклонена.",
+            parse_mode='Markdown'
+        )
+
+        source_id = deal.get('source_partner_chat_id')
+        target_id = deal.get('target_partner_chat_id')
+
+        text_for_source = (
+            "❌ *Ваша заявка на B2B сделку отклонена администратором.*\n\n"
+            f"Партнер: {target_id}\n\n"
+            "Вы можете связаться с администратором для уточнения причин или создать новую заявку с другими условиями."
+        )
+
+        try:
+            await bot.send_message(int(source_id), text_for_source, parse_mode='Markdown')
+        except Exception as notify_err:
+            logging.warning(f"Не удалось отправить уведомление источнику {source_id} об отклонении сделки {deal_id}: {notify_err}")
+
+    except Exception as e:
+        logging.error(f"Error rejecting pending B2B deal {deal_id}: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при отклонении сделки.")
 
 
 @dp.callback_query(F.data == "b2b_create")
@@ -2847,7 +3042,11 @@ BUSINESS_TYPE_EMOJIS = {
     'body_wellness': '🌸',
     'nutrition_coaching': '🍎',
     'mindfulness_coaching': '🧠',
-    'image_consulting': '👗'
+    'image_consulting': '👗',
+    'astrology': '🔮',
+    'numerology': '🔢',
+    'psychology_coaching': '🧠',
+    'meditation_spirituality': '🧘‍♀️'
 }
 
 BUSINESS_TYPE_NAMES = {
@@ -2862,7 +3061,11 @@ BUSINESS_TYPE_NAMES = {
     'body_wellness': 'Телесная терапия',
     'nutrition_coaching': 'Нутрициология',
     'mindfulness_coaching': 'Ментальное здоровье',
-    'image_consulting': 'Стиль'
+    'image_consulting': 'Стиль',
+    'astrology': 'Астрология',
+    'numerology': 'Нумерология',
+    'psychology_coaching': 'Психология и коучинг',
+    'meditation_spirituality': 'Медитации и духовные практики'
 }
 
 @dp.message(Command("skip"), OutreachAdd.waiting_for_name)
