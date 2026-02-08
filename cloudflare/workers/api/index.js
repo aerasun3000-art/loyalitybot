@@ -140,7 +140,7 @@ async function executeTransaction(env, clientChatId, partnerChatId, txnType, raw
       key: env.SUPABASE_KEY,
     };
     const updateUrl = `${config.url}/rest/v1/users?chat_id=eq.${encodeURIComponent(clientChatId)}`;
-    await fetch(updateUrl, {
+    const updateResponse = await fetch(updateUrl, {
       method: 'PATCH',
       headers: {
         'apikey': config.key,
@@ -150,6 +150,15 @@ async function executeTransaction(env, clientChatId, partnerChatId, txnType, raw
       },
       body: JSON.stringify({ balance: newBalance }),
     });
+
+    if (!updateResponse.ok) {
+      const errText = await updateResponse.text();
+      console.error('[processTransaction] Balance update failed:', updateResponse.status, errText);
+      return new Response(JSON.stringify({ error: 'Failed to update balance' }), {
+        status: 500,
+        headers: corsHeaders(request),
+      });
+    }
     
     // Record transaction
     const transactionData = {

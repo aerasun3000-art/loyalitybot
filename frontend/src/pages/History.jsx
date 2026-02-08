@@ -48,9 +48,9 @@ const History = () => {
       const balanceAfter = runningBalance
 
       if (txn.operation_type === 'accrual' || txn.operation_type === 'enrollment_bonus') {
-        runningBalance -= txn.earned_points || 0
+        runningBalance += txn.earned_points || 0
       } else if (txn.operation_type === 'redemption') {
-        runningBalance += txn.spent_points || 0
+        runningBalance -= txn.spent_points || 0
       }
 
       return {

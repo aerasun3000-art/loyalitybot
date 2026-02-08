@@ -582,10 +582,9 @@ async def handle_service_approval(callback_query: types.CallbackQuery):
         except Exception as e:
             logger.warning(f"Не удалось отправить уведомление партнёру об услуге {service_id}: {e}")
             
+        await callback_query.answer()
     else:
         await callback_query.answer("Ошибка при обновлении статуса услуги в БД.")
-        
-    await callback_query.answer()
 
 
 # --- Управление услугами текущих партнёров ---
@@ -2235,8 +2234,8 @@ async def approve_ugc_content(callback_query: types.CallbackQuery):
             # Получаем информацию о контенте для уведомления
             ugc_info = db_manager.client.from_('ugc_content').select('promoter_chat_id, content_url').eq('id', ugc_id).limit(1).execute()
             if ugc_info.data:
-                promoter_id = ugc_info.data[0]['promoter_chat_id']
-                
+                promoter_id = ugc_info.data[0].get('promoter_chat_id')
+
                 await callback_query.message.edit_text(
                     f"✅ **UGC контент одобрен!**\n\n"
                     f"ID: {ugc_id}\n"
@@ -2257,7 +2256,8 @@ async def approve_ugc_content(callback_query: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка при одобрении UGC: {e}")
         await callback_query.answer("Произошла ошибка.", show_alert=True)
-    
+        return
+
     await callback_query.answer()
 
 
@@ -2276,8 +2276,8 @@ async def reject_ugc_content(callback_query: types.CallbackQuery):
         # Получаем информацию о контенте для уведомления
         ugc_info = db_manager.client.from_('ugc_content').select('promoter_chat_id').eq('id', ugc_id).limit(1).execute()
         if ugc_info.data:
-            promoter_id = ugc_info.data[0]['promoter_chat_id']
-            
+            promoter_id = ugc_info.data[0].get('promoter_chat_id')
+
             await callback_query.message.edit_text(f"❌ **UGC контент отклонён.**\n\nID: {ugc_id}")
             
             # Уведомляем промоутера
@@ -2290,7 +2290,8 @@ async def reject_ugc_content(callback_query: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка при отклонении UGC: {e}")
         await callback_query.answer("Произошла ошибка.", show_alert=True)
-    
+        return
+
     await callback_query.answer()
 
 

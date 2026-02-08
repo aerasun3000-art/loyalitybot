@@ -251,7 +251,7 @@ def callback_nps_rating(call):
         log_exception(logger, e, f"Ошибка обработки NPS callback для клиента {client_chat_id}")
         try:
             client_bot.answer_callback_query(call.id, "Произошла ошибка. Попробуйте позже.")
-        except:
+        except Exception:
             pass
 
 
@@ -324,7 +324,7 @@ def handle_view_conversation(call):
                     time_str = dt.strftime('%H:%M')
                 else:
                     time_str = ''
-            except:
+            except Exception:
                 time_str = ''
             
             if sender_type == 'client':
@@ -366,7 +366,7 @@ def handle_view_conversation(call):
         try:
             client_bot.answer_callback_query(call.id, "Ошибка загрузки переписки")
             client_bot.send_message(chat_id, "❌ Произошла ошибка при загрузке переписки. Попробуйте позже.")
-        except:
+        except Exception:
             pass
 
 
@@ -416,7 +416,7 @@ def handle_show_qr_code(call):
         try:
             client_bot.answer_callback_query(call.id, "Ошибка при генерации QR-кода")
             client_bot.send_message(chat_id, "❌ Произошла ошибка при генерации QR-кода. Попробуйте позже.")
-        except:
+        except Exception:
             pass
 
 
@@ -484,7 +484,7 @@ def handle_new_user_start(message):
                             start_param_padded = start_param
                         qr_data_json = base64.b64decode(start_param_padded).decode('utf-8')
                         qr_data = json.loads(qr_data_json)
-                    except:
+                    except Exception:
                         # Если не удалось распарсить, проверяем старый формат
                         if start_param.startswith('send_qr_'):
                             data_part = start_param.replace('send_qr_', '')
@@ -1629,7 +1629,7 @@ def callback_convert_period(call):
 #         # Удаляем сообщение "Думаю..."
 #         try:
 #             client_bot.delete_message(chat_id, thinking_msg.message_id)
-#         except:
+#         except Exception:
 #             pass
 #         
 #         # Отправляем ответ
@@ -1647,7 +1647,7 @@ def callback_convert_period(call):
 #         
 #         try:
 #             client_bot.delete_message(chat_id, thinking_msg.message_id)
-#         except:
+#         except Exception:
 #             pass
 #         
 #         client_bot.send_message(
@@ -2238,7 +2238,7 @@ def send_qr_to_partner(partner_chat_id: str, qr_image_data: str, client_chat_id:
         try:
             response_json = e.response.json()
             error_description = response_json.get('description', str(e))
-        except:
+        except Exception:
             error_description = str(e)
         
         error_msg = f"HTTP ошибка {e.response.status_code}: {error_description}"

@@ -50,11 +50,10 @@ class TransactionQueue:
 
     def process_pending(self):
         """Пытается выполнить отложенные транзакции."""
-        if self._processing:
-            return {"processed": 0, "failed": 0}
-
         try:
             with self._lock:
+                if self._processing:
+                    return {"processed": 0, "failed": 0}
                 queue = self._read_queue()
                 if not queue:
                     return {"processed": 0, "failed": 0}

@@ -56,7 +56,6 @@ export async function supabaseRequest(env, endpoint, options = {}) {
     return JSON.parse(text);
   } catch (error) {
     console.error('[supabaseRequest] JSON parse error:', error);
-    console.error('[supabaseRequest] Response text:', await response.text());
     throw new Error(`Failed to parse Supabase response: ${error.message}`);
   }
 }

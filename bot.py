@@ -1681,7 +1681,7 @@ def handle_revenue_share_menu(message):
                     currency = 'RUB'
             else:
                 currency = 'RUB'
-        except:
+        except Exception:
             currency = 'RUB'
         
         message_text = f"""
@@ -1761,7 +1761,7 @@ def handle_pv_info(message):
         try:
             partner_city = sm.get_partner_city(partner_chat_id)
             currency = get_currency_by_city(partner_city) if partner_city else 'RUB'
-        except:
+        except Exception:
             currency = 'RUB'
         
         # Определяем уровень
@@ -2075,7 +2075,7 @@ def handle_export_data(chat_id):
             # Удаляем временный файл
             try:
                 os.remove(result)
-            except:
+            except Exception:
                 pass
         else:
             bot.send_message(
@@ -2642,7 +2642,7 @@ def process_promo_photo(message):
                     chat_id,
                     processing_msg.message_id
                 )
-            except:
+            except Exception:
                 # Если не можем редактировать, отправляем новое сообщение
                 bot.send_message(chat_id, "✅ Изображение успешно загружено!")
         else:
@@ -2653,7 +2653,7 @@ def process_promo_photo(message):
                     chat_id,
                     processing_msg.message_id
                 )
-            except:
+            except Exception:
                 # Если не можем редактировать, отправляем новое сообщение
                 bot.send_message(
                     chat_id,
@@ -2668,7 +2668,7 @@ def process_promo_photo(message):
                 chat_id,
                 processing_msg.message_id
             )
-        except:
+        except Exception:
             # Если не можем редактировать, отправляем новое сообщение
             bot.send_message(
                 chat_id,
@@ -3506,7 +3506,7 @@ def handle_promo_manage_list(chat_id):
                     end_date_str = end_date_obj.strftime('%d.%m.%Y')
                 else:
                     end_date_str = 'N/A'
-            except:
+            except Exception:
                 end_date_str = str(end_date)[:10] if end_date else 'N/A'
             
             btn = types.InlineKeyboardButton(
@@ -3583,7 +3583,7 @@ def handle_promo_delete_confirmation(chat_id, promo_id):
                 end_date_str = end_date_obj.strftime('%d.%m.%Y')
             else:
                 end_date_str = 'N/A'
-        except:
+        except Exception:
             end_date_str = str(end_date)[:10] if end_date else 'N/A'
         
         # Типы акций
@@ -4157,7 +4157,7 @@ def handle_partner_messages(message):
             try:
                 client_data = sm.get_client_details_for_partner(int(client_id)) if client_id.isdigit() else None
                 client_name = client_data.get('name', 'Не указано') if client_data else 'Неизвестный клиент'
-            except:
+            except Exception:
                 client_name = 'Неизвестный клиент'
             
             # Информация о последнем сообщении
@@ -4207,7 +4207,7 @@ def handle_view_conversation(call):
             client_data = sm.get_client_details_for_partner(int(client_chat_id)) if client_chat_id.isdigit() else None
             client_name = client_data.get('name', 'Не указано') if client_data else 'Неизвестный клиент'
             client_phone = client_data.get('phone', 'Не указан') if client_data else 'Не указан'
-        except:
+        except Exception:
             client_name = 'Неизвестный клиент'
             client_phone = 'Не указан'
         
@@ -4250,7 +4250,7 @@ def handle_view_conversation(call):
                 else:
                     dt = datetime.fromisoformat(created_at)
                 date_str = dt.strftime('%d.%m.%Y %H:%M')
-            except:
+            except Exception:
                 date_str = created_at[:16] if created_at else 'Неизвестно'
             
             # Определяем автора
