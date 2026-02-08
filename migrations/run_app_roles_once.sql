@@ -24,6 +24,6 @@ CREATE POLICY "Allow anon to read app_roles"
 
 -- ========== 2. Назначить модераторов ==========
 INSERT INTO app_roles (chat_id, role)
-VALUES ('YOUR_TELEGRAM_CHAT_ID', 'moderator'),
+VALUES ('406631153', 'moderator'),
        ('182392905', 'moderator')
 ON CONFLICT (chat_id) DO UPDATE SET role = EXCLUDED.role;

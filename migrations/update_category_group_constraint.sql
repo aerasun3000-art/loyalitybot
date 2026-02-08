@@ -17,6 +17,7 @@ CHECK (category_group IN (
     'entertainment',    -- Развлечения
     'healthcare',       -- Здравоохранение
     'services',         -- Услуги
+    'self_discovery',   -- Самопознание
     'activity',         -- Активности (legacy)
     'influencer',       -- Блогер/Инфлюенсер
     'b2b'               -- B2B
@@ -37,10 +38,11 @@ CHECK (category_group IS NULL OR category_group IN (
     'entertainment',
     'healthcare',
     'services',
+    'self_discovery',
     'activity',
     'influencer',
     'b2b'
 ));
 
 -- Комментарий
-COMMENT ON COLUMN partners.category_group IS 'Глобальная категория бизнеса: beauty, food, education, retail, sports_fitness, entertainment, healthcare, services, influencer';
+COMMENT ON COLUMN partners.category_group IS 'Глобальная категория бизнеса: beauty, food, education, retail, sports_fitness, entertainment, healthcare, services, self_discovery, influencer';

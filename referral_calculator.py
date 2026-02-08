@@ -48,24 +48,30 @@ class CommissionDistribution(BaseModel):
     commissions: List[CommissionItem]
     system_total: float
     buyer_special_reward: Optional[float] = None  # Для B2B: спец-кэшбэк покупателю (начисляется отдельно в balance)
-    logic_type: Literal['standard', 'b2b'] = Field(..., description="Какая логика была применена")
+    logic_type: Literal['standard', 'b2b', 'blogger_platform'] = Field(..., description="Какая логика была применена")
 
 # --- Service ---
 
 class ReferralCalculator:
     """
-    Калькулятор реферальных комиссий с поддержкой двух логик:
-    1. СТАНДАРТНАЯ: MLM 3 уровня (5%/5%/5%) от комиссионного фонда продавца
-    2. B2B-DEAL: Прямая сделка между партнерами (70% партнеру-источнику, 30% системе, БЕЗ MLM)
+    Калькулятор реферальных комиссий с поддержкой трёх логик:
+    1. B2B-DEAL: Прямая сделка между партнерами (приоритет)
+    2. BLOGGER-PLATFORM: Партнёр-инфлюенсер получает % с любой покупки привлечённого клиента (если нет B2B)
+    3. СТАНДАРТНАЯ: MLM 3 уровня (5%/5%/5%) от комиссионного фонда продавца
     """
     
-    def __init__(self, users_db: Dict[str, User], deals_db: List[B2BDeal] = None):
+    def __init__(self, users_db: Dict[str, User], deals_db: List[B2BDeal] = None,
+                 partner_influencer_ids: Optional[set] = None, blogger_platform_percent: float = 0.05):
         """
         :param users_db: Словарь пользователей {user_id: User}
         :param deals_db: Список активных B2B сделок
+        :param partner_influencer_ids: Множество chat_id партнёров с типом influencer (блогеры)
+        :param blogger_platform_percent: Процент от чека в комиссионный фонд для блогера (по умолчанию 5%)
         """
         self.users_db = users_db
         self.deals_db = deals_db or []
+        self.partner_influencer_ids = partner_influencer_ids or set()
+        self.blogger_platform_percent = blogger_platform_percent
 
     def _build_referral_chain(self, user_id: str) -> List[User]:
         """Строит цепочку рефералов вверх до 3 уровней (L1, L2, L3)."""
@@ -170,6 +176,34 @@ class ReferralCalculator:
             logger.info(f"B2B calculation: fund={commission_fund:.2f}, system={system_fee:.2f}, partner={partner_commission:.2f}, buyer_reward={buyer_special_reward:.2f}")
             
         else:
+            # 2. Проверяем режим «блогер/инфлюенсер»: L1 — партнёр с типом influencer, нет B2B с продавцом
+            chain = self._build_referral_chain(purchase.user_id)
+            if chain and len(chain) >= 1 and chain[0].id in self.partner_influencer_ids:
+                logic_type = "blogger_platform"
+                commission_fund = purchase.amount * self.blogger_platform_percent
+                system_fee = commission_fund * 0.30
+                system_total += system_fee
+                commissions.append(CommissionItem(
+                    user_id="SYSTEM",
+                    amount=system_fee,
+                    type='b2b_system_fee',
+                    description=f"30% system fee from blogger platform fund ({commission_fund:.2f})"
+                ))
+                partner_commission = commission_fund * 0.70
+                commissions.append(CommissionItem(
+                    user_id=chain[0].id,
+                    amount=partner_commission,
+                    type='b2b_partner',
+                    description=f"70% blogger platform commission to influencer (from fund {commission_fund:.2f})"
+                ))
+                logger.info(f"Blogger platform: fund={commission_fund:.2f}, partner={chain[0].id}, amount={partner_commission:.2f}")
+                return CommissionDistribution(
+                    commissions=commissions,
+                    system_total=system_total,
+                    buyer_special_reward=buyer_special_reward,
+                    logic_type=logic_type
+                )
+            
             # ========== СТАНДАРТНАЯ ЛОГИКА (MLM) ==========
             logger.info("Using Standard MLM Logic")
             
@@ -345,6 +379,29 @@ class TestReferralCalculator(unittest.TestCase):
         # В B2B НЕ должно быть MLM (L1/L2/L3)
         mlm_commissions = [c for c in result.commissions if c.type in ['L1', 'L2', 'L3']]
         self.assertEqual(len(mlm_commissions), 0, "B2B should not have MLM commissions")
+
+    def test_blogger_platform_logic(self):
+        """Тест режима блогер/инфлюенсер: L1 — партнёр influencer, нет B2B с продавцом."""
+        self.users["u_bob"] = User(id="u_bob", referrer_id="p_blogger")
+        self.deals = []  # Нет B2B сделки между p_blogger и p_seller
+        self.calculator = ReferralCalculator(
+            self.users, self.deals,
+            partner_influencer_ids={"p_blogger"},
+            blogger_platform_percent=0.05
+        )
+        purchase = PurchaseInput(
+            user_id="u_bob",
+            amount=10000,
+            seller_partner_id="p_seller",
+            cashback_percent=0.05
+        )
+        result = self.calculator.calculate_commissions(purchase)
+        self.assertEqual(result.logic_type, "blogger_platform")
+        commission_fund = 10000 * 0.05  # 500
+        self.assertEqual(result.system_total, commission_fund * 0.30)  # 150
+        partner_comm = next(c for c in result.commissions if c.type == 'b2b_partner')
+        self.assertEqual(partner_comm.user_id, "p_blogger")
+        self.assertEqual(partner_comm.amount, commission_fund * 0.70)  # 350
 
 if __name__ == '__main__':
     unittest.main()

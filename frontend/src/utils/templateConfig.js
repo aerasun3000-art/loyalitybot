@@ -9,6 +9,7 @@
 export const TEMPLATE_MAP = {
   // BOOKING (записаться на время)
   'beauty': 'booking',
+  'self_discovery': 'booking',
   'fitness': 'booking',
   'education': 'booking',
   'healthcare': 'booking',
@@ -36,6 +37,20 @@ export const DEFAULT_MODULE_CONFIG = {
       schedule: false,
       tags: true,
       about: false,
+    },
+    cta: {
+      primary: 'external_booking',
+      secondary: 'message',
+    },
+  },
+  self_discovery: {
+    template: 'booking',
+    modules: {
+      specialists: true,
+      portfolio: true,
+      schedule: false,
+      tags: true,
+      about: true,
     },
     cta: {
       primary: 'external_booking',
