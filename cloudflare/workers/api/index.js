@@ -60,7 +60,7 @@ async function getOrCreateReferralCode(env, chatId) {
  */
 async function getClientBalance(env, clientChatId) {
   try {
-    const result = await supabaseRequest(env, `users?chat_id=eq.${clientChatId}&select=balance`);
+    const result = await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(clientChatId)}&select=balance`);
     if (result && result.length > 0) {
       return result[0].balance || 0;
     }
@@ -77,7 +77,7 @@ async function getClientBalance(env, clientChatId) {
 async function calculateAccrualPoints(env, partnerChatId, rawAmount) {
   try {
     // Get partner info
-    const partner = await supabaseRequest(env, `partners?chat_id=eq.${partnerChatId}&select=cashback_rate,default_cashback_percent`);
+    const partner = await supabaseRequest(env, `partners?chat_id=eq.${encodeURIComponent(partnerChatId)}&select=cashback_rate,default_cashback_percent`);
     
     let cashbackRate = 0.05; // Default 5%
     
@@ -139,7 +139,7 @@ async function executeTransaction(env, clientChatId, partnerChatId, txnType, raw
       url: env.SUPABASE_URL,
       key: env.SUPABASE_KEY,
     };
-    const updateUrl = `${config.url}/rest/v1/users?chat_id=eq.${clientChatId}`;
+    const updateUrl = `${config.url}/rest/v1/users?chat_id=eq.${encodeURIComponent(clientChatId)}`;
     await fetch(updateUrl, {
       method: 'PATCH',
       headers: {
@@ -189,7 +189,7 @@ async function executeTransaction(env, clientChatId, partnerChatId, txnType, raw
 async function redeemPromotion(env, clientChatId, promotionId, pointsToSpend) {
   try {
     // Get promotion
-    const promotions = await supabaseRequest(env, `promotions?id=eq.${promotionId}&select=*`);
+    const promotions = await supabaseRequest(env, `promotions?id=eq.${encodeURIComponent(promotionId)}&select=*`);
     
     if (!promotions || promotions.length === 0) {
       return {
@@ -393,6 +393,10 @@ ${text}
     }
     
     const data = await response.json();
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('[translateText] Unexpected OpenAI response:', JSON.stringify(data));
+      return { success: false, error: 'Unexpected response from translation service' };
+    }
     let translated = data.choices[0].message.content.trim();
     
     // Remove possible quotes
@@ -436,7 +440,7 @@ async function sendQrToPartner(env, qrImage, clientChatId, partnerChatId, partne
     
     // If username is provided, find chat_id by username
     if (!finalPartnerChatId && partnerUsername) {
-      const partners = await supabaseRequest(env, `partners?username=eq.${partnerUsername}&select=chat_id`);
+      const partners = await supabaseRequest(env, `partners?username=eq.${encodeURIComponent(partnerUsername)}&select=chat_id`);
       if (partners && partners.length > 0) {
         finalPartnerChatId = partners[0].chat_id;
       } else {
@@ -612,7 +616,7 @@ async function getDistrictAvailability(env, city) {
     ];
     
     // Get occupied positions from partners table
-    const partners = await supabaseRequest(env, `partners?city=eq.${city}&select=district,business_type,status,chat_id,name`);
+    const partners = await supabaseRequest(env, `partners?city=eq.${encodeURIComponent(city)}&select=district,business_type,status,chat_id,name`);
     
     // Build occupied map
     const occupied = {};
@@ -832,7 +836,7 @@ export default {
         try {
           const contentType = request.headers.get('content-type') || '';
           
-          if (!contentType.includes('multipart/form-data') && !contentType.includes('application/x-www-form-urlencoded')) {
+          if (!contentType.includes('multipart/form-data') && !contentType.includes('application/x-www-form-urlencoded') && !contentType.includes('application/json')) {
             return jsonResponse({
               success: false,
               error: 'Content-Type должен быть multipart/form-data',

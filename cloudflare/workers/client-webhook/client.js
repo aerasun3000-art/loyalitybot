@@ -27,6 +27,9 @@ import {
  */
 export async function handleStart(env, update) {
   const message = update.message;
+  if (!message || !message.chat || !message.from) {
+    return { success: false, error: 'Invalid message structure' };
+  }
   const chatId = String(message.chat.id);
   const userId = String(message.from.id);
   const text = message.text || '';

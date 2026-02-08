@@ -332,11 +332,11 @@ export async function handleCallbackQuery(env, update) {
   try {
     // Check admin rights
     if (!isAdmin(env, chatId)) {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'У вас нет прав администратора', true);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'У вас нет прав администратора', show_alert: true });
       return { success: true, handled: true, action: 'access_denied' };
     }
     
-    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Загрузка...');
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Загрузка...' });
     
     // Route to appropriate handler
     if (data === 'back_to_main') {
@@ -423,7 +423,7 @@ export async function handleCallbackQuery(env, update) {
     return { success: true, handled: true, action: 'main_menu' };
   } catch (error) {
     logError('handleCallbackQuery (admin)', error, { chatId, data });
-    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Произошла ошибка', true);
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Произошла ошибка', show_alert: true });
     throw error;
   }
 }
@@ -553,15 +553,15 @@ async function handlePartnerApproval(env, callbackQuery, partnerId, newStatus) {
         );
       }
       
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, resultText);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: resultText });
       return { success: true, handled: true, action: 'partner_updated', status: newStatus };
     } else {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Ошибка при обновлении статуса в БД', true);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка при обновлении статуса в БД', show_alert: true });
       return { success: false, handled: true, action: 'partner_update_failed' };
     }
   } catch (error) {
     logError('handlePartnerApproval', error, { partnerId, newStatus });
-    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Произошла ошибка', true);
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Произошла ошибка', show_alert: true });
     throw error;
   }
 }
@@ -637,7 +637,7 @@ async function handlePartnerDeleteSelect(env, callbackQuery, partnerId) {
     const partner = [...applications, ...approved].find(p => p.chat_id === partnerId);
     
     if (!partner) {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Партнер не найден', true);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Партнер не найден', show_alert: true });
       return { success: false, handled: true };
     }
     
@@ -688,7 +688,7 @@ async function handlePartnerDeleteConfirm(env, callbackQuery, partnerId) {
     const success = await deletePartner(env, partnerId);
     
     if (success) {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, '✅ Партнер удален');
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: '✅ Партнер удален' });
       const keyboard = [[{ text: '◀️ Назад', callback_data: 'admin_partners' }]];
       await editMessageText(
         env.ADMIN_BOT_TOKEN,
@@ -702,7 +702,7 @@ async function handlePartnerDeleteConfirm(env, callbackQuery, partnerId) {
       );
       return { success: true, handled: true, action: 'partner_deleted' };
     } else {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, '❌ Ошибка удаления', true);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: '❌ Ошибка удаления', show_alert: true });
       const keyboard = [[{ text: '◀️ Назад', callback_data: 'admin_partners' }]];
       await editMessageText(
         env.ADMIN_BOT_TOKEN,
@@ -715,7 +715,7 @@ async function handlePartnerDeleteConfirm(env, callbackQuery, partnerId) {
     }
   } catch (error) {
     logError('handlePartnerDeleteConfirm', error, { partnerId });
-    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Произошла ошибка', true);
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Произошла ошибка', show_alert: true });
     throw error;
   }
 }
@@ -767,16 +767,16 @@ async function handleServiceApproval(env, callbackQuery, serviceId, newStatus) {
         }
       }
       
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, resultText);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: resultText });
       return { success: true, handled: true, action: 'service_updated', status: newStatus };
     } else {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Ошибка при обновлении статуса в БД', true);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка при обновлении статуса в БД', show_alert: true });
       return { success: false, handled: true, action: 'service_update_failed' };
     }
   } catch (error) {
     console.error('[handleServiceApproval] Error:', error);
     logError('handleServiceApproval', error, { serviceId, newStatus });
-    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Произошла ошибка', true);
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Произошла ошибка', show_alert: true });
     throw error;
   }
 }
@@ -873,7 +873,7 @@ async function handleBroadcastAll(env, callbackQuery) {
     const partnerChatIds = partners.map(p => p.chat_id).filter(id => id);
     
     if (partnerChatIds.length === 0) {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Нет партнёров для рассылки', true);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Нет партнёров для рассылки', show_alert: true });
       return { success: false, handled: true };
     }
     
@@ -896,7 +896,7 @@ async function handleBroadcastAll(env, callbackQuery) {
     return { success: true, handled: true, action: 'broadcast_all', count: partnerChatIds.length };
   } catch (error) {
     logError('handleBroadcastAll', error, { chatId });
-    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Ошибка', true);
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка', show_alert: true });
     throw error;
   }
 }
@@ -911,7 +911,7 @@ async function handleBroadcastSelectCity(env, callbackQuery) {
     const cities = await getDistinctCities(env);
     
     if (cities.length === 0) {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Нет городов', true);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Нет городов', show_alert: true });
       return { success: false, handled: true };
     }
     
@@ -950,7 +950,7 @@ async function handleBroadcastCity(env, callbackQuery, cityBase64) {
     const partnerChatIds = partners.map(p => p.chat_id).filter(id => id);
     
     if (partnerChatIds.length === 0) {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Нет партнёров в этом городе', true);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Нет партнёров в этом городе', show_alert: true });
       return { success: false, handled: true };
     }
     
@@ -974,7 +974,7 @@ async function handleBroadcastCity(env, callbackQuery, cityBase64) {
     return { success: true, handled: true, action: 'broadcast_city', city, count: partnerChatIds.length };
   } catch (error) {
     logError('handleBroadcastCity', error, { chatId, cityBase64 });
-    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Ошибка', true);
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка', show_alert: true });
     throw error;
   }
 }
@@ -989,7 +989,7 @@ async function handleBroadcastSelectCategory(env, callbackQuery) {
     const categories = await getDistinctCategories(env);
     
     if (categories.length === 0) {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Нет категорий', true);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Нет категорий', show_alert: true });
       return { success: false, handled: true };
     }
     
@@ -1027,7 +1027,7 @@ async function handleBroadcastCategory(env, callbackQuery, category) {
     const partnerChatIds = partners.map(p => p.chat_id).filter(id => id);
     
     if (partnerChatIds.length === 0) {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Нет партнёров в этой категории', true);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Нет партнёров в этой категории', show_alert: true });
       return { success: false, handled: true };
     }
     
@@ -1051,7 +1051,7 @@ async function handleBroadcastCategory(env, callbackQuery, category) {
     return { success: true, handled: true, action: 'broadcast_category', category: decodedCategory, count: partnerChatIds.length };
   } catch (error) {
     logError('handleBroadcastCategory', error, { chatId, category });
-    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Ошибка', true);
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка', show_alert: true });
     throw error;
   }
 }
@@ -1117,7 +1117,7 @@ async function handleCancelBroadcast(env, callbackQuery) {
   
   try {
     await clearBotState(env, chatId);
-    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, 'Рассылка отменена');
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Рассылка отменена' });
     await showMainMenu(env, chatId);
     return { success: true, handled: true, action: 'broadcast_cancelled' };
   } catch (error) {

@@ -1,6 +1,19 @@
 /**
  * Telegram Bot API utility for Cloudflare Workers
  */
+/**
+ * Safely parse JSON response from Telegram API
+ */
+async function safeJsonResponse(response) {
+  try {
+    return await response.json();
+  } catch (e) {
+    const text = await response.text().catch(() => '');
+    console.error('[Telegram API] Failed to parse JSON response:', text);
+    return { ok: false, error: 'Invalid JSON response' };
+  }
+}
+
 
 /**
  * Send message via Telegram Bot API
@@ -86,7 +99,7 @@ export async function answerCallbackQuery(token, callbackQueryId, options = {}) 
     body: JSON.stringify(payload),
   });
 
-  return response.json();
+  return safeJsonResponse(response);
 }
 
 /**
@@ -111,7 +124,7 @@ export async function editMessageText(token, chatId, messageId, text, options = 
     body: JSON.stringify(payload),
   });
 
-  return response.json();
+  return safeJsonResponse(response);
 }
 
 /**
@@ -136,7 +149,7 @@ export async function setWebhook(token, webhookUrl, secretToken = null) {
     body: JSON.stringify(payload),
   });
 
-  return response.json();
+  return safeJsonResponse(response);
 }
 
 /**
@@ -153,7 +166,7 @@ export async function deleteWebhook(token) {
     body: JSON.stringify({ drop_pending_updates: true }),
   });
 
-  return response.json();
+  return safeJsonResponse(response);
 }
 
 /**
@@ -163,5 +176,5 @@ export async function getWebhookInfo(token) {
   const url = `https://api.telegram.org/bot${token}/getWebhookInfo`;
   
   const response = await fetch(url);
-  return response.json();
+  return safeJsonResponse(response);
 }

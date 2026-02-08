@@ -37,7 +37,23 @@ export async function supabaseRequest(env, endpoint, options = {}) {
     throw new Error(`Supabase error: ${response.status} - ${error}`);
   }
 
-  return response.json();
+  const contentType = response.headers.get('content-type');
+  const contentLength = response.headers.get('content-length');
+
+  if (contentLength === '0' || !contentType || !contentType.includes('application/json')) {
+    return [];
+  }
+
+  try {
+    const text = await response.text();
+    if (!text || text.trim() === '') {
+      return [];
+    }
+    return JSON.parse(text);
+  } catch (error) {
+    console.error('[supabaseRequest] JSON parse error:', error);
+    throw new Error(`Failed to parse Supabase response: ${error.message}`);
+  }
 }
 
 /**
