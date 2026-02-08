@@ -8,9 +8,8 @@ from supabase import create_client, Client
 from postgrest.exceptions import APIError
 from transaction_queue import TransactionQueue
 import pandas as pd
-import logging 
+import logging
 from dateutil import parser # Добавлена библиотека для безопасного парсинга дат
-from transaction_queue import TransactionQueue
 import sentry_sdk
 
 # Импорт нового калькулятора комиссий
@@ -420,7 +419,7 @@ class SupabaseManager:
                 from currency_utils import get_currency_by_city
                 # Получаем город партнера из БД (если partner_chat_id указан)
                 if partner_chat_id:
-                    partner_response = self.client.table('partners').select('city').eq('chat_id', str(partner_chat_id)).limit(1).execute()
+                    partner_response = self.client.from_('partners').select('city').eq('chat_id', str(partner_chat_id)).limit(1).execute()
                     if partner_response.data and len(partner_response.data) > 0:
                         partner_city = partner_response.data[0].get('city')
                         if partner_city:
@@ -797,7 +796,7 @@ class SupabaseManager:
         currency = 'USD'  # По умолчанию
         try:
             from currency_utils import get_currency_by_city
-            partner_response = self.client.table('partners').select('city').eq('chat_id', str(partner_chat_id)).limit(1).execute()
+            partner_response = self.client.from_('partners').select('city').eq('chat_id', str(partner_chat_id)).limit(1).execute()
             if partner_response.data and len(partner_response.data) > 0:
                 partner_city = partner_response.data[0].get('city')
                 if partner_city:
@@ -1067,10 +1066,10 @@ class SupabaseManager:
             records = response.data if isinstance(response.data, list) else []
             for txn in records:
                 if txn_type == 'accrual':
-                    summary['points'] += int(txn.get('earned_points') or 0)
+                    summary['points'] += float(txn.get('earned_points') or 0)
                     summary['amount'] += float(txn.get('total_amount') or 0.0)
                 else:
-                    summary['points'] += int(txn.get('spent_points') or 0)
+                    summary['points'] += float(txn.get('spent_points') or 0)
                     summary['amount'] += float(txn.get('total_amount') or 0.0)
         except Exception as e:
             logging.error(f"Ошибка получения суточных лимитов для {client_chat_id}: {e}")
@@ -4250,7 +4249,7 @@ class SupabaseManager:
                 
                 if transaction_id:
                     try:
-                        txn_data = self.client.table('transactions').select(
+                        txn_data = self.client.from_('transactions').select(
                             'currency, date_time'
                         ).eq('id', transaction_id).single().execute()
                         
@@ -5692,7 +5691,7 @@ class SupabaseManager:
         if not self.client: return None
         try:
             # Ищем активную сделку
-            response = self.client.table('partner_deals').select('*').match({
+            response = self.client.from_('partner_deals').select('*').match({
                 'source_partner_chat_id': str(source_partner_id),
                 'target_partner_chat_id': str(target_partner_id),
                 'status': 'active'
@@ -5720,7 +5719,7 @@ class SupabaseManager:
         """Получает расширенную конфигурацию партнера."""
         if not self.client: return {}
         try:
-            response = self.client.table('partners').select(
+            response = self.client.from_('partners').select(
                 'category_group, ui_config, default_cashback_percent, default_referral_commission_percent, base_reward_percent'
             ).eq('chat_id', str(partner_chat_id)).single().execute()
             return response.data or {}
@@ -5743,13 +5742,13 @@ class SupabaseManager:
             
             if as_source:
                 # Сделки, где партнер привел клиентов к другим
-                response_source = self.client.table('partner_deals').select('*').eq('source_partner_chat_id', str(partner_chat_id)).execute()
+                response_source = self.client.from_('partner_deals').select('*').eq('source_partner_chat_id', str(partner_chat_id)).execute()
                 if response_source.data:
                     deals.extend(response_source.data)
             
             if as_target:
                 # Сделки, где к партнеру привели клиентов
-                response_target = self.client.table('partner_deals').select('*').eq('target_partner_chat_id', str(partner_chat_id)).execute()
+                response_target = self.client.from_('partner_deals').select('*').eq('target_partner_chat_id', str(partner_chat_id)).execute()
                 if response_target.data:
                     deals.extend(response_target.data)
             
@@ -5787,7 +5786,7 @@ class SupabaseManager:
             logging.error(f"Invalid base_reward_percent: {new_percent} (must be between 0 and 1)")
             return False
         try:
-            self.client.table('partners').update({
+            self.client.from_('partners').update({
                 'base_reward_percent': new_percent
             }).eq('chat_id', str(partner_chat_id)).execute()
             logging.info(f"Updated base_reward_percent for partner {partner_chat_id} to {new_percent}")

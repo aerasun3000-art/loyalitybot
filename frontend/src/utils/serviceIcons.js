@@ -126,6 +126,48 @@ export const serviceCategories = {
     isMainPage: false
   },
   
+  // Самопознание (Self-discovery)
+  astrology: {
+    code: 'astrology',
+    icon: 'mindfulness_coaching',
+    name: 'Астрология',
+    nameEn: 'Astrology',
+    color: 'from-indigo-500 to-indigo-700',
+    emoji: '🔮',
+    displayOrder: 13,
+    isMainPage: false
+  },
+  numerology: {
+    code: 'numerology',
+    icon: 'mindfulness_coaching',
+    name: 'Нумерология',
+    nameEn: 'Numerology',
+    color: 'from-purple-500 to-purple-700',
+    emoji: '🔢',
+    displayOrder: 14,
+    isMainPage: false
+  },
+  psychology_coaching: {
+    code: 'psychology_coaching',
+    icon: 'mindfulness_coaching',
+    name: 'Психология и коучинг',
+    nameEn: 'Psychology & Coaching',
+    color: 'from-jewelry-brown-light to-jewelry-burgundy',
+    emoji: '🧠',
+    displayOrder: 15,
+    isMainPage: false
+  },
+  meditation_spirituality: {
+    code: 'meditation_spirituality',
+    icon: 'mindfulness_coaching',
+    name: 'Медитации и духовные практики',
+    nameEn: 'Meditation & Spirituality',
+    color: 'from-emerald-500 to-emerald-700',
+    emoji: '🧘‍♀️',
+    displayOrder: 16,
+    isMainPage: false
+  },
+  
   // Старые категории для обратной совместимости
   manicure: {
     code: 'nail_care',
@@ -582,7 +624,7 @@ export const getServiceIcon = (serviceName = '', serviceCategory = '') => {
   if (searchStr.includes('косметолог') || searchStr.includes('чистка лица') || searchStr.includes('эстетик')) {
     return 'facial_aesthetics'
   }
-  if (searchStr.includes('реснниц') || searchStr.includes('ламинирован')) {
+  if (searchStr.includes('ресниц') || searchStr.includes('ламинирован')) {
     return 'lash_services'
   }
   if (searchStr.includes('массаж')) {
@@ -689,6 +731,22 @@ export const categoryGroups = [
       'body_wellness', 'nutrition_coaching', 'mindfulness_coaching', 'image_consulting'
     ],
     displayOrder: 1,
+    avgDuration: '60 min'
+  },
+  {
+    id: 'self_discovery',
+    code: 'self_discovery',
+    name: 'Самопознание',
+    nameEn: 'Self-Discovery',
+    emoji: '🔮',
+    icon: 'beauty',
+    categories: [
+      'astrology',
+      'numerology',
+      'psychology_coaching',
+      'meditation_spirituality'
+    ],
+    displayOrder: 11,
     avgDuration: '60 min'
   },
   {
@@ -823,7 +881,8 @@ export const getCategoriesByGroup = (groupCode) => {
     'healthcare': 'healthcare',
     'services': 'services',
     'travel': 'travel_tourism',
-    'automotive': 'automotive_pets'
+    'automotive': 'automotive_pets',
+    'self_discovery': 'self_discovery'
   }
   
   const mappedCode = groupMapping[groupCode] || groupCode

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createPartnerApplication } from '../services/supabase'
 import { getChatId, hapticFeedback, getTelegramUser, getStartParam } from '../utils/telegram'
 import { getPartnerCitiesList, getDistrictsByCity, isOnlineService } from '../utils/locations'
-import { getAllServiceCategories } from '../utils/serviceIcons'
+import { getCategoriesByGroup } from '../utils/serviceIcons'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
@@ -34,7 +34,7 @@ const PartnerApply = () => {
   const [cities] = useState(getPartnerCitiesList())
   const [districts, setDistricts] = useState([])
   const [showSuccess, setShowSuccess] = useState(false)
-  const [serviceCategories] = useState(getAllServiceCategories())
+  const serviceCategories = getCategoriesByGroup(formData.categoryGroup)
   const [referredByChatId, setReferredByChatId] = useState(null) // Chat ID партнера, который пригласил
 
   // Получаем referred_by_chat_id из start_param при загрузке компонента
@@ -85,7 +85,12 @@ const PartnerApply = () => {
       processedValue = value.replace('@', '').trim()
     }
     
-    setFormData(prev => ({ ...prev, [name]: processedValue }))
+    setFormData(prev => ({
+      ...prev,
+      [name]: processedValue,
+      // Сбрасываем категорию услуг при смене типа бизнеса
+      ...(name === 'categoryGroup' ? { businessType: '' } : {})
+    }))
     // Очищаем ошибку при вводе
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }))
@@ -119,7 +124,7 @@ const PartnerApply = () => {
     
     // Проверка глобальной категории
     if (!formData.categoryGroup) {
-      newErrors.categoryGroup = language === 'ru' ? 'Выберите тип бизнеса' : 'Select business type'
+      newErrors.categoryGroup = t('partner_category_group_required')
     }
     
     // Компания обязательна только для не-блогеров
@@ -127,9 +132,9 @@ const PartnerApply = () => {
       newErrors.companyName = t('partner_company_required')
     }
     
-    // Категория услуг обязательна только для beauty
-    if (formData.categoryGroup === 'beauty' && !formData.businessType) {
-      newErrors.businessType = language === 'ru' ? 'Выберите категорию услуг' : 'Select service category'
+    // Категория услуг обязательна для beauty и самопознания
+    if ((formData.categoryGroup === 'beauty' || formData.categoryGroup === 'self_discovery') && !formData.businessType) {
+      newErrors.businessType = t('partner_business_type_required')
     }
     
     // Город обязателен только для оффлайн
@@ -152,11 +157,8 @@ const PartnerApply = () => {
     } else if (formData.city && !formData.district) {
       // Для других городов проверяем наличие района
       const districtsForCity = getDistrictsByCity(formData.city)
-      if (districtsForCity.length > 0 && districtsForCity[0].value === 'All') {
-        // Автоматически устанавливаем "All" для городов с одним районом
-        setFormData(prev => ({ ...prev, district: 'All' }))
-      } else if (districtsForCity.length > 0) {
-        // Если есть районы, но не выбран - ошибка
+      if (districtsForCity.length > 0 && districtsForCity[0].value !== 'All') {
+        // Если есть районы (не только "All"), но не выбран - ошибка
         newErrors.district = t('partner_district_required')
       }
     }
@@ -413,6 +415,7 @@ const PartnerApply = () => {
               <option value="entertainment">🎬 {language === 'ru' ? 'Развлечения' : 'Entertainment'}</option>
               <option value="healthcare">🏥 {language === 'ru' ? 'Здравоохранение' : 'Healthcare'}</option>
               <option value="services">🧹 {language === 'ru' ? 'Услуги' : 'Services'}</option>
+              <option value="self_discovery">🔮 {language === 'ru' ? 'Самопознание' : 'Self-Discovery'}</option>
               <option value="influencer">🤳 {language === 'ru' ? 'Блогер/Инфлюенсер' : 'Influencer/Blogger'}</option>
               <option value="b2b">🏢 B2B</option>
             </select>
@@ -444,8 +447,8 @@ const PartnerApply = () => {
           </div>
           )}
 
-          {/* Категория услуг (только для Beauty) */}
-          {formData.categoryGroup === 'beauty' && (
+          {/* Категория услуг (Beauty и Самопознание) */}
+          {(formData.categoryGroup === 'beauty' || formData.categoryGroup === 'self_discovery') && (
             <div className="mb-4">
               <label className="block text-gray-700 font-semibold mb-2">
                 {language === 'ru' ? 'Категория услуг' : 'Service Category'} {t('required_field')}

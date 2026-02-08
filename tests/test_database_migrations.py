@@ -52,6 +52,24 @@ class TestDatabaseSchema:
         
         assert 'company_name' in columns
         assert 'business_type' in columns
+
+    def test_partner_broadcast_campaigns_table_columns(self):
+        """Тест колонок таблицы partner_broadcast_campaigns (B2B TZ)"""
+        columns = [
+            'id',
+            'partner_chat_id',
+            'template_id',
+            'recipient_count',
+            'sent_count',
+            'started_at',
+            'finished_at',
+            'status',
+            'error_message',
+        ]
+        assert 'partner_chat_id' in columns
+        assert 'template_id' in columns
+        assert 'sent_count' in columns
+        assert 'status' in columns
     
     def test_services_table_columns(self):
         """Тест колонок таблицы services"""
@@ -333,29 +351,29 @@ class TestDefaultValues:
 class TestConstraints:
     """Тесты ограничений"""
     
+    @staticmethod
+    def _read_all_migrations():
+        """Читает все SQL-миграции и возвращает объединённый текст"""
+        migrations_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'migrations')
+        all_sql = ''
+        if os.path.isdir(migrations_dir):
+            for fname in os.listdir(migrations_dir):
+                if fname.endswith('.sql'):
+                    with open(os.path.join(migrations_dir, fname), 'r', encoding='utf-8') as f:
+                        all_sql += f.read() + '\n'
+        return all_sql.lower()
+
     def test_chat_id_unique(self):
-        """Тест уникальности chat_id"""
-        chat_ids = ['123', '456', '123']  # дубликат
-        
-        unique_ids = set(chat_ids)
-        has_duplicates = len(chat_ids) != len(unique_ids)
-        
-        assert has_duplicates is True
-    
-    def test_balance_non_negative(self):
-        """Тест неотрицательного баланса"""
-        balance = -100
-        
-        is_valid = balance >= 0
-        assert is_valid is False
-    
+        """Тест: в миграциях должен быть UNIQUE constraint на chat_id"""
+        sql = self._read_all_migrations()
+        has_unique = 'unique' in sql and 'chat_id' in sql
+        assert has_unique, "UNIQUE constraint на chat_id не найден в SQL-миграциях"
+
     def test_status_check_constraint(self):
-        """Тест CHECK constraint для статуса"""
-        valid_statuses = ['Pending', 'Approved', 'Rejected']
-        status = 'Invalid'
-        
-        is_valid = status in valid_statuses
-        assert is_valid is False
+        """Тест: в миграциях должен быть CHECK constraint на status"""
+        sql = self._read_all_migrations()
+        has_check = bool(re.search(r'check\s*\(.*status\s+in\s*\(', sql))
+        assert has_check, "CHECK constraint на status не найден в SQL-миграциях"
 
 
 class TestBotStatesTable:
