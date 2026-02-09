@@ -133,7 +133,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
           
           {/* Показываем выбранный город */}
           {step === 'district' && selectedCity && (
-            <div className="mt-2 text-sm text-jewelry-gray-elegant text-center flex items-center justify-center gap-1">
+            <div className="mt-2 text-sm text-sakura-muted text-center flex items-center justify-center gap-1">
               <span className="text-lg leading-none">📍</span>
               <span>{selectedCity}</span>
             </div>
@@ -176,7 +176,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
                   ))}
                   
                   {cities.length === 0 && (
-                    <div className="text-center text-jewelry-gray-elegant py-8">
+                    <div className="text-center text-sakura-muted py-8">
                       <span className="text-5xl leading-none mx-auto mb-2">🏙️</span>
                       <p>{language === 'ru' ? 'Города не найдены' : 'No cities found'}</p>
                     </div>
@@ -215,12 +215,12 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
                   ))}
                   
                   {districts.length === 0 && (
-                    <div className="text-center text-jewelry-gray-elegant py-8">
+                    <div className="text-center text-sakura-muted py-8">
                       <span className="text-5xl leading-none mx-auto mb-2">🌆</span>
                       <p>{language === 'ru' ? 'Районы не найдены' : 'No districts found'}</p>
                       <button
                         onClick={() => handleConfirm(selectedCity, '')}
-                        className="mt-4 px-6 py-2 bg-jewelry-gold text-jewelry-cream rounded-lg font-semibold hover:bg-jewelry-gold-dark transition-colors"
+                        className="mt-4 px-6 py-2 bg-sakura-gold text-sakura-bg rounded-lg font-semibold hover:bg-sakura-mid transition-colors"
                       >
                         {language === 'ru' ? 'Продолжить без района' : 'Continue without district'}
                       </button>
@@ -237,7 +237,7 @@ const LocationSelector = ({ isOpen, onClose, onSelect }) => {
           <div className="px-4 py-3 border-t border-gray-200">
             <button
               onClick={handleClearFilters}
-              className="w-full py-3 text-jewelry-brown-dark font-semibold rounded-xl border-2 border-jewelry-gold/30 hover:bg-jewelry-gold/5 transition-colors duration-200 flex items-center justify-center gap-2"
+              className="w-full py-3 text-sakura-deep font-semibold rounded-xl border-2 border-sakura-gold/30 hover:bg-sakura-gold/5 transition-colors duration-200 flex items-center justify-center gap-2"
             >
               <span className="text-lg leading-none">🗑️</span>
               <span>{language === 'ru' ? 'Сбросить фильтры' : 'Clear filters'}</span>

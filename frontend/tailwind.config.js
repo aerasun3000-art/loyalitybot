@@ -15,65 +15,20 @@ export default {
         'tg-button': 'var(--tg-theme-button-color)',
         'tg-button-text': 'var(--tg-theme-button-text-color)',
         'tg-secondary-bg': 'var(--tg-theme-secondary-bg-color)',
-        // Роскошная палитра в стиле ювелирного магазина
-        'jewelry': {
-          // Розовые цвета (основная палитра)
-          'pink-dark': '#8B008B',       // Темно-розовый (DarkMagenta)
-          'pink-medium': '#C71585',     // Средне-розовый (MediumVioletRed)
-          'pink-light': '#FFC0CB',      // Светло-розовый (Pink)
-          'rose': '#FF69B4',           // Ярко-розовый (HotPink)
-          'purple': '#800080',         // Фиолетовый (Purple)
-          'lavender': '#E6E6FA',       // Лавандовый (Lavender)
-          'white-soft': '#F8F8F8',     // Мягкий белый
-          'gray-light': '#D3D3D3',     // Светло-серый
-          'text-dark': '#333333',      // Темный текст
-          // Золотые и коричневые цвета (для jewelry-стиля)
-          'brown-dark': '#3D2817',      // Темно-коричневый
-          'brown-light': '#8B7355',     // Светло-коричневый
-          'burgundy': '#722F37',        // Бордовый
-          'gold': '#D4AF37',            // Золотой
-          'gold-dark': '#B8941F',       // Темно-золотой
-          'gold-light': '#F4E4BC',      // Светло-золотой
-          'cream': '#F5F5DC',           // Кремовый
-          'gray-elegant': '#6B6B6B',   // Элегантный серый
-        },
-        // Vanilla Blush palette (option 4)
-        'rose-surface': '#FCF7F2',
-        'rose-border': '#F1C9DA',
-        'rose-heading': '#6E104A',
-        'rose-accent': '#D5408B',
-        'rose-secondary': '#707070',
 
-        // Emerald/Teal palette (reference-like)
-        'emerald-deep': '#003E3E',
-        'emerald': '#007F6E',
-        'emerald-aqua': '#00D1BA',
-        'emerald-heading': '#0B3A2E',
-        'emerald-accent': '#19C29E',
-        'emerald-border': '#BFE6DE',
-
-        // Sakura palette from screenshot
-        'sakura-surface': '#FADCD5',
-        'sakura-border': '#765D67',
-        'sakura-accent': '#6D3C52',
-        'sakura-mid': '#4B2138',
-        'sakura-deep': '#1B0C1A',
-        'sakura-dark': '#2D222F',
-        'sakura-light': '#FEF5F3',
-        'sakura-cream': '#FFF8F5',
-        // Orange variant (Modern Flat Design)
-        'orange': {
-          '50': '#FFF7ED',
-          '100': '#FFEDD5',
-          '200': '#FED7AA',
-          '300': '#FDBA74',
-          '400': '#FB923C',
-          '500': '#F97316',
-          '600': '#EA580C',
-          '700': '#C2410C',
-          '800': '#9A3412',
-          '900': '#7C2D12',
-        },
+        // Sakura palette — CSS vars auto-flip in dark mode, opacity support
+        'sakura-bg': 'rgb(var(--sakura-bg) / <alpha-value>)',
+        'sakura-light': 'rgb(var(--sakura-light) / <alpha-value>)',
+        'sakura-cream': 'rgb(var(--sakura-cream) / <alpha-value>)',
+        'sakura-surface': 'rgb(var(--sakura-surface) / <alpha-value>)',
+        'sakura-border': 'rgb(var(--sakura-border) / <alpha-value>)',
+        'sakura-accent': 'rgb(var(--sakura-accent) / <alpha-value>)',
+        'sakura-mid': 'rgb(var(--sakura-mid) / <alpha-value>)',
+        'sakura-deep': 'rgb(var(--sakura-deep) / <alpha-value>)',
+        'sakura-dark': 'rgb(var(--sakura-dark) / <alpha-value>)',
+        'sakura-gold': 'rgb(var(--sakura-gold) / <alpha-value>)',
+        'sakura-gold-light': 'rgb(var(--sakura-gold-light) / <alpha-value>)',
+        'sakura-muted': 'rgb(var(--sakura-muted) / <alpha-value>)',
       },
     },
   },

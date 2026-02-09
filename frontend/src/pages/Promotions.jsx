@@ -282,8 +282,8 @@ const Promotions = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-gradient-to-r from-jewelry-brown-dark to-jewelry-burgundy px-4 pt-6 pb-8">
+      <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream">
+        <div className="bg-gradient-to-r from-sakura-deep to-sakura-mid px-4 pt-6 pb-8">
           <div className="flex items-center mb-6">
             <div className="w-6 h-6 bg-white/50 rounded animate-pulse mr-3" />
             <div className="h-8 bg-white/50 rounded w-40 animate-pulse" />
@@ -351,7 +351,7 @@ const Promotions = () => {
           />
           <button
             onClick={() => setSearchQuery('')}
-            className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <svg
               width="20"

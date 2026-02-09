@@ -249,7 +249,7 @@ const News = () => {
           />
           <button
             onClick={() => setSearchQuery('')}
-            className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <svg
               width="20"

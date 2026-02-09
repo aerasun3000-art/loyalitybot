@@ -8,7 +8,7 @@ const TermsOfService = () => {
   const { t } = useTranslation(language)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream">
       {/* Header */}
       <div className="bg-gradient-to-br from-purple-500 to-purple-600 px-4 pt-6 pb-8 sticky top-0 z-10 shadow-md">
         <div className="flex items-center justify-between mb-4">

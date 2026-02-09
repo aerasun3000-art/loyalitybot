@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getFilteredServices, getClientBalance, getClientRatedPartners, getPartnersMetrics, getReferralPartnerInfo, getPromotionsForService, notifyPartnerInterest, upsertNpsRating, isApprovedPartner } from '../services/supabase'
 import { getChatId, getUsername, hapticFeedback, showAlert, openTelegramLink } from '../utils/telegram'
 import { getCategoryByCode, serviceCategories, getAllServiceCategories, getCategoryGroupByCode } from '../utils/serviceIcons'
+import { normalizeCategoryCode, isCompetitor } from '../utils/categoryHelpers'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import useCurrencyStore from '../store/currencyStore'
@@ -12,6 +13,11 @@ import Loader from '../components/Loader'
 import LocationSelector from '../components/LocationSelector'
 import { PartnerCardSkeleton } from '../components/SkeletonCard'
 import ServicesFilterBar from '../components/ServicesFilterBar'
+import QuickRatingModal from '../components/services/QuickRatingModal'
+import ServiceModal from '../components/services/ServiceModal'
+import EmptyCategoryModal from '../components/services/EmptyCategoryModal'
+import Toast from '../components/Toast'
+import { useToast } from '../hooks/useToast'
 import QRCode from 'qrcode'
 
 const CATEGORY_PRIORITY = {
@@ -33,7 +39,8 @@ const Services = () => {
   const { language } = useLanguageStore()
   const { t } = useTranslation(language)
   const { currency, rates, setRates } = useCurrencyStore()
-  
+  const { toast, showToast, hideToast } = useToast()
+
   const [loading, setLoading] = useState(true)
   const [services, setServices] = useState([])
   const [balance, setBalance] = useState(0)
@@ -72,12 +79,6 @@ const Services = () => {
     return getCategoryByCode(code) || serviceCategories[code] || null
   }, [])
 
-  const normalizeCategoryCode = useCallback((code) => {
-    if (!code) return null
-    const categoryData = resolveCategory(code)
-    return categoryData?.code || code
-  }, [resolveCategory])
-
   const getCategorySortValue = useCallback((code) => {
     const canonical = normalizeCategoryCode(code)
     if (!canonical) return 500
@@ -86,7 +87,7 @@ const Services = () => {
     }
     const categoryData = resolveCategory(canonical)
     return categoryData?.displayOrder ?? 500
-  }, [normalizeCategoryCode, resolveCategory])
+  }, [resolveCategory])
 
   useEffect(() => {
     loadData()
@@ -159,6 +160,7 @@ const Services = () => {
       }
     } catch (error) {
       console.error('Error loading services:', error)
+      showToast(t('error_something_wrong'))
     } finally {
       setLoading(false)
     }
@@ -317,7 +319,7 @@ const Services = () => {
     
     const hasPartnersInCategory = services.some(service => {
       // Скрываем конкурентов
-      if (isCompetitor(service)) {
+      if (isCompetitor(service, referralPartnerInfo, isPartnerUser)) {
         return false
       }
       
@@ -375,36 +377,7 @@ const Services = () => {
     return group.partner?.district === selectedDistrict
   }
 
-  // Функция для проверки, является ли партнер конкурентом
-  const isCompetitor = useCallback((service) => {
-    // Партнёры видят все услуги без клиентских ограничений (в т.ч. конкурентов)
-    if (isPartnerUser) {
-      return false
-    }
-    // Если у клиента нет партнера, который его добавил, не скрываем никого
-    if (!referralPartnerInfo) {
-      return false
-    }
-
-    const servicePartnerId = service.partner_chat_id || service.partnerId
-    const serviceCategory = service.partner?.business_type || service.category || service.categoryCode
-    
-    // Если это сам партнер, который добавил клиента - НЕ конкурент (показываем)
-    if (servicePartnerId === referralPartnerInfo.chatId) {
-      return false
-    }
-
-    if (!serviceCategory || !referralPartnerInfo.businessType) {
-      return false
-    }
-
-    // Нормализуем категории для сравнения
-    const referralCategory = normalizeCategoryCode(referralPartnerInfo.businessType)
-    const serviceCategoryNormalized = normalizeCategoryCode(serviceCategory)
-
-    // Если категории совпадают - это конкурент (скрываем)
-    return referralCategory === serviceCategoryNormalized
-  }, [isPartnerUser, referralPartnerInfo, normalizeCategoryCode])
+  // isCompetitor → utils/categoryHelpers.js
 
   useEffect(() => {
     // Проверяем, что категория валидна - либо есть в существующих услугах, либо в списке всех возможных категорий
@@ -444,7 +417,7 @@ const Services = () => {
       
       const hasPartnersInCategory = services.some(service => {
         // Скрываем конкурентов
-        if (isCompetitor(service)) {
+        if (isCompetitor(service, referralPartnerInfo, isPartnerUser)) {
           return false
         }
         
@@ -491,7 +464,7 @@ const Services = () => {
       partner: group.partner,
       partner_chat_id: group.partnerId,
       category: group.categoryCode
-    }))
+    }, referralPartnerInfo, isPartnerUser))
 
     if (filter === 'my_district') {
       groups = groups.filter(matchesDistrict)
@@ -1102,7 +1075,7 @@ const Services = () => {
                                   hapticFeedback('light')
                                   setQuickRatingModal({ open: true, group, rating: 0 })
                                 }}
-                                className={`p-2 rounded-full border transition-colors ${favoritePartnerIdsSet.has(group.partnerId) ? 'border-red-300 bg-red-100 text-red-600' : 'border-sakura-border/60 bg-white/70 text-sakura-dark/70 hover:border-sakura-accent'}`}
+                                className={`p-2.5 rounded-full border transition-colors ${favoritePartnerIdsSet.has(group.partnerId) ? 'border-red-300 bg-red-100 text-red-600' : 'border-sakura-border/60 bg-white/70 text-sakura-dark/70 hover:border-sakura-accent'}`}
                                 title={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'Уже в любимых' : 'Already in favorites') : (language === 'ru' ? 'Оценить и добавить в любимые' : 'Rate and add to favorites')}
                                 aria-label={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'В любимых' : 'In favorites') : (language === 'ru' ? 'Добавить в любимые' : 'Add to favorites')}
                               >
@@ -1122,7 +1095,7 @@ const Services = () => {
                                 e.stopPropagation()
                                 handlePlayClick(group.id, e)
                               }}
-                              className="p-2 rounded-full border border-sakura-border/60 bg-white/70 text-sakura-dark hover:border-sakura-accent transition-colors"
+                              className="p-2.5 rounded-full border border-sakura-border/60 bg-white/70 text-sakura-dark hover:border-sakura-accent transition-colors"
                               aria-label={isExpanded ? (language === 'ru' ? 'Свернуть' : 'Collapse') : (language === 'ru' ? 'Подробнее' : 'Details')}
                             >
                               {isExpanded ? (
@@ -1184,48 +1157,14 @@ const Services = () => {
         )}
       </div>
 
-      {/* Модалка быстрой оценки (добавить в любимые) */}
-      {quickRatingModal.open && quickRatingModal.group && (
-        <div className="fixed inset-0 z-[99]" onClick={() => setQuickRatingModal({ open: false, group: null, rating: 0 })}>
-          <div className="absolute inset-0 bg-sakura-deep/50 backdrop-blur-sm" />
-          <div className="relative h-full flex items-center justify-center px-4" onClick={(e) => e.stopPropagation()}>
-            <div className="relative z-10 w-full max-w-sm bg-sakura-surface/95 border border-sakura-border/60 rounded-3xl shadow-2xl p-6">
-              <h3 className="text-lg font-bold text-sakura-dark mb-2 text-center">
-                {language === 'ru' ? 'Оцените мастера' : 'Rate this master'}
-              </h3>
-              <p className="text-sm text-sakura-dark/70 text-center mb-4">{quickRatingModal.group.companyName}</p>
-              <div className="flex flex-wrap justify-center gap-2 mb-4">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setQuickRatingModal(prev => ({ ...prev, rating: n }))}
-                    className={`w-10 h-10 rounded-full font-bold text-sm transition-all ${
-                      quickRatingModal.rating === n ? 'bg-sakura-accent text-white' : 'bg-sakura-surface/30 text-sakura-dark'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setQuickRatingModal({ open: false, group: null, rating: 0 })}
-                  className="flex-1 py-2.5 rounded-full bg-sakura-surface/30 text-sakura-dark font-semibold"
-                >
-                  {language === 'ru' ? 'Отмена' : 'Cancel'}
-                </button>
-                <button
-                  onClick={handleQuickRatingSubmit}
-                  disabled={quickRatingModal.rating < 1 || quickRatingSubmitting}
-                  className="flex-1 py-2.5 rounded-full bg-sakura-accent text-white font-semibold disabled:opacity-50"
-                >
-                  {quickRatingSubmitting ? (language === 'ru' ? 'Сохранение...' : 'Saving...') : (language === 'ru' ? 'Отправить' : 'Submit')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuickRatingModal
+        quickRatingModal={quickRatingModal}
+        quickRatingSubmitting={quickRatingSubmitting}
+        language={language}
+        onClose={() => setQuickRatingModal({ open: false, group: null, rating: 0 })}
+        onSubmit={handleQuickRatingSubmit}
+        onRatingChange={(n) => setQuickRatingModal(prev => ({ ...prev, rating: n }))}
+      />
 
       {/* Модальное окно выбора локации */}
       <LocationSelector
@@ -1234,222 +1173,37 @@ const Services = () => {
         onSelect={handleLocationSelect}
       />
 
-      {isServiceModalOpen && selectedService && (
-        <div className="fixed inset-0 z-[100]" onClick={handleCloseServiceModal} role="dialog" aria-modal="true" aria-labelledby="service-modal-title">
-          <div className="absolute inset-0 bg-sakura-deep/50 backdrop-blur-sm" />
-          <div 
-            className="relative h-full flex items-center justify-center px-4 py-4"
-            onClick={(e) => e.stopPropagation()}
-            style={{ paddingBottom: '80px', maxHeight: '100vh', overflow: 'hidden' }}
-          >
-            <div 
-              ref={serviceModalRef}
-              className="relative z-10 w-full max-w-md bg-sakura-surface/85 border border-sakura-border/60 rounded-3xl shadow-2xl p-6 max-h-[calc(100vh-8rem)] overflow-y-auto"
-              style={{ maxHeight: 'calc(100vh - 8rem)', WebkitOverflowScrolling: 'touch' }}
-            >
-            <button
-              onClick={handleCloseServiceModal}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full border border-sakura-border/40 bg-sakura-surface/20 text-sakura-dark hover:bg-sakura-surface/30 transition-colors z-20"
-              aria-label="Закрыть"
-            >
-              ×
-            </button>
-            <div className="space-y-4 text-sakura-dark pb-8">
-              <div>
-                <p className="text-sm text-sakura-dark/60 mb-1 uppercase tracking-wide">Услуга</p>
-                <h2 id="service-modal-title" className="text-xl font-bold">{selectedService.title}</h2>
-                <p className="text-sm text-sakura-dark/70 mt-1">
-                  {selectedService.partner?.company_name || selectedService.partner?.name || t('partner_not_connected')}
-                </p>
-              </div>
-              {selectedService.description && (
-                <p className="text-sm text-sakura-dark/80 bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-3">
-                  {selectedService.description}
-                </p>
-              )}
-              <div className="flex items-center gap-3 bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-3">
-                <span className="text-2xl">💸</span>
-                <div className="flex-1">
-                  <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">
-                    {language === 'ru' ? 'Стоимость' : 'Cost'}
-                  </p>
-                  <p className="text-lg font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
-                    {formatPriceWithPoints(selectedService.price_points, currency, rates, true, language)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">
-                    {language === 'ru' ? 'Ваш баланс' : 'Your balance'}
-                  </p>
-                  <p className={`text-lg font-semibold ${
-                    balance >= selectedService.price_points ? 'text-green-600' : 'text-red-500'
-                  }`}>
-                    {formatPriceWithPoints(balance, currency, rates, false, language)}
-                  </p>
-                </div>
-              </div>
+      <ServiceModal
+        isOpen={isServiceModalOpen}
+        selectedService={selectedService}
+        servicePromotions={servicePromotions}
+        balance={balance}
+        chatId={chatId}
+        qrImage={qrImage}
+        qrError={qrError}
+        isQrLoading={isQrLoading}
+        language={language}
+        t={t}
+        currency={currency}
+        rates={rates}
+        formatPriceWithPoints={formatPriceWithPoints}
+        serviceModalRef={serviceModalRef}
+        onClose={handleCloseServiceModal}
+        onGetCashback={handleGetCashback}
+        onRedeemViaPromotion={handleRedeemViaPromotion}
+        onBookTime={handleBookTime}
+        onContactPartner={handleContactPartner}
+        onShowLocation={handleShowLocation}
+      />
 
-
-              <div className="space-y-3">
-                {/* Кнопка обмена по акции (показывается только если есть активная акция) */}
-                {(() => {
-                  const promotions = servicePromotions[selectedService.id] || []
-                  const redemptionPromotion = promotions.find(p => 
-                    p.promotion_type === 'points_redemption' && 
-                    p.max_points_payment && 
-                    p.max_points_payment > 0
-                  )
-                  
-                  if (redemptionPromotion) {
-                    return (
-                      <button
-                        onClick={handleRedeemViaPromotion}
-                        className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-mid to-sakura-dark text-white font-semibold shadow-md hover:shadow-lg transition-all"
-                      >
-                        {language === 'ru' 
-                          ? `🎁 Обменять по акции: ${redemptionPromotion.title}`
-                          : `🎁 Redeem via promotion: ${redemptionPromotion.title}`}
-                      </button>
-                    )
-                  }
-                  return null
-                })()}
-
-                <button
-                  onClick={handleGetCashback}
-                  disabled={isQrLoading}
-                  className="w-full py-3 rounded-full bg-sakura-accent text-white font-semibold shadow-md hover:bg-sakura-accent/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isQrLoading ? 'Генерируем QR...' : (language === 'ru' ? 'Получить кэшбэк в баллах' : 'Get cashback points')}
-                </button>
-
-                <button
-                  onClick={handleShowLocation}
-                  className="w-full py-3 rounded-full bg-white text-sakura-dark font-semibold shadow-md border border-sakura-border hover:bg-sakura-surface transition-colors"
-                >
-                  {language === 'ru' ? '📍 Показать на карте' : '📍 Show on Map'}
-                </button>
-
-                <button
-                  onClick={handleBookTime}
-                  disabled={!selectedService.booking_url && !selectedService.partner?.booking_url}
-                  className="w-full py-3 rounded-full bg-sakura-deep text-white font-semibold shadow-md hover:bg-sakura-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={(!selectedService.booking_url && !selectedService.partner?.booking_url) ? (language === 'ru' ? 'Ссылка уточняется' : 'Link TBD') : ''}
-                >
-                  {(!selectedService.booking_url && !selectedService.partner?.booking_url)
-                    ? (language === 'ru' ? 'Забронировать (ссылка уточняется)' : 'Book (link TBD)')
-                    : (language === 'ru' ? 'Забронировать время' : 'Book time')}
-                </button>
-                <button
-                  onClick={handleContactPartner}
-                  className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-accent to-sakura-mid text-white font-semibold shadow-md hover:shadow-lg transition-all"
-                >
-                  {language === 'ru' ? '💬 Написать партнёру' : '💬 Contact Partner'}
-                </button>
-              </div>
-
-              {qrError && (
-                <div className="text-sm text-red-500 bg-red-100/60 border border-red-200 rounded-2xl p-3">
-                  {qrError}
-                </div>
-              )}
-
-              {qrImage && (
-                <div className="flex flex-col items-center gap-3 bg-white/90 border border-sakura-border/40 rounded-3xl p-4 mb-8 pb-8">
-                  <img src={qrImage} alt="QR для начисления" className="w-48 h-48 object-contain" />
-                  <p className="text-xs text-sakura-dark/70 text-center px-2">
-                    {language === 'ru' ? 'Покажите код мастеру при оплате — он подтвердит начисление баллов.' : 'Show this code to the master at payment — they will confirm points.'}
-                  </p>
-                  {chatId && (
-                    <p className="text-xs text-sakura-dark/50 text-center px-2 font-mono">
-                      ID: {chatId}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Модальное окно "Место свободно" */}
-      {isEmptyCategoryModalOpen && emptyCategoryCode && (
-        <div 
-          className="fixed inset-0 z-[100]" 
-          onClick={() => {
-            setIsEmptyCategoryModalOpen(false)
-            navigate('/')
-          }}
-          style={{ zIndex: 1000 }}
-        >
-          <div className="absolute inset-0 bg-sakura-deep/50 backdrop-blur-sm" />
-          <div 
-            className="relative h-full flex items-center justify-center px-4 py-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative z-10 w-full max-w-md bg-sakura-surface/95 border border-sakura-border/60 rounded-3xl shadow-2xl p-6">
-              <button
-                onClick={() => {
-                  setIsEmptyCategoryModalOpen(false)
-                  navigate('/')
-                }}
-                className="absolute top-4 right-4 w-10 h-10 rounded-full border border-sakura-border/40 bg-sakura-surface/20 text-sakura-dark hover:bg-sakura-surface/30 transition-colors z-20"
-                aria-label="Закрыть"
-              >
-                ×
-              </button>
-              <div className="space-y-4 text-sakura-dark text-center">
-                <div className="text-6xl mb-4">🎯</div>
-                <h2 className="text-2xl font-bold mb-2">
-                  {language === 'ru' ? 'Место свободно!' : 'Spot Available!'}
-                </h2>
-                {/* Debug info */}
-                {process.env.NODE_ENV === 'development' && (
-                  <p className="text-xs text-gray-500">Category: {emptyCategoryCode}</p>
-                )}
-                <p className="text-sakura-dark/80 mb-6">
-                  {language === 'ru' 
-                    ? 'В этой категории пока нет партнеров. Станьте первым и получите преимущество!'
-                    : 'There are no partners in this category yet. Be the first and get an advantage!'}
-                </p>
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={() => {
-                      hapticFeedback('medium')
-                      navigate('/partner/apply')
-                      setIsEmptyCategoryModalOpen(false)
-                    }}
-                    className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-mid to-sakura-dark text-white font-semibold shadow-md hover:shadow-lg transition-all"
-                  >
-                    {language === 'ru' ? '🤝 Стать партнером' : '🤝 Become a Partner'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      hapticFeedback('light')
-                      setIsEmptyCategoryModalOpen(false)
-                      navigate('/community')
-                    }}
-                    className="w-full py-3 rounded-full bg-sakura-accent/90 text-white font-semibold shadow-md border border-sakura-border hover:bg-sakura-accent transition-colors"
-                  >
-                    {t('spot_recommend_place')}
-                  </button>
-                  <button
-                    onClick={() => {
-                      hapticFeedback('light')
-                      setIsEmptyCategoryModalOpen(false)
-                      navigate('/')
-                    }}
-                    className="w-full py-3 rounded-full bg-white text-sakura-dark font-semibold shadow-md border border-sakura-border hover:bg-sakura-surface transition-colors"
-                  >
-                    {language === 'ru' ? 'Закрыть' : 'Close'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <EmptyCategoryModal
+        isOpen={isEmptyCategoryModalOpen}
+        emptyCategoryCode={emptyCategoryCode}
+        language={language}
+        t={t}
+        navigate={navigate}
+        onClose={() => setIsEmptyCategoryModalOpen(false)}
+      />
 
       {/* Скрыть скроллбар и адаптивный цвет текста */}
       <style>{`
@@ -1476,6 +1230,8 @@ const Services = () => {
           mix-blend-mode: difference;
         }
       `}</style>
+
+      {toast && <Toast message={toast.message} type={toast.type} key={toast.key} onClose={hideToast} />}
     </div>
   )
 }

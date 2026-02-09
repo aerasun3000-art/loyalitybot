@@ -90,7 +90,7 @@ function Community() {
 
   if (!chatId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-gray-600">{t('referral_auth_required')}</p>
         </div>
@@ -102,9 +102,9 @@ function Community() {
   const achievements = getAchievementProgress()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream">
       {/* Шапка */}
-      <div className="bg-gradient-to-br from-jewelry-brown-dark via-jewelry-burgundy to-jewelry-gold px-4 pt-6 pb-8">
+      <div className="bg-gradient-to-br from-sakura-deep via-sakura-mid to-sakura-accent px-4 pt-6 pb-8">
         <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => navigate('/')}
@@ -152,7 +152,7 @@ function Community() {
                 <div className="text-white/70 text-xs mt-1">{t('referral_active')}</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-jewelry-gold">
+                <div className="text-2xl font-bold text-sakura-gold">
                   {referralStats.total_earnings || 0} 💸
                 </div>
                 <div className="text-white/70 text-xs mt-1">{t('referral_earned')}</div>
@@ -165,17 +165,17 @@ function Community() {
       {/* Основной контент */}
       <div className="px-4 -mt-4 pb-20">
         {/* Реферальная ссылка */}
-        <div className="bg-white rounded-xl p-6 shadow-lg mb-4 border border-jewelry-gold/20">
+        <div className="bg-white dark:bg-sakura-dark rounded-xl p-6 shadow-lg mb-4 border border-sakura-gold/20">
           <div className="flex items-center gap-3 mb-4">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-gold">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <h2 className="text-lg font-bold text-jewelry-brown-dark">{t('referral_your_link')}</h2>
+            <h2 className="text-lg font-bold text-sakura-deep">{t('referral_your_link')}</h2>
           </div>
 
           {(referralStats?.total_referrals ?? 0) === 0 && (
-            <p className="text-sm text-jewelry-gray-elegant mb-4 rounded-lg bg-jewelry-gold/10 p-3 border border-jewelry-gold/20">
+            <p className="text-sm text-sakura-muted mb-4 rounded-lg bg-sakura-gold/10 p-3 border border-sakura-gold/20">
               {t('referral_empty_state')}
             </p>
           )}
@@ -184,7 +184,7 @@ function Community() {
             <>
               <div className="bg-gray-50 rounded-lg p-3 mb-4 border border-gray-200">
                 <p className="text-xs text-gray-500 mb-1">{t('referral_code')}</p>
-                <p className="text-lg font-mono font-bold text-jewelry-brown-dark break-all">
+                <p className="text-lg font-mono font-bold text-sakura-deep break-all">
                   {referralCode}
                 </p>
               </div>
@@ -198,7 +198,7 @@ function Community() {
 
               <button
                 onClick={handleCopyLink}
-                className="w-full bg-jewelry-gold text-white py-3 rounded-lg font-semibold hover:bg-jewelry-gold-dark transition-colors shadow-lg flex items-center justify-center gap-2"
+                className="w-full bg-sakura-gold text-white py-3 rounded-lg font-semibold hover:bg-sakura-mid transition-colors shadow-lg flex items-center justify-center gap-2"
               >
                 {copied ? (
                   <>
@@ -226,9 +226,9 @@ function Community() {
         </div>
 
         {/* Как это работает */}
-        <div className="bg-white rounded-xl p-6 shadow-lg mb-4 border border-jewelry-gold/20">
-          <h2 className="text-lg font-bold text-jewelry-brown-dark mb-4 flex items-center gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+        <div className="bg-white dark:bg-sakura-dark rounded-xl p-6 shadow-lg mb-4 border border-sakura-gold/20">
+          <h2 className="text-lg font-bold text-sakura-deep mb-4 flex items-center gap-2">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-gold">
               <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
               <path d="M12 8V12L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
@@ -237,31 +237,31 @@ function Community() {
           
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <div className="bg-jewelry-gold/10 rounded-full p-2 flex-shrink-0">
-                <span className="text-jewelry-gold font-bold">1</span>
+              <div className="bg-sakura-gold/10 rounded-full p-2 flex-shrink-0">
+                <span className="text-sakura-gold font-bold">1</span>
               </div>
               <div>
-                <p className="font-semibold text-jewelry-brown-dark">{t('referral_step1_title')}</p>
+                <p className="font-semibold text-sakura-deep">{t('referral_step1_title')}</p>
                 <p className="text-sm text-gray-600">{t('referral_step1_desc')}</p>
               </div>
             </div>
             
             <div className="flex items-start gap-3">
-              <div className="bg-jewelry-gold/10 rounded-full p-2 flex-shrink-0">
-                <span className="text-jewelry-gold font-bold">2</span>
+              <div className="bg-sakura-gold/10 rounded-full p-2 flex-shrink-0">
+                <span className="text-sakura-gold font-bold">2</span>
               </div>
               <div>
-                <p className="font-semibold text-jewelry-brown-dark">{t('referral_step2_title')}</p>
+                <p className="font-semibold text-sakura-deep">{t('referral_step2_title')}</p>
                 <p className="text-sm text-gray-600">{t('referral_step2_desc')}</p>
               </div>
             </div>
             
             <div className="flex items-start gap-3">
-              <div className="bg-jewelry-gold/10 rounded-full p-2 flex-shrink-0">
-                <span className="text-jewelry-gold font-bold">3</span>
+              <div className="bg-sakura-gold/10 rounded-full p-2 flex-shrink-0">
+                <span className="text-sakura-gold font-bold">3</span>
               </div>
               <div>
-                <p className="font-semibold text-jewelry-brown-dark">{t('referral_step3_title')}</p>
+                <p className="font-semibold text-sakura-deep">{t('referral_step3_title')}</p>
                 <p className="text-sm text-gray-600">{t('referral_step3_desc')}</p>
               </div>
             </div>
@@ -269,43 +269,43 @@ function Community() {
         </div>
 
         {/* Бонусы */}
-        <div className="bg-white rounded-xl p-6 shadow-lg mb-4 border border-jewelry-gold/20">
-          <h2 className="text-lg font-bold text-jewelry-brown-dark mb-4 flex items-center gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+        <div className="bg-white dark:bg-sakura-dark rounded-xl p-6 shadow-lg mb-4 border border-sakura-gold/20">
+          <h2 className="text-lg font-bold text-sakura-deep mb-4 flex items-center gap-2">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-gold">
               <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21L12 17.77L5.82 21L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="currentColor" fillOpacity="0.1" />
             </svg>
             {t('referral_bonuses')}
           </h2>
           
           <div className="space-y-3">
-            <div className="bg-gradient-to-r from-jewelry-gold/10 to-jewelry-gold/5 rounded-lg p-4 border border-jewelry-gold/20">
+            <div className="bg-gradient-to-r from-sakura-gold/10 to-sakura-gold/5 rounded-lg p-4 border border-sakura-gold/20">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-jewelry-brown-dark">{t('referral_bonus_registration')}</span>
-                <span className="text-jewelry-gold font-bold">+100 💸</span>
+                <span className="font-semibold text-sakura-deep">{t('referral_bonus_registration')}</span>
+                <span className="text-sakura-gold font-bold">+100 💸</span>
               </div>
               <p className="text-sm text-gray-600">{t('referral_bonus_registration_desc')}</p>
             </div>
             
-            <div className="bg-gradient-to-r from-jewelry-gold/10 to-jewelry-gold/5 rounded-lg p-4 border border-jewelry-gold/20">
+            <div className="bg-gradient-to-r from-sakura-gold/10 to-sakura-gold/5 rounded-lg p-4 border border-sakura-gold/20">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-jewelry-brown-dark">{t('referral_bonus_transaction')}</span>
-                <span className="text-jewelry-gold font-bold">8%</span>
+                <span className="font-semibold text-sakura-deep">{t('referral_bonus_transaction')}</span>
+                <span className="text-sakura-gold font-bold">8%</span>
               </div>
               <p className="text-sm text-gray-600">{t('referral_bonus_transaction_desc')}</p>
             </div>
             
-            <div className="bg-gradient-to-r from-jewelry-gold/10 to-jewelry-gold/5 rounded-lg p-4 border border-jewelry-gold/20">
+            <div className="bg-gradient-to-r from-sakura-gold/10 to-sakura-gold/5 rounded-lg p-4 border border-sakura-gold/20">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-jewelry-brown-dark">{t('referral_bonus_level2')}</span>
-                <span className="text-jewelry-gold font-bold">+25 💸 + 4%</span>
+                <span className="font-semibold text-sakura-deep">{t('referral_bonus_level2')}</span>
+                <span className="text-sakura-gold font-bold">+25 💸 + 4%</span>
               </div>
               <p className="text-sm text-gray-600">{t('referral_bonus_level2_desc')}</p>
             </div>
             
-            <div className="bg-gradient-to-r from-jewelry-gold/10 to-jewelry-gold/5 rounded-lg p-4 border border-jewelry-gold/20">
+            <div className="bg-gradient-to-r from-sakura-gold/10 to-sakura-gold/5 rounded-lg p-4 border border-sakura-gold/20">
               <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-jewelry-brown-dark">{t('referral_bonus_level3')}</span>
-                <span className="text-jewelry-gold font-bold">+10 💸 + 2%</span>
+                <span className="font-semibold text-sakura-deep">{t('referral_bonus_level3')}</span>
+                <span className="text-sakura-gold font-bold">+10 💸 + 2%</span>
               </div>
               <p className="text-sm text-gray-600">{t('referral_bonus_level3_desc')}</p>
             </div>
@@ -313,9 +313,9 @@ function Community() {
         </div>
 
         {/* Достижения */}
-        <div className="bg-white rounded-xl p-6 shadow-lg mb-4 border border-jewelry-gold/20">
-          <h2 className="text-lg font-bold text-jewelry-brown-dark mb-4 flex items-center gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+        <div className="bg-white dark:bg-sakura-dark rounded-xl p-6 shadow-lg mb-4 border border-sakura-gold/20">
+          <h2 className="text-lg font-bold text-sakura-deep mb-4 flex items-center gap-2">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-gold">
               <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21L12 17.77L5.82 21L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             {t('referral_achievements')}
@@ -327,21 +327,21 @@ function Community() {
                 key={index}
                 className={`rounded-lg p-4 border ${
                   achievement.reached
-                    ? 'bg-gradient-to-r from-jewelry-gold/20 to-jewelry-gold/10 border-jewelry-gold/40'
+                    ? 'bg-gradient-to-r from-sakura-gold/20 to-sakura-gold/10 border-sakura-gold/40'
                     : 'bg-gray-50 border-gray-200'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {achievement.reached ? (
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-jewelry-gold">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-gold">
                         <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     ) : (
                       <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
                     )}
                     <div>
-                      <p className="font-semibold text-jewelry-brown-dark">
+                      <p className="font-semibold text-sakura-deep">
                         {t('referral_achievement').replace('{count}', achievement.threshold)}
                       </p>
                       <p className="text-sm text-gray-600">
@@ -349,7 +349,7 @@ function Community() {
                       </p>
                     </div>
                   </div>
-                  <span className="text-jewelry-gold font-bold">+{achievement.bonus} 💸</span>
+                  <span className="text-sakura-gold font-bold">+{achievement.bonus} 💸</span>
                 </div>
               </div>
             ))}
@@ -358,21 +358,21 @@ function Community() {
 
         {/* Последние награды */}
         {referralStats?.recent_rewards && referralStats.recent_rewards.length > 0 && (
-          <div className="bg-white rounded-xl p-6 shadow-lg mb-4 border border-jewelry-gold/20">
-            <h2 className="text-lg font-bold text-jewelry-brown-dark mb-4">{t('referral_recent_rewards')}</h2>
+          <div className="bg-white dark:bg-sakura-dark rounded-xl p-6 shadow-lg mb-4 border border-sakura-gold/20">
+            <h2 className="text-lg font-bold text-sakura-deep mb-4">{t('referral_recent_rewards')}</h2>
             
             <div className="space-y-2">
               {referralStats.recent_rewards.slice(0, 5).map((reward, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div>
-                    <p className="text-sm font-semibold text-jewelry-brown-dark">
+                    <p className="text-sm font-semibold text-sakura-deep">
                       {reward.description || t('referral_reward')}
                     </p>
                     <p className="text-xs text-gray-500">
                       {new Date(reward.created_at).toLocaleDateString(language === 'ru' ? 'ru' : 'en')}
                     </p>
                   </div>
-                  <span className="text-jewelry-gold font-bold">+{reward.points} 💸</span>
+                  <span className="text-sakura-gold font-bold">+{reward.points} 💸</span>
                 </div>
               ))}
             </div>

@@ -172,7 +172,7 @@ const Navigation = () => {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-sakura-surface/85 border-t border-sakura-border/50 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.25)] z-50 backdrop-blur-md">
+    <nav className="fixed bottom-0 left-0 right-0 bg-sakura-surface/85 border-t border-sakura-border/50 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.25)] z-50 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
       <div className="flex items-center justify-around h-16 max-w-screen-xl mx-auto px-2">
         {navItems.map((item) => {
           const active = isActive(item.path)
@@ -181,13 +181,13 @@ const Navigation = () => {
               key={item.path}
               onClick={() => handleNavigation(item.path)}
               className={`relative flex flex-col items-center justify-center min-w-[60px] h-full transition-colors ${
-                active ? 'text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]' : 'text-jewelry-gray-elegant'
+                active ? 'text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]' : 'text-sakura-muted'
               }`}
             >
               <div className="transition-opacity">
                 {item.icon(active)}
               </div>
-              <span className={`text-[10px] mt-1 font-medium ${active ? 'font-semibold' : ''}`}>
+              <span className={`text-xs mt-1 font-medium ${active ? 'font-semibold' : ''}`}>
                 {t(item.labelKey)}
               </span>
               {active && (

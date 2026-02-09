@@ -16,7 +16,7 @@ const About = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream pb-20">
       {/* Шапка */}
       <div className="bg-gradient-to-br from-pink-400 to-rose-500 px-4 pt-6 pb-8">
         <div className="flex items-center justify-between mb-6">
@@ -52,7 +52,7 @@ const About = () => {
         {/* О программе */}
         <div className="bg-white rounded-2xl p-6 shadow-lg mb-4">
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-lg leading-none text-jewelry-gold">ℹ️</span>
+            <span className="text-lg leading-none text-sakura-gold">ℹ️</span>
             <h3 className="font-bold text-gray-800 text-lg">{t('about_what_is')}</h3>
           </div>
           <p className="text-gray-600 leading-relaxed mb-4">
@@ -60,19 +60,19 @@ const About = () => {
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-pink-50 rounded-xl p-3 text-center">
-              <span className="text-lg leading-none mx-auto mb-1 text-jewelry-gold">💰</span>
+              <span className="text-lg leading-none mx-auto mb-1 text-sakura-gold">💰</span>
               <div className="text-xs text-gray-700 font-medium">{t('about_earn_points')}</div>
             </div>
             <div className="bg-purple-50 rounded-xl p-3 text-center">
-              <span className="text-lg leading-none mx-auto mb-1 text-jewelry-gold">🎉</span>
+              <span className="text-lg leading-none mx-auto mb-1 text-sakura-gold">🎉</span>
               <div className="text-xs text-gray-700 font-medium">{t('about_get_rewards')}</div>
             </div>
             <div className="bg-blue-50 rounded-xl p-3 text-center">
-              <span className="text-lg leading-none mx-auto mb-1 text-jewelry-gold">⭐</span>
+              <span className="text-lg leading-none mx-auto mb-1 text-sakura-gold">⭐</span>
               <div className="text-xs text-gray-700 font-medium">{t('about_vip_status')}</div>
             </div>
             <div className="bg-green-50 rounded-xl p-3 text-center">
-              <span className="text-lg leading-none mx-auto mb-1 text-jewelry-gold">🧠</span>
+              <span className="text-lg leading-none mx-auto mb-1 text-sakura-gold">🧠</span>
               <div className="text-xs text-gray-700 font-medium">{t('about_partners')}</div>
             </div>
           </div>

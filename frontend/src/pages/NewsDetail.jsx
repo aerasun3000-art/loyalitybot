@@ -127,9 +127,9 @@ const NewsDetail = () => {
 
   if (!displayNews) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream flex items-center justify-center">
         <div className="text-center">
-          <span className="text-6xl leading-none mx-auto mb-4 text-jewelry-gray-elegant">⚠️</span>
+          <span className="text-6xl leading-none mx-auto mb-4 text-sakura-muted">⚠️</span>
           <h2 className="text-xl font-bold text-gray-800 mb-2">
             {language === 'ru' ? 'Новость не найдена' : 'News not found'}
           </h2>
@@ -145,7 +145,7 @@ const NewsDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream pb-24">
       {/* Шапка с кнопками */}
       <div className="bg-white px-4 py-3 flex items-center justify-between sticky top-0 z-10 border-b border-gray-100">
         <button

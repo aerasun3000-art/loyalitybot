@@ -216,7 +216,7 @@ const History = () => {
     .reduce((sum, t) => sum + (t.spent_points || 0), 0)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream">
       {/* Шапка */}
       <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-4 pt-6 pb-8">
         <div className="flex items-center mb-6">
@@ -295,10 +295,10 @@ const History = () => {
       </div>
 
       {/* Список транзакций */}
-      <div className="px-4 -mt-4 pb-20">
+      <div className="px-4 -mt-4 pb-24">
         {filteredTransactions.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
-            <span className="text-6xl leading-none mx-auto mb-4 block text-jewelry-gray-elegant">🚫</span>
+            <span className="text-6xl leading-none mx-auto mb-4 block text-sakura-muted">🚫</span>
             <p className="text-gray-600">{t('history_no_items')}</p>
           </div>
         ) : (
@@ -418,7 +418,7 @@ const History = () => {
                       key={n}
                       type="button"
                       onClick={() => setRatingForm(prev => ({ ...prev, rating: n }))}
-                      className={`w-9 h-9 rounded-lg font-semibold text-sm ${
+                      className={`w-11 h-11 rounded-lg font-semibold text-sm ${
                         ratingForm.rating === n
                           ? 'bg-orange-500 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

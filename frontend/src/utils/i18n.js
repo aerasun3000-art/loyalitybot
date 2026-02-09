@@ -690,7 +690,9 @@ export const translateDynamicContent = async (
   // Динамически импортируем функцию перевода
   try {
     const { translateText } = await import('./translate.js')
-    return await translateText(text, lang, sourceLang)
+    const { sanitizeText } = await import('./sanitize.js')
+    const translated = await translateText(text, lang, sourceLang)
+    return sanitizeText(translated)
   } catch (error) {
     console.error('Error importing translate utility:', error)
     return text

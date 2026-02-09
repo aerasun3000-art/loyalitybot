@@ -211,13 +211,13 @@ const PromotionDetail = () => {
 
   if (!promotion) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream flex items-center justify-center">
         <div className="text-center">
-          <span className="text-6xl leading-none mx-auto mb-4 text-jewelry-gray-elegant">⚠️</span>
+          <span className="text-6xl leading-none mx-auto mb-4 text-sakura-muted">⚠️</span>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Акция не найдена</h2>
           <button
             onClick={handleBack}
-            className="text-jewelry-gold font-semibold"
+            className="text-sakura-gold font-semibold"
           >
             ← Назад к акциям
           </button>

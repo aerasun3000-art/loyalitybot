@@ -2,25 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Telegram Web App переменные - Розовая женственная тема */
+/* Telegram Web App + Sakura палитра — переменные */
 :root {
   --tg-theme-bg-color: #ffffff;
   --tg-theme-text-color: #000000;
   --tg-theme-hint-color: #999999;
-  --tg-theme-link-color: #FF69B4;
-  --tg-theme-button-color: #FF69B4;
+  --tg-theme-link-color: #6D3C52;
+  --tg-theme-button-color: #6D3C52;
   --tg-theme-button-text-color: #ffffff;
-  --tg-theme-secondary-bg-color: #FFF0F5;
+  --tg-theme-secondary-bg-color: #FAF7F5;
+
+  /* Sakura palette — RGB channels for opacity support */
+  --sakura-bg: 250 247 245;
+  --sakura-light: 254 245 243;
+  --sakura-cream: 255 248 245;
+  --sakura-surface: 250 220 213;
+  --sakura-border: 118 93 103;
+  --sakura-accent: 109 60 82;
+  --sakura-mid: 75 33 56;
+  --sakura-deep: 27 12 26;
+  --sakura-dark: 45 34 47;
+  --sakura-gold: 184 134 11;
+  --sakura-gold-light: 245 230 200;
+  --sakura-muted: 107 91 110;
 }
 
 .dark {
-  --tg-theme-bg-color: #2D1B2E;
+  --tg-theme-bg-color: #1B0C1A;
   --tg-theme-text-color: #ffffff;
-  --tg-theme-hint-color: #C9A0DC;
-  --tg-theme-link-color: #FF69B4;
-  --tg-theme-button-color: #E6B3E6;
+  --tg-theme-hint-color: #A090A3;
+  --tg-theme-link-color: #D4899B;
+  --tg-theme-button-color: #D4899B;
   --tg-theme-button-text-color: #ffffff;
-  --tg-theme-secondary-bg-color: #3D2640;
+  --tg-theme-secondary-bg-color: #2D222F;
+
+  /* Sakura palette — dark mode RGB */
+  --sakura-bg: 27 21 32;
+  --sakura-light: 30 24 34;
+  --sakura-cream: 26 18 24;
+  --sakura-surface: 45 34 47;
+  --sakura-border: 90 74 82;
+  --sakura-accent: 212 137 155;
+  --sakura-mid: 196 122 144;
+  --sakura-deep: 245 230 232;
+  --sakura-dark: 232 213 216;
+  --sakura-gold: 212 168 50;
+  --sakura-gold-light: 61 46 26;
+  --sakura-muted: 160 144 163;
 }
 
 body {
@@ -51,22 +79,29 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Стили для кнопок в стиле Telegram */
+/* Dark mode: переопределение стандартных цветов */
+@layer base {
+  .dark {
+    color-scheme: dark;
+  }
+}
+
+/* Компоненты Telegram */
 @layer components {
   .tg-button {
-    @apply bg-tg-button text-tg-button-text rounded-lg px-4 py-3 font-medium 
+    @apply bg-tg-button text-tg-button-text rounded-lg px-4 py-3 font-medium
            hover:opacity-90 active:opacity-80 transition-opacity;
   }
-  
+
   .tg-button-secondary {
     @apply bg-tg-secondary-bg text-tg-text rounded-lg px-4 py-3 font-medium
            hover:opacity-90 active:opacity-80 transition-opacity;
   }
-  
+
   .tg-card {
     @apply bg-tg-secondary-bg rounded-2xl p-4 shadow-sm;
   }
-  
+
   .tg-input {
     @apply w-full bg-tg-secondary-bg text-tg-text rounded-lg px-4 py-3
            border-2 border-transparent focus:border-tg-button outline-none
@@ -74,41 +109,34 @@ html {
   }
 }
 
-/* Улучшенные тени с розовым оттенком */
-.card-shadow {
-  box-shadow: 
-    0 1px 3px rgba(255, 105, 180, 0.1),
-    0 4px 12px rgba(255, 105, 180, 0.15),
-    0 16px 32px rgba(255, 105, 180, 0.1);
-}
+/* Кнопки — 3 варианта */
+@layer components {
+  .btn-primary {
+    @apply bg-sakura-accent text-white rounded-xl px-4 py-3 font-medium
+           hover:bg-sakura-mid active:scale-95 transition-all;
+  }
 
-.card-shadow-hover {
-  box-shadow: 
-    0 4px 8px rgba(255, 105, 180, 0.15),
-    0 8px 24px rgba(255, 105, 180, 0.2),
-    0 24px 48px rgba(255, 105, 180, 0.15);
-  transform: translateY(-2px);
-}
+  .btn-secondary {
+    @apply bg-sakura-surface text-sakura-deep rounded-xl px-4 py-3 font-medium
+           border border-sakura-border/30 hover:bg-sakura-surface/80 active:scale-95 transition-all;
+  }
 
-/* Градиентные кнопки */
-.btn-gradient {
-  background: linear-gradient(135deg, #FF69B4 0%, #FF1493 100%);
-  transition: all 0.3s ease;
-}
+  .btn-ghost {
+    @apply bg-transparent text-sakura-deep rounded-xl px-4 py-3 font-medium
+           hover:bg-sakura-surface/50 active:scale-95 transition-all;
+  }
 
-.btn-gradient:hover {
-  background: linear-gradient(135deg, #FF1493 0%, #FF69B4 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 105, 180, 0.3);
-}
-
-.btn-gradient:active {
-  transform: translateY(0) scale(0.98);
+  /* Sakura search bar */
+  .search-bar-sakura {
+    @apply w-full bg-sakura-light rounded-xl px-4 py-3 text-sakura-deep
+           placeholder-sakura-muted border-0 focus:outline-none focus:ring-2
+           focus:ring-sakura-accent/20 transition-all;
+  }
 }
 
 /* Анимированный градиент */
 .bg-animated-gradient {
-  background: linear-gradient(270deg, #FF69B4, #FF1493, #E6B3E6);
+  background: linear-gradient(270deg, rgb(var(--sakura-accent)), rgb(var(--sakura-mid)), rgb(var(--sakura-surface)));
   background-size: 600% 600%;
   animation: gradient-shift 8s ease infinite;
 }
@@ -121,18 +149,13 @@ html {
 
 /* Плавное появление */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .fade-in-up {
-  animation: fadeInUp 0.5s ease-out forwards;
+  animation: fadeInUp 0.3s ease-out forwards;
+  opacity: 0;
 }
 
 /* Задержки для каскадного появления */
@@ -140,56 +163,42 @@ html {
 .delay-200 { animation-delay: 0.2s; }
 .delay-300 { animation-delay: 0.3s; }
 .delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
 
-/* Modern Flat Design Variants */
-@layer components {
-  /* Orange Variant Styles */
-  .card-flat-orange {
-    @apply bg-white rounded-2xl shadow-md hover:shadow-lg transition-all;
-  }
-  
-  .btn-flat-orange {
-    @apply bg-orange-500 text-white rounded-lg px-4 py-2 font-medium 
-           hover:bg-orange-600 active:scale-95 transition-all;
-  }
-  
-  /* Sakura Variant Styles */
-  .card-flat-sakura {
-    @apply bg-white rounded-2xl shadow-md hover:shadow-lg transition-all;
-  }
-  
-  .btn-flat-sakura {
-    @apply bg-sakura-accent text-white rounded-lg px-4 py-2 font-medium 
-           hover:bg-sakura-mid active:scale-95 transition-all;
-  }
-  
-  /* Minimal Variant Styles */
-  .card-flat-minimal {
-    @apply bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all;
-  }
-  
-  .btn-flat-minimal {
-    @apply bg-gray-800 text-white rounded-md px-3 py-1.5 text-sm font-medium 
-           hover:bg-gray-900 active:scale-95 transition-all;
-  }
-  
-  /* Search Bar Styles */
-  .search-bar-flat {
-    @apply w-full bg-gray-50 rounded-xl px-4 py-3 text-gray-600 
-           placeholder-gray-400 border-0 focus:outline-none focus:ring-2 
-           focus:ring-orange-500/20 transition-all;
-  }
-  
-  .search-bar-sakura {
-    @apply w-full bg-sakura-light rounded-xl px-4 py-3 text-gray-600 
-           placeholder-gray-400 border-0 focus:outline-none focus:ring-2 
-           focus:ring-sakura-accent/20 transition-all;
-  }
-  
-  .search-bar-minimal {
-    @apply w-full bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-600 
-           placeholder-gray-400 border border-gray-200 focus:outline-none 
-           focus:border-gray-400 transition-all;
-  }
+/* Модалки — fade overlay + scale content */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.25s ease-out forwards;
+}
+
+/* Toast анимации */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-12px); }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.25s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.2s ease-in forwards;
+}
