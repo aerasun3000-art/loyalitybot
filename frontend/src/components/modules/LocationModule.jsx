@@ -77,7 +77,7 @@ const LocationModule = ({
   }
 
   return (
-    <div className="bg-white px-4 py-4">
+    <div className="bg-sakura-surface px-4 py-4">
       {/* Заголовок секции */}
       <h2 className="text-lg font-semibold text-gray-900 mb-3">
         📍 {language === 'ru' ? 'Локация и контакты' : 'Location & Contacts'}
@@ -91,14 +91,14 @@ const LocationModule = ({
         >
           {/* Мини-карта placeholder */}
           {showMap && (
-            <div className="relative h-32 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 mb-3">
+            <div className="relative h-32 rounded-xl overflow-hidden bg-gradient-to-br from-sakura-cream to-sakura-surface mb-3">
               {/* Декоративная карта */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-4xl">🗺️</div>
               </div>
               {/* Overlay с призывом */}
               <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
-                <span className="px-3 py-1.5 bg-white/90 rounded-full text-sm font-medium text-gray-700 shadow-sm">
+                <span className="px-3 py-1.5 bg-sakura-cream/95 rounded-full text-sm font-medium text-sakura-deep shadow-sm">
                   {language === 'ru' ? 'Открыть карту' : 'Open map'} →
                 </span>
               </div>
@@ -140,7 +140,7 @@ const LocationModule = ({
           {username && (
             <button
               onClick={handleMessage}
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gray-100 text-gray-700 font-medium transition-colors active:bg-gray-200"
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-sakura-cream text-sakura-deep font-medium transition-colors active:bg-sakura-cream/80"
             >
               <span>💬</span>
               <span>{language === 'ru' ? 'Написать' : 'Message'}</span>
@@ -151,7 +151,7 @@ const LocationModule = ({
           {phone && (
             <button
               onClick={handleCall}
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gray-100 text-gray-700 font-medium transition-colors active:bg-gray-200"
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-sakura-cream text-sakura-deep font-medium transition-colors active:bg-sakura-cream/80"
             >
               <span>📞</span>
               <span>{language === 'ru' ? 'Позвонить' : 'Call'}</span>

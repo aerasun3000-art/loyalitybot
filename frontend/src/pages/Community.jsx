@@ -5,6 +5,8 @@ import { getChatId, getTelegramUser, hapticFeedback } from '../utils/telegram'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
+import Layout from '../components/Layout'
+import { Link2, Clock, Star, Copy, Check, Users, Trophy, Zap } from 'lucide-react'
 
 function Community() {
   const navigate = useNavigate()
@@ -31,8 +33,7 @@ function Community() {
       setLoading(true)
       const stats = await getReferralStats(chatId)
       setReferralStats(stats)
-      
-      // Получаем реферальный код
+
       const code = stats?.referral_code || await getOrCreateReferralCode(chatId)
       setReferralCode(code)
     } catch (error) {
@@ -44,7 +45,6 @@ function Community() {
 
   const getReferralLink = () => {
     if (!referralCode) return ''
-    // Получаем username бота из переменной окружения
     const botUsername = import.meta.env.VITE_BOT_USERNAME || 'mindbeatybot'
     return `https://t.me/${botUsername.replace('@', '')}?start=ref_${referralCode}`
   }
@@ -65,10 +65,10 @@ function Community() {
 
   const getLevelInfo = (level) => {
     const levels = {
-      bronze: { emoji: '🥉', name: t('referral_level_bronze'), color: 'text-amber-600' },
-      silver: { emoji: '🥈', name: t('referral_level_silver'), color: 'text-gray-400' },
-      gold: { emoji: '🥇', name: t('referral_level_gold'), color: 'text-yellow-500' },
-      platinum: { emoji: '💎', name: t('referral_level_platinum'), color: 'text-blue-400' }
+      bronze: { emoji: '🥉', name: t('referral_level_bronze') },
+      silver: { emoji: '🥈', name: t('referral_level_silver') },
+      gold: { emoji: '🥇', name: t('referral_level_gold') },
+      platinum: { emoji: '💎', name: t('referral_level_platinum') }
     }
     return levels[level] || levels.bronze
   }
@@ -90,11 +90,11 @@ function Community() {
 
   if (!chatId) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-gray-600">{t('referral_auth_required')}</p>
+      <Layout>
+        <div className="flex items-center justify-center min-h-[60vh] p-4">
+          <p style={{ color: 'var(--tg-theme-hint-color)' }}>{t('referral_auth_required')}</p>
         </div>
-      </div>
+      </Layout>
     )
   }
 
@@ -102,117 +102,114 @@ function Community() {
   const achievements = getAchievementProgress()
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream">
-      {/* Шапка */}
-      <div className="bg-gradient-to-br from-sakura-deep via-sakura-mid to-sakura-accent px-4 pt-6 pb-8">
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => navigate('/')}
-            className="text-white"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M15 18L9 12L15 6"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-          <h1 className="text-xl font-bold text-white">{t('referral_title')}</h1>
-          <div className="w-6" />
-        </div>
+    <Layout>
+      <div className="max-w-screen-sm mx-auto px-4 flex flex-col gap-4">
+        {/* Заголовок */}
+        <h1 className="text-xl font-bold pt-2">{t('referral_title')}</h1>
 
         {/* Уровень и статистика */}
         {referralStats && (
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">{levelInfo.emoji}</span>
-                <div>
-                  <div className="text-white/80 text-sm">{t('referral_your_level')}</div>
-                  <div className={`text-white font-bold text-lg ${levelInfo.color}`}>
-                    {levelInfo.name}
-                  </div>
-                </div>
+          <div
+            className="rounded-2xl p-4"
+            style={{
+              background: 'linear-gradient(135deg, var(--tg-theme-button-color), color-mix(in srgb, var(--tg-theme-button-color) 60%, rgb(var(--sakura-deep))))',
+            }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-3xl">{levelInfo.emoji}</span>
+              <div>
+                <div className="text-white/80 text-sm">{t('referral_your_level')}</div>
+                <div className="text-white font-bold text-lg">{levelInfo.name}</div>
               </div>
             </div>
-            
-            <div className="grid grid-cols-3 gap-3 mt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-3">
+                <div className="text-xl font-bold text-white">
                   {referralStats.total_referrals || 0}
                 </div>
-                <div className="text-white/70 text-xs mt-1">{t('referral_total')}</div>
+                <div className="text-white/70 text-[11px] mt-0.5">{t('referral_total')}</div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">
+              <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-3">
+                <div className="text-xl font-bold text-white">
                   {referralStats.active_referrals || 0}
                 </div>
-                <div className="text-white/70 text-xs mt-1">{t('referral_active')}</div>
+                <div className="text-white/70 text-[11px] mt-0.5">{t('referral_active')}</div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-sakura-gold">
-                  {referralStats.total_earnings || 0} 💸
+              <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-3">
+                <div className="text-xl font-bold text-white">
+                  {referralStats.total_earnings || 0}
                 </div>
-                <div className="text-white/70 text-xs mt-1">{t('referral_earned')}</div>
+                <div className="text-white/70 text-[11px] mt-0.5">{t('referral_earned')}</div>
               </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* Основной контент */}
-      <div className="px-4 -mt-4 pb-20">
         {/* Реферальная ссылка */}
-        <div className="bg-white dark:bg-sakura-dark rounded-xl p-6 shadow-lg mb-4 border border-sakura-gold/20">
-          <div className="flex items-center gap-3 mb-4">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-gold">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <h2 className="text-lg font-bold text-sakura-deep">{t('referral_your_link')}</h2>
+        <div
+          className="rounded-2xl p-4"
+          style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Link2 size={18} style={{ color: 'var(--tg-theme-button-color)' }} />
+            <h2 className="font-bold">{t('referral_your_link')}</h2>
           </div>
 
           {(referralStats?.total_referrals ?? 0) === 0 && (
-            <p className="text-sm text-sakura-muted mb-4 rounded-lg bg-sakura-gold/10 p-3 border border-sakura-gold/20">
+            <p
+              className="text-sm mb-3 rounded-xl p-3"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 10%, transparent)',
+                color: 'var(--tg-theme-text-color)',
+              }}
+            >
               {t('referral_empty_state')}
             </p>
           )}
-          
+
           {referralCode ? (
             <>
-              <div className="bg-gray-50 rounded-lg p-3 mb-4 border border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">{t('referral_code')}</p>
-                <p className="text-lg font-mono font-bold text-sakura-deep break-all">
-                  {referralCode}
-                </p>
+              <div
+                className="rounded-xl p-3 mb-3"
+                style={{
+                  backgroundColor: 'var(--tg-theme-bg-color)',
+                  border: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)',
+                }}
+              >
+                <p className="text-[11px] mb-0.5" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('referral_code')}</p>
+                <p className="text-base font-mono font-bold break-all">{referralCode}</p>
               </div>
-              
-              <div className="bg-gray-50 rounded-lg p-3 mb-4 border border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">{t('referral_link')}</p>
-                <p className="text-sm text-gray-700 break-all">
+
+              <div
+                className="rounded-xl p-3 mb-3"
+                style={{
+                  backgroundColor: 'var(--tg-theme-bg-color)',
+                  border: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)',
+                }}
+              >
+                <p className="text-[11px] mb-0.5" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('referral_link')}</p>
+                <p className="text-sm break-all" style={{ color: 'var(--tg-theme-hint-color)' }}>
                   {getReferralLink() || t('referral_link_generating')}
                 </p>
               </div>
 
               <button
                 onClick={handleCopyLink}
-                className="w-full bg-sakura-gold text-white py-3 rounded-lg font-semibold hover:bg-sakura-mid transition-colors shadow-lg flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                style={{
+                  backgroundColor: 'var(--tg-theme-button-color)',
+                  color: 'var(--tg-theme-button-text-color, #fff)',
+                }}
               >
                 {copied ? (
                   <>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <Check size={18} />
                     {t('referral_copied')}
                   </>
                 ) : (
                   <>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="2" />
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" />
-                    </svg>
+                    <Copy size={18} />
                     {t('referral_copy_link')}
                   </>
                 )}
@@ -220,137 +217,127 @@ function Community() {
             </>
           ) : (
             <div className="text-center py-4">
-              <p className="text-gray-600">{t('referral_code_loading')}</p>
+              <p style={{ color: 'var(--tg-theme-hint-color)' }}>{t('referral_code_loading')}</p>
             </div>
           )}
         </div>
 
         {/* Как это работает */}
-        <div className="bg-white dark:bg-sakura-dark rounded-xl p-6 shadow-lg mb-4 border border-sakura-gold/20">
-          <h2 className="text-lg font-bold text-sakura-deep mb-4 flex items-center gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-gold">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
-              <path d="M12 8V12L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            {t('referral_how_it_works')}
-          </h2>
-          
+        <div
+          className="rounded-2xl p-4"
+          style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Clock size={18} style={{ color: 'var(--tg-theme-button-color)' }} />
+            <h2 className="font-bold">{t('referral_how_it_works')}</h2>
+          </div>
+
           <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="bg-sakura-gold/10 rounded-full p-2 flex-shrink-0">
-                <span className="text-sakura-gold font-bold">1</span>
+            {[
+              { num: 1, title: t('referral_step1_title'), desc: t('referral_step1_desc') },
+              { num: 2, title: t('referral_step2_title'), desc: t('referral_step2_desc') },
+              { num: 3, title: t('referral_step3_title'), desc: t('referral_step3_desc') },
+            ].map((step) => (
+              <div key={step.num} className="flex items-start gap-3">
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 15%, transparent)',
+                    color: 'var(--tg-theme-button-color)',
+                  }}
+                >
+                  {step.num}
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">{step.title}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--tg-theme-hint-color)' }}>{step.desc}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-sakura-deep">{t('referral_step1_title')}</p>
-                <p className="text-sm text-gray-600">{t('referral_step1_desc')}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-3">
-              <div className="bg-sakura-gold/10 rounded-full p-2 flex-shrink-0">
-                <span className="text-sakura-gold font-bold">2</span>
-              </div>
-              <div>
-                <p className="font-semibold text-sakura-deep">{t('referral_step2_title')}</p>
-                <p className="text-sm text-gray-600">{t('referral_step2_desc')}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-3">
-              <div className="bg-sakura-gold/10 rounded-full p-2 flex-shrink-0">
-                <span className="text-sakura-gold font-bold">3</span>
-              </div>
-              <div>
-                <p className="font-semibold text-sakura-deep">{t('referral_step3_title')}</p>
-                <p className="text-sm text-gray-600">{t('referral_step3_desc')}</p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
         {/* Бонусы */}
-        <div className="bg-white dark:bg-sakura-dark rounded-xl p-6 shadow-lg mb-4 border border-sakura-gold/20">
-          <h2 className="text-lg font-bold text-sakura-deep mb-4 flex items-center gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-gold">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21L12 17.77L5.82 21L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="currentColor" fillOpacity="0.1" />
-            </svg>
-            {t('referral_bonuses')}
-          </h2>
-          
-          <div className="space-y-3">
-            <div className="bg-gradient-to-r from-sakura-gold/10 to-sakura-gold/5 rounded-lg p-4 border border-sakura-gold/20">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-sakura-deep">{t('referral_bonus_registration')}</span>
-                <span className="text-sakura-gold font-bold">+100 💸</span>
+        <div
+          className="rounded-2xl p-4"
+          style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Zap size={18} style={{ color: 'var(--tg-theme-button-color)' }} />
+            <h2 className="font-bold">{t('referral_bonuses')}</h2>
+          </div>
+
+          <div className="space-y-2">
+            {[
+              { title: t('referral_bonus_registration'), value: '+100', desc: t('referral_bonus_registration_desc') },
+              { title: t('referral_bonus_transaction'), value: '8%', desc: t('referral_bonus_transaction_desc') },
+              { title: t('referral_bonus_level2'), value: '+25 + 4%', desc: t('referral_bonus_level2_desc') },
+              { title: t('referral_bonus_level3'), value: '+10 + 2%', desc: t('referral_bonus_level3_desc') },
+            ].map((bonus, i) => (
+              <div
+                key={i}
+                className="rounded-xl p-3"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 8%, transparent)',
+                }}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold text-sm">{bonus.title}</span>
+                  <span className="font-bold text-sm" style={{ color: 'var(--tg-theme-button-color)' }}>
+                    {bonus.value}
+                  </span>
+                </div>
+                <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>{bonus.desc}</p>
               </div>
-              <p className="text-sm text-gray-600">{t('referral_bonus_registration_desc')}</p>
-            </div>
-            
-            <div className="bg-gradient-to-r from-sakura-gold/10 to-sakura-gold/5 rounded-lg p-4 border border-sakura-gold/20">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-sakura-deep">{t('referral_bonus_transaction')}</span>
-                <span className="text-sakura-gold font-bold">8%</span>
-              </div>
-              <p className="text-sm text-gray-600">{t('referral_bonus_transaction_desc')}</p>
-            </div>
-            
-            <div className="bg-gradient-to-r from-sakura-gold/10 to-sakura-gold/5 rounded-lg p-4 border border-sakura-gold/20">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-sakura-deep">{t('referral_bonus_level2')}</span>
-                <span className="text-sakura-gold font-bold">+25 💸 + 4%</span>
-              </div>
-              <p className="text-sm text-gray-600">{t('referral_bonus_level2_desc')}</p>
-            </div>
-            
-            <div className="bg-gradient-to-r from-sakura-gold/10 to-sakura-gold/5 rounded-lg p-4 border border-sakura-gold/20">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-sakura-deep">{t('referral_bonus_level3')}</span>
-                <span className="text-sakura-gold font-bold">+10 💸 + 2%</span>
-              </div>
-              <p className="text-sm text-gray-600">{t('referral_bonus_level3_desc')}</p>
-            </div>
+            ))}
           </div>
         </div>
 
         {/* Достижения */}
-        <div className="bg-white dark:bg-sakura-dark rounded-xl p-6 shadow-lg mb-4 border border-sakura-gold/20">
-          <h2 className="text-lg font-bold text-sakura-deep mb-4 flex items-center gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-gold">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21L12 17.77L5.82 21L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {t('referral_achievements')}
-          </h2>
-          
-          <div className="space-y-3">
+        <div
+          className="rounded-2xl p-4"
+          style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy size={18} style={{ color: 'var(--tg-theme-button-color)' }} />
+            <h2 className="font-bold">{t('referral_achievements')}</h2>
+          </div>
+
+          <div className="space-y-2">
             {achievements.map((achievement, index) => (
               <div
                 key={index}
-                className={`rounded-lg p-4 border ${
-                  achievement.reached
-                    ? 'bg-gradient-to-r from-sakura-gold/20 to-sakura-gold/10 border-sakura-gold/40'
-                    : 'bg-gray-50 border-gray-200'
-                }`}
+                className="rounded-xl p-3 flex items-center justify-between"
+                style={{
+                  backgroundColor: achievement.reached
+                    ? 'color-mix(in srgb, var(--tg-theme-button-color) 12%, transparent)'
+                    : 'var(--tg-theme-bg-color)',
+                  border: achievement.reached
+                    ? '1px solid color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)'
+                    : '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)',
+                }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {achievement.reached ? (
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-gold">
-                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    ) : (
-                      <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
-                    )}
-                    <div>
-                      <p className="font-semibold text-sakura-deep">
-                        {t('referral_achievement').replace('{count}', achievement.threshold)}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {t('referral_achievement_bonus').replace('{bonus}', achievement.bonus)}
-                      </p>
-                    </div>
+                <div className="flex items-center gap-3">
+                  {achievement.reached ? (
+                    <Check size={20} style={{ color: 'var(--tg-theme-button-color)' }} />
+                  ) : (
+                    <div
+                      className="w-5 h-5 rounded-full"
+                      style={{ border: '2px solid color-mix(in srgb, var(--tg-theme-hint-color) 30%, transparent)' }}
+                    />
+                  )}
+                  <div>
+                    <p className="font-semibold text-sm">
+                      {t('referral_achievement').replace('{count}', achievement.threshold)}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                      {t('referral_achievement_bonus').replace('{bonus}', achievement.bonus)}
+                    </p>
                   </div>
-                  <span className="text-sakura-gold font-bold">+{achievement.bonus} 💸</span>
                 </div>
+                <span className="font-bold text-sm" style={{ color: 'var(--tg-theme-button-color)' }}>
+                  +{achievement.bonus}
+                </span>
               </div>
             ))}
           </div>
@@ -358,28 +345,35 @@ function Community() {
 
         {/* Последние награды */}
         {referralStats?.recent_rewards && referralStats.recent_rewards.length > 0 && (
-          <div className="bg-white dark:bg-sakura-dark rounded-xl p-6 shadow-lg mb-4 border border-sakura-gold/20">
-            <h2 className="text-lg font-bold text-sakura-deep mb-4">{t('referral_recent_rewards')}</h2>
-            
+          <div
+            className="rounded-2xl p-4 mb-4"
+            style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
+          >
+            <h2 className="font-bold mb-3">{t('referral_recent_rewards')}</h2>
+
             <div className="space-y-2">
               {referralStats.recent_rewards.slice(0, 5).map((reward, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 rounded-xl"
+                  style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}
+                >
                   <div>
-                    <p className="text-sm font-semibold text-sakura-deep">
+                    <p className="text-sm font-semibold">
                       {reward.description || t('referral_reward')}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>
                       {new Date(reward.created_at).toLocaleDateString(language === 'ru' ? 'ru' : 'en')}
                     </p>
                   </div>
-                  <span className="text-sakura-gold font-bold">+{reward.points} 💸</span>
+                  <span className="font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>+{reward.points}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   )
 }
 

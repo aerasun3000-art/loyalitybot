@@ -6,14 +6,6 @@ import { useTranslation, translateDynamicContent } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 
-const gradients = [
-  'from-sakura-mid/60 via-sakura-accent/50 to-sakura-deep/60',
-  'from-sakura-accent/60 via-sakura-mid/50 to-sakura-deep/60',
-  'from-sakura-mid/50 via-sakura-dark/40 to-sakura-accent/50',
-  'from-sakura-deep/60 via-sakura-mid/50 to-sakura-accent/50',
-  'from-sakura-accent/50 via-sakura-dark/40 to-sakura-mid/50'
-]
-
 const newsIcons = ['📢', '✨', '🎉', '🎁', '🌟', '💖', '🔥', '⭐']
 
 const News = () => {
@@ -28,7 +20,7 @@ const News = () => {
   const [activeSlide, setActiveSlide] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
-  
+
   // Категории новостей (обновляются при изменении языка)
   const categories = [
     { id: 'all', label: language === 'ru' ? 'Все' : 'All' },
@@ -179,7 +171,7 @@ const News = () => {
     // Поиск
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.title?.toLowerCase().includes(query) ||
         item.preview_text?.toLowerCase().includes(query) ||
         item.content?.toLowerCase().includes(query)
@@ -192,51 +184,42 @@ const News = () => {
   // Используем переведенные новости, если доступны
   const displayNews = translatedNews.length > 0 ? translatedNews : news
   const filteredNews = filterNews(displayNews)
-  
+
   // Главные новости для карусели (первые 2-3)
   const featuredNews = filteredNews.slice(0, Math.min(filteredNews.length, 3))
   // ВСЕ новости для списка (включая те, что в карусели)
   const listNews = filteredNews
-  
+
   const listSectionTitle = language === 'ru' ? 'Рекомендуемые для вас' : 'For you today news'
-  
+
   if (loading || translating) {
     return <Loader />
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden pb-24 text-sakura-surface">
-      <div className="absolute inset-0 -z-20">
-        <img
-          src="/bg/sakura.jpg"
-          alt="Sakura background"
-          className="w-full h-full object-cover opacity-85"
-        />
-      </div>
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
+    <div className="relative min-h-screen overflow-hidden pb-24" style={{ backgroundColor: 'var(--tg-theme-bg-color)', color: 'var(--tg-theme-text-color)' }}>
 
-      {/* Header Section - Component 2 */}
-      <div className="sticky top-0 z-20 bg-sakura-deep/90 backdrop-blur-xl border-b border-sakura-border/40">
+      {/* Header Section */}
+      <div className="sticky top-0 z-20 backdrop-blur-xl"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 90%, transparent)',
+          borderBottom: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 20%, transparent)'
+        }}>
         <div className="px-4 pt-14 pb-4">
-          <h1 className="text-[28px] font-bold text-white leading-tight">
+          <h1 className="text-[28px] font-bold leading-tight"
+            style={{ color: 'var(--tg-theme-button-text-color, #fff)' }}>
             {t('news_title')}
           </h1>
         </div>
       </div>
 
-      {/* Search Bar - Component 3 */}
-      <div className="sticky top-[70px] z-10 px-4 pt-4 pb-2 bg-sakura-deep/90 backdrop-blur-xl">
-        <div className="flex items-center gap-3 h-12 px-4 bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)]">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#6B7280"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+      {/* Search Bar */}
+      <div className="sticky top-[70px] z-10 px-4 pt-4 pb-2 backdrop-blur-xl"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 90%, transparent)' }}>
+        <div className="flex items-center gap-3 h-12 px-4 rounded-xl shadow-sm"
+          style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="var(--tg-theme-hint-color)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.35-4.35" />
           </svg>
@@ -245,22 +228,12 @@ const News = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={language === 'ru' ? 'Поиск новостей' : 'Search for news'}
-            className="flex-1 text-base text-[#111827] placeholder:text-[#9CA3AF] outline-none bg-transparent"
+            className="flex-1 text-base outline-none bg-transparent"
+            style={{ color: 'var(--tg-theme-text-color)', '::placeholder': { color: 'var(--tg-theme-hint-color)' } }}
           />
-          <button
-            onClick={() => setSearchQuery('')}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#6B7280"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+          <button onClick={() => setSearchQuery('')} className="p-2 rounded-lg">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="var(--tg-theme-hint-color)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <path d="m15 9-6 6M9 9l6 6" />
             </svg>
@@ -268,8 +241,9 @@ const News = () => {
         </div>
       </div>
 
-      {/* Category Tabs - Component 4 */}
-      <div className="sticky top-[134px] z-10 px-4 pt-2 pb-3 bg-sakura-deep/90 backdrop-blur-xl">
+      {/* Category Tabs */}
+      <div className="sticky top-[134px] z-10 px-4 pt-2 pb-3 backdrop-blur-xl"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 90%, transparent)' }}>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {categories.map((category) => (
             <button
@@ -278,11 +252,11 @@ const News = () => {
                 hapticFeedback('light')
                 setActiveCategory(category.id)
               }}
-              className={`flex-shrink-0 h-10 px-4 rounded-[20px] text-sm font-medium transition-all duration-200 ${
-                activeCategory === category.id
-                  ? 'bg-sakura-accent text-white'
-                  : 'bg-white text-[#6B7280]'
-              }`}
+              className="flex-shrink-0 h-10 px-4 rounded-[20px] text-sm font-medium"
+              style={activeCategory === category.id
+                ? { backgroundColor: 'var(--tg-theme-button-text-color, #fff)', color: 'var(--tg-theme-button-color)' }
+                : { backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-text-color, #fff) 20%, transparent)', color: 'var(--tg-theme-button-text-color, #fff)' }
+              }
             >
               {category.label}
             </button>
@@ -292,10 +266,11 @@ const News = () => {
 
       <div className="relative z-10 pt-6 pb-6">
         {filteredNews.length === 0 ? (
-          <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 text-center border border-sakura-border/40 shadow-xl mx-4">
-            <span className="text-6xl leading-none mx-auto mb-4 block">🌸</span>
-            <h3 className="text-xl font-bold mb-2 text-[#111827]">{t('news_no_items')}</h3>
-            <p className="text-sm text-[#6B7280]">
+          <div className="rounded-3xl p-8 text-center mx-4"
+            style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}>
+            <span className="text-6xl leading-none mx-auto mb-4 block">📰</span>
+            <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>{t('news_no_items')}</h3>
+            <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
               {language === 'ru'
                 ? 'Следите за обновлениями — вскоре мы поделимся свежими новостями.'
                 : 'Stay tuned — fresh updates will appear here very soon.'}
@@ -306,9 +281,9 @@ const News = () => {
             {/* Карусель главных новостей - большие карточки с peek effect */}
             {featuredNews.length > 0 && (
               <div className="mb-6">
-                <div 
+                <div
                   className="flex gap-4 overflow-x-auto scrollbar-hide px-4"
-                  style={{ 
+                  style={{
                     scrollbarWidth: 'none',
                     msOverflowStyle: 'none',
                     scrollSnapType: 'x mandatory',
@@ -316,18 +291,18 @@ const News = () => {
                   }}
                 >
                   {featuredNews.map((item, index) => {
-                    const gradient = gradients[index % gradients.length]
                     const newsIcon = newsIcons[index % newsIcons.length]
 
                     return (
                       <div
                         key={item.id}
                         onClick={() => handleNewsClick(item.id)}
-                        className="flex-shrink-0 w-[85%] bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.1)] overflow-hidden cursor-pointer transition-all duration-200 active:scale-[0.98]"
+                        className="flex-shrink-0 w-[85%] rounded-xl shadow-sm overflow-hidden cursor-pointer active:scale-[0.98]"
                         style={{
                           scrollSnapAlign: 'start',
                           minWidth: '85%',
-                          maxWidth: '85%'
+                          maxWidth: '85%',
+                          backgroundColor: 'var(--tg-theme-secondary-bg-color)'
                         }}
                       >
                         {/* Изображение */}
@@ -339,31 +314,32 @@ const News = () => {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <div className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
-                              <span className="text-6xl text-white/30">{newsIcon}</span>
+                            <div className="w-full h-full flex items-center justify-center"
+                              style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)' }}>
+                              <span className="text-6xl opacity-30">{newsIcon}</span>
                             </div>
                           )}
                         </div>
-                        
+
                         {/* Текстовый блок */}
                         <div style={{ padding: '16px' }}>
                           {/* Дата и время чтения */}
                           <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs text-[#6B7280] leading-[1.4] font-normal">
+                            <span className="text-xs leading-[1.4] font-normal" style={{ color: 'var(--tg-theme-hint-color)' }}>
                               {formatShortDate(item.created_at)}
                             </span>
-                            <span className="text-xs text-[#6B7280]">•</span>
-                            <span className="text-xs text-[#6B7280] leading-[1.4] font-normal">7 min</span>
+                            <span className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>•</span>
+                            <span className="text-xs leading-[1.4] font-normal" style={{ color: 'var(--tg-theme-hint-color)' }}>7 min</span>
                           </div>
-                          
+
                           {/* Заголовок */}
-                          <h3 className="text-lg font-bold text-[#111827] leading-[1.4] line-clamp-3">
+                          <h3 className="text-lg font-bold leading-[1.4] line-clamp-3" style={{ color: 'var(--tg-theme-text-color)' }}>
                             {item.title}
                           </h3>
-                          
+
                           {/* Описание, если есть */}
                           {item.preview_text && (
-                            <p className="text-sm text-[#6B7280] leading-[1.5] mt-2 line-clamp-2">
+                            <p className="text-sm leading-[1.5] mt-2 line-clamp-2" style={{ color: 'var(--tg-theme-hint-color)' }}>
                               {item.preview_text}
                             </p>
                           )}
@@ -375,49 +351,49 @@ const News = () => {
               </div>
             )}
 
-            {/* Список новостей с миниатюрами - Component 7 */}
+            {/* Список новостей с миниатюрами */}
             {listNews.length > 0 && (
               <div className="px-4 mt-6">
                 <div className="mb-4">
-                  <h2 className="text-[20px] font-bold text-[#111827] leading-[1.3]">
+                  <h2 className="text-[20px] font-bold leading-[1.3]" style={{ color: 'var(--tg-theme-text-color)' }}>
                     {listSectionTitle}
                   </h2>
                 </div>
-                <div className="bg-white rounded-xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+                <div className="rounded-xl overflow-hidden shadow-sm"
+                  style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}>
                   {listNews.map((item, index) => {
-                    const gradient = gradients[(index + featuredNews.length) % gradients.length]
                     const newsIcon = newsIcons[(index + featuredNews.length) % newsIcons.length]
 
                     return (
                       <div
                         key={item.id}
                         onClick={() => handleNewsClick(item.id)}
-                        className="flex items-start cursor-pointer transition-all duration-200 hover:bg-gray-50 active:bg-gray-100"
+                        className="flex items-start cursor-pointer active:opacity-80"
                         style={{
                           padding: '16px',
                           gap: '16px',
-                          borderBottom: index < listNews.length - 1 ? '1px solid #E5E7EB' : 'none',
+                          borderBottom: index < listNews.length - 1 ? '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)' : 'none',
                           minHeight: '100px'
                         }}
                       >
                         {/* Левая часть - текст */}
                         <div className="flex-1 min-w-0" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           {/* Имя автора */}
-                          <p className="text-sm font-medium text-[#111827] leading-[1.5]" style={{ fontSize: '14px', fontWeight: 500 }}>
+                          <p className="text-sm font-medium leading-[1.5]" style={{ color: 'var(--tg-theme-text-color)', fontSize: '14px', fontWeight: 500 }}>
                             {item.author || 'Admin'}
                           </p>
-                          
+
                           {/* Заголовок */}
-                          <h3 className="text-base font-semibold text-[#111827] leading-[1.5] line-clamp-2" style={{ fontSize: '16px', fontWeight: 600 }}>
+                          <h3 className="text-base font-semibold leading-[1.5] line-clamp-2" style={{ color: 'var(--tg-theme-text-color)', fontSize: '16px', fontWeight: 600 }}>
                             {item.title}
                           </h3>
-                          
+
                           {/* Мета-информация */}
-                          <p className="text-xs text-[#6B7280] leading-[1.4]" style={{ fontSize: '12px', fontWeight: 400 }}>
+                          <p className="text-xs leading-[1.4]" style={{ color: 'var(--tg-theme-hint-color)', fontSize: '12px', fontWeight: 400 }}>
                             {language === 'ru' ? '5 мин чтения' : '5 min read'} • {formatShortDate(item.created_at)}
                           </p>
                         </div>
-                        
+
                         {/* Правая часть - миниатюра */}
                         <div className="flex-shrink-0">
                           {item.image_url ? (
@@ -432,15 +408,16 @@ const News = () => {
                               }}
                             />
                           ) : (
-                            <div 
-                              className={`bg-gradient-to-br ${gradient} flex items-center justify-center`}
+                            <div
+                              className="flex items-center justify-center"
                               style={{
                                 width: '80px',
                                 height: '80px',
-                                borderRadius: '8px'
+                                borderRadius: '8px',
+                                backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)'
                               }}
                             >
-                              <span className="text-2xl text-white/30">{newsIcon}</span>
+                              <span className="text-2xl opacity-30">{newsIcon}</span>
                             </div>
                           )}
                         </div>
@@ -480,4 +457,3 @@ const News = () => {
 }
 
 export default News
-

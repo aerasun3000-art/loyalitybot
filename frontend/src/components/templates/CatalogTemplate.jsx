@@ -57,7 +57,7 @@ const CatalogTemplate = ({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-sakura-bg pb-24">
       {/* Hero изображение (меньше для каталога) */}
       <HeroModule 
         partner={partner}
@@ -68,7 +68,7 @@ const CatalogTemplate = ({
       
       {/* Заголовок */}
       <div className="-mt-6 relative z-10">
-        <div className="bg-white rounded-t-3xl">
+        <div className="bg-sakura-surface rounded-t-3xl">
           <HeaderModule 
             partner={partner}
             rating={rating}
@@ -81,7 +81,7 @@ const CatalogTemplate = ({
       
       {/* О компании (если включен модуль и есть описание) */}
       {config.modules.about && description && (
-        <div className="bg-white px-4 py-4 border-t border-gray-100">
+        <div className="bg-sakura-surface px-4 py-4 border-t border-sakura-border/20">
           <button
             onClick={() => {
               hapticFeedback('light')
@@ -120,7 +120,7 @@ const CatalogTemplate = ({
       )}
       
       {/* Разделитель */}
-      <div className="h-2 bg-gray-100" />
+      <div className="h-2 bg-sakura-surface/40" />
       
       {/* Каталог товаров/услуг */}
       <ServicesModule 
@@ -134,7 +134,7 @@ const CatalogTemplate = ({
       />
       
       {/* Локация и контакты */}
-      <div className="h-2 bg-gray-100" />
+      <div className="h-2 bg-sakura-surface/40" />
       <LocationModule 
         partner={partner}
         showMap={true}
@@ -157,7 +157,7 @@ const CatalogTemplate = ({
           onClick={() => setSelectedService(null)}
         >
           <div 
-            className="w-full bg-white rounded-t-3xl max-h-[80vh] overflow-hidden"
+            className="w-full bg-sakura-surface rounded-t-3xl max-h-[80vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Изображение */}
@@ -189,7 +189,7 @@ const CatalogTemplate = ({
                   {selectedService.tags.map((tag, index) => (
                     <span 
                       key={index}
-                      className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600"
+                      className="px-2 py-1 rounded-full text-xs bg-sakura-cream text-sakura-deep"
                     >
                       {tag.emoji} {language === 'ru' ? tag.name_ru : tag.name_en}
                     </span>
@@ -198,7 +198,7 @@ const CatalogTemplate = ({
               )}
               
               {/* Цена и статус */}
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-sakura-border/20">
                 <div>
                   <p className="text-2xl font-bold text-gray-900">
                     ${selectedService.price_local || selectedService.price || 0}
@@ -218,7 +218,8 @@ const CatalogTemplate = ({
                     }
                     setSelectedService(null)
                   }}
-                  className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-sakura-accent to-sakura-dark"
+                  className="px-6 py-3 rounded-xl font-semibold"
+                  style={{ backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }}
                 >
                   💬 {language === 'ru' ? 'Связаться' : 'Contact'}
                 </button>
@@ -227,10 +228,10 @@ const CatalogTemplate = ({
             
             {/* Кнопка закрытия */}
             <div className="p-4 pt-0">
-              <button
-                onClick={() => setSelectedService(null)}
-                className="w-full py-3 rounded-xl font-medium bg-gray-100 text-gray-700"
-              >
+                <button
+                  onClick={() => setSelectedService(null)}
+                  className="w-full py-3 rounded-xl font-medium bg-sakura-cream text-sakura-deep"
+                >
                 {language === 'ru' ? 'Закрыть' : 'Close'}
               </button>
             </div>

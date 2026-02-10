@@ -180,25 +180,39 @@ const PartnerIncomePresentation = () => {
   const maxClients = Math.max(...networkData.map(d => d.clients));
   const maxRevenue = Math.max(...systemRevenueData.map(d => d.revenue));
 
+  const tabStyle = (isActive) => isActive
+    ? { backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }
+    : { backgroundColor: 'var(--tg-theme-bg-color, #fff)', color: 'var(--tg-theme-text-color)', border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)' };
+
+  const sectionCardStyle = {
+    backgroundColor: 'var(--tg-theme-bg-color, #fff)',
+    border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)'
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sakura-light via-white to-sakura-cream">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, var(--tg-theme-bg-color, #f9fafb), var(--tg-theme-secondary-bg-color, #f3f4f6))' }}>
       {/* Header */}
-      <div className="bg-white border-b-2 border-sakura-mid/20 sticky top-0 z-50 shadow-sm">
+      <div className="sticky top-0 z-50 shadow-sm" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)', borderBottom: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <a
               href="/onepager/partner"
-              className="flex items-center gap-2 text-sakura-dark hover:text-sakura-mid transition-colors font-medium"
+              className="flex items-center gap-2 font-medium transition-colors"
+              style={{ color: 'var(--tg-theme-text-color)' }}
             >
               <span className="text-xl">←</span>
               <span>{t('back')}</span>
             </a>
             <button
               onClick={handleLanguageToggle}
-              className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border-2 border-sakura-mid/30 hover:border-sakura-mid transition-colors"
+              className="flex items-center gap-2 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 90%, transparent)',
+                border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)'
+              }}
             >
               <span className="text-xl">{language === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
-              <span className="font-bold text-sakura-dark">{language === 'ru' ? 'RU' : 'EN'}</span>
+              <span className="font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>{language === 'ru' ? 'RU' : 'EN'}</span>
             </button>
           </div>
         </div>
@@ -207,64 +221,34 @@ const PartnerIncomePresentation = () => {
       {/* Hero Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-12">
-          <h1 className="text-5xl md:text-6xl font-bold text-sakura-dark mb-4">
+          <h1 className="text-5xl md:text-6xl font-bold mb-4" style={{ color: 'var(--tg-theme-text-color)' }}>
             {t('title')}
           </h1>
-          <p className="text-2xl text-sakura-mid mb-8">
+          <p className="text-2xl mb-8" style={{ color: 'var(--tg-theme-button-color)' }}>
             {t('subtitle')}
           </p>
         </div>
 
         {/* Tabs */}
         <div className="flex gap-4 justify-center mb-8 flex-wrap">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-6 py-3 rounded-xl font-bold transition-all ${
-              activeTab === 'overview'
-                ? 'bg-gradient-to-r from-sakura-mid to-sakura-dark text-white shadow-lg'
-                : 'bg-white text-sakura-dark border-2 border-sakura-mid/30 hover:border-sakura-mid'
-            }`}
-          >
-            {t('scenario')}
-          </button>
-          <button
-            onClick={() => setActiveTab('income')}
-            className={`px-6 py-3 rounded-xl font-bold transition-all ${
-              activeTab === 'income'
-                ? 'bg-gradient-to-r from-sakura-mid to-sakura-dark text-white shadow-lg'
-                : 'bg-white text-sakura-dark border-2 border-sakura-mid/30 hover:border-sakura-mid'
-            }`}
-          >
-            {t('incomeBreakdown')}
-          </button>
-          <button
-            onClick={() => setActiveTab('network')}
-            className={`px-6 py-3 rounded-xl font-bold transition-all ${
-              activeTab === 'network'
-                ? 'bg-gradient-to-r from-sakura-mid to-sakura-dark text-white shadow-lg'
-                : 'bg-white text-sakura-dark border-2 border-sakura-mid/30 hover:border-sakura-mid'
-            }`}
-          >
-            {t('networkStructure')}
-          </button>
-          <button
-            onClick={() => setActiveTab('growth')}
-            className={`px-6 py-3 rounded-xl font-bold transition-all ${
-              activeTab === 'growth'
-                ? 'bg-gradient-to-r from-sakura-mid to-sakura-dark text-white shadow-lg'
-                : 'bg-white text-sakura-dark border-2 border-sakura-mid/30 hover:border-sakura-mid'
-            }`}
-          >
-            {t('growth')}
-          </button>
+          {['overview', 'income', 'network', 'growth'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === tab ? 'shadow-lg' : ''}`}
+              style={tabStyle(activeTab === tab)}
+            >
+              {t(tab === 'overview' ? 'scenario' : tab === 'income' ? 'incomeBreakdown' : tab === 'network' ? 'networkStructure' : 'growth')}
+            </button>
+          ))}
         </div>
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
             {/* Scenario Description */}
-            <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-sakura-mid/20">
-              <h2 className="text-3xl font-bold text-sakura-dark mb-4">
+            <div className="rounded-2xl p-8 shadow-xl" style={sectionCardStyle}>
+              <h2 className="text-3xl font-bold mb-4" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('scenario')}
               </h2>
               <p className="text-lg text-gray-700 mb-6">
@@ -272,8 +256,8 @@ const PartnerIncomePresentation = () => {
               </p>
 
               <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-gradient-to-br from-sakura-light to-white rounded-xl p-6 border border-sakura-mid/20">
-                  <h3 className="text-xl font-bold text-sakura-dark mb-4">
+                <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, var(--tg-theme-secondary-bg-color), var(--tg-theme-bg-color, #fff))', border: '1px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)' }}>
+                  <h3 className="text-xl font-bold mb-4" style={{ color: 'var(--tg-theme-text-color)' }}>
                     {t('assumptions')}
                   </h3>
                   <ul className="space-y-3 text-gray-700">
@@ -300,14 +284,14 @@ const PartnerIncomePresentation = () => {
                   </ul>
                 </div>
 
-                <div className="bg-gradient-to-br from-sakura-cream to-white rounded-xl p-6 border border-sakura-mid/20">
-                  <h3 className="text-xl font-bold text-sakura-dark mb-4">
+                <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--tg-theme-button-color) 5%, var(--tg-theme-bg-color)), var(--tg-theme-bg-color, #fff))', border: '1px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)' }}>
+                  <h3 className="text-xl font-bold mb-4" style={{ color: 'var(--tg-theme-text-color)' }}>
                     {t('keyMetrics')}
                   </h3>
                   <div className="space-y-4">
                     <div>
                       <div className="text-sm text-gray-600 mb-1">{t('avgMonthly')}</div>
-                      <div className="text-3xl font-bold text-sakura-dark">
+                      <div className="text-3xl font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>
                         {formatCurrency(2644.95)}
                       </div>
                     </div>
@@ -323,8 +307,8 @@ const PartnerIncomePresentation = () => {
             </div>
 
             {/* Timeline */}
-            <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-sakura-mid/20">
-              <h2 className="text-3xl font-bold text-sakura-dark mb-6">
+            <div className="rounded-2xl p-8 shadow-xl" style={sectionCardStyle}>
+              <h2 className="text-3xl font-bold mb-6" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('timeline')}
               </h2>
               <div className="space-y-6">
@@ -362,7 +346,7 @@ const PartnerIncomePresentation = () => {
                   period={t('yearTotal')}
                   income={formatCurrency(33085.80)}
                   details={t('yearDetails')}
-                  color="from-sakura-mid to-sakura-dark"
+                  color="from-rose-400 to-rose-600"
                 />
               </div>
             </div>
@@ -373,18 +357,18 @@ const PartnerIncomePresentation = () => {
         {activeTab === 'income' && (
           <div className="space-y-8">
             {/* Monthly Income Chart */}
-            <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-sakura-mid/20">
-              <h2 className="text-3xl font-bold text-sakura-dark mb-6">
+            <div className="rounded-2xl p-8 shadow-xl" style={sectionCardStyle}>
+              <h2 className="text-3xl font-bold mb-6" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('monthlyIncome')}
               </h2>
               <div className="space-y-4">
                 {monthlyData.map((data, idx) => (
                   <div key={idx} className="relative">
                     <div className="flex items-center gap-4 mb-2">
-                      <div className="w-20 text-sm font-bold text-sakura-dark">
+                      <div className="w-20 text-sm font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>
                         {t('month' + data.month)}
                       </div>
-                      <div className="flex-1 relative h-12 bg-gray-100 rounded-lg overflow-hidden">
+                      <div className="flex-1 relative h-12 bg-sakura-cream rounded-lg overflow-hidden">
                         {/* Personal Income */}
                         <div
                           className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-400 to-blue-600"
@@ -452,41 +436,41 @@ const PartnerIncomePresentation = () => {
         {activeTab === 'network' && (
           <div className="space-y-8">
             {/* Network Visualization */}
-            <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-sakura-mid/20">
-              <h2 className="text-3xl font-bold text-sakura-dark mb-6">
+            <div className="rounded-2xl p-8 shadow-xl" style={sectionCardStyle}>
+              <h2 className="text-3xl font-bold mb-6" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('networkStructure')}
               </h2>
               <NetworkTree />
             </div>
 
             {/* Network Growth Chart */}
-            <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-sakura-mid/20">
-              <h2 className="text-3xl font-bold text-sakura-dark mb-6">
+            <div className="rounded-2xl p-8 shadow-xl" style={sectionCardStyle}>
+              <h2 className="text-3xl font-bold mb-6" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('networkGrowth')}
               </h2>
               <div className="space-y-4">
                 {networkData.map((data, idx) => (
                   <div key={idx} className="relative">
                     <div className="flex items-center gap-4 mb-2">
-                      <div className="w-20 text-sm font-bold text-sakura-dark">
+                      <div className="w-20 text-sm font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>
                         {t('month' + data.month)}
                       </div>
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
                           <div className="w-24 text-xs text-gray-600">{t('partners')}:</div>
-                          <div className="flex-1 relative h-6 bg-gray-100 rounded overflow-hidden">
+                          <div className="flex-1 relative h-6 bg-sakura-cream rounded overflow-hidden">
                             <div
-                              className="absolute left-0 top-0 h-full bg-gradient-to-r from-sakura-mid to-sakura-dark"
-                              style={{ width: `${(data.partners / maxPartners) * 100}%` }}
+                              className="absolute left-0 top-0 h-full"
+                              style={{ width: `${(data.partners / maxPartners) * 100}%`, backgroundColor: 'var(--tg-theme-button-color)' }}
                             />
-                            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs font-bold text-sakura-dark">
+                            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>
                               {data.partners}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="w-24 text-xs text-gray-600">{t('clients')}:</div>
-                          <div className="flex-1 relative h-6 bg-gray-100 rounded overflow-hidden">
+                          <div className="flex-1 relative h-6 bg-sakura-cream rounded overflow-hidden">
                             <div
                               className="absolute left-0 top-0 h-full bg-gradient-to-r from-green-400 to-green-600"
                               style={{ width: `${(data.clients / maxClients) * 100}%` }}
@@ -509,18 +493,18 @@ const PartnerIncomePresentation = () => {
         {activeTab === 'growth' && (
           <div className="space-y-8">
             {/* System Revenue Growth */}
-            <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-sakura-mid/20">
-              <h2 className="text-3xl font-bold text-sakura-dark mb-6">
+            <div className="rounded-2xl p-8 shadow-xl" style={sectionCardStyle}>
+              <h2 className="text-3xl font-bold mb-6" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('systemGrowth')}
               </h2>
               <div className="space-y-4">
                 {systemRevenueData.map((data, idx) => (
                   <div key={idx} className="relative">
                     <div className="flex items-center gap-4 mb-2">
-                      <div className="w-20 text-sm font-bold text-sakura-dark">
+                      <div className="w-20 text-sm font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>
                         {t('month' + data.month)}
                       </div>
-                      <div className="flex-1 relative h-12 bg-gray-100 rounded-lg overflow-hidden">
+                      <div className="flex-1 relative h-12 bg-sakura-cream rounded-lg overflow-hidden">
                         <div
                           className="absolute left-0 top-0 h-full bg-gradient-to-r from-orange-400 to-orange-600"
                           style={{ width: `${(data.revenue / maxRevenue) * 100}%` }}
@@ -536,21 +520,21 @@ const PartnerIncomePresentation = () => {
             </div>
 
             {/* Income Growth Comparison */}
-            <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-sakura-mid/20">
-              <h2 className="text-3xl font-bold text-sakura-dark mb-6">
+            <div className="rounded-2xl p-8 shadow-xl" style={sectionCardStyle}>
+              <h2 className="text-3xl font-bold mb-6" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('incomeGrowth')}
               </h2>
               <div className="space-y-4">
                 {monthlyData.map((data, idx) => (
                   <div key={idx} className="relative">
                     <div className="flex items-center gap-4 mb-2">
-                      <div className="w-20 text-sm font-bold text-sakura-dark">
+                      <div className="w-20 text-sm font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>
                         {t('month' + data.month)}
                       </div>
-                      <div className="flex-1 relative h-12 bg-gray-100 rounded-lg overflow-hidden">
+                      <div className="flex-1 relative h-12 bg-sakura-cream rounded-lg overflow-hidden">
                         <div
-                          className="absolute left-0 top-0 h-full bg-gradient-to-r from-sakura-mid to-sakura-dark"
-                          style={{ width: `${(data.total / maxTotal) * 100}%` }}
+                          className="absolute left-0 top-0 h-full"
+                          style={{ width: `${(data.total / maxTotal) * 100}%`, backgroundColor: 'var(--tg-theme-button-color)' }}
                         />
                         <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white font-bold text-sm">
                           {formatCurrency(data.total)}
@@ -574,7 +558,7 @@ const TimelineItem = ({ period, income, details, color }) => (
     <div className={`w-4 h-4 rounded-full bg-gradient-to-r ${color} flex-shrink-0 mt-2`} />
     <div className="flex-1">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xl font-bold text-sakura-dark">{period}</h3>
+        <h3 className="text-xl font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>{period}</h3>
         <div className="text-xl font-bold text-green-600">{income}</div>
       </div>
       <p className="text-gray-600">{details}</p>
@@ -600,7 +584,7 @@ const IncomeCard = ({ title, amount, description, color }) => (
 const NetworkTree = () => (
   <div className="flex flex-col items-center space-y-8">
     {/* Level 0 - Partner A */}
-    <div className="bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl p-6 shadow-lg">
+    <div className="rounded-xl p-6 shadow-lg text-white" style={{ backgroundColor: 'var(--tg-theme-button-color)' }}>
       <div className="text-2xl font-bold">Partner A (You)</div>
       <div className="text-sm opacity-90">20 clients</div>
     </div>
@@ -640,9 +624,3 @@ const NetworkTree = () => (
 );
 
 export default PartnerIncomePresentation;
-
-
-
-
-
-

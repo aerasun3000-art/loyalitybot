@@ -136,7 +136,7 @@ const AdminAnalytics = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-sakura-cream dark:bg-sakura-dark">
       {/* Заголовок */}
       <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -159,7 +159,7 @@ const AdminAnalytics = () => {
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 period === days
                   ? 'bg-purple-600 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'bg-sakura-surface dark:bg-sakura-dark text-sakura-muted hover:bg-sakura-cream dark:hover:bg-sakura-dark'
               }`}
             >
               {days === 365 ? 'Год' : `${days} дней`}
@@ -207,12 +207,12 @@ const AdminAnalytics = () => {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
             ⭐ NPS по платформе
           </h2>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-sm">
+          <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-8 shadow-sm">
             <div className="text-center">
               <div className={`text-6xl font-bold mb-2 ${
-                systemStats.systemNPS > 50 ? 'text-green-500' :
-                systemStats.systemNPS > 0 ? 'text-yellow-500' :
-                'text-red-500'
+                systemStats.systemNPS > 50 ? 'text-sakura-mid' :
+                systemStats.systemNPS > 0 ? 'text-sakura-gold' :
+                'text-sakura-accent'
               }`}>
                 {systemStats.systemNPS}
               </div>
@@ -231,10 +231,10 @@ const AdminAnalytics = () => {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
             👥 Рейтинг партнёров по обороту
           </h2>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+                <thead className="bg-sakura-cream dark:bg-sakura-dark">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       #
@@ -258,7 +258,7 @@ const AdminAnalytics = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {partnerStats.map((partner, index) => (
-                    <tr key={partner.chat_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <tr key={partner.chat_id} className="hover:bg-sakura-cream dark:hover:bg-sakura-dark/50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
                           {index === 0 && '🥇'}

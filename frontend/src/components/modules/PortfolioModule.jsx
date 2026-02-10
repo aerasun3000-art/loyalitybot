@@ -83,7 +83,7 @@ const PortfolioModule = ({
   // Placeholder при загрузке
   if (loading) {
     return (
-      <div className="bg-white px-4 py-4">
+      <div className="bg-sakura-surface px-4 py-4">
         <h2 className="text-lg font-semibold text-gray-900 mb-3">
           🖼️ {title || (language === 'ru' ? 'Портфолио' : 'Portfolio')}
         </h2>
@@ -91,7 +91,7 @@ const PortfolioModule = ({
           {[1, 2, 3, 4].map((i) => (
             <div 
               key={i}
-              className="aspect-square rounded-lg bg-gray-200 animate-pulse"
+              className="aspect-square rounded-lg bg-sakura-cream animate-pulse"
             />
           ))}
         </div>
@@ -109,7 +109,7 @@ const PortfolioModule = ({
   const hiddenCount = photos.length - maxVisible
 
   return (
-    <div className="bg-white px-4 py-4">
+    <div className="bg-sakura-surface px-4 py-4">
       {/* Заголовок секции */}
       <h2 className="text-lg font-semibold text-gray-900 mb-3">
         🖼️ {title || (language === 'ru' ? 'Портфолио' : 'Portfolio')}
@@ -120,7 +120,7 @@ const PortfolioModule = ({
         {visiblePhotos.map((photo, index) => (
           <div
             key={photo.id || index}
-            className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer"
+            className="relative aspect-square rounded-lg overflow-hidden bg-sakura-cream cursor-pointer"
             onClick={() => handlePhotoClick(index)}
           >
             <img

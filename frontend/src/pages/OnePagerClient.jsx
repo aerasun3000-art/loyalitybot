@@ -100,7 +100,7 @@ const OnePagerClient = () => {
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {['Кофейни', 'Рестораны', 'Салоны красоты', 'Фитнес-клубы', 'Магазины', 'Кинотеатры', 'Автосервисы', 'Аптеки'].map((category) => (
-            <div key={category} className="bg-white dark:bg-gray-800 rounded-xl p-6 text-center shadow-sm hover:shadow-md transition-shadow">
+            <div key={category} className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 text-center shadow-sm hover:shadow-md transition-shadow">
               <div className="text-2xl mb-2">
                 {category === 'Кофейни' && '☕'}
                 {category === 'Рестораны' && '🍽️'}
@@ -120,7 +120,7 @@ const OnePagerClient = () => {
       </div>
 
       {/* FAQ */}
-      <div className="bg-white dark:bg-gray-800 py-16">
+      <div className="bg-sakura-surface dark:bg-sakura-dark py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-center text-gray-900 dark:text-white mb-12">
             ❓ Частые вопросы
@@ -190,7 +190,7 @@ const OnePagerClient = () => {
           <p className="text-xl text-blue-100 mb-8">
             Откройте бота и получите приветственные 100 баллов в подарок 🎁
           </p>
-          <button className="px-12 py-4 bg-white text-blue-600 rounded-xl font-bold text-xl hover:shadow-2xl transition-shadow">
+          <button className="px-12 py-4 bg-sakura-surface text-sakura-accent rounded-xl font-bold text-xl hover:shadow-2xl transition-shadow">
             Открыть бота →
           </button>
         </div>
@@ -201,7 +201,7 @@ const OnePagerClient = () => {
 
 // Вспомогательные компоненты
 const HowToCard = ({ icon, title, description, highlight }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow">
+  <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow">
     <div className="text-5xl mb-4">{icon}</div>
     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
       {title}
@@ -216,7 +216,7 @@ const HowToCard = ({ icon, title, description, highlight }) => (
 );
 
 const RewardCard = ({ icon, title, points }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 text-center shadow-sm hover:shadow-md transition-shadow">
+  <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 text-center shadow-sm hover:shadow-md transition-shadow">
     <div className="text-5xl mb-3">{icon}</div>
     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
       {title}
@@ -240,7 +240,7 @@ const FeatureCard = ({ icon, title, description }) => (
 );
 
 const FAQItem = ({ question, answer }) => (
-  <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6">
+  <div className="bg-sakura-cream dark:bg-sakura-dark rounded-xl p-6">
     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
       {question}
     </h3>

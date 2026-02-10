@@ -4,7 +4,6 @@ import { getNewsById, incrementNewsViews } from '../services/supabase'
 import { hapticFeedback } from '../utils/telegram'
 import { useTranslation, translateDynamicContent } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
-// import LuxuryIcon from '../components/LuxuryIcons'
 import Loader from '../components/Loader'
 
 const NewsDetail = () => {
@@ -28,9 +27,7 @@ const NewsDetail = () => {
       return
     }
 
-    // Проверяем, доступен ли API для переводов
     const checkApiAndTranslate = async () => {
-      // Если в БД уже есть предзаполненные английские поля, используем их без обращения к API
       if (language === 'en' && (news.title_en || news.preview_text_en || news.content_en)) {
         const mapped = {
           ...news,
@@ -42,7 +39,6 @@ const NewsDetail = () => {
         return
       }
 
-      // Если API URL не установлен, используем оригинальный текст
       const apiUrl = import.meta.env.VITE_API_URL
       if (!apiUrl) {
         console.warn('⚠️ VITE_API_URL не установлен. Переводы отключены. Показываем оригинальный текст.')
@@ -63,7 +59,7 @@ const NewsDetail = () => {
         setTranslatedNews(translated)
       } catch (error) {
         console.error('Error translating news:', error)
-        setTranslatedNews(news) // Fallback на оригинал при ошибке
+        setTranslatedNews(news)
       } finally {
         setTranslating(false)
       }
@@ -76,16 +72,13 @@ const NewsDetail = () => {
     try {
       setLoading(true)
       const newsData = await getNewsById(parseInt(id))
-      
+
       if (!newsData) {
-        // Новость не найдена
         navigate('/news')
         return
       }
-      
+
       setNews(newsData)
-      
-      // Увеличиваем счетчик просмотров
       await incrementNewsViews(parseInt(id))
     } catch (error) {
       console.error('Error loading news detail:', error)
@@ -109,10 +102,9 @@ const NewsDetail = () => {
 
   const handleShare = () => {
     hapticFeedback('medium')
-    // Можно добавить функцию шаринга через Telegram
     if (window.Telegram?.WebApp) {
-      const message = language === 'ru' 
-        ? 'Функция "Поделиться" скоро будет доступна!' 
+      const message = language === 'ru'
+        ? 'Функция "Поделиться" скоро будет доступна!'
         : 'Share feature coming soon!'
       window.Telegram.WebApp.showAlert(message)
     }
@@ -122,21 +114,19 @@ const NewsDetail = () => {
     return <Loader />
   }
 
-  // Используем переведенную новость, если доступна
   const displayNews = translatedNews || news
 
   if (!displayNews) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}>
         <div className="text-center">
-          <span className="text-6xl leading-none mx-auto mb-4 text-sakura-muted">⚠️</span>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">
+          <span className="text-6xl leading-none mx-auto mb-4">⚠️</span>
+          <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
             {language === 'ru' ? 'Новость не найдена' : 'News not found'}
           </h2>
-          <button
-            onClick={handleBack}
-            className="text-pink-500 font-semibold"
-          >
+          <button onClick={handleBack} className="font-semibold"
+            style={{ color: 'var(--tg-theme-button-color)' }}>
             ← {t('news_back_to_news')}
           </button>
         </div>
@@ -145,41 +135,20 @@ const NewsDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream pb-24">
+    <div className="min-h-screen pb-24" style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}>
       {/* Шапка с кнопками */}
-      <div className="bg-white px-4 py-3 flex items-center justify-between sticky top-0 z-10 border-b border-gray-100">
-        <button
-          onClick={handleBack}
-          className="p-2 -ml-2 text-gray-700"
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+      <div className="px-4 py-3 flex items-center justify-between sticky top-0 z-10"
+        style={{ backgroundColor: 'var(--tg-theme-bg-color)', borderBottom: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)' }}>
+        <button onClick={handleBack} className="p-2 -ml-2" style={{ color: 'var(--tg-theme-text-color)' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
-        
-        <span className="font-semibold text-gray-800">
+        <span className="font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>
           {t('news_title')}
         </span>
-        
-        <button
-          onClick={handleShare}
-          className="p-2 -mr-2 text-gray-700"
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+        <button onClick={handleShare} className="p-2 -mr-2" style={{ color: 'var(--tg-theme-text-color)' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="18" cy="5" r="3" />
             <circle cx="6" cy="12" r="3" />
             <circle cx="18" cy="19" r="3" />
@@ -191,48 +160,27 @@ const NewsDetail = () => {
       {/* Изображение */}
       {displayNews.image_url && (
         <div className="relative">
-          <img
-            src={displayNews.image_url}
-            alt={displayNews.title}
-            className="w-full h-64 object-cover"
-          />
+          <img src={displayNews.image_url} alt={displayNews.title} className="w-full h-64 object-cover" />
         </div>
       )}
 
       {/* Контент */}
       <div className="px-4 py-6">
-        {/* Заголовок */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-4 leading-tight">
+        <h1 className="text-3xl font-bold mb-4 leading-tight" style={{ color: 'var(--tg-theme-text-color)' }}>
           {displayNews.title}
         </h1>
 
-        {/* Мета-информация */}
-        <div className="flex items-center gap-4 mb-6 text-sm text-gray-500">
+        <div className="flex items-center gap-4 mb-6 text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
           <div className="flex items-center gap-1">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <circle cx="8" cy="8" r="7" />
               <path d="M8 4v4l3 2" />
             </svg>
             <span>{formatDate(displayNews.created_at)}</span>
           </div>
-          
           {displayNews.views_count > 0 && (
             <div className="flex items-center gap-1">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" />
                 <circle cx="8" cy="8" r="2" />
               </svg>
@@ -241,106 +189,55 @@ const NewsDetail = () => {
           )}
         </div>
 
-        {/* Основной текст */}
-        <div className="prose prose-pink max-w-none">
-          <div className="text-gray-700 leading-relaxed whitespace-pre-wrap text-base">
-            {displayNews.content}
-          </div>
+        <div className="leading-relaxed whitespace-pre-wrap text-base" style={{ color: 'var(--tg-theme-text-color)' }}>
+          {displayNews.content}
         </div>
 
-        {/* Разделитель */}
-        <div className="my-8 border-t border-gray-200"></div>
+        <div className="my-8" style={{ borderTop: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)' }}></div>
 
         {/* Дополнительная информация */}
-        <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-2xl p-6 border border-pink-100">
-          <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+        <div className="rounded-2xl p-6"
+          style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}>
+          <h3 className="font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--tg-theme-text-color)' }}>
             <span className="text-lg leading-none">ℹ️</span>
             {language === 'ru' ? 'Информация' : 'Information'}
           </h3>
-          <div className="space-y-2 text-sm text-gray-600">
+          <div className="space-y-2 text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
             <div className="flex justify-between">
               <span>{t('news_published')}:</span>
-              <span className="font-semibold text-gray-800">
+              <span className="font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {formatDate(displayNews.created_at)}
               </span>
             </div>
             {displayNews.updated_at && displayNews.updated_at !== displayNews.created_at && (
               <div className="flex justify-between">
                 <span>{language === 'ru' ? 'Обновлено' : 'Updated'}:</span>
-                <span className="font-semibold text-gray-800">
+                <span className="font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>
                   {formatDate(displayNews.updated_at)}
                 </span>
               </div>
             )}
             <div className="flex justify-between">
               <span>{t('news_views')}:</span>
-              <span className="font-semibold text-gray-800">
+              <span className="font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {displayNews.views_count || 0}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Кнопка "Назад к новостям" */}
-        <button
-          onClick={handleBack}
-          className="w-full mt-6 bg-gradient-to-r from-pink-500 to-purple-500 text-white py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform duration-200"
+        <button onClick={handleBack}
+          className="w-full mt-6 py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 active:scale-95"
+          style={{ backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }}
         >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M15 10H5M10 15l-5-5 5-5" />
           </svg>
           {t('news_back_to_news')}
         </button>
       </div>
-
-      {/* Стили для prose */}
-      <style>{`
-        .prose {
-          max-width: none;
-        }
-        .prose p {
-          margin-bottom: 1em;
-        }
-        .prose h2 {
-          font-size: 1.5em;
-          font-weight: bold;
-          margin-top: 1.5em;
-          margin-bottom: 0.5em;
-          color: #1f2937;
-        }
-        .prose h3 {
-          font-size: 1.25em;
-          font-weight: bold;
-          margin-top: 1.25em;
-          margin-bottom: 0.5em;
-          color: #1f2937;
-        }
-        .prose ul, .prose ol {
-          padding-left: 1.5em;
-          margin-bottom: 1em;
-        }
-        .prose li {
-          margin-bottom: 0.5em;
-        }
-        .prose strong {
-          font-weight: 600;
-          color: #111827;
-        }
-        .prose a {
-          color: #ec4899;
-          text-decoration: underline;
-        }
-      `}</style>
     </div>
   )
 }
 
 export default NewsDetail
-

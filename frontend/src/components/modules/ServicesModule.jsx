@@ -71,7 +71,7 @@ const ServicesModule = ({
   }
 
   return (
-    <div className="bg-white">
+    <div className="bg-sakura-surface">
       {/* Заголовок секции */}
       <div className="px-4 pt-4 pb-2">
         <h2 className="text-lg font-semibold text-gray-900">
@@ -80,7 +80,7 @@ const ServicesModule = ({
       </div>
       
       {/* Список услуг */}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-sakura-border/20">
         {sortedServices.map((service) => {
           const isExpanded = expandedServiceId === service.id
           const isSelected = selectedServiceId === service.id
@@ -90,17 +90,17 @@ const ServicesModule = ({
           return (
             <div 
               key={service.id}
-              className={`px-4 py-3 transition-colors ${
-                isSelected 
-                  ? 'bg-sakura-light/30' 
-                  : 'active:bg-gray-50'
-              }`}
+              className="px-4 py-3"
+              style={isSelected
+                ? { backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 10%, transparent)' }
+                : {}
+              }
               onClick={() => handleServiceClick(service)}
             >
               <div className="flex gap-3">
                 {/* Фото услуги */}
                 {showImage && service.image_url && (
-                  <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-gray-100">
+                  <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden bg-sakura-cream">
                     <img
                       src={service.image_url}
                       alt={service.title}
@@ -157,7 +157,7 @@ const ServicesModule = ({
                       {service.tags.map((tag, index) => (
                         <span 
                           key={index}
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600"
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-sakura-cream text-sakura-muted"
                         >
                           {tag.emoji} {language === 'ru' ? tag.name_ru : tag.name_en}
                         </span>
@@ -169,7 +169,7 @@ const ServicesModule = ({
               
               {/* Развёрнутое описание */}
               {isExpanded && service.description && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="mt-3 pt-3 border-t border-sakura-border/20">
                   <p className="text-sm text-gray-600">
                     {service.description}
                   </p>

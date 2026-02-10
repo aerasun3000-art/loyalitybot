@@ -28,6 +28,15 @@ const translations = {
     categories_page_title: 'Все категории',
     home_rewards: 'Награды',
     home_more: 'Ещё ...',
+    category_beauty: 'Красота',
+    category_food: 'Еда',
+    category_sport: 'Спорт',
+    category_health: 'Здоровье',
+    category_shopping: 'Шопинг',
+    category_coffee: 'Кофе',
+    category_gaming: 'Игры',
+    category_travel: 'Путешествия',
+    category_more: 'Еще',
     
     // Promotions Page
     promo_title: 'Акции партнёров',
@@ -239,6 +248,15 @@ const translations = {
     loyalty_points_to_next: 'баллов до следующего уровня',
     loyalty_max_level: 'Максимальный уровень!',
     loyalty_max_reached: 'Вы достигли максимального уровня!',
+    tier_bronze: 'Бронзовый уровень',
+    tier_silver: 'Серебряный уровень',
+    tier_gold: 'Золотой уровень',
+    tier_platinum: 'Платиновый уровень',
+    tier_diamond: 'Бриллиантовый уровень',
+    loyalty_card_balance_label: 'Ваш баланс',
+    loyalty_card_progress_label: 'Прогресс до награды',
+    loyalty_card_to_next_level: 'Еще {remaining} баллов до уровня {tier}',
+    loyalty_card_level_reached: 'Вы достигли уровня {tier}',
     
     // Profile Page
     profile_title: 'Профиль',
@@ -338,6 +356,15 @@ const translations = {
     categories_page_title: 'All categories',
     home_rewards: 'Rewards',
     home_more: 'More ...',
+    category_beauty: 'Beauty',
+    category_food: 'Food',
+    category_sport: 'Sport',
+    category_health: 'Health',
+    category_shopping: 'Shopping',
+    category_coffee: 'Coffee',
+    category_gaming: 'Gaming',
+    category_travel: 'Travel',
+    category_more: 'More',
     
     // Promotions Page
     promo_title: 'Partner Promotions',
@@ -549,6 +576,15 @@ const translations = {
     loyalty_points_to_next: 'points to next level',
     loyalty_max_level: 'Maximum level!',
     loyalty_max_reached: 'You have reached the maximum level!',
+    tier_bronze: 'Bronze tier',
+    tier_silver: 'Silver tier',
+    tier_gold: 'Gold tier',
+    tier_platinum: 'Platinum tier',
+    tier_diamond: 'Diamond tier',
+    loyalty_card_balance_label: 'Your balance',
+    loyalty_card_progress_label: 'Progress to reward',
+    loyalty_card_to_next_level: '{remaining} points to {tier} level',
+    loyalty_card_level_reached: 'You reached {tier} level',
     
     // Profile Page
     profile_title: 'Profile',

@@ -15,7 +15,7 @@ const PartnerApply = () => {
   const user = getTelegramUser()
   const { language } = useLanguageStore()
   const { t } = useTranslation(language)
-  
+
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: user?.first_name || '',
@@ -56,7 +56,7 @@ const PartnerApply = () => {
     if (formData.city) {
       const districtsForCity = getDistrictsByCity(formData.city)
       setDistricts(districtsForCity)
-      
+
       // Для New York не устанавливаем автоматически "All" - пользователь должен выбрать район
       if (formData.city === 'New York') {
         // Для NY сбрасываем district, чтобы пользователь выбрал конкретный район
@@ -79,12 +79,12 @@ const PartnerApply = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target
     let processedValue = value
-    
+
     // Для username автоматически убираем символ @
     if (name === 'username') {
       processedValue = value.replace('@', '').trim()
     }
-    
+
     setFormData(prev => ({
       ...prev,
       [name]: processedValue,
@@ -99,8 +99,8 @@ const PartnerApply = () => {
 
   const handleCityChange = (e) => {
     const city = e.target.value
-    setFormData(prev => ({ 
-      ...prev, 
+    setFormData(prev => ({
+      ...prev,
       city,
       district: '' // Сбрасываем район при смене города
     }))
@@ -111,47 +111,47 @@ const PartnerApply = () => {
 
   const validateForm = () => {
     const newErrors = {}
-    
+
     if (!formData.name.trim()) {
       newErrors.name = t('partner_name_required')
     }
-    
+
     if (!formData.phone.trim()) {
       newErrors.phone = t('partner_phone_required')
     } else if (!/^\+?[0-9\s\-()]{10,}$/.test(formData.phone)) {
       newErrors.phone = t('partner_phone_invalid')
     }
-    
+
     // Проверка глобальной категории
     if (!formData.categoryGroup) {
       newErrors.categoryGroup = t('partner_category_group_required')
     }
-    
+
     // Компания обязательна только для не-блогеров
     if (formData.categoryGroup !== 'influencer' && !formData.companyName.trim()) {
       newErrors.companyName = t('partner_company_required')
     }
-    
+
     // Категория услуг обязательна для beauty и самопознания
     if ((formData.categoryGroup === 'beauty' || formData.categoryGroup === 'self_discovery') && !formData.businessType) {
       newErrors.businessType = t('partner_business_type_required')
     }
-    
+
     // Город обязателен только для оффлайн
     if (formData.workMode === 'offline' && !formData.city) {
       newErrors.city = t('partner_city_required')
     }
-    
+
     // Проверка процента комиссии
     if (!formData.referralCommissionPercent || formData.referralCommissionPercent < 0 || formData.referralCommissionPercent > 100) {
       newErrors.referralCommissionPercent = language === 'ru' ? 'Введите процент от 0 до 100' : 'Enter percentage from 0 to 100'
     }
-    
+
     // Для New York район обязателен и не может быть "All"
     if (formData.city === 'New York') {
       if (!formData.district || formData.district === 'All') {
-        newErrors.district = language === 'ru' 
-          ? 'Выберите конкретный район Нью-Йорка' 
+        newErrors.district = language === 'ru'
+          ? 'Выберите конкретный район Нью-Йорка'
           : 'Please select a specific New York district'
       }
     } else if (formData.city && !formData.district) {
@@ -162,39 +162,39 @@ const PartnerApply = () => {
         newErrors.district = t('partner_district_required')
       }
     }
-    
+
     // Username не обязателен, но если указан - проверяем формат (без @)
     if (formData.username) {
       const cleanUsername = formData.username.replace('@', '').trim()
       if (!/^[a-zA-Z0-9_]{5,32}$/.test(cleanUsername)) {
-        newErrors.username = language === 'ru' 
-          ? 'Username должен содержать только буквы, цифры и подчеркивания (5-32 символа, без @)' 
+        newErrors.username = language === 'ru'
+          ? 'Username должен содержать только буквы, цифры и подчеркивания (5-32 символа, без @)'
           : 'Username must contain only letters, numbers and underscores (5-32 characters, without @)'
       }
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     // Проверка chatId
     if (!chatId) {
       hapticFeedback('error')
       setErrors({ submit: 'Chat ID не найден. Пожалуйста, откройте форму через Telegram бота.' })
       return
     }
-    
+
     if (!validateForm()) {
       hapticFeedback('error')
       return
     }
-    
+
     setLoading(true)
     hapticFeedback('medium')
-    
+
     try {
       const applicationData = {
         chatId: chatId.toString(),
@@ -211,20 +211,20 @@ const PartnerApply = () => {
         referralCommissionPercent: parseFloat(formData.referralCommissionPercent) || 10, // НОВОЕ: процент комиссии
         referredByChatId: referredByChatId || null
       }
-      
+
       console.log('Submitting application:', applicationData)
-      
+
       await createPartnerApplication(applicationData)
-      
+
       hapticFeedback('success')
       setShowSuccess(true)
-      
+
       // Перенаправляем через 3 секунды
       setTimeout(() => {
         // Можно отправить в партнерский бот
         window.location.href = `https://t.me/ghbipartnerbot?start=partner_applied`
       }, 3000)
-      
+
     } catch (error) {
       console.error('Error submitting application:', error)
       hapticFeedback('error')
@@ -235,9 +235,19 @@ const PartnerApply = () => {
     }
   }
 
+  const inputStyle = (hasError) => ({
+    backgroundColor: 'var(--tg-theme-bg-color)',
+    color: 'var(--tg-theme-text-color)',
+    WebkitTextFillColor: 'var(--tg-theme-text-color)',
+    border: hasError
+      ? '2px solid #ef4444'
+      : '2px solid color-mix(in srgb, var(--tg-theme-hint-color) 25%, transparent)'
+  })
+
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sakura-light via-white to-sakura-cream flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4"
+        style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}>
         <div className="max-w-md w-full relative z-10">
           {/* Кнопка возврата */}
           <div className="mb-4">
@@ -246,53 +256,60 @@ const PartnerApply = () => {
                 hapticFeedback('light')
                 navigate('/')
               }}
-              className="p-2 rounded-full border border-sakura-mid/20 bg-white/40 text-sakura-dark hover:bg-white/60 transition-colors backdrop-blur-md"
+              className="p-2 rounded-full"
+              style={{
+                backgroundColor: 'var(--tg-theme-secondary-bg-color)',
+                color: 'var(--tg-theme-text-color)',
+                border: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 20%, transparent)'
+              }}
               aria-label={language === 'ru' ? 'Вернуться на главную' : 'Back to home'}
             >
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M19 12H5M12 19l-7-7 7-7" />
               </svg>
             </button>
           </div>
 
-          <div className="bg-white/70 backdrop-blur-xl rounded-3xl p-8 text-center shadow-2xl border border-white/50">
-            <div className="w-20 h-20 bg-sakura-surface/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-sakura-mid/20">
-              <svg className="w-12 h-12 text-sakura-mid" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="rounded-3xl p-8 text-center shadow-lg"
+            style={{
+              backgroundColor: 'var(--tg-theme-secondary-bg-color)',
+              border: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 20%, transparent)'
+            }}>
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 15%, transparent)' }}>
+              <svg className="w-12 h-12" fill="none" stroke="var(--tg-theme-button-color)" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            
-            <h1 className="text-2xl font-bold text-sakura-dark mb-3">
+
+            <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--tg-theme-text-color)' }}>
               {t('partner_success_title')} 🎉
             </h1>
-            
-            <p className="text-gray-600 mb-6">
+
+            <p className="mb-6" style={{ color: 'var(--tg-theme-hint-color)' }}>
               {t('partner_success_text')}
             </p>
-            
-            <div className="bg-sakura-light/30 rounded-xl p-4 mb-6 border border-sakura-mid/10">
-              <p className="text-sm text-gray-700">
+
+            <div className="rounded-xl p-4 mb-6"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 10%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--tg-theme-button-color) 15%, transparent)'
+              }}>
+              <p className="text-sm" style={{ color: 'var(--tg-theme-text-color)' }}>
                 <strong>{t('partner_your_location')}:</strong><br/>
                 {isOnlineService(formData.city, formData.district) ? (
-                  <span className="text-sakura-mid font-semibold">
+                  <span className="font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>
                     🌍 {formData.city === 'Все' || formData.city === 'Online' ? (formData.city === 'Online' ? 'Online' : t('partner_work_everywhere')) : `${formData.city} (${formData.district === 'All' ? 'All districts' : t('partner_all_districts')})`}
                   </span>
                 ) : (
-                  <span className="text-sakura-mid font-semibold">
+                  <span className="font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>
                     📍 {formData.city}, {formData.district}
                   </span>
                 )}
               </p>
             </div>
-            
-            <p className="text-xs text-gray-500 mb-4">
+
+            <p className="text-xs mb-4" style={{ color: 'var(--tg-theme-hint-color)' }}>
               {t('partner_redirecting')}
             </p>
 
@@ -302,7 +319,8 @@ const PartnerApply = () => {
                 hapticFeedback('light')
                 navigate('/')
               }}
-              className="w-full py-3 px-6 rounded-xl font-semibold text-white bg-gradient-to-r from-sakura-mid to-sakura-dark hover:shadow-lg active:scale-95 transition-all"
+              className="w-full py-3 px-6 rounded-xl font-semibold active:scale-95"
+              style={{ backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }}
             >
               {language === 'ru' ? 'Вернуться на главную' : 'Back to Home'}
             </button>
@@ -313,7 +331,7 @@ const PartnerApply = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sakura-light via-white to-sakura-cream py-6 px-4">
+    <div className="min-h-screen py-6 px-4" style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}>
       <div className="max-w-md mx-auto relative z-10">
         {/* Кнопка возврата */}
         <div className="mb-4">
@@ -322,17 +340,15 @@ const PartnerApply = () => {
               hapticFeedback('light')
               navigate('/')
             }}
-            className="p-2 rounded-full border border-sakura-mid/20 bg-white/40 text-sakura-dark hover:bg-white/60 transition-colors backdrop-blur-md"
+            className="p-2 rounded-full"
+            style={{
+              backgroundColor: 'var(--tg-theme-secondary-bg-color)',
+              color: 'var(--tg-theme-text-color)',
+              border: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 20%, transparent)'
+            }}
             aria-label={language === 'ru' ? 'Вернуться на главную' : 'Back to home'}
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
           </button>
@@ -340,19 +356,23 @@ const PartnerApply = () => {
 
         {/* Заголовок */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-sakura-dark mb-2">
+          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
             {t('partner_apply_title')} 🤝
           </h1>
-          <p className="text-sakura-dark/70">
+          <p style={{ color: 'var(--tg-theme-hint-color)' }}>
             {t('partner_apply_subtitle')}
           </p>
         </div>
 
         {/* Форма */}
-        <form onSubmit={handleSubmit} className="bg-white/70 backdrop-blur-xl rounded-3xl p-6 shadow-2xl border border-white/50">
+        <form onSubmit={handleSubmit} className="rounded-3xl p-6 shadow-lg"
+          style={{
+            backgroundColor: 'var(--tg-theme-secondary-bg-color)',
+            border: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 20%, transparent)'
+          }}>
           {/* Имя */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
+            <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
               {t('partner_name')} {t('required_field')}
             </label>
             <input
@@ -360,10 +380,8 @@ const PartnerApply = () => {
               name="name"
               value={formData.name}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                errors.name ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-              } focus:outline-none transition-all placeholder-sakura-dark/40`}
-              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+              className="w-full px-4 py-3 rounded-xl focus:outline-none"
+              style={inputStyle(errors.name)}
               placeholder={language === 'ru' ? 'Иван Иванов' : 'John Doe'}
             />
             {errors.name && (
@@ -373,7 +391,7 @@ const PartnerApply = () => {
 
           {/* Телефон */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
+            <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
               {t('partner_phone')} {t('required_field')}
             </label>
             <input
@@ -381,10 +399,8 @@ const PartnerApply = () => {
               name="phone"
               value={formData.phone}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                errors.phone ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-              } focus:outline-none transition-all placeholder-sakura-dark/40`}
-              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+              className="w-full px-4 py-3 rounded-xl focus:outline-none"
+              style={inputStyle(errors.phone)}
               placeholder={t('partner_phone_placeholder')}
             />
             {errors.phone && (
@@ -394,17 +410,15 @@ const PartnerApply = () => {
 
           {/* Глобальная категория бизнеса */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
+            <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
               {language === 'ru' ? 'Тип бизнеса' : 'Business Type'} {t('required_field')}
             </label>
             <select
               name="categoryGroup"
               value={formData.categoryGroup}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                errors.categoryGroup ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-              } focus:outline-none transition-all`}
-              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+              className="w-full px-4 py-3 rounded-xl focus:outline-none"
+              style={inputStyle(errors.categoryGroup)}
             >
               <option value="">{language === 'ru' ? 'Выберите тип бизнеса' : 'Select business type'}</option>
               <option value="beauty">💄 {language === 'ru' ? 'Красота (Салон/Мастер)' : 'Beauty (Salon/Master)'}</option>
@@ -427,7 +441,7 @@ const PartnerApply = () => {
           {/* Название компании */}
           {formData.categoryGroup !== 'influencer' && (
             <div className="mb-4">
-              <label className="block text-gray-700 font-semibold mb-2">
+              <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('partner_company')} {t('required_field')}
               </label>
             <input
@@ -435,10 +449,8 @@ const PartnerApply = () => {
               name="companyName"
               value={formData.companyName}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                errors.companyName ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-              } focus:outline-none transition-all placeholder-sakura-dark/40`}
-              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+              className="w-full px-4 py-3 rounded-xl focus:outline-none"
+              style={inputStyle(errors.companyName)}
               placeholder={t('partner_company_placeholder')}
             />
             {errors.companyName && (
@@ -450,17 +462,15 @@ const PartnerApply = () => {
           {/* Категория услуг (Beauty и Самопознание) */}
           {(formData.categoryGroup === 'beauty' || formData.categoryGroup === 'self_discovery') && (
             <div className="mb-4">
-              <label className="block text-gray-700 font-semibold mb-2">
+              <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {language === 'ru' ? 'Категория услуг' : 'Service Category'} {t('required_field')}
               </label>
             <select
               name="businessType"
               value={formData.businessType}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                errors.businessType ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-              } focus:outline-none transition-all`}
-              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+              className="w-full px-4 py-3 rounded-xl focus:outline-none"
+              style={inputStyle(errors.businessType)}
             >
               <option value="">{language === 'ru' ? 'Выберите категорию услуг' : 'Select service category'}</option>
               {serviceCategories.map((category) => (
@@ -477,17 +487,15 @@ const PartnerApply = () => {
 
           {/* Режим работы */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
+            <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
               {language === 'ru' ? 'Режим работы' : 'Work Mode'} {t('required_field')}
             </label>
             <select
               name="workMode"
               value={formData.workMode}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                errors.workMode ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-              } focus:outline-none transition-all`}
-              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+              className="w-full px-4 py-3 rounded-xl focus:outline-none"
+              style={inputStyle(errors.workMode)}
             >
               <option value="offline">📍 {language === 'ru' ? 'Оффлайн (только в своем городе)' : 'Offline (only in your city)'}</option>
               <option value="online">🌍 {language === 'ru' ? 'Онлайн (всем городам)' : 'Online (all cities)'}</option>
@@ -496,9 +504,9 @@ const PartnerApply = () => {
             {errors.workMode && (
               <p className="text-red-500 text-sm mt-1">{errors.workMode}</p>
             )}
-            <p className="text-gray-500 text-xs mt-1">
-              {language === 'ru' 
-                ? '💡 Онлайн и Гибрид партнеры видны клиентам всех городов' 
+            <p className="text-xs mt-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
+              {language === 'ru'
+                ? '💡 Онлайн и Гибрид партнеры видны клиентам всех городов'
                 : '💡 Online and Hybrid partners are visible to clients in all cities'}
             </p>
           </div>
@@ -506,17 +514,15 @@ const PartnerApply = () => {
           {/* Город (обязателен только для оффлайн) */}
           {formData.workMode === 'offline' && (
             <div className="mb-4">
-              <label className="block text-gray-700 font-semibold mb-2">
+              <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('partner_city')} {t('required_field')}
               </label>
             <select
               name="city"
               value={formData.city}
               onChange={handleCityChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                errors.city ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-              } focus:outline-none transition-all`}
-              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+              className="w-full px-4 py-3 rounded-xl focus:outline-none"
+              style={inputStyle(errors.city)}
             >
               <option value="">{t('partner_city_placeholder')}</option>
               {cities.map((city) => (
@@ -533,7 +539,7 @@ const PartnerApply = () => {
 
           {/* Процент комиссии системе */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
+            <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
               {language === 'ru' ? 'Процент комиссии системе за клиента' : 'Commission % to system per client'} {t('required_field')}
             </label>
             <div className="relative">
@@ -545,43 +551,41 @@ const PartnerApply = () => {
                 min="0"
                 max="100"
                 step="0.1"
-                className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                  errors.referralCommissionPercent ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-                } focus:outline-none transition-all placeholder-sakura-dark/40`}
-                style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+                className="w-full px-4 py-3 rounded-xl focus:outline-none"
+                style={inputStyle(errors.referralCommissionPercent)}
                 placeholder="10"
               />
-              <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
+              <span className="absolute right-4 top-1/2 transform -translate-y-1/2"
+                style={{ color: 'var(--tg-theme-hint-color)' }}>%</span>
             </div>
             {errors.referralCommissionPercent && (
               <p className="text-red-500 text-sm mt-1">{errors.referralCommissionPercent}</p>
             )}
-            <p className="text-gray-500 text-xs mt-1">
-              {language === 'ru' 
-                ? '💡 Процент, который вы платите системе за каждого клиента, пришедшего от другого партнера. Эти средства распределяются как Revenue Share.' 
+            <p className="text-xs mt-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
+              {language === 'ru'
+                ? '💡 Процент, который вы платите системе за каждого клиента, пришедшего от другого партнера. Эти средства распределяются как Revenue Share.'
                 : '💡 Percentage you pay to the system for each client referred by another partner. These funds are distributed as Revenue Share.'}
             </p>
           </div>
 
           {/* Username (Telegram) */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
-              {language === 'ru' ? 'Telegram username мастера' : 'Master Telegram username'} 
-              <span className="text-gray-500 text-sm font-normal ml-1">
+            <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
+              {language === 'ru' ? 'Telegram username мастера' : 'Master Telegram username'}
+              <span className="text-sm font-normal ml-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
                 ({language === 'ru' ? 'необязательно' : 'optional'})
               </span>
             </label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">@</span>
+              <span className="absolute left-4 top-1/2 transform -translate-y-1/2"
+                style={{ color: 'var(--tg-theme-hint-color)' }}>@</span>
               <input
                 type="text"
                 name="username"
                 value={formData.username}
                 onChange={handleInputChange}
-                className={`w-full pl-8 pr-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                  errors.username ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-                } focus:outline-none transition-all placeholder-sakura-dark/40`}
-                style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+                className="w-full pl-8 pr-4 py-3 rounded-xl focus:outline-none"
+                style={inputStyle(errors.username)}
                 placeholder={language === 'ru' ? 'vera_yoga03 или @vera_yoga03' : 'vera_yoga03 or @vera_yoga03'}
               />
             </div>
@@ -589,9 +593,9 @@ const PartnerApply = () => {
               <p className="text-red-500 text-sm mt-1">{errors.username}</p>
             )}
             {!formData.username && (
-              <p className="text-gray-500 text-xs mt-1">
-                {language === 'ru' 
-                  ? '💡 Если у мастера нет username, клиенты смогут написать через бота' 
+              <p className="text-xs mt-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                {language === 'ru'
+                  ? '💡 Если у мастера нет username, клиенты смогут написать через бота'
                   : '💡 If master has no username, clients can contact via bot'}
               </p>
             )}
@@ -599,9 +603,9 @@ const PartnerApply = () => {
 
           {/* Ссылка на бронирование */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-2">
-              {language === 'ru' ? 'Ссылка на бронирование времени' : 'Booking URL'} 
-              <span className="text-gray-500 text-sm font-normal ml-1">
+            <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
+              {language === 'ru' ? 'Ссылка на бронирование времени' : 'Booking URL'}
+              <span className="text-sm font-normal ml-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
                 ({language === 'ru' ? 'необязательно' : 'optional'})
               </span>
             </label>
@@ -610,19 +614,17 @@ const PartnerApply = () => {
               name="bookingUrl"
               value={formData.bookingUrl}
               onChange={handleInputChange}
-              className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                errors.bookingUrl ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-              } focus:outline-none transition-all placeholder-sakura-dark/40`}
-              style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+              className="w-full px-4 py-3 rounded-xl focus:outline-none"
+              style={inputStyle(errors.bookingUrl)}
               placeholder={language === 'ru' ? 'https://example.com/booking' : 'https://example.com/booking'}
             />
             {errors.bookingUrl && (
               <p className="text-red-500 text-sm mt-1">{errors.bookingUrl}</p>
             )}
             {!formData.bookingUrl && (
-              <p className="text-gray-500 text-xs mt-1">
-                {language === 'ru' 
-                  ? '💡 Ссылка на вашу систему бронирования (Yclients, Яндекс.Бронирование и т.д.)' 
+              <p className="text-xs mt-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                {language === 'ru'
+                  ? '💡 Ссылка на вашу систему бронирования (Yclients, Яндекс.Бронирование и т.д.)'
                   : '💡 Link to your booking system (Yclients, Yandex.Booking, etc.)'}
               </p>
             )}
@@ -631,17 +633,15 @@ const PartnerApply = () => {
           {/* Район */}
           {formData.city && (
             <div className="mb-6">
-              <label className="block text-gray-700 font-semibold mb-2">
+              <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('partner_district')} {t('required_field')}
               </label>
               <select
                 name="district"
                 value={formData.district}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 rounded-xl border-2 bg-white/50 backdrop-blur-sm text-sakura-dark ${
-                  errors.district ? 'border-red-400' : 'border-sakura-mid/20 focus:border-sakura-mid'
-                } focus:outline-none transition-all`}
-                style={{ color: '#111827', WebkitTextFillColor: '#111827' }}
+                className="w-full px-4 py-3 rounded-xl focus:outline-none"
+                style={inputStyle(errors.district)}
               >
                 <option value="">{t('partner_district_placeholder')}</option>
                 {districts.map((district) => (
@@ -654,7 +654,7 @@ const PartnerApply = () => {
                 <p className="text-red-500 text-sm mt-1">{errors.district}</p>
               )}
               {formData.district === 'All' && (
-                <p className="text-sakura-mid text-sm mt-2 flex items-center gap-1">
+                <p className="text-sm mt-2 flex items-center gap-1" style={{ color: 'var(--tg-theme-button-color)' }}>
                   <span>💡</span>
                   <span>{t('partner_all_districts_hint')}</span>
                 </p>
@@ -663,8 +663,12 @@ const PartnerApply = () => {
           )}
 
           {/* Инфо */}
-          <div className="bg-sakura-mid/10 rounded-xl p-4 mb-6 border border-sakura-mid/20">
-            <p className="text-sm text-sakura-dark">
+          <div className="rounded-xl p-4 mb-6"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--tg-theme-button-color) 15%, transparent)'
+            }}>
+            <p className="text-sm" style={{ color: 'var(--tg-theme-text-color)' }}>
               <strong>ℹ️ {language === 'ru' ? 'Обратите внимание' : 'Note'}:</strong><br/>
               {t('partner_location_info')}
             </p>
@@ -681,11 +685,11 @@ const PartnerApply = () => {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-4 rounded-xl font-bold text-white transition-all shadow-lg shadow-sakura-mid/30 ${
-              loading
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-sakura-mid to-sakura-dark hover:scale-[1.02] active:scale-[0.98]'
-            }`}
+            className="w-full py-4 rounded-xl font-bold active:scale-[0.98]"
+            style={loading
+              ? { backgroundColor: 'var(--tg-theme-hint-color)', color: 'var(--tg-theme-bg-color)', cursor: 'not-allowed', opacity: 0.5 }
+              : { backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }
+            }
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -702,7 +706,8 @@ const PartnerApply = () => {
         <div className="mt-6 text-center">
            <button
              onClick={() => navigate('/partner/beauty-presentation')}
-             className="text-sakura-mid hover:text-sakura-dark underline text-sm font-medium transition-colors"
+             className="underline text-sm font-medium"
+             style={{ color: 'var(--tg-theme-button-color)' }}
            >
              {language === 'ru' ? '✨ Посмотреть презентацию для Beauty' : '✨ View Beauty Presentation'}
            </button>
@@ -710,7 +715,7 @@ const PartnerApply = () => {
 
           {/* Дополнительная информация */}
           <div className="mt-4 text-center">
-            <p className="text-sakura-dark/60 text-sm">
+            <p className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
               {t('partner_footer_text')}
             </p>
           </div>
@@ -720,4 +725,3 @@ const PartnerApply = () => {
 }
 
 export default PartnerApply
-

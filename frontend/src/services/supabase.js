@@ -1843,7 +1843,7 @@ export const getAppSetting = async (settingKey, defaultValue = null) => {
  * Получить путь к фоновому изображению
  */
 export const getBackgroundImage = async () => {
-  return await getAppSetting('background_image', '/bg/sakura.jpg')
+  return await getAppSetting('background_image', '/bg/default.jpg')
 }
 
 /**

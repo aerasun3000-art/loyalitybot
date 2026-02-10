@@ -8,7 +8,7 @@ const TermsOfService = () => {
   const { t } = useTranslation(language)
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}>
       {/* Header */}
       <div className="bg-gradient-to-br from-purple-500 to-purple-600 px-4 pt-6 pb-8 sticky top-0 z-10 shadow-md">
         <div className="flex items-center justify-between mb-4">
@@ -35,7 +35,7 @@ const TermsOfService = () => {
 
       {/* Content */}
       <div className="px-4 py-6 pb-20">
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <div className="bg-sakura-surface rounded-2xl p-6 shadow-sm">
           {language === 'ru' ? (
             // Русская версия
             <div className="prose prose-sm max-w-none">
@@ -239,7 +239,7 @@ const TermsOfService = () => {
                   Для вопросов и поддержки:
                 </p>
                 <ul className="list-none text-gray-600 text-sm space-y-1">
-                  <li><strong>Telegram:</strong> команда <code className="bg-gray-100 px-1 rounded">/support</code> в боте</li>
+                  <li><strong>Telegram:</strong> команда <code className="bg-sakura-cream px-1 rounded">/support</code> в боте</li>
                   <li><strong>Email:</strong> support@loyalitybot.com</li>
                   <li><strong>Поддержка:</strong> @LoyaltyBot_Support</li>
                 </ul>
@@ -464,7 +464,7 @@ const TermsOfService = () => {
                   For questions and support:
                 </p>
                 <ul className="list-none text-gray-600 text-sm space-y-1">
-                  <li><strong>Telegram:</strong> <code className="bg-gray-100 px-1 rounded">/support</code> command in the bot</li>
+                  <li><strong>Telegram:</strong> <code className="bg-sakura-cream px-1 rounded">/support</code> command in the bot</li>
                   <li><strong>Email:</strong> support@loyalitybot.com</li>
                   <li><strong>Support:</strong> @LoyaltyBot_Support</li>
                 </ul>

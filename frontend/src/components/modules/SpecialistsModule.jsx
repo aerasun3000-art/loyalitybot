@@ -58,7 +58,7 @@ const SpecialistsModule = ({
   // Placeholder при загрузке
   if (loading) {
     return (
-      <div className="bg-white px-4 py-4">
+      <div className="bg-sakura-surface px-4 py-4">
         <h2 className="text-lg font-semibold text-gray-900 mb-3">
           👩‍🎨 {language === 'ru' ? 'Специалисты' : 'Specialists'}
         </h2>
@@ -70,7 +70,7 @@ const SpecialistsModule = ({
             >
               <div className="w-16 h-16 mx-auto rounded-full bg-gray-200" />
               <div className="h-3 bg-gray-200 rounded mt-2 mx-auto w-14" />
-              <div className="h-2 bg-gray-100 rounded mt-1 mx-auto w-10" />
+              <div className="h-2 bg-sakura-cream rounded mt-1 mx-auto w-10" />
             </div>
           ))}
         </div>
@@ -84,7 +84,7 @@ const SpecialistsModule = ({
   }
 
   return (
-    <div className="bg-white px-4 py-4">
+    <div className="bg-sakura-surface px-4 py-4">
       {/* Заголовок секции */}
       <h2 className="text-lg font-semibold text-gray-900 mb-3">
         👩‍🎨 {language === 'ru' ? 'Специалисты' : 'Specialists'}
@@ -105,10 +105,14 @@ const SpecialistsModule = ({
             >
               {/* Аватар */}
               <div className={`relative w-16 h-16 mx-auto rounded-full overflow-hidden ${
-                isSelected 
-                  ? 'ring-2 ring-sakura-accent ring-offset-2' 
-                  : 'ring-1 ring-gray-200'
-              }`}>
+                isSelected
+                  ? 'ring-2 ring-offset-2'
+                  : 'ring-1'
+              }`}
+                style={isSelected
+                  ? { '--tw-ring-color': 'var(--tg-theme-button-color)' }
+                  : { '--tw-ring-color': 'color-mix(in srgb, var(--tg-theme-hint-color) 30%, transparent)' }
+                }>
                 {specialist.photo_url ? (
                   <img
                     src={specialist.photo_url}
@@ -117,15 +121,16 @@ const SpecialistsModule = ({
                     loading="lazy"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-sakura-light to-sakura-mid flex items-center justify-center text-2xl">
+                  <div className="w-full h-full flex items-center justify-center text-2xl"
+                    style={{ background: 'linear-gradient(to bottom right, color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent), color-mix(in srgb, var(--tg-theme-button-color) 60%, transparent))' }}>
                     👤
                   </div>
                 )}
                 
                 {/* Badge рейтинга */}
                 {specialist.rating > 0 && (
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-white rounded-full shadow-sm text-xs font-medium flex items-center gap-0.5">
-                    <span className="text-yellow-500 text-[10px]">⭐</span>
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-sakura-surface rounded-full shadow-sm text-xs font-medium flex items-center gap-0.5">
+                    <span className="text-sakura-gold text-[10px]">⭐</span>
                     <span>{specialist.rating.toFixed(1)}</span>
                   </div>
                 )}

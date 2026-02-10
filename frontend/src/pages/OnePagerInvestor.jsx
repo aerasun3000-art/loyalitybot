@@ -79,7 +79,7 @@ const OnePagerInvestor = () => {
       </div>
 
       {/* Рыночный потенциал */}
-      <div className="bg-white dark:bg-gray-800 py-16">
+      <div className="bg-sakura-surface dark:bg-sakura-dark py-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-center text-gray-900 dark:text-white mb-12">
             📊 Рыночный потенциал
@@ -132,7 +132,7 @@ const OnePagerInvestor = () => {
         </h2>
         
         <div className="grid md:grid-cols-2 gap-8">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg">
+          <div className="bg-sakura-surface dark:bg-sakura-dark rounded-2xl p-8 shadow-lg">
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
               Монетизация
             </h3>
@@ -185,7 +185,7 @@ const OnePagerInvestor = () => {
             <TractionCard value="+35%" label="MoM рост" />
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-8">
+          <div className="bg-sakura-surface dark:bg-sakura-dark rounded-2xl p-8">
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">
               📈 Прогноз роста (24 месяца)
             </h3>
@@ -240,7 +240,7 @@ const OnePagerInvestor = () => {
       </div>
 
       {/* Использование средств */}
-      <div className="bg-white dark:bg-gray-800 py-16">
+      <div className="bg-sakura-surface dark:bg-sakura-dark py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl font-bold text-center text-gray-900 dark:text-white mb-12">
             💵 Использование инвестиций ($3M)
@@ -265,7 +265,7 @@ const OnePagerInvestor = () => {
             Станьте частью революции в программах лояльности для SMB
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
-            <button className="px-8 py-4 bg-white text-purple-900 rounded-xl font-bold text-lg hover:shadow-2xl transition-shadow">
+            <button className="px-8 py-4 bg-sakura-surface text-sakura-deep rounded-xl font-bold text-lg hover:shadow-2xl transition-shadow">
               Скачать Pitch Deck
             </button>
             <button className="px-8 py-4 bg-purple-600 text-white rounded-xl font-bold text-lg border-2 border-white/30 hover:bg-purple-700 transition-colors">
@@ -304,7 +304,7 @@ const MarketCard = ({ title, subtitle, value, description, highlight }) => (
   <div className={`rounded-2xl p-6 ${
     highlight
       ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white'
-      : 'bg-gray-50 dark:bg-gray-700'
+      : 'bg-sakura-cream dark:bg-sakura-dark'
   }`}>
     <div className={`text-sm font-bold mb-1 ${highlight ? 'text-purple-100' : 'text-gray-500 dark:text-gray-400'}`}>
       {subtitle}
@@ -325,7 +325,7 @@ const TargetItem = ({ icon, text }) => (
 );
 
 const RevenueItem = ({ model, description, share }) => (
-  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+  <div className="flex items-center justify-between p-4 bg-sakura-cream dark:bg-sakura-dark rounded-lg">
     <div>
       <div className="font-bold text-gray-900 dark:text-white">{model}</div>
       <div className="text-sm text-gray-600 dark:text-gray-400">{description}</div>
@@ -346,7 +346,7 @@ const UnitEconItem = ({ label, value, highlight }) => (
 );
 
 const TractionCard = ({ value, label }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 text-center shadow-sm">
+  <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 text-center shadow-sm">
     <div className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600 mb-2">
       {value}
     </div>
@@ -358,7 +358,7 @@ const ProjectionCard = ({ period, partners, users, mrr, highlight }) => (
   <div className={`rounded-xl p-6 ${
     highlight
       ? 'bg-gradient-to-br from-purple-600 to-blue-600 text-white shadow-lg scale-105'
-      : 'bg-gray-50 dark:bg-gray-700'
+      : 'bg-sakura-cream dark:bg-sakura-dark'
   }`}>
     <div className={`text-lg font-bold mb-4 ${highlight ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
       {period}
@@ -393,7 +393,7 @@ const ProjectionCard = ({ period, partners, users, mrr, highlight }) => (
 );
 
 const TeamCard = ({ name, experience, expertise }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+  <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
     <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl text-white">
       👤
     </div>

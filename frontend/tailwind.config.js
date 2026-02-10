@@ -7,14 +7,18 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      borderRadius: {
+        xl: '16px',
+        '2xl': '24px',
+      },
       colors: {
-        'tg-bg': 'var(--tg-theme-bg-color)',
-        'tg-text': 'var(--tg-theme-text-color)',
-        'tg-hint': 'var(--tg-theme-hint-color)',
-        'tg-link': 'var(--tg-theme-link-color)',
-        'tg-button': 'var(--tg-theme-button-color)',
-        'tg-button-text': 'var(--tg-theme-button-text-color)',
-        'tg-secondary-bg': 'var(--tg-theme-secondary-bg-color)',
+        'tg-bg': 'var(--tg-theme-bg-color, #ffffff)',
+        'tg-text': 'var(--tg-theme-text-color, #1c1c1e)',
+        'tg-hint': 'var(--tg-theme-hint-color, #8e8e93)',
+        'tg-link': 'var(--tg-theme-link-color, #007aff)',
+        'tg-button': 'var(--tg-theme-button-color, #007aff)',
+        'tg-button-text': 'var(--tg-theme-button-text-color, #ffffff)',
+        'tg-secondary-bg': 'var(--tg-theme-secondary-bg-color, #f2f2f7)',
 
         // Sakura palette — CSS vars auto-flip in dark mode, opacity support
         'sakura-bg': 'rgb(var(--sakura-bg) / <alpha-value>)',

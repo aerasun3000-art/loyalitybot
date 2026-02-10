@@ -104,12 +104,12 @@ const MenuModule = ({
   }
 
   return (
-    <div className="bg-white">
+    <div className="bg-sakura-surface">
       {/* Табы категорий */}
       {categories.length > 0 && (
         <div 
           ref={tabsRef}
-          className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-3 border-b border-gray-100 sticky top-0 bg-white z-10"
+          className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-3 border-b border-sakura-border sticky top-0 bg-sakura-surface z-10"
         >
           {categories.map((cat) => {
             const isActive = activeCategory === cat.code
@@ -121,13 +121,13 @@ const MenuModule = ({
                 id={`menu-tab-${cat.code}`}
                 onClick={() => handleCategoryChange(cat.code)}
                 disabled={!hasItems}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-sakura-accent text-white'
-                    : hasItems
-                      ? 'bg-gray-100 text-gray-700 active:bg-gray-200'
-                      : 'bg-gray-50 text-gray-300 cursor-not-allowed'
-                }`}
+                className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium"
+                style={isActive
+                  ? { backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }
+                  : hasItems
+                    ? { backgroundColor: 'color-mix(in srgb, var(--tg-theme-hint-color) 10%, transparent)', color: 'var(--tg-theme-text-color)' }
+                    : { backgroundColor: 'color-mix(in srgb, var(--tg-theme-hint-color) 5%, transparent)', color: 'var(--tg-theme-hint-color)', cursor: 'not-allowed' }
+                }
               >
                 {cat.emoji} {cat.name}
               </button>
@@ -138,7 +138,7 @@ const MenuModule = ({
       
       {/* Диетические фильтры */}
       {availableDietaryTags.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-2 bg-gray-50">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-2 bg-sakura-cream">
           {availableDietaryTags.map((tag) => {
             const isActive = activeDietaryFilter === tag.code
             
@@ -148,8 +148,8 @@ const MenuModule = ({
                 onClick={() => handleDietaryFilterToggle(tag.code)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   isActive
-                    ? 'bg-green-500 text-white'
-                    : 'bg-white text-gray-600 border border-gray-200 active:bg-gray-100'
+                    ? 'bg-sakura-mid text-white'
+                    : 'bg-sakura-surface text-sakura-muted border border-sakura-border active:bg-sakura-cream'
                 }`}
               >
                 {tag.emoji} {tag.name}
@@ -160,7 +160,7 @@ const MenuModule = ({
       )}
       
       {/* Список блюд */}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-sakura-border/20">
         {filteredItems.length === 0 ? (
           <div className="px-4 py-8 text-center text-gray-500">
             {language === 'ru' ? 'Ничего не найдено' : 'Nothing found'}
@@ -177,7 +177,7 @@ const MenuModule = ({
               >
                 {/* Фото блюда */}
                 {item.image_url && (
-                  <div className="flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-gray-100">
+                  <div className="flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden bg-sakura-cream">
                     <img
                       src={item.image_url}
                       alt={item.title}
@@ -225,19 +225,23 @@ const MenuModule = ({
                     {onAddToCart && (
                       <div className="flex items-center gap-2">
                         {quantity > 0 ? (
-                          <div className="flex items-center gap-2 bg-sakura-accent rounded-full">
+                          <div className="flex items-center gap-2 rounded-full"
+                            style={{ backgroundColor: 'var(--tg-theme-button-color)' }}>
                             <button
                               onClick={() => onAddToCart(item, -1)}
-                              className="w-8 h-8 flex items-center justify-center text-white font-bold"
+                              className="w-8 h-8 flex items-center justify-center font-bold"
+                              style={{ color: 'var(--tg-theme-button-text-color, #fff)' }}
                             >
                               −
                             </button>
-                            <span className="text-white font-medium min-w-[20px] text-center">
+                            <span className="font-medium min-w-[20px] text-center"
+                              style={{ color: 'var(--tg-theme-button-text-color, #fff)' }}>
                               {quantity}
                             </span>
                             <button
                               onClick={() => handleAddToCart(item)}
-                              className="w-8 h-8 flex items-center justify-center text-white font-bold"
+                              className="w-8 h-8 flex items-center justify-center font-bold"
+                              style={{ color: 'var(--tg-theme-button-text-color, #fff)' }}
                             >
                               +
                             </button>
@@ -245,7 +249,8 @@ const MenuModule = ({
                         ) : (
                           <button
                             onClick={() => handleAddToCart(item)}
-                            className="px-4 py-2 bg-sakura-accent text-white text-sm font-medium rounded-full active:scale-95 transition-transform"
+                            className="px-4 py-2 text-sm font-medium rounded-full active:scale-95"
+                            style={{ backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }}
                           >
                             {language === 'ru' ? 'Добавить' : 'Add'}
                           </button>

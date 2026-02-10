@@ -10,7 +10,7 @@ export const serviceCategories = {
     icon: 'nail_care',
     name: 'Ногтевой сервис',
     nameEn: 'Nail Care',
-    color: 'from-sakura-mid to-sakura-gold',
+    color: 'from-rose-400 to-amber-400',
     emoji: '💅',
     displayOrder: 1,
     isMainPage: true
@@ -20,7 +20,7 @@ export const serviceCategories = {
     icon: 'brow_design',
     name: 'Коррекция и окрашивание бровей',
     nameEn: 'Brow Design',
-    color: 'from-sakura-gold to-sakura-muted',
+    color: 'from-amber-400 to-pink-300',
     emoji: '👁️',
     displayOrder: 2,
     isMainPage: true
@@ -30,7 +30,7 @@ export const serviceCategories = {
     icon: 'hair_salon',
     name: 'Парикмахерские услуги',
     nameEn: 'Hair Salon Services',
-    color: 'from-sakura-muted to-sakura-gold',
+    color: 'from-pink-300 to-amber-400',
     emoji: '💇‍♀️',
     displayOrder: 3,
     isMainPage: true
@@ -40,7 +40,7 @@ export const serviceCategories = {
     icon: 'hair_removal',
     name: 'Депиляция',
     nameEn: 'Hair Removal',
-    color: 'from-sakura-gold to-sakura-mid',
+    color: 'from-amber-400 to-rose-400',
     emoji: '⚡',
     displayOrder: 4,
     isMainPage: true
@@ -50,7 +50,7 @@ export const serviceCategories = {
     icon: 'facial_aesthetics',
     name: 'Косметология',
     nameEn: 'Facial Aesthetics',
-    color: 'from-sakura-mid to-sakura-deep',
+    color: 'from-rose-400 to-rose-600',
     emoji: '✨',
     displayOrder: 5,
     isMainPage: true
@@ -60,7 +60,7 @@ export const serviceCategories = {
     icon: 'lash_services',
     name: 'Наращивание и ламинирование ресниц',
     nameEn: 'Lash Services',
-    color: 'from-sakura-muted to-sakura-gold',
+    color: 'from-pink-300 to-amber-400',
     emoji: '👀',
     displayOrder: 6,
     isMainPage: true
@@ -70,7 +70,7 @@ export const serviceCategories = {
     icon: 'massage_therapy',
     name: 'Массаж',
     nameEn: 'Massage Therapy',
-    color: 'from-sakura-gold to-sakura-muted',
+    color: 'from-amber-400 to-pink-300',
     emoji: '💆‍♀️',
     displayOrder: 7,
     isMainPage: true
@@ -80,7 +80,7 @@ export const serviceCategories = {
     icon: 'makeup_pmu',
     name: 'Визаж и перманент',
     nameEn: 'Make-up & PMU',
-    color: 'from-sakura-mid to-sakura-gold',
+    color: 'from-rose-400 to-amber-400',
     emoji: '💄',
     displayOrder: 8,
     isMainPage: true
@@ -90,7 +90,7 @@ export const serviceCategories = {
     icon: 'body_wellness',
     name: 'Телесная терапия',
     nameEn: 'Body Wellness',
-    color: 'from-sakura-gold to-sakura-bg',
+    color: 'from-amber-400 to-pink-50',
     emoji: '🌸',
     displayOrder: 9,
     isMainPage: false
@@ -100,7 +100,7 @@ export const serviceCategories = {
     icon: 'nutrition_coaching',
     name: 'Нутрициология и питание',
     nameEn: 'Nutrition Coaching',
-    color: 'from-sakura-gold-light to-sakura-gold',
+    color: 'from-amber-300 to-amber-400',
     emoji: '🍎',
     displayOrder: 10,
     isMainPage: false
@@ -110,7 +110,7 @@ export const serviceCategories = {
     icon: 'mindfulness_coaching',
     name: 'Ментальное здоровье',
     nameEn: 'Mindfulness & Coaching',
-    color: 'from-sakura-muted to-sakura-mid',
+    color: 'from-pink-300 to-rose-400',
     emoji: '🧠',
     displayOrder: 11,
     isMainPage: false
@@ -120,7 +120,7 @@ export const serviceCategories = {
     icon: 'image_consulting',
     name: 'Стиль',
     nameEn: 'Image Consulting',
-    color: 'from-sakura-bg to-sakura-gold-light',
+    color: 'from-pink-50 to-amber-300',
     emoji: '👗',
     displayOrder: 12,
     isMainPage: false
@@ -152,7 +152,7 @@ export const serviceCategories = {
     icon: 'mindfulness_coaching',
     name: 'Психология и коучинг',
     nameEn: 'Psychology & Coaching',
-    color: 'from-sakura-muted to-sakura-mid',
+    color: 'from-pink-300 to-rose-400',
     emoji: '🧠',
     displayOrder: 15,
     isMainPage: false
@@ -174,7 +174,7 @@ export const serviceCategories = {
     icon: 'nail_care',
     name: 'Ногтевой сервис',
     nameEn: 'Nail Care',
-    color: 'from-sakura-mid to-sakura-gold',
+    color: 'from-rose-400 to-amber-400',
     emoji: '💅'
   },
   hairstyle: {
@@ -182,7 +182,7 @@ export const serviceCategories = {
     icon: 'hair_salon',
     name: 'Парикмахерские услуги',
     nameEn: 'Hair Salon Services',
-    color: 'from-sakura-muted to-sakura-gold',
+    color: 'from-pink-300 to-amber-400',
     emoji: '💇‍♀️'
   },
   massage: {
@@ -190,7 +190,7 @@ export const serviceCategories = {
     icon: 'massage_therapy',
     name: 'Массаж',
     nameEn: 'Massage Therapy',
-    color: 'from-sakura-gold to-sakura-muted',
+    color: 'from-amber-400 to-pink-300',
     emoji: '💆‍♀️'
   },
   cosmetologist: {
@@ -198,7 +198,7 @@ export const serviceCategories = {
     icon: 'facial_aesthetics',
     name: 'Косметология',
     nameEn: 'Facial Aesthetics',
-    color: 'from-sakura-mid to-sakura-deep',
+    color: 'from-rose-400 to-rose-600',
     emoji: '✨'
   },
   eyebrows: {
@@ -206,7 +206,7 @@ export const serviceCategories = {
     icon: 'brow_design',
     name: 'Коррекция и окрашивание бровей',
     nameEn: 'Brow Design',
-    color: 'from-sakura-gold to-sakura-muted',
+    color: 'from-amber-400 to-pink-300',
     emoji: '👁️'
   },
   eyelashes: {
@@ -214,7 +214,7 @@ export const serviceCategories = {
     icon: 'lash_services',
     name: 'Наращивание и ламинирование ресниц',
     nameEn: 'Lash Services',
-    color: 'from-sakura-muted to-sakura-gold',
+    color: 'from-pink-300 to-amber-400',
     emoji: '👀'
   },
   laser: {
@@ -222,7 +222,7 @@ export const serviceCategories = {
     icon: 'hair_removal',
     name: 'Депиляция',
     nameEn: 'Hair Removal',
-    color: 'from-sakura-gold to-sakura-mid',
+    color: 'from-amber-400 to-rose-400',
     emoji: '⚡'
   },
   makeup: {
@@ -230,7 +230,7 @@ export const serviceCategories = {
     icon: 'makeup_pmu',
     name: 'Визаж и перманент',
     nameEn: 'Make-up & PMU',
-    color: 'from-sakura-mid to-sakura-gold',
+    color: 'from-rose-400 to-amber-400',
     emoji: '💄'
   },
   skincare: {
@@ -238,7 +238,7 @@ export const serviceCategories = {
     icon: 'facial_aesthetics',
     name: 'Уход за кожей',
     nameEn: 'Skincare',
-    color: 'from-sakura-mid to-sakura-deep',
+    color: 'from-rose-400 to-rose-600',
     emoji: '✨'
   },
   cleaning: {
@@ -246,7 +246,7 @@ export const serviceCategories = {
     icon: 'cleaning',
     name: 'Уборка и клининг',
     nameEn: 'Cleaning Services',
-    color: 'from-sakura-gold to-sakura-muted',
+    color: 'from-amber-400 to-pink-300',
     emoji: '🧹'
   },
   repair: {
@@ -254,7 +254,7 @@ export const serviceCategories = {
     icon: 'repair',
     name: 'Ремонт',
     nameEn: 'Repair Services',
-    color: 'from-sakura-muted to-sakura-gold',
+    color: 'from-pink-300 to-amber-400',
     emoji: '🔧'
   },
   delivery: {
@@ -262,7 +262,7 @@ export const serviceCategories = {
     icon: 'delivery',
     name: 'Доставка',
     nameEn: 'Delivery',
-    color: 'from-sakura-gold-light to-sakura-gold',
+    color: 'from-amber-300 to-amber-400',
     emoji: '🚚'
   },
   fitness: {
@@ -270,7 +270,7 @@ export const serviceCategories = {
     icon: 'fitness',
     name: 'Фитнес',
     nameEn: 'Fitness',
-    color: 'from-sakura-gold to-sakura-muted',
+    color: 'from-amber-400 to-pink-300',
     emoji: '🏃‍♀️'
   },
   spa: {
@@ -278,7 +278,7 @@ export const serviceCategories = {
     icon: 'spa',
     name: 'SPA',
     nameEn: 'SPA',
-    color: 'from-sakura-bg to-sakura-gold-light',
+    color: 'from-pink-50 to-amber-300',
     emoji: '🛁'
   },
   yoga: {
@@ -286,7 +286,7 @@ export const serviceCategories = {
     icon: 'yoga',
     name: 'Йога',
     nameEn: 'Yoga',
-    color: 'from-sakura-muted to-sakura-gold',
+    color: 'from-pink-300 to-amber-400',
     emoji: '🧘‍♀️'
   },
   nutrition: {
@@ -294,7 +294,7 @@ export const serviceCategories = {
     icon: 'nutrition_coaching',
     name: 'Питание',
     nameEn: 'Nutrition',
-    color: 'from-sakura-gold-light to-sakura-gold',
+    color: 'from-amber-300 to-amber-400',
     emoji: '🥗'
   },
   psychology: {
@@ -302,7 +302,7 @@ export const serviceCategories = {
     icon: 'mindfulness_coaching',
     name: 'Психолог',
     nameEn: 'Psychology',
-    color: 'from-sakura-muted to-sakura-mid',
+    color: 'from-pink-300 to-rose-400',
     emoji: '🧠'
   },
   
@@ -672,7 +672,7 @@ export const getServiceCategory = (serviceName = '') => {
     icon: 'default',
     name: 'Услуга',
     nameEn: 'Service',
-    color: 'from-sakura-gold to-sakura-muted'
+    color: 'from-amber-400 to-pink-300'
   }
 }
 

@@ -21,10 +21,21 @@ const ServiceModal = ({
   onShowLocation
 }) => {
   if (!isOpen || !selectedService) return null
+  const ru = language === 'ru'
+
+  const btnPrimary = {
+    backgroundColor: 'var(--tg-theme-button-color)',
+    color: 'var(--tg-theme-button-text-color, #fff)',
+  }
+  const btnSecondary = {
+    backgroundColor: 'var(--tg-theme-secondary-bg-color)',
+    color: 'var(--tg-theme-text-color)',
+  }
 
   return (
-    <div className="fixed inset-0 z-[100] animate-fade-in" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="service-modal-title">
-      <div className="absolute inset-0 bg-sakura-deep/50 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-[100]" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="service-modal-title"
+      style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+    >
       <div
         className="relative h-full flex items-center justify-center px-4 py-4"
         onClick={(e) => e.stopPropagation()}
@@ -32,52 +43,58 @@ const ServiceModal = ({
       >
         <div
           ref={serviceModalRef}
-          className="relative z-10 w-full max-w-md bg-sakura-surface/85 border border-sakura-border/60 rounded-3xl shadow-2xl p-6 max-h-[calc(100vh-8rem)] overflow-y-auto animate-scale-in"
-          style={{ maxHeight: 'calc(100vh - 8rem)', WebkitOverflowScrolling: 'touch' }}
+          className="relative z-10 w-full max-w-md rounded-2xl shadow-2xl p-5 max-h-[calc(100vh-8rem)] overflow-y-auto"
+          style={{ backgroundColor: 'var(--tg-theme-bg-color)', WebkitOverflowScrolling: 'touch' }}
         >
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full border border-sakura-border/40 bg-sakura-surface/20 text-sakura-dark hover:bg-sakura-surface/30 transition-colors z-20"
+            className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center text-lg"
+            style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-hint-color)' }}
             aria-label="Закрыть"
           >
             ×
           </button>
-          <div className="space-y-4 text-sakura-dark pb-8">
+
+          <div className="space-y-4 pb-4">
             <div>
-              <p className="text-sm text-sakura-dark/60 mb-1 uppercase tracking-wide">Услуга</p>
-              <h2 id="service-modal-title" className="text-xl font-bold">{selectedService.title}</h2>
-              <p className="text-sm text-sakura-dark/70 mt-1">
+              <p className="text-xs uppercase tracking-wide mb-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                {ru ? 'Услуга' : 'Service'}
+              </p>
+              <h2 id="service-modal-title" className="text-xl font-bold pr-10" style={{ color: 'var(--tg-theme-text-color)' }}>
+                {selectedService.title}
+              </h2>
+              <p className="text-sm mt-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
                 {selectedService.partner?.company_name || selectedService.partner?.name || t('partner_not_connected')}
               </p>
             </div>
+
             {selectedService.description && (
-              <p className="text-sm text-sakura-dark/80 bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-3">
+              <p className="text-sm rounded-xl p-3" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-text-color)' }}>
                 {selectedService.description}
               </p>
             )}
-            <div className="flex items-center gap-3 bg-sakura-surface/15 border border-sakura-border/30 rounded-2xl p-3">
+
+            <div className="flex items-center gap-3 rounded-xl p-3" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}>
               <span className="text-2xl">💸</span>
               <div className="flex-1">
-                <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">
-                  {language === 'ru' ? 'Стоимость' : 'Cost'}
+                <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                  {ru ? 'Стоимость' : 'Cost'}
                 </p>
-                <p className="text-lg font-semibold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+                <p className="text-lg font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>
                   {formatPriceWithPoints(selectedService.price_points, currency, rates, true, language)}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-sakura-dark/60 uppercase tracking-wide">
-                  {language === 'ru' ? 'Ваш баланс' : 'Your balance'}
+                <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                  {ru ? 'Баланс' : 'Balance'}
                 </p>
-                <p className={`text-lg font-semibold ${
-                  balance >= selectedService.price_points ? 'text-green-600' : 'text-red-500'
-                }`}>
+                <p className={`text-lg font-semibold ${balance >= selectedService.price_points ? 'text-green-600' : 'text-red-500'}`}>
                   {formatPriceWithPoints(balance, currency, rates, false, language)}
                 </p>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {(() => {
                 const promotions = servicePromotions[selectedService.id] || []
                 const redemptionPromotion = promotions.find(p =>
@@ -85,69 +102,54 @@ const ServiceModal = ({
                   p.max_points_payment &&
                   p.max_points_payment > 0
                 )
-
                 if (redemptionPromotion) {
                   return (
-                    <button
-                      onClick={onRedeemViaPromotion}
-                      className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-mid to-sakura-dark text-white font-semibold shadow-md hover:shadow-lg transition-all"
-                    >
-                      {language === 'ru'
-                        ? `🎁 Обменять по акции: ${redemptionPromotion.title}`
-                        : `🎁 Redeem via promotion: ${redemptionPromotion.title}`}
+                    <button onClick={onRedeemViaPromotion} className="w-full py-3 rounded-xl font-semibold text-sm active:scale-[0.98]" style={btnPrimary}>
+                      {ru ? `🎁 Обменять: ${redemptionPromotion.title}` : `🎁 Redeem: ${redemptionPromotion.title}`}
                     </button>
                   )
                 }
                 return null
               })()}
 
-              <button
-                onClick={onGetCashback}
-                disabled={isQrLoading}
-                className="w-full py-3 rounded-full bg-sakura-accent text-white font-semibold shadow-md hover:bg-sakura-accent/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              <button onClick={onGetCashback} disabled={isQrLoading}
+                className="w-full py-3 rounded-xl font-semibold text-sm active:scale-[0.98] disabled:opacity-50"
+                style={btnPrimary}
               >
-                {isQrLoading ? 'Генерируем QR...' : (language === 'ru' ? 'Получить кэшбэк в баллах' : 'Get cashback points')}
+                {isQrLoading ? '...' : (ru ? 'Получить кэшбэк' : 'Get cashback')}
               </button>
 
-              <button
-                onClick={onShowLocation}
-                className="w-full py-3 rounded-full bg-white text-sakura-dark font-semibold shadow-md border border-sakura-border hover:bg-sakura-surface transition-colors"
-              >
-                {language === 'ru' ? '📍 Показать на карте' : '📍 Show on Map'}
+              <button onClick={onShowLocation} className="w-full py-3 rounded-xl font-semibold text-sm active:scale-[0.98]" style={btnSecondary}>
+                {ru ? '📍 На карте' : '📍 Show on map'}
               </button>
 
-              <button
-                onClick={onBookTime}
+              <button onClick={onBookTime}
                 disabled={!selectedService.booking_url && !selectedService.partner?.booking_url}
-                className="w-full py-3 rounded-full bg-sakura-deep text-white font-semibold shadow-md hover:bg-sakura-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title={(!selectedService.booking_url && !selectedService.partner?.booking_url) ? (language === 'ru' ? 'Ссылка уточняется' : 'Link TBD') : ''}
+                className="w-full py-3 rounded-xl font-semibold text-sm active:scale-[0.98] disabled:opacity-40"
+                style={btnSecondary}
               >
                 {(!selectedService.booking_url && !selectedService.partner?.booking_url)
-                  ? (language === 'ru' ? 'Забронировать (ссылка уточняется)' : 'Book (link TBD)')
-                  : (language === 'ru' ? 'Забронировать время' : 'Book time')}
+                  ? (ru ? 'Забронировать (уточняется)' : 'Book (TBD)')
+                  : (ru ? 'Забронировать время' : 'Book time')}
               </button>
-              <button
-                onClick={onContactPartner}
-                className="w-full py-3 rounded-full bg-gradient-to-r from-sakura-accent to-sakura-mid text-white font-semibold shadow-md hover:shadow-lg transition-all"
-              >
-                {language === 'ru' ? '💬 Написать партнёру' : '💬 Contact Partner'}
+
+              <button onClick={onContactPartner} className="w-full py-3 rounded-xl font-semibold text-sm active:scale-[0.98]" style={btnPrimary}>
+                {ru ? '💬 Написать партнёру' : '💬 Contact partner'}
               </button>
             </div>
 
             {qrError && (
-              <div className="text-sm text-red-500 bg-red-100/60 border border-red-200 rounded-2xl p-3">
-                {qrError}
-              </div>
+              <div className="text-sm text-red-600 bg-red-50 rounded-xl p-3">{qrError}</div>
             )}
 
             {qrImage && (
-              <div className="flex flex-col items-center gap-3 bg-white/90 border border-sakura-border/40 rounded-3xl p-4 mb-8 pb-8">
-                <img src={qrImage} alt="QR для начисления" className="w-48 h-48 object-contain" />
-                <p className="text-xs text-sakura-dark/70 text-center px-2">
-                  {language === 'ru' ? 'Покажите код мастеру при оплате — он подтвердит начисление баллов.' : 'Show this code to the master at payment — they will confirm points.'}
+              <div className="flex flex-col items-center gap-3 rounded-xl p-4" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}>
+                <img src={qrImage} alt="QR" className="w-48 h-48 object-contain" />
+                <p className="text-xs text-center" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                  {ru ? 'Покажите код мастеру при оплате' : 'Show this code to the master at payment'}
                 </p>
                 {chatId && (
-                  <p className="text-xs text-sakura-dark/50 text-center px-2 font-mono">
+                  <p className="text-xs text-center font-mono" style={{ color: 'var(--tg-theme-hint-color)', opacity: 0.6 }}>
                     ID: {chatId}
                   </p>
                 )}

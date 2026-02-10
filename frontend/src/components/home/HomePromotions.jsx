@@ -22,19 +22,19 @@ const HomePromotions = ({ translatedPromotions, carouselRef, t, navigate, onProm
   }
 
   return (
-    <div className="mb-6 fade-in-up delay-100">
+    <div className="mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold text-sakura-deep flex items-center gap-2">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+        <h2 className="text-2xl font-bold flex items-center gap-2" style={{ color: 'var(--tg-theme-text-color)' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ color: 'var(--tg-theme-text-color)' }}>
             <rect x="3" y="7" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             <path d="M8 7V5C8 3.895 8.895 3 10 3H14C15.105 3 16 3.895 16 5V7M8 12H16M8 16H12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             <circle cx="17" cy="11" r="1" fill="currentColor" />
           </svg>
           {t('promo_title')}
         </h2>
-        <button
-          onClick={() => navigate('/promotions')}
-          className="bg-sakura-accent/15 text-sakura-deep font-semibold text-sm px-3 py-1 rounded-lg border border-sakura-accent/30 hover:bg-sakura-accent/25 transition-colors drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]"
+        <button onClick={() => navigate('/promotions')}
+          className="font-semibold text-sm px-3 py-1 rounded-lg"
+          style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 15%, transparent)', color: 'var(--tg-theme-button-color)' }}
         >
           {t('home_see_all')} →
         </button>
@@ -45,10 +45,7 @@ const HomePromotions = ({ translatedPromotions, carouselRef, t, navigate, onProm
           <div
             ref={(el) => { carouselRef.current = el }}
             className="flex gap-2 overflow-x-auto scrollbar-hide snap-x snap-mandatory"
-            style={{
-              WebkitOverflowScrolling: 'touch',
-              scrollBehavior: 'smooth'
-            }}
+            style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}
           >
             {displayPromotions.map((promo, index) => {
               const daysLeft = getDaysRemaining(promo.end_date)
@@ -65,7 +62,7 @@ const HomePromotions = ({ translatedPromotions, carouselRef, t, navigate, onProm
                 <div
                   key={`${promo.id}-${index}`}
                   onClick={() => onPromotionClick(promo.id)}
-                  className={`relative flex-shrink-0 cursor-pointer hover:scale-105 active:scale-[0.98] transition-all duration-300 rounded-2xl overflow-hidden shadow-lg ${
+                  className={`relative flex-shrink-0 cursor-pointer active:scale-[0.98] rounded-2xl overflow-hidden shadow-lg ${
                     !promo.image_url ? colors.bg : ''
                   }`}
                   style={{
@@ -78,17 +75,10 @@ const HomePromotions = ({ translatedPromotions, carouselRef, t, navigate, onProm
                 >
                   {promo.image_url ? (
                     <>
-                      <img
-                        src={promo.image_url}
-                        alt={promo.title}
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                      <div
-                        className="absolute inset-0"
-                        style={{
-                          background: 'linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.6))'
-                        }}
-                      />
+                      <img src={promo.image_url} alt={promo.title}
+                        className="absolute inset-0 w-full h-full object-cover" />
+                      <div className="absolute inset-0"
+                        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.6))' }} />
                     </>
                   ) : (
                     <div className={`absolute inset-0 ${colors.bg} opacity-90`} />
@@ -103,17 +93,13 @@ const HomePromotions = ({ translatedPromotions, carouselRef, t, navigate, onProm
                   </div>
 
                   <div className="absolute top-0 left-0 right-0 z-10 p-4 pt-14">
-                    <h3
-                      className="text-white font-bold mb-1 drop-shadow-lg line-clamp-2"
-                      style={{ fontSize: '16px', fontWeight: 700, lineHeight: '1.3', color: '#FFFFFF' }}
-                    >
+                    <h3 className="text-white font-bold mb-1 drop-shadow-lg line-clamp-2"
+                      style={{ fontSize: '16px', fontWeight: 700, lineHeight: '1.3', color: '#FFFFFF' }}>
                       {promo.title}
                     </h3>
                     {promo.partner?.company_name && (
-                      <p
-                        className="text-white/90 drop-shadow-md line-clamp-1"
-                        style={{ fontSize: '12px', fontWeight: 400, opacity: 0.9 }}
-                      >
+                      <p className="text-white/90 drop-shadow-md line-clamp-1"
+                        style={{ fontSize: '12px', fontWeight: 400, opacity: 0.9 }}>
                         {promo.partner.company_name}
                       </p>
                     )}
@@ -121,22 +107,20 @@ const HomePromotions = ({ translatedPromotions, carouselRef, t, navigate, onProm
 
                   <div className="absolute top-3 left-3 z-20 flex flex-wrap gap-1.5">
                     {isEndingSoon && (
-                      <div className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg">
+                      <div className="bg-sakura-accent text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg">
                         🔥 {daysLeft}д
                       </div>
                     )}
                     {isNew && !isEndingSoon && (
-                      <div className="bg-green-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg">
+                      <div className="bg-sakura-mid text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg">
                         ⚡ {t('promo_new')}
                       </div>
                     )}
                   </div>
 
                   <div className="absolute bottom-4 right-4 z-10">
-                    <div
-                      className="text-white font-bold drop-shadow-lg"
-                      style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF' }}
-                    >
+                    <div className="text-white font-bold drop-shadow-lg"
+                      style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF' }}>
                       {promo.discount_value || (promo.required_points > 0 ? `${promo.required_points} ${t('promo_points')}` : t('promo_free'))}
                     </div>
                   </div>
@@ -146,8 +130,9 @@ const HomePromotions = ({ translatedPromotions, carouselRef, t, navigate, onProm
           </div>
         </div>
       ) : (
-        <div className="bg-sakura-surface/15 rounded-xl p-8 text-center border border-sakura-border/30">
-          <p className="text-sakura-mid">{t('no_promotions') || 'Нет активных акций'}</p>
+        <div className="rounded-xl p-8 text-center"
+          style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-hint-color)' }}>
+          <p>{t('no_promotions') || 'Нет активных акций'}</p>
         </div>
       )}
     </div>

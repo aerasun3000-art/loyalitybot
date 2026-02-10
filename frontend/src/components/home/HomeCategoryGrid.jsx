@@ -20,38 +20,30 @@ const HomeCategoryGrid = ({ language, t, navigate }) => {
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold text-sakura-deep">
+        <h2 className="text-2xl font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>
           {t('home_services')}
         </h2>
-        <button
-          onClick={() => navigate('/services')}
-          className="flex items-center gap-1"
-        >
-          <span className="text-sakura-deep font-semibold hover:opacity-80 transition-colors drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+        <button onClick={() => navigate('/services')} className="flex items-center gap-1">
+          <span className="font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>
             {t('home_see_all')}
           </span>
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
         {cardsToDisplay.map((item, index) => {
           if (item.type === 'more') {
             return (
               <div
                 key="more"
-                onClick={() => {
-                  hapticFeedback('light')
-                  navigate('/categories')
-                }}
-                className={`fade-in-up delay-${(index + 1) * 100} bg-sakura-deep rounded-2xl p-3 md:p-4 cursor-pointer
-                           hover:scale-105 hover:shadow-lg
-                           active:scale-95 transition-all duration-200
-                           relative h-28 md:h-32 flex flex-col items-center justify-center`}
+                onClick={() => { hapticFeedback('light'); navigate('/categories') }}
+                className="rounded-2xl p-3 md:p-4 cursor-pointer active:scale-95 relative h-28 md:h-32 flex flex-col items-center justify-center"
+                style={{ backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }}
               >
-                <h3 className="font-bold text-lg md:text-xl text-white">
+                <h3 className="font-bold text-lg md:text-xl">
                   {language === 'ru' ? 'Еще' : 'More'}
                 </h3>
-                <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 text-white text-3xl md:text-4xl">
+                <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 text-3xl md:text-4xl">
                   →
                 </div>
               </div>
@@ -71,12 +63,11 @@ const HomeCategoryGrid = ({ language, t, navigate }) => {
                 params.set('category_group', group.code)
                 navigate(`/services?${params.toString()}`)
               }}
-              className={`fade-in-up delay-${(index + 1) * 100} bg-white dark:bg-sakura-dark rounded-2xl p-3 md:p-4 cursor-pointer
-                         hover:scale-105 hover:shadow-lg
-                         active:scale-95 transition-all duration-200
-                         relative h-28 md:h-32 flex flex-col overflow-hidden shadow-md`}
+              className="rounded-2xl p-3 md:p-4 cursor-pointer active:scale-95 relative h-28 md:h-32 flex flex-col overflow-hidden shadow-sm"
+              style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
             >
-              <h3 className="font-bold text-sm md:text-sm text-sakura-deep leading-tight pr-12 md:pr-12 line-clamp-2">
+              <h3 className="font-bold text-sm md:text-sm leading-tight pr-12 md:pr-12 line-clamp-2"
+                style={{ color: 'var(--tg-theme-text-color)' }}>
                 {displayName}
               </h3>
               <div className="absolute bottom-2 right-2 md:bottom-3 md:right-3 text-4xl md:text-5xl">

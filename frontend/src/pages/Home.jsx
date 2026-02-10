@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getTelegramUser, getChatId, hapticFeedback } from '../utils/telegram'
+import { getTelegramUser, getChatId, hapticFeedback, openTelegramLink } from '../utils/telegram'
+import QRCode from 'qrcode'
 import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage, getReferralPartnerInfo, getReferralStats, getOrCreateReferralCode, getOnboardingSeen, setOnboardingSeen, isApprovedPartner } from '../services/supabase'
 import { getServiceIcon, getMainPageCategories, getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
 import { filterCompetitors } from '../utils/categoryHelpers'
@@ -23,6 +24,74 @@ import {
 } from '../components/SkeletonCard'
 import Toast from '../components/Toast'
 import { useToast } from '../hooks/useToast'
+import Layout from '../components/Layout'
+import LoyaltyCard from '../components/LoyaltyCard'
+import CategoryGridNeo, { buildCategoriesFromServiceTiles } from '../components/CategoryGridNeo'
+import NewsCarouselNeo from '../components/NewsCarouselNeo'
+// BottomNav теперь глобально в App.jsx
+import ThemeSwitcher from '../components/ThemeSwitcher'
+import QuickActions from '../components/QuickActions'
+import QuickActionsGrid, { DEFAULT_CATEGORIES } from '../components/QuickActionsGrid'
+import { shareReferralLink, buildReferralLink } from '../utils/referralShare'
+import { Share2 } from 'lucide-react'
+
+// Простая лестница уровней лояльности по количеству баллов
+// Порог = количество баллов, с которого начинается уровень
+const TIER_LADDER = [
+  { name: 'Bronze', threshold: 0 },
+  { name: 'Silver', threshold: 500 },
+  { name: 'Gold', threshold: 2000 },
+  { name: 'Platinum', threshold: 5000 },
+  { name: 'Diamond', threshold: 10000 },
+]
+
+const getTierInfo = (balance) => {
+  let current = TIER_LADDER[0]
+  let next = null
+
+  for (let i = 0; i < TIER_LADDER.length; i += 1) {
+    const tier = TIER_LADDER[i]
+    if (balance >= tier.threshold) {
+      current = tier
+      next = TIER_LADDER[i + 1] || null
+    } else {
+      next = tier
+      break
+    }
+  }
+
+  if (!next) {
+    // Пользователь на максимальном уровне
+    return {
+      currentTier: current.name,
+      nextTierName: current.name,
+      nextTierPoints: null,
+    }
+  }
+
+  return {
+    currentTier: current.name,
+    nextTierName: next.name,
+    nextTierPoints: next.threshold,
+  }
+}
+
+const getTierLabelKey = (name) => {
+  switch (name) {
+    case 'Bronze':
+      return 'tier_bronze'
+    case 'Silver':
+      return 'tier_silver'
+    case 'Gold':
+      return 'tier_gold'
+    case 'Platinum':
+      return 'tier_platinum'
+    case 'Diamond':
+      return 'tier_diamond'
+    default:
+      return name
+  }
+}
 
 const Home = () => {
   const navigate = useNavigate()
@@ -31,13 +100,6 @@ const Home = () => {
   const { language } = useLanguageStore()
   const { t } = useTranslation(language)
   const { toast, showToast, hideToast } = useToast()
-  const [bgImage, setBgImage] = useState((import.meta.env && import.meta.env.VITE_BG_IMAGE) || '/bg/sakura.jpg')
-  const buildTimeString = (import.meta.env && import.meta.env.VITE_BUILD_TIME) 
-    ? String(import.meta.env.VITE_BUILD_TIME) 
-    : new Date().toLocaleString(language === 'ru' ? 'ru-RU' : 'en-US', { 
-        year: 'numeric', month: '2-digit', day: '2-digit', 
-        hour: '2-digit', minute: '2-digit' 
-      })
   
   const [loading, setLoading] = useState(true)
   const [balance, setBalance] = useState(0)
@@ -60,6 +122,9 @@ const Home = () => {
   const [selectedCategoryGroup, setSelectedCategoryGroup] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(1)
+  const [showQrModal, setShowQrModal] = useState(false)
+  const [qrImage, setQrImage] = useState(null)
+  const [qrLoading, setQrLoading] = useState(false)
   const carouselRef = useRef(null)
   const isScrollingRef = useRef(false)
 
@@ -113,7 +178,6 @@ const Home = () => {
 
   useEffect(() => {
     loadData()
-    loadBackgroundImage()
   }, [chatId])
 
   useEffect(() => {
@@ -234,18 +298,6 @@ const Home = () => {
 
     checkApiAndTranslate()
   }, [promotions, language])
-
-  const loadBackgroundImage = async () => {
-    try {
-      const bg = await getBackgroundImage()
-      if (bg) {
-        setBgImage(bg)
-      }
-    } catch (error) {
-      // Тихо обрабатываем ошибку, используем дефолтный фон
-      console.warn('Background image not loaded from DB, using default:', error?.message || error)
-    }
-  }
 
   const loadData = async () => {
     try {
@@ -540,153 +592,350 @@ const Home = () => {
     return date.toLocaleDateString(locale, options)
   }
 
-  // Skeleton вместо Loader
+  // Генерация QR-кода для пользователя
+  const handleShowQr = async () => {
+    if (!chatId) {
+      showToast(language === 'ru' ? 'Необходима авторизация' : 'Authorization required')
+      return
+    }
+
+    hapticFeedback('light')
+    setQrLoading(true)
+
+    try {
+      // Формат QR: CLIENT_ID:<chat_id>
+      const qrData = `CLIENT_ID:${chatId}`
+      const qrDataUrl = await QRCode.toDataURL(qrData, {
+        width: 280,
+        margin: 2,
+        color: {
+          dark: '#1a1a2e',
+          light: '#ffffff'
+        }
+      })
+      setQrImage(qrDataUrl)
+      setShowQrModal(true)
+    } catch (error) {
+      console.error('Error generating QR:', error)
+      showToast(language === 'ru' ? 'Ошибка генерации QR-кода' : 'Error generating QR code')
+    } finally {
+      setQrLoading(false)
+    }
+  }
+
+  // Отправка сообщения в поддержку
+  const handleSupport = () => {
+    hapticFeedback('light')
+    const botUsername = import.meta.env.VITE_CLIENT_BOT_USERNAME || 'mindbeatybot'
+    const supportLink = `https://t.me/${botUsername}?start=support`
+    openTelegramLink(supportLink)
+  }
+
+  // Skeleton вместо Loader (новый дизайн)
   if (loading) {
     return (
-      <div className="relative min-h-screen pb-24">
-        {/* Background image - fixed to cover all content */}
-        <div
-          className="fixed inset-0 -z-10 bg-center bg-cover opacity-60 pointer-events-none select-none"
-          style={{ backgroundImage: `url(${bgImage})` }}
-        />
-        {/* Gradient overlay */}
-        <div className="fixed inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
-        <div className="px-4 pt-6 pb-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="h-8 bg-white/50 rounded w-32 animate-pulse" />
-            <div className="h-10 bg-white/50 rounded-full w-16 animate-pulse" />
+      <Layout>
+        <div className="max-w-screen-sm mx-auto px-4 flex flex-col gap-6 pb-4">
+          {/* Header skeleton */}
+          <header className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+              <div className="flex flex-col gap-1">
+                <div className="h-4 w-24 rounded animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+                <div className="h-3 w-16 rounded animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+              </div>
+            </div>
+            <div className="h-8 w-16 rounded-full animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+          </header>
+          {/* LoyaltyCard skeleton */}
+          <div className="h-[200px] rounded-3xl animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+          {/* QuickActions skeleton */}
+          <div className="flex gap-3">
+            <div className="flex-1 h-14 rounded-2xl animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+            <div className="flex-1 h-14 rounded-2xl animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
           </div>
-          <BalanceSkeleton />
+          {/* QuickActionsGrid skeleton */}
+          <div className="grid grid-cols-2 gap-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-[100px] rounded-[24px] animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+            ))}
+          </div>
+          {/* News carousel skeleton */}
+          <div className="flex gap-4 overflow-hidden">
+            <div className="flex-none w-[280px] h-[160px] rounded-2xl animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+            <div className="flex-none w-[280px] h-[160px] rounded-2xl animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+          </div>
+          {/* Categories skeleton */}
+          <div className="grid grid-cols-3 gap-4 pb-20">
+            {[...Array(9)].map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-2">
+                <div className="w-16 h-16 rounded-2xl animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+                <div className="h-3 w-10 rounded animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color, #e5e7eb)' }} />
+              </div>
+            ))}
+          </div>
         </div>
-
-        <div className="px-4 mb-6">
-          <div className="overflow-x-auto flex gap-4 pb-2">
-            <CarouselCardSkeleton />
-            <CarouselCardSkeleton />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-t-[2rem] px-4 pt-6 pb-24">
-          <div className="h-8 bg-pink-100 rounded w-32 mb-4 animate-pulse" />
-          <div className="overflow-x-auto flex gap-3 pb-4 mb-6">
-            <NewsCardSkeleton />
-            <NewsCardSkeleton />
-            <NewsCardSkeleton />
-          </div>
-
-          <div className="grid grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => <ServiceSkeleton key={i} />)}
-          </div>
-        </div>
-      </div>
+      </Layout>
     )
   }
 
-  return (
-    <div className="relative min-h-screen pb-24">
-      {/* Background image - fixed to cover all content */}
-      <div
-        className="fixed inset-0 -z-10 bg-center bg-cover opacity-60 pointer-events-none select-none"
-        style={{ backgroundImage: `url(${bgImage})` }}
-      />
-      {/* Gradient overlay */}
-      <div className="fixed inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
-      {/* Шапка с приветствием */}
-      <div className="px-4 pt-6 pb-4">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-sakura-deep bg-gradient-to-br from-white/35 to-sakura-surface/33 backdrop-blur-sm px-3 py-1 rounded-lg drop-shadow">
-            {t('home_greeting')} {userName}
-          </h1>
-          <LanguageSwitcher />
+  // Новый дизайн (по умолчанию)
+  const { currentTier, nextTierName, nextTierPoints } = getTierInfo(balance || 0)
+    const currentTierLabel = t(getTierLabelKey(currentTier))
+    const promoItems = Array.isArray(translatedPromotions)
+      ? translatedPromotions.map((p) => ({
+          id: `promo-${p.id}`,
+          rawId: p.id,
+          title: p.title,
+          image: p.image_url || undefined,
+          tag: 'АКЦИЯ',
+          kind: 'promo',
+        }))
+      : []
+    const newsItems = Array.isArray(translatedNews)
+      ? translatedNews.map((n) => ({
+          id: `news-${n.id}`,
+          rawId: n.id,
+          title: n.title,
+          image: n.image_url || n.image || undefined,
+          tag: 'НОВОСТЬ',
+          kind: 'news',
+        }))
+      : []
+    const carouselItems = [...promoItems, ...newsItems]
+    const serviceTiles = getServiceTiles()
+    const neoCategories = buildCategoriesFromServiceTiles(serviceTiles)
+    const CATEGORY_KEYS = [
+      'category_beauty',
+      'category_food',
+      'category_sport',
+      'category_health',
+      'category_shopping',
+      'category_coffee',
+      'category_gaming',
+      'category_travel',
+      'category_more',
+    ]
+    const localizedCategories = neoCategories.map((cat, index) => ({
+      ...cat,
+      name: t(CATEGORY_KEYS[index] || 'category_more'),
+    }))
+    const handleQuickAction = (cat) => {
+      hapticFeedback('light')
+      if (cat.nameKey === 'support') {
+        handleSupport()
+      } else if (cat.nameKey === 'activities') {
+        navigate('/history')
+      } else {
+        navigate('/promotions')
+      }
+    }
+    const getQuickActionLabel = (cat) => {
+      if (cat.nameKey === 'rewards_store') return language === 'ru' ? 'Магазин наград' : 'Rewards Store'
+      if (cat.nameKey === 'activities') return t('history_title')
+      if (cat.nameKey === 'partner_offers') return t('promo_title')
+      if (cat.nameKey === 'support') return t('profile_support')
+      return cat.nameEn
+    }
+    return (
+      <Layout>
+        <div className="max-w-screen-sm mx-auto px-4 flex flex-col gap-6 pb-4">
+          <header className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-tg-secondary-bg flex items-center justify-center text-sm font-semibold">
+                {userName.slice(0, 2).toUpperCase() || '?'}
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-sm font-bold text-tg-text">
+                  {t('home_greeting')} {userName}
+                </h1>
+                <p className="text-[11px] text-tg-hint uppercase tracking-wide">
+                  {currentTierLabel}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <ThemeSwitcher />
+              <LanguageSwitcher />
+            </div>
+          </header>
+          <LoyaltyCard
+            balance={balance}
+            nextTierPoints={nextTierPoints}
+            currentTier={currentTier}
+            nextTierName={nextTierName}
+            t={t}
+            lang={language}
+          />
+          <QuickActions
+            onScanQr={handleShowQr}
+            onInvite={() => { hapticFeedback('light'); navigate('/community') }}
+            scanLabel={language === 'ru' ? 'Сканировать QR' : 'Scan QR'}
+            inviteLabel={language === 'ru' ? 'Пригласить' : 'Invite'}
+            loading={qrLoading}
+          />
+          <QuickActionsGrid
+            categories={DEFAULT_CATEGORIES}
+            onSelect={handleQuickAction}
+            getLabel={getQuickActionLabel}
+          />
+          {/* Реферальный блок */}
+          {chatId && referralCode && (
+            <section
+              className="p-4 rounded-2xl border border-black/5 dark:border-white/5"
+              style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>
+                    {t('home_referral_title')}
+                  </h3>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                    {t('home_referral_subtitle')}
+                  </p>
+                </div>
+                {referralStats && (
+                  <span className="text-lg">
+                    {({ bronze: '\u{1F949}', silver: '\u{1F948}', gold: '\u{1F947}', platinum: '\u{1F48E}' })[referralStats.referral_level] || '\u{1F949}'}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  hapticFeedback('light')
+                  const link = buildReferralLink(referralCode)
+                  await shareReferralLink(link, {
+                    title: 'LoyaltyBot',
+                    text: t('home_referral_subtitle'),
+                    onSuccess: () => showToast(t('toast_link_copied')),
+                    onError: () => showToast(t('toast_copy_failed')),
+                  })
+                }}
+                className="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                style={{
+                  backgroundColor: 'var(--tg-theme-button-color)',
+                  color: 'var(--tg-theme-button-text-color, #fff)',
+                }}
+              >
+                <Share2 size={16} />
+                {t('home_referral_share_btn')}
+              </button>
+              <div className="flex items-center justify-between mt-2">
+                <button
+                  type="button"
+                  onClick={() => { hapticFeedback('light'); navigate('/partner/apply') }}
+                  className="text-xs font-semibold"
+                  style={{ color: 'var(--tg-theme-link-color)' }}
+                >
+                  {t('referral_become_partner_btn')} →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { hapticFeedback('light'); navigate('/community') }}
+                  className="text-xs"
+                  style={{ color: 'var(--tg-theme-hint-color)' }}
+                >
+                  {t('home_referral_more')} →
+                </button>
+              </div>
+            </section>
+          )}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-tg-text">
+                {t('news_latest')}
+              </h2>
+              <button
+                type="button"
+                className="text-xs text-tg-link"
+                onClick={() => navigate('/promotions')}
+              >
+                {t('home_see_all')}
+              </button>
+            </div>
+            <NewsCarouselNeo
+              items={carouselItems.length > 0 ? carouselItems : undefined}
+              translating={translating}
+              onItemClick={(item) => {
+                hapticFeedback('light')
+                if (item.kind === 'promo') {
+                  navigate(`/promotions/${item.rawId}`)
+                } else if (item.kind === 'news') {
+                  navigate(`/news/${item.rawId}`)
+                }
+              }}
+            />
+          </section>
+          <section className="space-y-3 pb-20">
+            <h2 className="text-sm font-semibold text-tg-text">{t('home_services')}</h2>
+            <CategoryGridNeo
+              categories={localizedCategories}
+              onSelect={(cat) => {
+                const params = new URLSearchParams()
+                if (cat?.serviceCode) {
+                  params.set('category', cat.serviceCode)
+                }
+                navigate(params.toString() ? `/services?${params.toString()}` : '/services')
+              }}
+            />
+          </section>
         </div>
-
-        <HomeBalance
-          balance={balance}
-          pointsToNextReward={pointsToNextReward}
+        <LocationSelector
+          isOpen={isLocationSelectorOpen}
+          onClose={() => setIsLocationSelectorOpen(false)}
+          onSelect={handleLocationSelect}
+        />
+        <HomeOnboarding
+          showOnboarding={showOnboarding}
+          onboardingStep={onboardingStep}
           language={language}
           t={t}
-          navigate={navigate}
-          declinePoints={declinePoints}
+          onNext={nextOnboardingStep}
+          onDismiss={dismissOnboarding}
         />
-
-        <HomeReferral
-          chatId={chatId}
-          referralStats={referralStats}
-          referralCode={referralCode}
-          referralToast={referralToast}
-          referralLoading={referralLoading}
-          language={language}
-          t={t}
-          navigate={navigate}
-          setReferralToast={setReferralToast}
-        />
-      </div>
-
-      {/* Секция новостей + категории + акции */}
-      <div className="bg-gradient-to-br from-white/30 to-sakura-surface/28 backdrop-blur-sm rounded-t-[2rem] px-4 pt-6 pb-4">
-        <HomeNews
-          translatedNews={translatedNews}
-          translating={translating}
-          language={language}
-          t={t}
-          navigate={navigate}
-          onNewsClick={handleNewsClick}
-          formatDate={formatDate}
-        />
-        
-
-        <HomeCategoryGrid language={language} t={t} navigate={navigate} />
-
-        <HomePromotions
-          translatedPromotions={translatedPromotions}
-          carouselRef={carouselRef}
-          t={t}
-          navigate={navigate}
-          onPromotionClick={handlePromotionClick}
-        />
-      </div>
-
-            <HomeOnboarding
-        showOnboarding={showOnboarding}
-        onboardingStep={onboardingStep}
-        language={language}
-        t={t}
-        onNext={nextOnboardingStep}
-        onDismiss={dismissOnboarding}
-      />
-
-      {/* Модальное окно выбора локации */}
-      <LocationSelector
-        isOpen={isLocationSelectorOpen}
-        onClose={() => setIsLocationSelectorOpen(false)}
-        onSelect={handleLocationSelect}
-      />
-
-    {/* Техническая отметка версии/времени билда */}
-    <div className="fixed bottom-1 right-2 z-50 px-2 py-1 rounded-md text-[10px] opacity-70 bg-white/70 dark:bg-black/30 border border-black/10 dark:border-white/10">
-      Build: {buildTimeString}
-    </div>
-
-      {/* Скрыть скроллбар */}
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .line-clamp-2 {
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-      `}</style>
-
-      {toast && <Toast message={toast.message} type={toast.type} key={toast.key} onClose={hideToast} />}
-    </div>
-  )
+        {/* QR Modal */}
+        {showQrModal && qrImage && (
+          <div
+            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+            onClick={() => setShowQrModal(false)}
+          >
+            <div
+              className="bg-sakura-surface dark:bg-sakura-dark rounded-3xl p-6 max-w-sm w-full text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-bold mb-2 text-tg-text">
+                {language === 'ru' ? 'Ваш QR-код' : 'Your QR Code'}
+              </h3>
+              <p className="text-sm text-tg-hint mb-4">
+                {language === 'ru'
+                  ? 'Покажите этот QR-код партнеру для быстрого начисления или списания баллов'
+                  : 'Show this QR code to the partner for quick points accrual or redemption'}
+              </p>
+              <div className="flex justify-center mb-4 bg-white rounded-2xl p-4">
+                <img src={qrImage} alt="QR Code" className="w-64 h-64 object-contain" />
+              </div>
+              {chatId && (
+                <p className="text-xs text-tg-hint mb-4 font-mono">
+                  ID: {chatId}
+                </p>
+              )}
+              <button
+                onClick={() => setShowQrModal(false)}
+                className="w-full py-3 rounded-xl font-medium bg-tg-secondary-bg text-tg-text active:scale-[0.98] transition-transform"
+                style={{
+                  backgroundColor: 'var(--tg-theme-secondary-bg-color)',
+                  color: 'var(--tg-theme-text-color)',
+                }}
+              >
+                {language === 'ru' ? 'Закрыть' : 'Close'}
+              </button>
+            </div>
+          </div>
+        )}
+        {toast && <Toast message={toast.message} type={toast.type} key={toast.key} onClose={hideToast} />}
+      </Layout>
+    )
 }
 
 export default Home

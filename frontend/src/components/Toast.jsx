@@ -21,10 +21,10 @@ const Toast = ({ message, type = 'error', duration = 4000, onClose }) => {
   if (!visible) return null
 
   const bgColor = type === 'error'
-    ? 'bg-red-500/90'
+    ? 'bg-sakura-accent/90'
     : type === 'warning'
-      ? 'bg-yellow-500/90'
-      : 'bg-green-500/90'
+      ? 'bg-sakura-gold/90'
+      : 'bg-sakura-mid/90'
 
   return (
     <div className={`fixed top-4 left-4 right-4 z-[200] ${bgColor} text-white rounded-xl px-4 py-3 shadow-xl backdrop-blur-sm text-sm font-medium text-center ${exiting ? 'animate-slide-up' : 'animate-slide-down'}`}>

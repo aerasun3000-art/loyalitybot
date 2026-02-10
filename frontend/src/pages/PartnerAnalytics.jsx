@@ -381,7 +381,7 @@ const PartnerAnalytics = () => {
 
   if (!partnerId) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-sakura-cream dark:bg-sakura-dark flex items-center justify-center p-4">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
             ⚠️ Partner ID не указан
@@ -400,7 +400,7 @@ const PartnerAnalytics = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-sakura-cream dark:bg-sakura-dark flex items-center justify-center p-4">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">
             ⚠️ Ошибка загрузки данных
@@ -422,9 +422,9 @@ const PartnerAnalytics = () => {
   // Не блокируем отображение, если нет статистики - показываем данные партнера
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-sakura-cream dark:bg-sakura-dark">
       {/* Заголовок */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-sakura-surface dark:bg-sakura-dark border-b border-sakura-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             📈 Дашборд Партнёра
@@ -438,7 +438,7 @@ const PartnerAnalytics = () => {
       {/* Данные партнера */}
       {partnerData && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
+          <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl shadow-sm p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 📋 Данные партнера
@@ -556,7 +556,7 @@ const PartnerAnalytics = () => {
                       <img
                         src={partnerData.photo_url}
                         alt={partnerData.company_name || 'Фото партнёра'}
-                        className="w-16 h-16 rounded-full object-cover border border-gray-200 dark:border-gray-600"
+                        className="w-16 h-16 rounded-full object-cover border border-sakura-border"
                       />
                     </div>
                   </div>
@@ -577,7 +577,7 @@ const PartnerAnalytics = () => {
                       type="text"
                       value={editFormData.name || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                       required
                     />
                     {editErrors.name && <p className="text-red-500 text-xs mt-1">{editErrors.name}</p>}
@@ -590,7 +590,7 @@ const PartnerAnalytics = () => {
                       type="tel"
                       value={editFormData.phone || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                       required
                     />
                     {editErrors.phone && <p className="text-red-500 text-xs mt-1">{editErrors.phone}</p>}
@@ -603,7 +603,7 @@ const PartnerAnalytics = () => {
                       type="text"
                       value={editFormData.company_name || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, company_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                       required
                     />
                     {editErrors.company_name && <p className="text-red-500 text-xs mt-1">{editErrors.company_name}</p>}
@@ -617,7 +617,7 @@ const PartnerAnalytics = () => {
                       onChange={(e) => {
                         setEditFormData({ ...editFormData, category_group: e.target.value, business_type: '' });
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                       required
                     >
                       <option value="">Выберите тип бизнеса</option>
@@ -643,7 +643,7 @@ const PartnerAnalytics = () => {
                       <select
                         value={editFormData.business_type || ''}
                         onChange={(e) => setEditFormData({ ...editFormData, business_type: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                       >
                         <option value="">Выберите категорию услуг</option>
                         {getCategoriesByGroup(editFormData.category_group).map((category) => (
@@ -662,7 +662,7 @@ const PartnerAnalytics = () => {
                     <select
                       value={editFormData.work_mode || 'offline'}
                       onChange={(e) => setEditFormData({ ...editFormData, work_mode: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                       required
                     >
                       <option value="offline">📍 Оффлайн (только в своем городе)</option>
@@ -686,7 +686,7 @@ const PartnerAnalytics = () => {
                             const newDistrict = (districtsForCity.length > 0 && districtsForCity[0].value === 'All') ? 'All' : '';
                             setEditFormData({ ...editFormData, city, district: newDistrict });
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                           required={editFormData.work_mode === 'offline'}
                         >
                           <option value="">Выберите город</option>
@@ -711,7 +711,7 @@ const PartnerAnalytics = () => {
                           <select
                             value={editFormData.district || ''}
                             onChange={(e) => setEditFormData({ ...editFormData, district: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                             required={editFormData.work_mode === 'offline'}
                           >
                             <option value="">Выберите район</option>
@@ -736,7 +736,7 @@ const PartnerAnalytics = () => {
                         type="text"
                         value={editFormData.username || ''}
                         onChange={(e) => setEditFormData({ ...editFormData, username: e.target.value.replace('@', '').trim() })}
-                        className="w-full pl-8 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full pl-8 pr-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                         placeholder="vera_yoga03"
                       />
                     </div>
@@ -750,7 +750,7 @@ const PartnerAnalytics = () => {
                       type="url"
                       value={editFormData.booking_url || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, booking_url: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                       placeholder="https://example.com/booking"
                     />
                     {editErrors.booking_url && <p className="text-red-500 text-xs mt-1">{editErrors.booking_url}</p>}
@@ -763,7 +763,7 @@ const PartnerAnalytics = () => {
                       type="url"
                       value={editFormData.photo_url || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, photo_url: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white"
                       placeholder="https://example.com/photo.jpg"
                     />
                     <p className="text-gray-500 text-xs mt-1">Ссылка на фото. Будет показано в каталоге услуг вместо иконки категории.</p>
@@ -817,7 +817,7 @@ const PartnerAnalytics = () => {
                       setEditFormData({});
                       setEditErrors({});
                     }}
-                    className="px-6 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
+                    className="px-6 py-2 bg-sakura-border dark:bg-sakura-border text-sakura-muted rounded-lg hover:bg-sakura-cream dark:hover:bg-sakura-cream transition-colors"
                   >
                     Отмена
                   </button>
@@ -840,7 +840,7 @@ const PartnerAnalytics = () => {
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 period === days
                   ? 'bg-primary-500 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'bg-sakura-surface dark:bg-sakura-dark text-sakura-muted hover:bg-sakura-cream dark:hover:bg-sakura-dark'
               }`}
             >
               {days === 365 ? 'Год' : `${days} дней`}
@@ -911,7 +911,7 @@ const PartnerAnalytics = () => {
             ⭐ NPS Индекс
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
               <div className="text-center">
                 <div className="text-5xl font-bold text-primary-500 mb-2">
                   {stats.npsScore}
@@ -924,7 +924,7 @@ const PartnerAnalytics = () => {
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-green-600 dark:text-green-400 font-medium">
@@ -950,7 +950,7 @@ const PartnerAnalytics = () => {
                     {stats.detractors}
                   </span>
                 </div>
-                <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between pt-2 border-t border-sakura-border">
                   <span className="text-purple-600 dark:text-purple-400 font-medium">
                     👑 Активных промоутеров
                   </span>
@@ -1011,7 +1011,7 @@ const PartnerAnalytics = () => {
           )}
           
           {/* Текущие настройки или форма редактирования */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+          <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
             {!isEditingReactivation ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1120,7 +1120,7 @@ const PartnerAnalytics = () => {
                       value={reactivationFormData.message_template ?? ''}
                       onChange={(e) => setReactivationFormData({...reactivationFormData, message_template: e.target.value})}
                       placeholder="Оставьте пустым для шаблона по умолчанию"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                        className="w-full px-3 py-2 border border-sakura-border rounded-lg bg-sakura-surface dark:bg-sakura-dark text-sakura-dark dark:text-white font-mono text-sm"
                     />
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Плейсхолдеры: {'{client_name}'}, {'{partner_name}'}, {'{offer_text}'}, {'{partner_contact_link}'}. Поддерживается Markdown.
@@ -1135,14 +1135,14 @@ const PartnerAnalytics = () => {
                   >
                     {savingReactivation ? 'Сохранение...' : '💾 Сохранить'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditingReactivation(false);
-                      setReactivationFormData({});
-                    }}
-                    className="px-6 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
-                  >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingReactivation(false);
+                    setReactivationFormData({});
+                  }}
+                  className="px-6 py-2 bg-sakura-border dark:bg-sakura-border text-sakura-muted rounded-lg hover:bg-sakura-cream dark:hover:bg-sakura-cream transition-colors"
+                >
                     Отмена
                   </button>
                 </div>
@@ -1162,10 +1162,10 @@ const PartnerAnalytics = () => {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
               💬 Клиенты, которые поставили оценку
             </h2>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+                <table className="min-w-full divide-y divide-sakura-border dark:divide-sakura-border">
+                  <thead className="bg-sakura-cream dark:bg-sakura-dark">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Клиент
@@ -1181,7 +1181,7 @@ const PartnerAnalytics = () => {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody className="bg-sakura-surface dark:bg-sakura-dark divide-y divide-sakura-border dark:divide-sakura-border">
                     {ratedClients.map((client, index) => {
                       const ratingColor = 
                         client.rating >= 9 ? 'text-green-600 dark:text-green-400' :
@@ -1203,7 +1203,7 @@ const PartnerAnalytics = () => {
                       });
 
                       return (
-                        <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <tr key={index} className="hover:bg-sakura-cream dark:hover:bg-sakura-dark">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
                               {client.clientName}
@@ -1280,7 +1280,7 @@ const PartnerAnalytics = () => {
 
 // Компонент карточки метрики
 const MetricCard = ({ icon, title, value, subtitle }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+  <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
     <div className="flex items-center gap-3 mb-2">
       <span className="text-3xl">{icon}</span>
       <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">

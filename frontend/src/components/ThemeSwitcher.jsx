@@ -12,7 +12,7 @@ const ThemeSwitcher = ({ className = '' }) => {
   return (
     <button
       onClick={handleToggle}
-      className={`flex items-center justify-center w-10 h-10 bg-white dark:bg-gray-800 rounded-full shadow-sm ${className}`}
+      className={`flex items-center justify-center w-10 h-10 bg-sakura-surface dark:bg-sakura-dark rounded-full shadow-sm ${className}`}
       aria-label="Toggle theme"
     >
       {theme === 'light' ? (

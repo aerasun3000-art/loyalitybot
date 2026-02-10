@@ -314,14 +314,21 @@ const translations = {
   }
 };
 
+// Стили-константы для переиспользования
+const btnPrimary = { backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' };
+const textPrimary = { color: 'var(--tg-theme-text-color)' };
+const textAccent = { color: 'var(--tg-theme-button-color)' };
+const textHint = { color: 'var(--tg-theme-hint-color)' };
+const borderAccent = (opacity = 30) => ({ border: `2px solid color-mix(in srgb, var(--tg-theme-button-color) ${opacity}%, transparent)` });
+const bgAccent = (opacity = 10) => ({ backgroundColor: `color-mix(in srgb, var(--tg-theme-button-color) ${opacity}%, transparent)` });
+
 const OnePagerPartner = () => {
   const { language, toggleLanguage } = useLanguageStore();
   const [earlyBirdCount, setEarlyBirdCount] = useState(0);
   const [remainingSlots, setRemainingSlots] = useState(20);
-  
+
   const t = useCallback((key, params = {}) => {
     let text = translations[language]?.[key] || translations.en[key] || key;
-    // Заменяем параметры
     Object.keys(params).forEach(param => {
       text = text.replace(`{${param}}`, params[param]);
     });
@@ -334,90 +341,75 @@ const OnePagerPartner = () => {
   };
 
   return (
-    <div className="min-h-screen bg-sakura-dark/5 relative overflow-hidden">
-      {/* Фоновое изображение (если есть) или мягкий градиент */}
-      <div className="absolute inset-0 bg-gradient-to-br from-sakura-light via-white to-sakura-cream opacity-90 z-0"></div>
+    <div className="min-h-screen relative overflow-hidden" style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}>
+      {/* Фоновый градиент */}
+      <div className="absolute inset-0 opacity-90 z-0" style={{ background: 'linear-gradient(135deg, var(--tg-theme-bg-color), var(--tg-theme-secondary-bg-color, #f3f4f6))' }}></div>
       {/* Контент поверх */}
       <div className="relative z-10">
       {/* Переключатель языка */}
       <div className="fixed top-4 right-4 z-50">
         <button
           onClick={handleLanguageToggle}
-          className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border-2 border-sakura-mid/30 hover:border-sakura-mid transition-colors"
+          className="flex items-center gap-2 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg"
+          style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 90%, transparent)', ...borderAccent(30) }}
         >
           <span className="text-xl">{language === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
-          <span className="font-bold text-sakura-dark">{language === 'ru' ? 'RU' : 'EN'}</span>
+          <span className="font-bold" style={textPrimary}>{language === 'ru' ? 'RU' : 'EN'}</span>
         </button>
       </div>
 
-      {/* Герой-секция с ранним предложением */}
+      {/* Герой-секция */}
       <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-sakura-mid to-sakura-dark opacity-10"></div>
+        <div className="absolute inset-0 opacity-10" style={{ backgroundColor: 'var(--tg-theme-button-color)' }}></div>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative">
           <div className="text-center">
-            {/* Бейдж раннего предложения */}
-            <div className="inline-block mb-6 px-6 py-2 bg-sakura-mid/10 text-sakura-dark border border-sakura-mid/30 rounded-full font-bold text-lg animate-pulse">
+            <div className="inline-block mb-6 px-6 py-2 rounded-full font-bold text-lg animate-pulse" style={{ ...bgAccent(10), ...borderAccent(30), ...textPrimary }}>
               {t('badge')}
             </div>
-            
-            <h1 className="text-5xl md:text-7xl font-bold text-sakura-dark mb-6">
+
+            <h1 className="text-5xl md:text-7xl font-bold mb-6" style={textPrimary}>
               {t('title')}
               <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-sakura-mid to-sakura-dark">
-                {t('subtitle')}
-              </span>
+              <span style={textAccent}>{t('subtitle')}</span>
             </h1>
-            
-            <p className="text-2xl text-sakura-dark/80 mb-8 max-w-3xl mx-auto">
+
+            <p className="text-2xl mb-8 max-w-3xl mx-auto" style={{ color: 'var(--tg-theme-text-color)', opacity: 0.8 }}>
               {t('description')}
               <br />
-              <span className="text-xl text-sakura-mid">{t('description2')}</span>
+              <span className="text-xl" style={textAccent}>{t('description2')}</span>
             </p>
 
             {/* Цены */}
             <div className="flex gap-6 justify-center flex-wrap mb-8">
-              <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-8 shadow-xl border border-white/50 transform scale-105 relative overflow-hidden">
-                {/* Эффект свечения */}
-                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gradient-to-br from-sakura-mid to-sakura-light opacity-20 blur-2xl rounded-full"></div>
-                
-                <div className="text-sm text-sakura-dark font-bold mb-2 uppercase tracking-wider">{t('first20')}</div>
-                <div className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sakura-mid to-sakura-dark mb-2">$29</div>
+              <div className="backdrop-blur-xl rounded-2xl p-8 shadow-xl relative overflow-hidden" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 70%, transparent)', border: '1px solid color-mix(in srgb, var(--tg-theme-bg-color, #fff) 50%, transparent)' }}>
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 opacity-20 blur-2xl rounded-full" style={{ backgroundColor: 'var(--tg-theme-button-color)' }}></div>
+                <div className="text-sm font-bold mb-2 uppercase tracking-wider" style={textPrimary}>{t('first20')}</div>
+                <div className="text-6xl font-bold mb-2" style={textAccent}>$29</div>
                 <div className="text-xl text-gray-600 mb-4">{t('perMonth')}</div>
                 <div className="text-sm text-gray-500 line-through mb-2">{t('regular')}</div>
                 <div className="text-green-600 font-bold">{t('save')}</div>
               </div>
-              
-              <div className="bg-white/40 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/30">
+
+              <div className="backdrop-blur-md rounded-2xl p-8 shadow-lg" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 40%, transparent)', border: '1px solid color-mix(in srgb, var(--tg-theme-bg-color, #fff) 30%, transparent)' }}>
                 <div className="text-sm text-gray-600 font-bold mb-2">{t('after20')}</div>
-                <div className="text-6xl font-bold text-sakura-dark/80 mb-2">$99</div>
+                <div className="text-6xl font-bold mb-2" style={{ ...textPrimary, opacity: 0.8 }}>$99</div>
                 <div className="text-xl text-gray-600 mb-4">{t('perMonth')}</div>
                 <div className="text-sm text-gray-500">{t('standard')}</div>
               </div>
             </div>
 
-            {/* Счетчик оставшихся мест */}
             {remainingSlots !== null && remainingSlots > 0 && (
               <div className="bg-yellow-100/80 backdrop-blur-sm border border-yellow-400/50 rounded-xl p-4 mb-8 inline-block shadow-sm">
-                <div className="text-2xl font-bold text-yellow-800">
-                  {t('slotsRemaining', { count: remainingSlots })}
-                </div>
-                <div className="text-lg text-yellow-700 mt-2">
-                  {t('partnersJoined', { count: earlyBirdCount || 0 })}
-                </div>
+                <div className="text-2xl font-bold text-yellow-800">{t('slotsRemaining', { count: remainingSlots })}</div>
+                <div className="text-lg text-yellow-700 mt-2">{t('partnersJoined', { count: earlyBirdCount || 0 })}</div>
               </div>
             )}
 
             <div className="flex gap-4 justify-center flex-wrap">
-              <a 
-                href="/partner/apply" 
-                className="px-10 py-5 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold text-xl hover:shadow-2xl transition-all transform hover:scale-105"
-              >
+              <a href="/partner/apply" className="px-10 py-5 rounded-xl font-bold text-xl hover:shadow-2xl transition-all transform hover:scale-105" style={btnPrimary}>
                 {t('claimSpot')}
               </a>
-              <a 
-                href="#how-it-works" 
-                className="px-10 py-5 bg-white text-sakura-dark rounded-xl font-bold text-xl border-2 border-sakura-mid hover:bg-sakura-light transition-colors"
-              >
+              <a href="#how-it-works" className="px-10 py-5 rounded-xl font-bold text-xl transition-colors" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)', ...textPrimary, border: '2px solid var(--tg-theme-button-color)' }}>
                 {t('learnMore')}
               </a>
             </div>
@@ -425,102 +417,54 @@ const OnePagerPartner = () => {
         </div>
       </div>
 
-      {/* Что такое эксклюзивность */}
+      {/* Эксклюзивность */}
       <div className="py-16 relative" id="exclusivity">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <h2 className="text-4xl md:text-5xl font-bold text-center text-sakura-dark mb-4">
-            {t('exclusivityTitle')}
-          </h2>
+          <h2 className="text-4xl md:text-5xl font-bold text-center mb-4" style={textPrimary}>{t('exclusivityTitle')}</h2>
           <p className="text-xl text-center text-gray-600 mb-12 max-w-3xl mx-auto">
-            {t('exclusivityDesc')}
-            <br />
-            <span className="text-lg text-sakura-mid">{t('exclusivityDesc2')}</span>
+            {t('exclusivityDesc')}<br />
+            <span className="text-lg" style={textAccent}>{t('exclusivityDesc2')}</span>
           </p>
-          
+
           <div className="grid md:grid-cols-2 gap-8 mb-12">
-            <ExclusivityCard
-              icon="🎯"
-              title={t('territoryProtection')}
-              description={t('territoryProtectionDesc')}
-            />
-            <ExclusivityCard
-              icon="💸" 
-              title={t('maxRevenue')}
-              description={t('maxRevenueDesc')}
-            />
-            <ExclusivityCard
-              icon="📈"
-              title={t('revenueShare')}
-              description={t('revenueShareDesc')}
-            />
-            <ExclusivityCard
-              icon="🏆"
-              title={t('masterPartner')}
-              description={t('masterPartnerDesc')}
-            />
+            <ExclusivityCard icon="🎯" title={t('territoryProtection')} description={t('territoryProtectionDesc')} />
+            <ExclusivityCard icon="💸" title={t('maxRevenue')} description={t('maxRevenueDesc')} />
+            <ExclusivityCard icon="📈" title={t('revenueShare')} description={t('revenueShareDesc')} />
+            <ExclusivityCard icon="🏆" title={t('masterPartner')} description={t('masterPartnerDesc')} />
           </div>
 
-          {/* 10 районов */}
-          <div className="bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl p-8 mb-8 shadow-lg">
-            <h3 className="text-3xl font-bold text-center text-sakura-dark mb-6">
-              {t('districtsTitle')}
-            </h3>
+          {/* Районы */}
+          <div className="backdrop-blur-md rounded-2xl p-8 mb-8 shadow-lg" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 40%, transparent)', border: '1px solid color-mix(in srgb, var(--tg-theme-bg-color, #fff) 50%, transparent)' }}>
+            <h3 className="text-3xl font-bold text-center mb-6" style={textPrimary}>{t('districtsTitle')}</h3>
             <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {[
-                'Manhattan Downtown',
-                'Manhattan Midtown',
-                'Manhattan Upper East',
-                'Manhattan Upper West',
-                'Brooklyn Downtown',
-                'Brooklyn North',
-                'Brooklyn South + S.I.',
-                'Queens West + Bronx South',
-                'Queens East',
-                'Brooklyn Central'
-              ].map((district, idx) => (
-                <div key={idx} className="bg-white rounded-lg p-4 text-center shadow-sm">
-                  <div className="text-sm font-bold text-sakura-dark">{district}</div>
+              {['Manhattan Downtown','Manhattan Midtown','Manhattan Upper East','Manhattan Upper West','Brooklyn Downtown','Brooklyn North','Brooklyn South + S.I.','Queens West + Bronx South','Queens East','Brooklyn Central'].map((district, idx) => (
+                <div key={idx} className="rounded-lg p-4 text-center shadow-sm" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
+                  <div className="text-sm font-bold" style={textPrimary}>{district}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 12 видов услуг */}
-          <div className="bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl p-8 shadow-lg">
-            <h3 className="text-3xl font-bold text-center text-sakura-dark mb-6">
-              {t('servicesTitle')}
-            </h3>
+          {/* Услуги */}
+          <div className="backdrop-blur-md rounded-2xl p-8 shadow-lg" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 40%, transparent)', border: '1px solid color-mix(in srgb, var(--tg-theme-bg-color, #fff) 50%, transparent)' }}>
+            <h3 className="text-3xl font-bold text-center mb-6" style={textPrimary}>{t('servicesTitle')}</h3>
             <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {[
-                { emoji: '💅', name: 'Nail Care' },
-                { emoji: '👁️', name: 'Brow Design' },
-                { emoji: '💇‍♀️', name: 'Hair Salon' },
-                { emoji: '⚡', name: 'Hair Removal' },
-                { emoji: '✨', name: 'Facial Aesthetics' },
-                { emoji: '👀', name: 'Lash Services' },
-                { emoji: '💆‍♀️', name: 'Massage Therapy' },
-                { emoji: '💄', name: 'Make-up & PMU' },
-                { emoji: '🌸', name: 'Body Wellness' },
-                { emoji: '🍎', name: 'Nutrition Coaching' },
-                { emoji: '🧠', name: 'Mindfulness & Coaching' },
-                { emoji: '👗', name: 'Image Consulting' }
-              ].map((service, idx) => (
-                <div key={idx} className="bg-white rounded-lg p-4 text-center shadow-sm hover:shadow-md transition-shadow">
+              {[{emoji:'💅',name:'Nail Care'},{emoji:'👁️',name:'Brow Design'},{emoji:'💇‍♀️',name:'Hair Salon'},{emoji:'⚡',name:'Hair Removal'},{emoji:'✨',name:'Facial Aesthetics'},{emoji:'👀',name:'Lash Services'},{emoji:'💆‍♀️',name:'Massage Therapy'},{emoji:'💄',name:'Make-up & PMU'},{emoji:'🌸',name:'Body Wellness'},{emoji:'🍎',name:'Nutrition Coaching'},{emoji:'🧠',name:'Mindfulness & Coaching'},{emoji:'👗',name:'Image Consulting'}].map((service, idx) => (
+                <div key={idx} className="rounded-lg p-4 text-center shadow-sm hover:shadow-md transition-shadow" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
                   <div className="text-3xl mb-2">{service.emoji}</div>
-                  <div className="text-sm font-medium text-sakura-dark">{service.name}</div>
+                  <div className="text-sm font-medium" style={textPrimary}>{service.name}</div>
                 </div>
               ))}
             </div>
             <p className="text-center text-gray-600 mt-6">
-              <strong>{t('totalPositions')}</strong> {t('positionsDesc')}
-              <br />
-              <span className="text-sakura-mid">{t('eachPosition')}</span>
+              <strong>{t('totalPositions')}</strong> {t('positionsDesc')}<br />
+              <span style={textAccent}>{t('eachPosition')}</span>
             </p>
           </div>
         </div>
       </div>
 
-      {/* Карта доступности - простая визуализация */}
+      {/* Карта доступности */}
       <div className="py-16 relative" id="availability">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <SimpleAvailabilityHeatmap t={t} language={language} />
@@ -528,168 +472,91 @@ const OnePagerPartner = () => {
       </div>
 
       {/* Ссылка на полную карту */}
-      <div className="bg-gradient-to-r from-sakura-mid/10 to-sakura-dark/10 py-8">
+      <div className="py-8" style={bgAccent(10)}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <a
-            href="/availability-map"
-            className="inline-block px-8 py-4 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105"
-          >
+          <a href="/availability-map" className="inline-block px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105" style={btnPrimary}>
             🗺️ {language === 'ru' ? 'Открыть Полную Карту Доступности' : 'Open Full Availability Map'}
           </a>
         </div>
       </div>
 
       {/* Как это работает */}
-      <div className="bg-gradient-to-br from-sakura-light to-white py-16" id="how-it-works">
+      <div className="py-16" id="how-it-works" style={{ background: 'linear-gradient(135deg, var(--tg-theme-secondary-bg-color), var(--tg-theme-bg-color, #fff))' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl md:text-5xl font-bold text-center text-sakura-dark mb-12">
-            {t('howItWorks')}
-          </h2>
-          
+          <h2 className="text-4xl md:text-5xl font-bold text-center mb-12" style={textPrimary}>{t('howItWorks')}</h2>
           <div className="grid md:grid-cols-4 gap-8">
-            <StepCard
-              number="1"
-              title={t('step1Title')}
-              description={t('step1Desc')}
-            />
-            <StepCard
-              number="2"
-              title={t('step2Title')}
-              description={t('step2Desc')}
-            />
-            <StepCard
-              number="3"
-              title={t('step3Title')}
-              description={t('step3Desc')}
-            />
-            <StepCard
-              number="4"
-              title={t('step4Title')}
-              description={t('step4Desc')}
-            />
+            <StepCard number="1" title={t('step1Title')} description={t('step1Desc')} />
+            <StepCard number="2" title={t('step2Title')} description={t('step2Desc')} />
+            <StepCard number="3" title={t('step3Title')} description={t('step3Desc')} />
+            <StepCard number="4" title={t('step4Title')} description={t('step4Desc')} />
           </div>
         </div>
       </div>
 
-      {/* Реферальная ссылка и QR-код */}
-      <div className="bg-white py-16">
+      {/* Реферальная ссылка */}
+      <div className="py-16" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-gradient-to-br from-sakura-light to-sakura-cream rounded-2xl p-8 shadow-lg border border-sakura-mid/20">
-            <h2 className="text-4xl font-bold text-center text-sakura-dark mb-6">
-              {t('referralLinkTitle')}
-            </h2>
-            <p className="text-xl text-center text-gray-700 mb-8">
-              {t('referralLinkDesc')}
-            </p>
-            
+          <div className="rounded-2xl p-8 shadow-lg" style={{ background: 'linear-gradient(135deg, var(--tg-theme-secondary-bg-color), color-mix(in srgb, var(--tg-theme-button-color) 5%, var(--tg-theme-bg-color)))', ...borderAccent(20) }}>
+            <h2 className="text-4xl font-bold text-center mb-6" style={textPrimary}>{t('referralLinkTitle')}</h2>
+            <p className="text-xl text-center text-gray-700 mb-8">{t('referralLinkDesc')}</p>
+
             <div className="grid md:grid-cols-2 gap-6 mb-8">
-              <div className="bg-white rounded-xl p-6 shadow-sm">
+              <div className="rounded-xl p-6 shadow-sm" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
                 <div className="text-2xl mb-4">🔗</div>
-                <div className="font-bold text-sakura-dark mb-2">{t('referralLinkItem1')}</div>
+                <div className="font-bold mb-2" style={textPrimary}>{t('referralLinkItem1')}</div>
               </div>
-              <div className="bg-white rounded-xl p-6 shadow-sm">
+              <div className="rounded-xl p-6 shadow-sm" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
                 <div className="text-2xl mb-4">📱</div>
-                <div className="font-bold text-sakura-dark mb-2">{t('referralLinkItem2')}</div>
+                <div className="font-bold mb-2" style={textPrimary}>{t('referralLinkItem2')}</div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 mb-6">
-              <h3 className="text-xl font-bold text-sakura-dark mb-4">{t('referralLinkWhere')}</h3>
+            <div className="rounded-xl p-6 mb-6" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
+              <h3 className="text-xl font-bold mb-4" style={textPrimary}>{t('referralLinkWhere')}</h3>
               <div className="grid md:grid-cols-2 gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('referralLinkWhere1')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('referralLinkWhere2')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('referralLinkWhere3')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('referralLinkWhere4')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('referralLinkWhere5')}</span>
-                </div>
+                {['referralLinkWhere1','referralLinkWhere2','referralLinkWhere3','referralLinkWhere4','referralLinkWhere5'].map(key => (
+                  <div key={key} className="flex items-center gap-2"><span className="text-green-500">✅</span><span>{t(key)}</span></div>
+                ))}
               </div>
             </div>
 
-            <div className="bg-sakura-mid/10 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-sakura-dark mb-4">{t('referralLinkResult')}</h3>
+            <div className="rounded-xl p-6" style={bgAccent(10)}>
+              <h3 className="text-xl font-bold mb-4" style={textPrimary}>{t('referralLinkResult')}</h3>
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('referralLinkResult1')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('referralLinkResult2')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('referralLinkResult3')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('referralLinkResult4')}</span>
-                </div>
+                {['referralLinkResult1','referralLinkResult2','referralLinkResult3','referralLinkResult4'].map(key => (
+                  <div key={key} className="flex items-center gap-2"><span className="text-green-500">✅</span><span>{t(key)}</span></div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Нулевая комиссия за своих клиентов */}
+      {/* Нулевая комиссия */}
       <div className="bg-gradient-to-r from-green-50 to-emerald-50 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-green-200">
-            <h2 className="text-4xl font-bold text-center text-sakura-dark mb-6">
-              {t('noCommissionTitle')}
-            </h2>
-            <p className="text-xl text-center text-gray-700 mb-8">
-              {t('noCommissionDesc')}
-            </p>
-            
+          <div className="bg-sakura-surface rounded-2xl p-8 shadow-xl border-2 border-green-200">
+            <h2 className="text-4xl font-bold text-center mb-6" style={textPrimary}>{t('noCommissionTitle')}</h2>
+            <p className="text-xl text-center text-gray-700 mb-8">{t('noCommissionDesc')}</p>
+
             <div className="grid md:grid-cols-2 gap-6 mb-8">
               <div className="bg-green-50 rounded-xl p-6 border-2 border-green-200">
-                <h3 className="text-xl font-bold text-sakura-dark mb-4">
-                  {t('noCommissionYourClients')}
-                </h3>
-                <div className="space-y-2 text-gray-700 whitespace-pre-line">
-                  {t('noCommissionYourClientsDesc')}
-                </div>
+                <h3 className="text-xl font-bold mb-4" style={textPrimary}>{t('noCommissionYourClients')}</h3>
+                <div className="space-y-2 text-gray-700 whitespace-pre-line">{t('noCommissionYourClientsDesc')}</div>
               </div>
-              
-              <div className="bg-sakura-light rounded-xl p-6 border-2 border-sakura-mid/30">
-                <h3 className="text-xl font-bold text-sakura-dark mb-4">
-                  {t('noCommissionOtherClients')}
-                </h3>
-                <div className="space-y-2 text-gray-700">
-                  {t('noCommissionOtherClientsDesc')}
-                </div>
+              <div className="rounded-xl p-6" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)', ...borderAccent(30) }}>
+                <h3 className="text-xl font-bold mb-4" style={textPrimary}>{t('noCommissionOtherClients')}</h3>
+                <div className="space-y-2 text-gray-700">{t('noCommissionOtherClientsDesc')}</div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-sakura-light to-sakura-cream rounded-xl p-6 border border-sakura-mid/30">
-              <h3 className="text-lg font-bold text-sakura-dark mb-4">{t('noCommissionExample')}</h3>
+            <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, var(--tg-theme-secondary-bg-color), color-mix(in srgb, var(--tg-theme-button-color) 5%, var(--tg-theme-bg-color)))', ...borderAccent(30) }}>
+              <h3 className="text-lg font-bold mb-4" style={textPrimary}>{t('noCommissionExample')}</h3>
               <div className="space-y-2 text-gray-700">
-                <div className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">•</span>
-                  <span>{t('noCommissionExample1')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-sakura-dark font-bold">•</span>
-                  <span>{t('noCommissionExample2')}</span>
-                </div>
-                <div className="mt-4 pt-4 border-t border-sakura-mid/30">
-                  <div className="font-bold text-lg text-sakura-dark">
-                    {t('noCommissionTotal')}
-                  </div>
+                <div className="flex items-start gap-2"><span className="text-green-600 font-bold">•</span><span>{t('noCommissionExample1')}</span></div>
+                <div className="flex items-start gap-2"><span className="font-bold" style={textPrimary}>•</span><span>{t('noCommissionExample2')}</span></div>
+                <div className="mt-4 pt-4" style={{ borderTop: '1px solid color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)' }}>
+                  <div className="font-bold text-lg" style={textPrimary}>{t('noCommissionTotal')}</div>
                 </div>
               </div>
             </div>
@@ -700,105 +567,50 @@ const OnePagerPartner = () => {
       {/* Защита от конкурентов */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-blue-200">
-            <h2 className="text-4xl font-bold text-center text-sakura-dark mb-6">
-              {t('competitorProtectionTitle')}
-            </h2>
-            <p className="text-xl text-center text-gray-700 mb-8">
-              {t('competitorProtectionDesc')}
-            </p>
-            
+          <div className="bg-sakura-surface rounded-2xl p-8 shadow-xl border-2 border-blue-200">
+            <h2 className="text-4xl font-bold text-center mb-6" style={textPrimary}>{t('competitorProtectionTitle')}</h2>
+            <p className="text-xl text-center text-gray-700 mb-8">{t('competitorProtectionDesc')}</p>
+
             <div className="bg-blue-50 rounded-xl p-6 mb-6 border border-blue-200">
-              <h3 className="text-lg font-bold text-sakura-dark mb-4">{t('competitorProtectionHow')}</h3>
+              <h3 className="text-lg font-bold mb-4" style={textPrimary}>{t('competitorProtectionHow')}</h3>
               <div className="space-y-3 text-gray-700">
-                <div className="flex items-start gap-2">
-                  <span className="text-blue-600">→</span>
-                  <span>{t('competitorProtectionExample')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-red-500">→</span>
-                  <span>{t('competitorProtectionExample1')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-600">→</span>
-                  <span>{t('competitorProtectionExample2')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-600">→</span>
-                  <span>{t('competitorProtectionExample3')}</span>
-                </div>
+                <div className="flex items-start gap-2"><span className="text-blue-600">→</span><span>{t('competitorProtectionExample')}</span></div>
+                <div className="flex items-start gap-2"><span className="text-red-500">→</span><span>{t('competitorProtectionExample1')}</span></div>
+                <div className="flex items-start gap-2"><span className="text-green-600">→</span><span>{t('competitorProtectionExample2')}</span></div>
+                <div className="flex items-start gap-2"><span className="text-green-600">→</span><span>{t('competitorProtectionExample3')}</span></div>
               </div>
             </div>
 
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border-2 border-green-200">
-              <div className="text-lg font-bold text-green-800 text-center">
-                {t('competitorProtectionBenefit')}
-              </div>
+              <div className="text-lg font-bold text-green-800 text-center">{t('competitorProtectionBenefit')}</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Как клиенты находят вас */}
-      <div className="bg-white py-16">
+      <div className="py-16" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-gradient-to-br from-sakura-light to-sakura-cream rounded-2xl p-8 shadow-lg border border-sakura-mid/30">
-            <h2 className="text-4xl font-bold text-center text-sakura-dark mb-6">
-              {t('howClientsFindYouTitle')}
-            </h2>
-            <p className="text-xl text-center text-gray-700 mb-8">
-              {t('howClientsFindYouDesc')}
-            </p>
-            
-            <div className="bg-white rounded-xl p-6 mb-6 shadow-sm">
-              <h3 className="text-xl font-bold text-sakura-dark mb-4">{t('howClientsFindYouWhat')}</h3>
+          <div className="rounded-2xl p-8 shadow-lg" style={{ background: 'linear-gradient(135deg, var(--tg-theme-secondary-bg-color), color-mix(in srgb, var(--tg-theme-button-color) 5%, var(--tg-theme-bg-color)))', ...borderAccent(30) }}>
+            <h2 className="text-4xl font-bold text-center mb-6" style={textPrimary}>{t('howClientsFindYouTitle')}</h2>
+            <p className="text-xl text-center text-gray-700 mb-8">{t('howClientsFindYouDesc')}</p>
+
+            <div className="rounded-xl p-6 mb-6 shadow-sm" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
+              <h3 className="text-xl font-bold mb-4" style={textPrimary}>{t('howClientsFindYouWhat')}</h3>
               <div className="grid md:grid-cols-2 gap-3">
-                <div className="flex items-start gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span className="text-sm">{t('howClientsFindYouWhat1')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span className="text-sm">{t('howClientsFindYouWhat2')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span className="text-sm">{t('howClientsFindYouWhat3')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span className="text-sm">{t('howClientsFindYouWhat4')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span className="text-sm">{t('howClientsFindYouWhat5')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-red-500">❌</span>
-                  <span className="text-sm">{t('howClientsFindYouWhat6')}</span>
-                </div>
+                {['howClientsFindYouWhat1','howClientsFindYouWhat2','howClientsFindYouWhat3','howClientsFindYouWhat4','howClientsFindYouWhat5'].map(key => (
+                  <div key={key} className="flex items-start gap-2"><span className="text-green-500">✅</span><span className="text-sm">{t(key)}</span></div>
+                ))}
+                <div className="flex items-start gap-2"><span className="text-red-500">❌</span><span className="text-sm">{t('howClientsFindYouWhat6')}</span></div>
               </div>
             </div>
 
-            <div className="bg-sakura-mid/10 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-sakura-dark mb-4">{t('howClientsFindYouBenefit')}</h3>
+            <div className="rounded-xl p-6" style={bgAccent(10)}>
+              <h3 className="text-xl font-bold mb-4" style={textPrimary}>{t('howClientsFindYouBenefit')}</h3>
               <div className="space-y-2">
-                <div className="flex items-start gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('howClientsFindYouBenefit1')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('howClientsFindYouBenefit2')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('howClientsFindYouBenefit3')}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-500">✅</span>
-                  <span>{t('howClientsFindYouBenefit4')}</span>
-                </div>
+                {['howClientsFindYouBenefit1','howClientsFindYouBenefit2','howClientsFindYouBenefit3','howClientsFindYouBenefit4'].map(key => (
+                  <div key={key} className="flex items-start gap-2"><span className="text-green-500">✅</span><span>{t(key)}</span></div>
+                ))}
               </div>
             </div>
           </div>
@@ -806,62 +618,28 @@ const OnePagerPartner = () => {
       </div>
 
       {/* Преимущества */}
-      <div className="bg-white py-16">
+      <div className="py-16" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl md:text-5xl font-bold text-center text-sakura-dark mb-12">
-            {t('whyJoin')}
-          </h2>
-          
+          <h2 className="text-4xl md:text-5xl font-bold text-center mb-12" style={textPrimary}>{t('whyJoin')}</h2>
           <div className="grid md:grid-cols-3 gap-8">
-            <BenefitCard
-              icon="🎁"
-              title={t('earlyBirdDiscount')}
-              description={t('earlyBirdDiscountDesc')}
-            />
-            <BenefitCard
-              icon="👑"
-              title={t('exclusiveTerritory')}
-              description={t('exclusiveTerritoryDesc')}
-            />
-            <BenefitCard
-              icon="📊"
-              title={t('analytics')}
-              description={t('analyticsDesc')}
-            />
-            <BenefitCard
-              icon="🤝"
-              title={t('revenueShareProgram')}
-              description={t('revenueShareProgramDesc')}
-            />
-            <BenefitCard
-              icon="💬"
-              title={t('telegramBot')}
-              description={t('telegramBotDesc')}
-            />
-            <BenefitCard
-              icon="🚀"
-              title={t('fastSetup')}
-              description={t('fastSetupDesc')}
-            />
+            <BenefitCard icon="🎁" title={t('earlyBirdDiscount')} description={t('earlyBirdDiscountDesc')} />
+            <BenefitCard icon="👑" title={t('exclusiveTerritory')} description={t('exclusiveTerritoryDesc')} />
+            <BenefitCard icon="📊" title={t('analytics')} description={t('analyticsDesc')} />
+            <BenefitCard icon="🤝" title={t('revenueShareProgram')} description={t('revenueShareProgramDesc')} />
+            <BenefitCard icon="💬" title={t('telegramBot')} description={t('telegramBotDesc')} />
+            <BenefitCard icon="🚀" title={t('fastSetup')} description={t('fastSetupDesc')} />
           </div>
         </div>
       </div>
 
-      {/* Income Presentation Link */}
-      <div className="bg-gradient-to-r from-sakura-mid/5 to-sakura-dark/5 py-12 backdrop-blur-sm">
+      {/* Income Presentation */}
+      <div className="py-12 backdrop-blur-sm" style={bgAccent(5)}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="bg-white/60 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/50">
+          <div className="backdrop-blur-md rounded-2xl p-8 shadow-lg" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 60%, transparent)', border: '1px solid color-mix(in srgb, var(--tg-theme-bg-color, #fff) 50%, transparent)' }}>
             <div className="text-5xl mb-4">💸</div>
-            <h2 className="text-3xl font-bold text-sakura-dark mb-4">
-              {t('incomePresentation')}
-            </h2>
-            <p className="text-lg text-gray-600 mb-6">
-              {t('incomePresentationDesc')}
-            </p>
-            <a
-              href="/partner/income-presentation"
-              className="inline-block px-8 py-4 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105"
-            >
+            <h2 className="text-3xl font-bold mb-4" style={textPrimary}>{t('incomePresentation')}</h2>
+            <p className="text-lg text-gray-600 mb-6">{t('incomePresentationDesc')}</p>
+            <a href="/partner/income-presentation" className="inline-block px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105" style={btnPrimary}>
               {t('incomePresentation')} →
             </a>
           </div>
@@ -869,28 +647,26 @@ const OnePagerPartner = () => {
       </div>
 
       {/* ROI Калькулятор */}
-      <div className="bg-gradient-to-br from-sakura-light to-white py-16">
+      <div className="py-16" style={{ background: 'linear-gradient(135deg, var(--tg-theme-secondary-bg-color), var(--tg-theme-bg-color, #fff))' }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <ROICalculator t={t} language={language} />
         </div>
       </div>
 
-      {/* Цены детально */}
-      <div className="bg-sakura-mid/5 py-16 backdrop-blur-sm">
+      {/* Цены */}
+      <div className="py-16 backdrop-blur-sm" style={bgAccent(5)}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-center text-sakura-dark mb-12">
-            {t('pricingDetails')}
-          </h2>
-          
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/50">
+          <h2 className="text-4xl font-bold text-center mb-12" style={textPrimary}>{t('pricingDetails')}</h2>
+
+          <div className="backdrop-blur-xl rounded-2xl p-8 shadow-2xl" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 80%, transparent)', border: '1px solid color-mix(in srgb, var(--tg-theme-bg-color, #fff) 50%, transparent)' }}>
             <div className="grid md:grid-cols-2 gap-8">
-              <div className="border-r border-gray-200 pr-8">
+              <div className="border-r border-sakura-border pr-8">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-2xl">🎁</span>
-                  <h3 className="text-2xl font-bold text-sakura-dark">{t('earlyBirdPlan')}</h3>
-                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">{t('limited')}</span>
+                  <h3 className="text-2xl font-bold" style={textPrimary}>{t('earlyBirdPlan')}</h3>
+                  <span className="bg-sakura-accent text-white text-xs px-2 py-1 rounded-full">{t('limited')}</span>
                 </div>
-                <div className="text-5xl font-bold text-sakura-dark mb-2">$29</div>
+                <div className="text-5xl font-bold mb-2" style={textPrimary}>$29</div>
                 <div className="text-lg text-gray-600 mb-6">{t('perMonth')}</div>
                 <ul className="space-y-3">
                   <ConditionItem text={t('exclusiveRights')} />
@@ -901,18 +677,16 @@ const OnePagerPartner = () => {
                   <ConditionItem text={t('support24')} />
                 </ul>
                 <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <div className="text-sm font-bold text-yellow-800">
-                    {t('onlyFirst20')}
-                  </div>
+                  <div className="text-sm font-bold text-yellow-800">{t('onlyFirst20')}</div>
                 </div>
               </div>
-              
+
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-2xl">💎</span>
-                  <h3 className="text-2xl font-bold text-sakura-dark">{t('premiumPlan')}</h3>
+                  <h3 className="text-2xl font-bold" style={textPrimary}>{t('premiumPlan')}</h3>
                 </div>
-                <div className="text-5xl font-bold text-sakura-dark mb-2">$99</div>
+                <div className="text-5xl font-bold mb-2" style={textPrimary}>$99</div>
                 <div className="text-lg text-gray-600 mb-6">{t('perMonth')}</div>
                 <ul className="space-y-3">
                   <ConditionItem text={t('exclusiveRights')} />
@@ -922,61 +696,40 @@ const OnePagerPartner = () => {
                   <ConditionItem text={t('telegramFeature')} />
                   <ConditionItem text={t('support24')} />
                 </ul>
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="text-sm text-gray-600">
-                    {t('standardPricing')}
-                  </div>
+                <div className="mt-6 p-4 bg-sakura-cream rounded-lg border border-sakura-border">
+                  <div className="text-sm text-gray-600">{t('standardPricing')}</div>
                 </div>
               </div>
             </div>
-            
-            <div className="mt-8 pt-8 border-t border-gray-200">
-              <div className="text-center">
-                <div className="text-lg font-bold text-sakura-dark mb-2">
-                  {t('allFeatures')}
-                </div>
-                <div className="text-gray-600">
-                  {t('onlyPriceDiff')}
-                </div>
-              </div>
+
+            <div className="mt-8 pt-8 border-t border-sakura-border text-center">
+              <div className="text-lg font-bold mb-2" style={textPrimary}>{t('allFeatures')}</div>
+              <div className="text-gray-600">{t('onlyPriceDiff')}</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* CTA финальный */}
-      <div className="bg-gradient-to-r from-sakura-mid to-sakura-dark py-20">
+      <div className="py-20" style={{ backgroundColor: 'var(--tg-theme-button-color)' }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-5xl font-bold text-white mb-6">
-            {t('finalTitle')}
-          </h2>
-          <p className="text-2xl text-white/90 mb-8">
-            {t('finalDesc')}
-            <br />
-            <span className="text-xl">{t('finalDesc2')}</span>
+          <h2 className="text-5xl font-bold mb-6" style={{ color: 'var(--tg-theme-button-text-color, #fff)' }}>{t('finalTitle')}</h2>
+          <p className="text-2xl mb-8" style={{ color: 'var(--tg-theme-button-text-color, #fff)', opacity: 0.9 }}>
+            {t('finalDesc')}<br /><span className="text-xl">{t('finalDesc2')}</span>
           </p>
-          
+
           {remainingSlots !== null && remainingSlots > 0 && (
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-6 mb-8 inline-block">
-              <div className="text-3xl font-bold text-white mb-2">
-                {t('slotsLeft', { count: remainingSlots })}
-              </div>
-              <div className="text-lg text-white/90">
-                {t('dontMiss')}
-              </div>
+            <div className="backdrop-blur-sm rounded-xl p-6 mb-8 inline-block" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-text-color, #fff) 20%, transparent)' }}>
+              <div className="text-3xl font-bold mb-2" style={{ color: 'var(--tg-theme-button-text-color, #fff)' }}>{t('slotsLeft', { count: remainingSlots })}</div>
+              <div className="text-lg" style={{ color: 'var(--tg-theme-button-text-color, #fff)', opacity: 0.9 }}>{t('dontMiss')}</div>
             </div>
           )}
-          
-          <a 
-            href="/partner/apply" 
-            className="inline-block px-12 py-6 bg-white text-sakura-dark rounded-xl font-bold text-2xl hover:shadow-2xl transition-all transform hover:scale-105"
-          >
+
+          <a href="/partner/apply" className="inline-block px-12 py-6 rounded-xl font-bold text-2xl hover:shadow-2xl transition-all transform hover:scale-105" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)', color: 'var(--tg-theme-text-color)' }}>
             {t('applyNow')}
           </a>
-          
-          <div className="mt-8 text-white/80 text-lg">
-            {t('noHiddenFees')}
-          </div>
+
+          <div className="mt-8 text-lg" style={{ color: 'var(--tg-theme-button-text-color, #fff)', opacity: 0.8 }}>{t('noHiddenFees')}</div>
         </div>
       </div>
       </div>
@@ -984,20 +737,8 @@ const OnePagerPartner = () => {
   );
 };
 
-// Константы вынесены за пределы компонента для предотвращения пересоздания
-const DISTRICTS = [
-  'Manhattan Downtown',
-  'Manhattan Midtown',
-  'Manhattan Upper East',
-  'Manhattan Upper West',
-  'Brooklyn Downtown',
-  'Brooklyn North',
-  'Brooklyn South + S.I.',
-  'Queens West + Bronx South',
-  'Queens East',
-  'Brooklyn Central'
-];
-
+// Константы
+const DISTRICTS = ['Manhattan Downtown','Manhattan Midtown','Manhattan Upper East','Manhattan Upper West','Brooklyn Downtown','Brooklyn North','Brooklyn South + S.I.','Queens West + Bronx South','Queens East','Brooklyn Central'];
 const SERVICES = [
   { id: 'nail_care', emoji: '💅', name: 'Nail Care' },
   { id: 'brow_design', emoji: '👁️', name: 'Brow Design' },
@@ -1013,7 +754,7 @@ const SERVICES = [
   { id: 'image_consulting', emoji: '👗', name: 'Image Consulting' }
 ];
 
-// Компонент простой визуализации доступности
+// SimpleAvailabilityHeatmap
 const SimpleAvailabilityHeatmap = memo(({ t, language }) => {
   const navigate = useNavigate();
   const [availability, setAvailability] = useState({});
@@ -1024,56 +765,25 @@ const SimpleAvailabilityHeatmap = memo(({ t, language }) => {
   const fetchAvailability = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // Запрос к Supabase напрямую через REST API
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/partners?select=district,business_type,status&city=eq.New York&district=not.is.null&business_type=not.is.null`,
-        {
-          headers: {
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          }
-        }
+        { headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY, 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` } }
       );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch availability');
-      }
-
+      if (!response.ok) throw new Error('Failed to fetch availability');
       const partners = await response.json();
-      
-      // Формируем карту доступности
       const availMap = {};
       DISTRICTS.forEach(district => {
         availMap[district] = {};
         SERVICES.forEach(service => {
-          const partner = partners.find(
-            p => p.district === district && p.business_type === service.id
-          );
-          
-          if (partner) {
-            if (partner.status === 'Approved') {
-              availMap[district][service.id] = 'taken';
-            } else {
-              availMap[district][service.id] = 'pending';
-            }
-          } else {
-            availMap[district][service.id] = 'available';
-          }
+          const partner = partners.find(p => p.district === district && p.business_type === service.id);
+          availMap[district][service.id] = partner ? (partner.status === 'Approved' ? 'taken' : 'pending') : 'available';
         });
       });
-
       setAvailability(availMap);
     } catch (error) {
       console.error('Error fetching availability:', error);
-      // В случае ошибки показываем все как available
       const availMap = {};
-      DISTRICTS.forEach(district => {
-        availMap[district] = {};
-        SERVICES.forEach(service => {
-          availMap[district][service.id] = 'available';
-        });
-      });
+      DISTRICTS.forEach(district => { availMap[district] = {}; SERVICES.forEach(service => { availMap[district][service.id] = 'available'; }); });
       setAvailability(availMap);
       setHasFetched(true);
     } finally {
@@ -1082,91 +792,48 @@ const SimpleAvailabilityHeatmap = memo(({ t, language }) => {
   }, []);
 
   useEffect(() => {
-    if (showMap && !hasFetched && !loading) {
-      fetchAvailability();
-    }
-    // fetchAvailability мемоизирован и не меняется, поэтому не включаем в зависимости
+    if (showMap && !hasFetched && !loading) fetchAvailability();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showMap, hasFetched, loading]);
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'taken':
-        return 'bg-red-100 border-red-400';
-      case 'pending':
-        return 'bg-yellow-100 border-yellow-400';
-      case 'available':
-        return 'bg-green-100 border-green-400';
-      default:
-        return 'bg-gray-100 border-gray-400';
+      case 'taken': return 'bg-red-100 border-red-400';
+      case 'pending': return 'bg-yellow-100 border-yellow-400';
+      case 'available': return 'bg-green-100 border-green-400';
+      default: return 'bg-sakura-cream border-sakura-border';
     }
   };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'taken':
-        return '✗';
-      case 'pending':
-        return '⏳';
-      case 'available':
-        return '✓';
-      default:
-        return '';
-    }
-  };
-
-  const handleCellClick = (district, service) => {
-    const status = availability[district]?.[service.id];
-    if (status === 'available') {
-      window.location.href = `/partner/apply?district=${encodeURIComponent(district)}&service=${encodeURIComponent(service.id)}`;
-    }
-  };
+  const getStatusIcon = (status) => { switch (status) { case 'taken': return '✗'; case 'pending': return '⏳'; case 'available': return '✓'; default: return ''; } };
+  const handleCellClick = (district, service) => { if (availability[district]?.[service.id] === 'available') window.location.href = `/partner/apply?district=${encodeURIComponent(district)}&service=${encodeURIComponent(service.id)}`; };
 
   return (
     <div className="text-center">
-      <h2 className="text-4xl md:text-5xl font-bold text-sakura-dark mb-4">
-        {t('availabilityMap')}
-      </h2>
-      <p className="text-lg text-gray-600 mb-6">
-        {t('availabilityMapDesc')}
-      </p>
+      <h2 className="text-4xl md:text-5xl font-bold mb-4" style={textPrimary}>{t('availabilityMap')}</h2>
+      <p className="text-lg text-gray-600 mb-6">{t('availabilityMapDesc')}</p>
 
       {!showMap ? (
-        <button
-          onClick={() => setShowMap(true)}
-          className="px-8 py-4 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105"
-        >
+        <button onClick={() => setShowMap(true)} className="px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105" style={btnPrimary}>
           {t('showAvailability')}
         </button>
       ) : (
         <>
-          <button
-            onClick={() => setShowMap(false)}
-            className="mb-6 px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
-          >
-            {t('hideAvailability')}
-          </button>
-
+          <button onClick={() => setShowMap(false)} className="mb-6 px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors">{t('hideAvailability')}</button>
           {loading ? (
             <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-sakura-dark"></div>
+              <div className="inline-block animate-spin rounded-full h-12 w-12" style={{ borderBottom: '2px solid var(--tg-theme-button-color)' }}></div>
               <p className="mt-4 text-gray-600">{language === 'ru' ? 'Загрузка...' : 'Loading...'}</p>
             </div>
           ) : (
             <div className="overflow-x-auto mt-6">
               <div className="inline-block min-w-full">
-                {/* Таблица доступности */}
-                <div className="inline-block border border-gray-200 rounded-lg overflow-hidden">
+                <div className="inline-block border border-sakura-border rounded-lg overflow-hidden">
                   <table className="min-w-full">
                     <thead>
                       <tr>
-                        <th className="bg-gray-50 p-3 text-left font-bold text-sm text-sakura-dark border-b">Район</th>
+                        <th className="bg-sakura-cream p-3 text-left font-bold text-sm border-b" style={textPrimary}>Район</th>
                         {SERVICES.map(service => (
-                          <th
-                            key={service.id}
-                            className="bg-gray-50 p-2 text-center font-medium text-xs text-sakura-dark border-b"
-                            title={service.name}
-                          >
+                          <th key={service.id} className="bg-sakura-cream p-2 text-center font-medium text-xs border-b" title={service.name} style={textPrimary}>
                             <div className="text-xl mb-1">{service.emoji}</div>
                             <div className="hidden md:block text-xs">{service.name.split(' ')[0]}</div>
                           </th>
@@ -1175,28 +842,15 @@ const SimpleAvailabilityHeatmap = memo(({ t, language }) => {
                     </thead>
                     <tbody>
                       {DISTRICTS.map(district => (
-                        <tr key={district} className="hover:bg-gray-50">
-                          <td className="p-3 font-bold text-sm text-sakura-dark border-b">
-                            <div className="truncate max-w-[150px]">{district}</div>
-                          </td>
+                        <tr key={district} className="hover:bg-sakura-cream/40">
+                          <td className="p-3 font-bold text-sm border-b" style={textPrimary}><div className="truncate max-w-[150px]">{district}</div></td>
                           {SERVICES.map(service => {
                             const status = availability[district]?.[service.id] || 'available';
                             const isClickable = status === 'available';
-                            
                             return (
-                              <td
-                                key={service.id}
-                                className={`
-                                  p-2 border-b
-                                  ${getStatusColor(status)}
-                                  ${isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}
-                                `}
-                                onClick={() => isClickable && handleCellClick(district, service)}
-                                title={`${district} - ${service.name}: ${status}`}
-                              >
-                                <div className="h-10 w-10 rounded-lg flex items-center justify-center mx-auto">
-                                  <span className="text-xl">{getStatusIcon(status)}</span>
-                                </div>
+                              <td key={service.id} className={`p-2 border-b ${getStatusColor(status)} ${isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
+                                onClick={() => isClickable && handleCellClick(district, service)} title={`${district} - ${service.name}: ${status}`}>
+                                <div className="h-10 w-10 rounded-lg flex items-center justify-center mx-auto"><span className="text-xl">{getStatusIcon(status)}</span></div>
                               </td>
                             );
                           })}
@@ -1208,33 +862,14 @@ const SimpleAvailabilityHeatmap = memo(({ t, language }) => {
               </div>
             </div>
           )}
-
-          {/* Легенда */}
           <div className="mt-8 flex flex-wrap gap-6 justify-center text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-green-100 border-2 border-green-400 rounded"></div>
-              <span>{t('available')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-yellow-100 border-2 border-yellow-400 rounded"></div>
-              <span>{t('pending')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-red-100 border-2 border-red-400 rounded"></div>
-              <span>{t('taken')}</span>
-            </div>
+            <div className="flex items-center gap-2"><div className="w-6 h-6 bg-green-100 border-2 border-green-400 rounded"></div><span>{t('available')}</span></div>
+            <div className="flex items-center gap-2"><div className="w-6 h-6 bg-yellow-100 border-2 border-yellow-400 rounded"></div><span>{t('pending')}</span></div>
+            <div className="flex items-center gap-2"><div className="w-6 h-6 bg-red-100 border-2 border-red-400 rounded"></div><span>{t('taken')}</span></div>
           </div>
-
-          <p className="mt-4 text-gray-500 text-sm">
-            {t('clickToApply')}
-          </p>
-
-          {/* Ссылка на полную карту */}
+          <p className="mt-4 text-gray-500 text-sm">{t('clickToApply')}</p>
           <div className="mt-6">
-            <button
-              onClick={() => navigate('/availability-map')}
-              className="inline-block px-6 py-3 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-lg font-bold hover:shadow-lg transition-all transform hover:scale-105"
-            >
+            <button onClick={() => navigate('/availability-map')} className="inline-block px-6 py-3 rounded-lg font-bold hover:shadow-lg transition-all transform hover:scale-105" style={btnPrimary}>
               🗺️ {language === 'ru' ? 'Открыть Полную Карту' : 'Open Full Map'}
             </button>
           </div>
@@ -1244,199 +879,95 @@ const SimpleAvailabilityHeatmap = memo(({ t, language }) => {
   );
 });
 
-// Компонент ROI Калькулятора
+// ROI Calculator
 const ROICalculator = memo(({ t, language }) => {
   const [monthlyClients, setMonthlyClients] = useState(50);
   const [averageCheck, setAverageCheck] = useState(100);
   const [currentRetention, setCurrentRetention] = useState(30);
 
   const roi = useMemo(() => {
-    // Программа лояльности увеличивает возврат клиентов на 20-40%
-    // Используем консервативную оценку в 25%
     const retentionIncrease = 25;
     const newRetention = Math.min(currentRetention + retentionIncrease, 100);
-    
-    // Текущие повторные клиенты
     const currentRepeatClients = monthlyClients * (currentRetention / 100);
-    
-    // Новые повторные клиенты с программой
     const newRepeatClients = monthlyClients * (newRetention / 100);
-    
-    // Дополнительные повторные клиенты
     const additionalRepeatClients = newRepeatClients - currentRepeatClients;
-    
-    // Дополнительная выручка (дополнительные клиенты × средний чек)
     const additionalRevenue = additionalRepeatClients * averageCheck;
-    
-    // Стоимость программы (Early Bird)
     const monthlyCost = 29;
-    
-    // Чистая прибыль
     const netProfit = additionalRevenue - monthlyCost;
-    
-    // ROI в процентах
     const roiPercent = monthlyCost > 0 ? ((netProfit / monthlyCost) * 100) : 0;
-    
-    return {
-      newRetention: Math.round(newRetention),
-      currentRepeatClients: Math.round(currentRepeatClients),
-      newRepeatClients: Math.round(newRepeatClients),
-      additionalClients: Math.round(additionalRepeatClients),
-      additionalRevenue: Math.round(additionalRevenue),
-      monthlyCost,
-      netProfit: Math.round(netProfit),
-      roi: Math.round(roiPercent)
-    };
+    return { newRetention: Math.round(newRetention), additionalClients: Math.round(additionalRepeatClients), additionalRevenue: Math.round(additionalRevenue), monthlyCost, netProfit: Math.round(netProfit), roi: Math.round(roiPercent) };
   }, [monthlyClients, averageCheck, currentRetention]);
 
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value);
-  };
+  const formatCurrency = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+
+  const inputStyle = { border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)', backgroundColor: 'var(--tg-theme-bg-color)', color: 'var(--tg-theme-text-color)' };
 
   return (
-    <div className="bg-white rounded-2xl p-8 shadow-2xl border-2 border-sakura-mid/20">
+    <div className="rounded-2xl p-8 shadow-2xl" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)', ...borderAccent(20) }}>
       <div className="text-center mb-8">
-        <h2 className="text-4xl md:text-5xl font-bold text-sakura-dark mb-4">
-          {t('roiCalculator')}
-        </h2>
-        <p className="text-lg text-gray-600">
-          {t('roiCalculatorDesc')}
-        </p>
+        <h2 className="text-4xl md:text-5xl font-bold mb-4" style={textPrimary}>{t('roiCalculator')}</h2>
+        <p className="text-lg text-gray-600">{t('roiCalculatorDesc')}</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-8">
-        {/* Левая часть - Ввод данных */}
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-bold text-sakura-dark mb-2">
-              {t('monthlyClients')}
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="1"
-                max="10000"
-                value={monthlyClients}
-                onChange={(e) => setMonthlyClients(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-full border-2 border-sakura-mid/30 rounded-xl px-4 py-3 text-lg focus:border-sakura-mid focus:outline-none transition-colors"
-              />
-            </div>
+            <label className="block text-sm font-bold mb-2" style={textPrimary}>{t('monthlyClients')}</label>
+            <input type="number" min="1" max="10000" value={monthlyClients} onChange={(e) => setMonthlyClients(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full rounded-xl px-4 py-3 text-lg focus:outline-none transition-colors" style={inputStyle} />
           </div>
-
           <div>
-            <label className="block text-sm font-bold text-sakura-dark mb-2">
-              {t('averageCheck')} ($)
-            </label>
+            <label className="block text-sm font-bold mb-2" style={textPrimary}>{t('averageCheck')} ($)</label>
             <div className="relative">
               <span className="absolute left-4 top-3 text-gray-500">$</span>
-              <input
-                type="number"
-                min="1"
-                max="10000"
-                value={averageCheck}
-                onChange={(e) => setAverageCheck(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-full border-2 border-sakura-mid/30 rounded-xl px-4 py-3 pl-8 text-lg focus:border-sakura-mid focus:outline-none transition-colors"
-              />
+              <input type="number" min="1" max="10000" value={averageCheck} onChange={(e) => setAverageCheck(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full rounded-xl px-4 py-3 pl-8 text-lg focus:outline-none transition-colors" style={inputStyle} />
             </div>
           </div>
-
           <div>
-            <label className="block text-sm font-bold text-sakura-dark mb-2">
-              {t('currentRetention')} ({t('percent')})
-            </label>
+            <label className="block text-sm font-bold mb-2" style={textPrimary}>{t('currentRetention')} ({t('percent')})</label>
             <div className="relative">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={currentRetention}
-                onChange={(e) => setCurrentRetention(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
-                className="w-full border-2 border-sakura-mid/30 rounded-xl px-4 py-3 text-lg focus:border-sakura-mid focus:outline-none transition-colors"
-              />
+              <input type="number" min="0" max="100" value={currentRetention} onChange={(e) => setCurrentRetention(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                className="w-full rounded-xl px-4 py-3 text-lg focus:outline-none transition-colors" style={inputStyle} />
               <span className="absolute right-4 top-3 text-gray-500">%</span>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {t('basedOnResearch')}
-            </p>
+            <p className="text-xs text-gray-500 mt-1">{t('basedOnResearch')}</p>
           </div>
-
-          <div className="pt-4 border-t border-gray-200">
-            <div className="text-sm text-gray-600 mb-2">
-              <strong>{t('retentionIncrease')}:</strong> {roi.newRetention}%
-            </div>
+          <div className="pt-4 border-t border-sakura-border">
+            <div className="text-sm text-gray-600 mb-2"><strong>{t('retentionIncrease')}:</strong> {roi.newRetention}%</div>
             <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-              <div 
-                className="bg-gradient-to-r from-sakura-mid to-sakura-dark h-full transition-all duration-300"
-                style={{ width: `${roi.newRetention}%` }}
-              />
+              <div className="h-full transition-all duration-300" style={{ width: `${roi.newRetention}%`, backgroundColor: 'var(--tg-theme-button-color)' }} />
             </div>
           </div>
         </div>
 
-        {/* Правая часть - Результаты */}
-        <div className="bg-gradient-to-br from-sakura-light to-sakura-cream rounded-xl p-6 space-y-4">
-          <h3 className="text-2xl font-bold text-sakura-dark mb-4">
-            {t('yourResults')}
-          </h3>
-
+        <div className="rounded-xl p-6 space-y-4" style={{ background: 'linear-gradient(135deg, var(--tg-theme-secondary-bg-color), color-mix(in srgb, var(--tg-theme-button-color) 5%, var(--tg-theme-bg-color)))' }}>
+          <h3 className="text-2xl font-bold mb-4" style={textPrimary}>{t('yourResults')}</h3>
           <div className="space-y-3">
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="text-sm text-gray-600 mb-1">
-                {t('additionalClients')}
-              </div>
-              <div className="text-2xl font-bold text-sakura-dark">
-                +{roi.additionalClients}
-              </div>
+            <div className="rounded-lg p-4 shadow-sm" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
+              <div className="text-sm text-gray-600 mb-1">{t('additionalClients')}</div>
+              <div className="text-2xl font-bold" style={textPrimary}>+{roi.additionalClients}</div>
             </div>
-
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="text-sm text-gray-600 mb-1">
-                {t('additionalRevenue')}
-              </div>
-              <div className="text-2xl font-bold text-green-600">
-                +{formatCurrency(roi.additionalRevenue)}
-              </div>
+            <div className="rounded-lg p-4 shadow-sm" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
+              <div className="text-sm text-gray-600 mb-1">{t('additionalRevenue')}</div>
+              <div className="text-2xl font-bold text-green-600">+{formatCurrency(roi.additionalRevenue)}</div>
             </div>
-
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="text-sm text-gray-600 mb-1">
-                {t('programCost')} ({t('monthlyCost')})
-              </div>
-              <div className="text-2xl font-bold text-sakura-dark">
-                {formatCurrency(roi.monthlyCost)}
-              </div>
+            <div className="rounded-lg p-4 shadow-sm" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
+              <div className="text-sm text-gray-600 mb-1">{t('programCost')} ({t('monthlyCost')})</div>
+              <div className="text-2xl font-bold" style={textPrimary}>{formatCurrency(roi.monthlyCost)}</div>
             </div>
-
             <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-300">
-              <div className="text-sm text-green-700 mb-1 font-bold">
-                {t('netProfit')}
-              </div>
-              <div className="text-3xl font-bold text-green-600">
-                {formatCurrency(roi.netProfit)}
-              </div>
-              <div className="text-sm text-green-600 mt-2">
-                {t('roi')}: {roi.roi > 0 ? '+' : ''}{roi.roi}%
-              </div>
+              <div className="text-sm text-green-700 mb-1 font-bold">{t('netProfit')}</div>
+              <div className="text-3xl font-bold text-green-600">{formatCurrency(roi.netProfit)}</div>
+              <div className="text-sm text-green-600 mt-2">{t('roi')}: {roi.roi > 0 ? '+' : ''}{roi.roi}%</div>
             </div>
           </div>
-
           {roi.netProfit > 0 && (
             <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                💡 {t('additionalProfitHint')}
-              </p>
+              <p className="text-sm text-yellow-800">💡 {t('additionalProfitHint')}</p>
             </div>
           )}
-
-          <a 
-            href="/partner/apply" 
-            className="block w-full mt-6 px-6 py-4 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold text-center hover:shadow-xl transition-all transform hover:scale-105"
-          >
+          <a href="/partner/apply" className="block w-full mt-6 px-6 py-4 rounded-xl font-bold text-center hover:shadow-xl transition-all transform hover:scale-105" style={btnPrimary}>
             {t('applyNow')}
           </a>
         </div>
@@ -1445,42 +976,28 @@ const ROICalculator = memo(({ t, language }) => {
   );
 });
 
-// Вспомогательные компоненты
+// Helper components
 const BenefitCard = ({ icon, title, description }) => (
-  <div className="bg-white/60 backdrop-blur-lg rounded-xl p-6 shadow-sm hover:shadow-lg transition-all border border-white/50 hover:border-sakura-mid/30">
+  <div className="backdrop-blur-lg rounded-xl p-6 shadow-sm hover:shadow-lg transition-all" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 60%, transparent)', border: '1px solid color-mix(in srgb, var(--tg-theme-bg-color, #fff) 50%, transparent)' }}>
     <div className="text-5xl mb-4">{icon}</div>
-    <h3 className="text-xl font-bold text-sakura-dark mb-2">
-      {title}
-    </h3>
-    <p className="text-gray-600">
-      {description}
-    </p>
+    <h3 className="text-xl font-bold mb-2" style={textPrimary}>{title}</h3>
+    <p className="text-gray-600">{description}</p>
   </div>
 );
 
 const StepCard = ({ number, title, description }) => (
   <div className="text-center">
-    <div className="w-20 h-20 bg-gradient-to-r from-sakura-mid to-sakura-dark rounded-full flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4">
-      {number}
-    </div>
-    <h3 className="text-xl font-bold text-sakura-dark mb-2">
-      {title}
-    </h3>
-    <p className="text-gray-600">
-      {description}
-    </p>
+    <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-4" style={btnPrimary}>{number}</div>
+    <h3 className="text-xl font-bold mb-2" style={textPrimary}>{title}</h3>
+    <p className="text-gray-600">{description}</p>
   </div>
 );
 
 const ExclusivityCard = ({ icon, title, description }) => (
-  <div className="bg-white/50 backdrop-blur-md rounded-xl p-6 shadow-sm border border-white/60 hover:shadow-md transition-all">
+  <div className="backdrop-blur-md rounded-xl p-6 shadow-sm hover:shadow-md transition-all" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 50%, transparent)', border: '1px solid color-mix(in srgb, var(--tg-theme-bg-color, #fff) 60%, transparent)' }}>
     <div className="text-4xl mb-3">{icon}</div>
-    <h3 className="text-xl font-bold text-sakura-dark mb-2">
-      {title}
-    </h3>
-    <p className="text-gray-600">
-      {description}
-    </p>
+    <h3 className="text-xl font-bold mb-2" style={textPrimary}>{title}</h3>
+    <p className="text-gray-600">{description}</p>
   </div>
 );
 
@@ -1492,5 +1009,3 @@ const ConditionItem = ({ text }) => (
 );
 
 export default OnePagerPartner;
-
-

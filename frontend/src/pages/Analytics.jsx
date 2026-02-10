@@ -88,7 +88,7 @@ export default function Analytics() {
   }
 
   const MetricCard = ({ title, value, icon, color, change, suffix = '' }) => (
-    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className="bg-sakura-surface rounded-xl p-6 shadow-sm border border-sakura-border">
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
         <div className={`p-2 rounded-lg ${color}`}>
@@ -123,7 +123,7 @@ export default function Analytics() {
             <div className="w-24 text-sm text-gray-600 dark:text-gray-400">
               {item.date}
             </div>
-            <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-6 relative">
+            <div className="flex-1 bg-sakura-cream rounded-full h-6 relative">
               <div
                 className="h-full rounded-full flex items-center justify-end pr-2"
                 style={{
@@ -151,7 +151,7 @@ export default function Analytics() {
 
   if (!stats) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="min-h-screen bg-sakura-cream dark:bg-sakura-dark p-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center py-12">
             <p className="text-gray-600 dark:text-gray-400">Недостаточно данных для аналитики</p>
@@ -162,9 +162,9 @@ export default function Analytics() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <div className="min-h-screen bg-sakura-cream dark:bg-sakura-dark pb-20">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+      <div className="bg-gradient-to-r from-sakura-deep to-sakura-mid text-white p-6">
         <div className="max-w-7xl mx-auto">
           <button
             onClick={() => navigate('/partner')}
@@ -186,8 +186,8 @@ export default function Analytics() {
               onClick={() => setSelectedPeriod(period)}
               className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
                 selectedPeriod === period
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  ? 'bg-sakura-accent text-white'
+                  : 'bg-sakura-surface text-sakura-deep hover:bg-sakura-cream'
               }`}
             >
               {period === 7 ? '7 дней' : period === 365 ? 'Весь период' : `${period} дней`}
@@ -196,7 +196,7 @@ export default function Analytics() {
         </div>
 
         {/* Tabs */}
-        <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="mb-6 border-b border-sakura-border/30">
           <div className="flex gap-4 overflow-x-auto">
             {[
               { id: 'overview', label: '📈 Обзор' },
@@ -209,8 +209,8 @@ export default function Analytics() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`pb-3 px-1 border-b-2 font-medium whitespace-nowrap transition-colors ${
                   activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                    ? 'border-sakura-accent text-sakura-accent'
+                    : 'border-transparent text-sakura-muted hover:text-sakura-deep'
                 }`}
               >
                 {tab.label}
@@ -228,7 +228,7 @@ export default function Analytics() {
                 title="Оборот"
                 value={formatCurrencyValue(stats.total_revenue)}
                 icon="💰"
-                color="bg-green-500"
+                color="bg-sakura-mid"
               />
               <MetricCard
                 title="Средний чек"
@@ -246,14 +246,14 @@ export default function Analytics() {
                 title="NPS Score"
                 value={stats.nps_score}
                 icon="⭐"
-                color="bg-yellow-500"
+                color="bg-sakura-gold"
               />
             </div>
 
             {/* Detailed Stats */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Clients */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+              <div className="bg-sakura-surface rounded-xl p-6 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">👥 Клиенты</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
@@ -272,7 +272,7 @@ export default function Analytics() {
                     <span className="text-gray-600 dark:text-gray-400">Повторные покупки</span>
                     <span className="font-semibold text-purple-600">{stats.returning_clients}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex justify-between items-center pt-2 border-t border-sakura-border">
                     <span className="text-gray-600 dark:text-gray-400">Churn Rate</span>
                     <span className={`font-semibold ${stats.churn_rate > 50 ? 'text-red-600' : 'text-green-600'}`}>
                       {formatPercent(stats.churn_rate)}
@@ -282,7 +282,7 @@ export default function Analytics() {
               </div>
 
               {/* Financial */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+              <div className="bg-sakura-surface rounded-xl p-6 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">💰 Финансы</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
@@ -307,7 +307,7 @@ export default function Analytics() {
                     <span className="text-gray-600 dark:text-gray-400">Транзакций</span>
                     <span className="font-semibold text-gray-900 dark:text-white">{stats.total_transactions}</span>
                   </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex justify-between items-center pt-2 border-t border-sakura-border">
                     <span className="text-gray-600 dark:text-gray-400">Частота покупок</span>
                     <span className="font-semibold text-purple-600">{stats.avg_frequency} транз/клиент</span>
                   </div>
@@ -315,7 +315,7 @@ export default function Analytics() {
               </div>
 
               {/* Conversion */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+              <div className="bg-sakura-surface rounded-xl p-6 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">🎯 Конверсии</h3>
                 <div className="space-y-4">
                   <div>
@@ -350,25 +350,25 @@ export default function Analytics() {
               </div>
 
               {/* NPS */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+              <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">⭐ NPS Индекс</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600 dark:text-gray-400">Средний NPS</span>
-                    <span className="font-semibold text-gray-900 dark:text-white">{stats.avg_nps.toFixed(2)}</span>
+                    <span className="text-sakura-muted">Средний NPS</span>
+                    <span className="font-semibold text-sakura-deep">{stats.avg_nps.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600 dark:text-gray-400">Чистый NPS Score</span>
-                    <span className={`font-semibold ${stats.nps_score >= 50 ? 'text-green-600' : stats.nps_score >= 0 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    <span className="text-sakura-muted">Чистый NPS Score</span>
+                    <span className={`font-semibold ${stats.nps_score >= 50 ? 'text-sakura-mid' : stats.nps_score >= 0 ? 'text-sakura-gold' : 'text-sakura-accent'}`}>
                       {stats.nps_score}
                     </span>
                   </div>
                   <div className="pt-2 space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="w-24 text-sm text-gray-600 dark:text-gray-400">🟢 9-10:</span>
-                      <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-6">
+                      <div className="flex-1 bg-sakura-cream rounded-full h-6">
                         <div
-                          className="bg-green-500 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium"
+                          className="bg-sakura-mid h-6 rounded-full flex items-center justify-center text-white text-xs font-medium"
                           style={{ width: `${stats.promoters > 0 ? 100 : 0}%`, minWidth: '30px' }}
                         >
                           {stats.promoters}
@@ -377,9 +377,9 @@ export default function Analytics() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-24 text-sm text-gray-600 dark:text-gray-400">🟡 7-8:</span>
-                      <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-6">
+                      <div className="flex-1 bg-sakura-cream rounded-full h-6">
                         <div
-                          className="bg-yellow-500 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium"
+                          className="bg-sakura-gold h-6 rounded-full flex items-center justify-center text-white text-xs font-medium"
                           style={{ width: `${stats.passives > 0 ? 70 : 0}%`, minWidth: '30px' }}
                         >
                           {stats.passives}
@@ -388,9 +388,9 @@ export default function Analytics() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-24 text-sm text-gray-600 dark:text-gray-400">🔴 0-6:</span>
-                      <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-6">
+                      <div className="flex-1 bg-sakura-cream rounded-full h-6">
                         <div
-                          className="bg-red-500 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium"
+                          className="bg-sakura-accent h-6 rounded-full flex items-center justify-center text-white text-xs font-medium"
                           style={{ width: `${stats.detractors > 0 ? 50 : 0}%`, minWidth: '30px' }}
                         >
                           {stats.detractors}
@@ -425,17 +425,17 @@ export default function Analytics() {
         {/* Charts Tab */}
         {activeTab === 'charts' && dailyStats && (
           <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
               <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">💰 Оборот по дням</h3>
               <SimpleBarChart data={dailyStats.daily_stats.slice(-14)} dataKey="revenue" color="#10b981" />
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
               <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">📊 Транзакции по дням</h3>
               <SimpleBarChart data={dailyStats.daily_stats.slice(-14)} dataKey="transactions" color="#3b82f6" />
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+            <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
               <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">👥 Уникальные клиенты по дням</h3>
               <SimpleBarChart data={dailyStats.daily_stats.slice(-14)} dataKey="unique_clients" color="#8b5cf6" />
             </div>
@@ -444,13 +444,13 @@ export default function Analytics() {
 
         {/* Cohorts Tab */}
         {activeTab === 'cohorts' && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+          <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">👥 Когортный анализ</h3>
             {cohorts.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                  <tr className="border-b border-sakura-border">
                       <th className="text-left py-3 px-4 text-gray-600 dark:text-gray-400">Месяц</th>
                       <th className="text-right py-3 px-4 text-gray-600 dark:text-gray-400">Клиентов</th>
                       <th className="text-right py-3 px-4 text-gray-600 dark:text-gray-400">Оборот</th>
@@ -460,7 +460,7 @@ export default function Analytics() {
                   </thead>
                   <tbody>
                     {cohorts.map((cohort, index) => (
-                      <tr key={index} className="border-b border-gray-100 dark:border-gray-700/50">
+                      <tr key={index} className="border-b border-sakura-border">
                         <td className="py-3 px-4 font-medium text-gray-900 dark:text-white">{cohort.month}</td>
                         <td className="py-3 px-4 text-right text-gray-700 dark:text-gray-300">{cohort.clients_count}</td>
                         <td className="py-3 px-4 text-right font-medium text-green-600">{formatCurrencyValue(cohort.total_revenue)}</td>
@@ -481,14 +481,14 @@ export default function Analytics() {
 
         {/* Top Clients Tab */}
         {activeTab === 'clients' && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
+          <div className="bg-sakura-surface dark:bg-sakura-dark rounded-xl p-6 shadow-sm">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">⭐ Топ клиенты по LTV</h3>
             {topClients.length > 0 ? (
               <div className="space-y-3">
                 {topClients.map((client, index) => (
                   <div
                     key={client.chat_id}
-                    className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                    className="flex items-center gap-4 p-4 bg-sakura-cream dark:bg-sakura-dark/50 rounded-lg"
                   >
                     <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-600 text-white rounded-full font-bold">
                       {index + 1}

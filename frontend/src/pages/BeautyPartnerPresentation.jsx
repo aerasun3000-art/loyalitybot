@@ -20,19 +20,29 @@ const BeautyPartnerPresentation = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sakura-light via-white to-sakura-cream">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}>
       {/* Navigation Bar */}
-      <nav className="sticky top-0 z-50 bg-sakura-surface/15 backdrop-blur-md border-b border-sakura-mid/20 shadow-sm">
+      <nav
+        className="sticky top-0 z-50 backdrop-blur-md shadow-sm"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 85%, transparent)',
+          borderBottom: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)'
+        }}
+      >
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-2xl">💅</span>
-            <span className="font-bold text-sakura-dark text-lg">
+            <span className="font-bold text-lg" style={{ color: 'var(--tg-theme-text-color)' }}>
               {isRu ? 'LoyalityBot для Бьюти' : 'LoyalityBot for Beauty'}
             </span>
           </div>
           <button
             onClick={() => navigate('/partner/apply')}
-            className="px-4 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-sakura-mid to-sakura-dark hover:shadow-lg active:scale-95 transition-all"
+            className="px-4 py-2 rounded-xl font-semibold hover:shadow-lg active:scale-95 transition-all"
+            style={{
+              backgroundColor: 'var(--tg-theme-button-color)',
+              color: 'var(--tg-theme-button-text-color, #fff)'
+            }}
           >
             {isRu ? 'Стать партнером' : 'Become Partner'}
           </button>
@@ -42,27 +52,33 @@ const BeautyPartnerPresentation = () => {
       {/* Hero Section */}
       <section className="relative py-16 px-4 overflow-hidden">
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          <div className="inline-block mb-4 px-4 py-2 rounded-full bg-sakura-mid/10 border border-sakura-mid/20">
-            <span className="text-sakura-dark font-semibold">
+          <div
+            className="inline-block mb-4 px-4 py-2 rounded-full"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)'
+            }}
+          >
+            <span className="font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>
               {isRu ? '✨ Программа лояльности нового поколения' : '✨ Next-gen loyalty program'}
             </span>
           </div>
-          
-          <h1 className="text-4xl md:text-5xl font-bold text-sakura-dark mb-4 leading-tight">
+
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight" style={{ color: 'var(--tg-theme-text-color)' }}>
             {isRu ? (
               <>
                 Увеличьте возврат клиентов<br />
-                <span className="text-sakura-mid">на 40% за 3 месяца</span>
+                <span style={{ color: 'var(--tg-theme-button-color)' }}>на 40% за 3 месяца</span>
               </>
             ) : (
               <>
                 Increase client retention<br />
-                <span className="text-sakura-mid">by 40% in 3 months</span>
+                <span style={{ color: 'var(--tg-theme-button-color)' }}>by 40% in 3 months</span>
               </>
             )}
           </h1>
 
-          <p className="text-xl text-gray-700 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl mb-8 max-w-2xl mx-auto" style={{ color: 'var(--tg-theme-hint-color)' }}>
             {isRu
               ? 'Telegram-бот для салонов красоты, который автоматизирует начисление баллов, напоминания клиентам и увеличивает повторные визиты через геймификацию.'
               : 'Telegram bot for beauty salons that automates points, client reminders and increases repeat visits through gamification.'}
@@ -71,13 +87,22 @@ const BeautyPartnerPresentation = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
             <button
               onClick={() => navigate('/partner/apply')}
-              className="px-8 py-4 rounded-xl font-bold text-white bg-gradient-to-r from-sakura-mid to-sakura-dark hover:shadow-xl active:scale-95 transition-all text-lg"
+              className="px-8 py-4 rounded-xl font-bold hover:shadow-xl active:scale-95 transition-all text-lg"
+              style={{
+                backgroundColor: 'var(--tg-theme-button-color)',
+                color: 'var(--tg-theme-button-text-color, #fff)'
+              }}
             >
               {isRu ? '🚀 Начать бесплатно' : '🚀 Start Free'}
             </button>
             <button
               onClick={() => scrollToSection('pricing')}
-              className="px-8 py-4 rounded-xl font-semibold text-sakura-dark bg-white/70 border-2 border-sakura-mid/30 hover:bg-white/90 active:scale-95 transition-all text-lg"
+              className="px-8 py-4 rounded-xl font-semibold active:scale-95 transition-all text-lg"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color) 70%, transparent)',
+                color: 'var(--tg-theme-text-color)',
+                border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)'
+              }}
             >
               {isRu ? '💰 Узнать цены' : '💰 See Pricing'}
             </button>
@@ -85,33 +110,39 @@ const BeautyPartnerPresentation = () => {
 
           {/* Trust Badges */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
-            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-sakura-mid/20">
-              <div className="text-2xl font-bold text-sakura-mid">500+</div>
-              <div className="text-sm text-gray-600">{isRu ? 'Партнеров' : 'Partners'}</div>
-            </div>
-            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-sakura-mid/20">
-              <div className="text-2xl font-bold text-sakura-mid">40%</div>
-              <div className="text-sm text-gray-600">{isRu ? 'Рост retention' : 'Retention Growth'}</div>
-            </div>
-            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-sakura-mid/20">
-              <div className="text-2xl font-bold text-sakura-mid">1 день</div>
-              <div className="text-sm text-gray-600">{isRu ? 'Запуск' : 'Setup Time'}</div>
-            </div>
-            <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-sakura-mid/20">
-              <div className="text-2xl font-bold text-sakura-mid">$0</div>
-              <div className="text-sm text-gray-600">{isRu ? 'Старт' : 'Start Free'}</div>
-            </div>
+            {[
+              { value: '500+', label: isRu ? 'Партнеров' : 'Partners' },
+              { value: '40%', label: isRu ? 'Рост retention' : 'Retention Growth' },
+              { value: isRu ? '1 день' : '1 day', label: isRu ? 'Запуск' : 'Setup Time' },
+              { value: '$0', label: isRu ? 'Старт' : 'Start Free' }
+            ].map((badge, idx) => (
+              <div
+                key={idx}
+                className="backdrop-blur-sm rounded-xl p-4"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 70%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)'
+                }}
+              >
+                <div className="text-2xl font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>{badge.value}</div>
+                <div className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{badge.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Problems Section */}
-      <section id="problems" className="py-16 px-4 bg-white/50">
+      <section
+        id="problems"
+        className="py-16 px-4"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 50%, transparent)' }}
+      >
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-sakura-dark text-center mb-12">
+          <h2 className="text-3xl font-bold text-center mb-12" style={{ color: 'var(--tg-theme-text-color)' }}>
             {isRu ? 'Знакомые проблемы?' : 'Familiar Problems?'}
           </h2>
-          
+
           <div className="grid md:grid-cols-2 gap-6">
             {[
               {
@@ -147,11 +178,12 @@ const BeautyPartnerPresentation = () => {
             ].map((problem, idx) => (
               <div
                 key={idx}
-                className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border-2 border-red-100 hover:border-red-200 transition-all shadow-sm"
+                className="backdrop-blur-sm rounded-2xl p-6 border-2 border-red-100 hover:border-red-200 transition-all shadow-sm"
+                style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 70%, transparent)' }}
               >
                 <div className="text-4xl mb-3">{problem.emoji}</div>
-                <h3 className="text-xl font-bold text-sakura-dark mb-2">{problem.title}</h3>
-                <p className="text-gray-600">{problem.desc}</p>
+                <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>{problem.title}</h3>
+                <p style={{ color: 'var(--tg-theme-hint-color)' }}>{problem.desc}</p>
               </div>
             ))}
           </div>
@@ -159,12 +191,16 @@ const BeautyPartnerPresentation = () => {
       </section>
 
       {/* Solutions Section */}
-      <section id="solutions" className="py-16 px-4 bg-gradient-to-br from-sakura-light/30 to-white">
+      <section
+        id="solutions"
+        className="py-16 px-4"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color) 70%, var(--tg-theme-secondary-bg-color))' }}
+      >
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-sakura-dark text-center mb-4">
+          <h2 className="text-3xl font-bold text-center mb-4" style={{ color: 'var(--tg-theme-text-color)' }}>
             {isRu ? 'Как мы решаем эти проблемы' : 'How We Solve These Problems'}
           </h2>
-          <p className="text-center text-gray-600 mb-12 text-lg">
+          <p className="text-center mb-12 text-lg" style={{ color: 'var(--tg-theme-hint-color)' }}>
             {isRu
               ? 'Простое решение для современного салона красоты'
               : 'Simple solution for modern beauty salon'}
@@ -211,15 +247,19 @@ const BeautyPartnerPresentation = () => {
             ].map((solution, idx) => (
               <div
                 key={idx}
-                className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border-2 border-sakura-mid/20 hover:border-sakura-mid/40 transition-all shadow-sm"
+                className="backdrop-blur-sm rounded-2xl p-6 transition-all shadow-sm"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 70%, transparent)',
+                  border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)'
+                }}
               >
                 <div className="flex items-start gap-4">
                   <div className={`text-4xl bg-gradient-to-br ${solution.color} rounded-xl p-3 w-16 h-16 flex items-center justify-center`}>
                     {solution.emoji}
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-sakura-dark mb-2">{solution.title}</h3>
-                    <p className="text-gray-600">{solution.desc}</p>
+                    <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>{solution.title}</h3>
+                    <p style={{ color: 'var(--tg-theme-hint-color)' }}>{solution.desc}</p>
                   </div>
                 </div>
               </div>
@@ -229,26 +269,36 @@ const BeautyPartnerPresentation = () => {
       </section>
 
       {/* Comparison Section */}
-      <section id="comparison" className="py-16 px-4 bg-white/50">
+      <section
+        id="comparison"
+        className="py-16 px-4"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 50%, transparent)' }}
+      >
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-sakura-dark text-center mb-12">
+          <h2 className="text-3xl font-bold text-center mb-12" style={{ color: 'var(--tg-theme-text-color)' }}>
             {isRu ? 'Сравнение с конкурентами' : 'Comparison with Competitors'}
           </h2>
 
-          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border-2 border-sakura-mid/20 overflow-x-auto">
+          <div
+            className="backdrop-blur-sm rounded-2xl p-6 overflow-x-auto"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 70%, transparent)',
+              border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)'
+            }}
+          >
             <table className="w-full">
               <thead>
-                <tr className="border-b-2 border-sakura-mid/20">
-                  <th className="text-left py-4 px-4 font-bold text-sakura-dark">
+                <tr style={{ borderBottom: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)' }}>
+                  <th className="text-left py-4 px-4 font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>
                     {isRu ? 'Функция' : 'Feature'}
                   </th>
-                  <th className="text-center py-4 px-4 font-bold text-sakura-mid">
+                  <th className="text-center py-4 px-4 font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>
                     {isRu ? 'LoyalityBot' : 'LoyalityBot'}
                   </th>
-                  <th className="text-center py-4 px-4 font-bold text-gray-500">
+                  <th className="text-center py-4 px-4 font-bold" style={{ color: 'var(--tg-theme-hint-color)' }}>
                     Yclients
                   </th>
-                  <th className="text-center py-4 px-4 font-bold text-gray-500">
+                  <th className="text-center py-4 px-4 font-bold" style={{ color: 'var(--tg-theme-hint-color)' }}>
                     Dikidi
                   </th>
                 </tr>
@@ -298,15 +348,19 @@ const BeautyPartnerPresentation = () => {
                     dikidi: '✅ Обязательно'
                   }
                 ].map((row, idx) => (
-                  <tr key={idx} className="border-b border-sakura-mid/10 hover:bg-sakura-light/20">
-                    <td className="py-4 px-4 font-semibold text-gray-700">{row.feature}</td>
+                  <tr
+                    key={idx}
+                    className="transition-all"
+                    style={{ borderBottom: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 10%, transparent)' }}
+                  >
+                    <td className="py-4 px-4 font-semibold" style={{ color: 'var(--tg-theme-text-color)' }}>{row.feature}</td>
                     <td className="py-4 px-4 text-center">
                       <span className="px-3 py-1 rounded-lg bg-green-100 text-green-700 font-semibold">
                         {row.loyalitybot}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-center text-gray-600">{row.yclients}</td>
-                    <td className="py-4 px-4 text-center text-gray-600">{row.dikidi}</td>
+                    <td className="py-4 px-4 text-center" style={{ color: 'var(--tg-theme-hint-color)' }}>{row.yclients}</td>
+                    <td className="py-4 px-4 text-center" style={{ color: 'var(--tg-theme-hint-color)' }}>{row.dikidi}</td>
                   </tr>
                 ))}
               </tbody>
@@ -316,12 +370,16 @@ const BeautyPartnerPresentation = () => {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-16 px-4 bg-gradient-to-br from-sakura-light/30 to-white">
+      <section
+        id="pricing"
+        className="py-16 px-4"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color) 70%, var(--tg-theme-secondary-bg-color))' }}
+      >
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-sakura-dark text-center mb-4">
+          <h2 className="text-3xl font-bold text-center mb-4" style={{ color: 'var(--tg-theme-text-color)' }}>
             {isRu ? 'Простые и прозрачные цены' : 'Simple & Transparent Pricing'}
           </h2>
-          <p className="text-center text-gray-600 mb-12 text-lg">
+          <p className="text-center mb-12 text-lg" style={{ color: 'var(--tg-theme-hint-color)' }}>
             {isRu
               ? 'Выберите план, который подходит вашему салону'
               : 'Choose the plan that fits your salon'}
@@ -329,11 +387,17 @@ const BeautyPartnerPresentation = () => {
 
           <div className="grid md:grid-cols-3 gap-6">
             {/* Free Plan */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border-2 border-sakura-mid/20">
+            <div
+              className="backdrop-blur-sm rounded-2xl p-6"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 70%, transparent)',
+                border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)'
+              }}
+            >
               <div className="text-center mb-6">
-                <div className="text-3xl font-bold text-sakura-dark mb-2">FREE</div>
-                <div className="text-4xl font-bold text-sakura-mid mb-1">$0</div>
-                <div className="text-gray-500 text-sm">{isRu ? 'навсегда' : 'forever'}</div>
+                <div className="text-3xl font-bold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>FREE</div>
+                <div className="text-4xl font-bold mb-1" style={{ color: 'var(--tg-theme-button-color)' }}>$0</div>
+                <div className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{isRu ? 'навсегда' : 'forever'}</div>
               </div>
               <ul className="space-y-3 mb-6">
                 <li className="flex items-start gap-2">
@@ -349,31 +413,48 @@ const BeautyPartnerPresentation = () => {
                   <span className="text-sm">{isRu ? 'Telegram бот' : 'Telegram bot'}</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-gray-400">❌</span>
-                  <span className="text-sm text-gray-400">{isRu ? 'Автонапоминания' : 'Auto reminders'}</span>
+                  <span style={{ color: 'var(--tg-theme-hint-color)' }}>❌</span>
+                  <span className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{isRu ? 'Автонапоминания' : 'Auto reminders'}</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-gray-400">❌</span>
-                  <span className="text-sm text-gray-400">{isRu ? 'Аналитика' : 'Analytics'}</span>
+                  <span style={{ color: 'var(--tg-theme-hint-color)' }}>❌</span>
+                  <span className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{isRu ? 'Аналитика' : 'Analytics'}</span>
                 </li>
               </ul>
               <button
                 onClick={() => navigate('/partner/apply')}
-                className="w-full py-3 rounded-xl font-semibold border-2 border-sakura-mid text-sakura-dark hover:bg-sakura-light transition-all"
+                className="w-full py-3 rounded-xl font-semibold transition-all"
+                style={{
+                  border: '2px solid var(--tg-theme-button-color)',
+                  color: 'var(--tg-theme-text-color)',
+                  backgroundColor: 'transparent'
+                }}
               >
                 {isRu ? 'Начать' : 'Start'}
               </button>
             </div>
 
             {/* Starter Plan */}
-            <div className="bg-gradient-to-br from-sakura-mid/10 to-sakura-dark/10 backdrop-blur-sm rounded-2xl p-6 border-2 border-sakura-mid shadow-lg relative">
-              <div className="absolute top-4 right-4 bg-sakura-mid text-white px-3 py-1 rounded-full text-xs font-bold">
+            <div
+              className="backdrop-blur-sm rounded-2xl p-6 shadow-lg relative"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 10%, var(--tg-theme-secondary-bg-color))',
+                border: '2px solid var(--tg-theme-button-color)'
+              }}
+            >
+              <div
+                className="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold"
+                style={{
+                  backgroundColor: 'var(--tg-theme-button-color)',
+                  color: 'var(--tg-theme-button-text-color, #fff)'
+                }}
+              >
                 {isRu ? 'ПОПУЛЯРНО' : 'POPULAR'}
               </div>
               <div className="text-center mb-6">
-                <div className="text-3xl font-bold text-sakura-dark mb-2">STARTER</div>
-                <div className="text-4xl font-bold text-sakura-mid mb-1">$29</div>
-                <div className="text-gray-500 text-sm">{isRu ? 'в месяц' : 'per month'}</div>
+                <div className="text-3xl font-bold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>STARTER</div>
+                <div className="text-4xl font-bold mb-1" style={{ color: 'var(--tg-theme-button-color)' }}>$29</div>
+                <div className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{isRu ? 'в месяц' : 'per month'}</div>
               </div>
               <ul className="space-y-3 mb-6">
                 <li className="flex items-start gap-2">
@@ -399,18 +480,28 @@ const BeautyPartnerPresentation = () => {
               </ul>
               <button
                 onClick={() => navigate('/partner/apply')}
-                className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-sakura-mid to-sakura-dark hover:shadow-xl transition-all"
+                className="w-full py-3 rounded-xl font-bold hover:shadow-xl transition-all"
+                style={{
+                  backgroundColor: 'var(--tg-theme-button-color)',
+                  color: 'var(--tg-theme-button-text-color, #fff)'
+                }}
               >
                 {isRu ? 'Выбрать' : 'Choose'}
               </button>
             </div>
 
             {/* Pro Plan */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border-2 border-sakura-mid/20">
+            <div
+              className="backdrop-blur-sm rounded-2xl p-6"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 70%, transparent)',
+                border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)'
+              }}
+            >
               <div className="text-center mb-6">
-                <div className="text-3xl font-bold text-sakura-dark mb-2">PRO</div>
-                <div className="text-4xl font-bold text-sakura-mid mb-1">$59</div>
-                <div className="text-gray-500 text-sm">{isRu ? 'в месяц' : 'per month'}</div>
+                <div className="text-3xl font-bold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>PRO</div>
+                <div className="text-4xl font-bold mb-1" style={{ color: 'var(--tg-theme-button-color)' }}>$59</div>
+                <div className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{isRu ? 'в месяц' : 'per month'}</div>
               </div>
               <ul className="space-y-3 mb-6">
                 <li className="flex items-start gap-2">
@@ -436,7 +527,12 @@ const BeautyPartnerPresentation = () => {
               </ul>
               <button
                 onClick={() => navigate('/partner/apply')}
-                className="w-full py-3 rounded-xl font-semibold border-2 border-sakura-mid text-sakura-dark hover:bg-sakura-light transition-all"
+                className="w-full py-3 rounded-xl font-semibold transition-all"
+                style={{
+                  border: '2px solid var(--tg-theme-button-color)',
+                  color: 'var(--tg-theme-text-color)',
+                  backgroundColor: 'transparent'
+                }}
               >
                 {isRu ? 'Выбрать' : 'Choose'}
               </button>
@@ -444,16 +540,22 @@ const BeautyPartnerPresentation = () => {
           </div>
 
           {/* Revenue Share Option */}
-          <div className="mt-8 bg-gradient-to-r from-sakura-mid/10 to-sakura-dark/10 rounded-2xl p-6 border-2 border-sakura-mid/30">
-            <h3 className="text-xl font-bold text-sakura-dark mb-3 text-center">
+          <div
+            className="mt-8 rounded-2xl p-6"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 10%, var(--tg-theme-secondary-bg-color))',
+              border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)'
+            }}
+          >
+            <h3 className="text-xl font-bold mb-3 text-center" style={{ color: 'var(--tg-theme-text-color)' }}>
               {isRu ? '💡 Опция Revenue Share' : '💡 Revenue Share Option'}
             </h3>
-            <p className="text-center text-gray-700 mb-4">
+            <p className="text-center mb-4" style={{ color: 'var(--tg-theme-text-color)' }}>
               {isRu
                 ? 'Для салонов с оборотом $20K+/мес: платите $39-99 + 1.5-2.5% от выручки вместо фиксированной цены.'
                 : 'For salons with $20K+/mo revenue: pay $39-99 + 1.5-2.5% of revenue instead of fixed price.'}
             </p>
-            <div className="text-center text-sm text-gray-600">
+            <div className="text-center text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>
               {isRu
                 ? 'Пример: оборот $30K → $99 + $600 = $699/мес (но вы экономите на маркетинге)'
                 : 'Example: $30K revenue → $99 + $600 = $699/mo (but you save on marketing)'}
@@ -463,9 +565,13 @@ const BeautyPartnerPresentation = () => {
       </section>
 
       {/* Results Section */}
-      <section id="results" className="py-16 px-4 bg-white/50">
+      <section
+        id="results"
+        className="py-16 px-4"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 50%, transparent)' }}
+      >
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-sakura-dark text-center mb-12">
+          <h2 className="text-3xl font-bold text-center mb-12" style={{ color: 'var(--tg-theme-text-color)' }}>
             {isRu ? 'Реальные результаты партнеров' : 'Real Partner Results'}
           </h2>
 
@@ -498,14 +604,18 @@ const BeautyPartnerPresentation = () => {
             ].map((caseStudy, idx) => (
               <div
                 key={idx}
-                className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border-2 border-sakura-mid/20 hover:shadow-lg transition-all"
+                className="backdrop-blur-sm rounded-2xl p-6 hover:shadow-lg transition-all"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 70%, transparent)',
+                  border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)'
+                }}
               >
                 <div className="text-4xl mb-3">{caseStudy.emoji}</div>
-                <h3 className="text-lg font-bold text-sakura-dark mb-1">{caseStudy.name}</h3>
-                <p className="text-sm text-gray-500 mb-4">{caseStudy.city}</p>
-                <div className="text-3xl font-bold text-sakura-mid mb-1">{caseStudy.result}</div>
-                <div className="text-sm text-gray-600 mb-1">{caseStudy.metric}</div>
-                <div className="text-xs text-gray-500">{caseStudy.period}</div>
+                <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--tg-theme-text-color)' }}>{caseStudy.name}</h3>
+                <p className="text-sm mb-4" style={{ color: 'var(--tg-theme-hint-color)' }}>{caseStudy.city}</p>
+                <div className="text-3xl font-bold mb-1" style={{ color: 'var(--tg-theme-button-color)' }}>{caseStudy.result}</div>
+                <div className="text-sm mb-1" style={{ color: 'var(--tg-theme-hint-color)' }}>{caseStudy.metric}</div>
+                <div className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>{caseStudy.period}</div>
               </div>
             ))}
           </div>
@@ -513,12 +623,15 @@ const BeautyPartnerPresentation = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 px-4 bg-gradient-to-r from-sakura-mid to-sakura-dark">
+      <section
+        className="py-16 px-4"
+        style={{ backgroundColor: 'var(--tg-theme-button-color)' }}
+      >
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ color: 'var(--tg-theme-button-text-color, #fff)' }}>
             {isRu ? 'Готовы увеличить доход?' : 'Ready to Increase Revenue?'}
           </h2>
-          <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl mb-8 max-w-2xl mx-auto" style={{ color: 'var(--tg-theme-button-text-color, #fff)', opacity: 0.9 }}>
             {isRu
               ? 'Присоединяйтесь к 500+ партнерам, которые уже используют LoyalityBot для роста бизнеса'
               : 'Join 500+ partners already using LoyalityBot to grow their business'}
@@ -526,18 +639,27 @@ const BeautyPartnerPresentation = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={() => navigate('/partner/apply')}
-              className="px-8 py-4 rounded-xl font-bold text-sakura-dark bg-white hover:bg-gray-100 active:scale-95 transition-all text-lg shadow-xl"
+              className="px-8 py-4 rounded-xl font-bold active:scale-95 transition-all text-lg shadow-xl"
+              style={{
+                backgroundColor: 'var(--tg-theme-bg-color)',
+                color: 'var(--tg-theme-text-color)'
+              }}
             >
               {isRu ? '🚀 Стать партнером бесплатно' : '🚀 Become Partner Free'}
             </button>
             <button
               onClick={() => scrollToSection('pricing')}
-              className="px-8 py-4 rounded-xl font-semibold text-white bg-white/20 border-2 border-white/30 hover:bg-white/30 active:scale-95 transition-all text-lg"
+              className="px-8 py-4 rounded-xl font-semibold active:scale-95 transition-all text-lg"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-text-color, #fff) 20%, transparent)',
+                color: 'var(--tg-theme-button-text-color, #fff)',
+                border: '2px solid color-mix(in srgb, var(--tg-theme-button-text-color, #fff) 30%, transparent)'
+              }}
             >
               {isRu ? '📋 Посмотреть тарифы' : '📋 View Plans'}
             </button>
           </div>
-          <p className="mt-6 text-white/80 text-sm">
+          <p className="mt-6 text-sm" style={{ color: 'var(--tg-theme-button-text-color, #fff)', opacity: 0.8 }}>
             {isRu
               ? '✅ Без кредитной карты • ✅ Запуск за 1 день • ✅ Отмена в любой момент'
               : '✅ No credit card • ✅ Launch in 1 day • ✅ Cancel anytime'}
@@ -546,8 +668,14 @@ const BeautyPartnerPresentation = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 px-4 bg-sakura-dark text-white text-center">
-        <p className="text-sm opacity-80">
+      <footer
+        className="py-8 px-4 text-center"
+        style={{
+          backgroundColor: 'var(--tg-theme-secondary-bg-color)',
+          color: 'var(--tg-theme-text-color)'
+        }}
+      >
+        <p className="text-sm" style={{ opacity: 0.8 }}>
           {isRu
             ? '© 2025 LoyalityBot. Все права защищены.'
             : '© 2025 LoyalityBot. All rights reserved.'}
@@ -558,8 +686,3 @@ const BeautyPartnerPresentation = () => {
 }
 
 export default BeautyPartnerPresentation
-
-
-
-
-

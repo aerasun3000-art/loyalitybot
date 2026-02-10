@@ -45,7 +45,7 @@ const HeaderModule = ({
   }
 
   return (
-    <div className="px-4 py-4 bg-white">
+    <div className="px-4 py-4 bg-sakura-surface">
       {/* Название */}
       <h1 className="text-2xl font-bold text-gray-900 leading-tight">
         {name}
@@ -56,7 +56,7 @@ const HeaderModule = ({
         {/* Рейтинг */}
         {displayRating > 0 && (
           <div className="flex items-center gap-1">
-            <span className="text-yellow-500">⭐</span>
+            <span className="text-sakura-gold">⭐</span>
             <span className="font-medium text-gray-900">{displayRating.toFixed(1)}</span>
             {displayReviews > 0 && (
               <span className="text-gray-500">({displayReviews})</span>

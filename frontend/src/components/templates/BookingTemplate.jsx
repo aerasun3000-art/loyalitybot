@@ -65,7 +65,7 @@ const BookingTemplate = ({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-sakura-cream pb-24">
       {/* Hero изображение */}
       <HeroModule 
         partner={partner}
@@ -76,7 +76,7 @@ const BookingTemplate = ({
       
       {/* Заголовок */}
       <div className="-mt-6 relative z-10">
-        <div className="bg-white rounded-t-3xl">
+        <div className="bg-sakura-surface rounded-t-3xl">
           <HeaderModule 
             partner={partner}
             rating={rating}
@@ -88,7 +88,7 @@ const BookingTemplate = ({
       </div>
       
       {/* Разделитель */}
-      <div className="h-2 bg-gray-100" />
+      <div className="h-2 bg-sakura-cream" />
       
       {/* Услуги */}
       <ServicesModule 
@@ -104,7 +104,7 @@ const BookingTemplate = ({
       {/* Специалисты (если включен модуль) */}
       {config.modules.specialists && (
         <>
-          <div className="h-2 bg-gray-100" />
+          <div className="h-2 bg-sakura-cream" />
           <SpecialistsModule 
             partnerId={partner?.chat_id}
             specialists={specialists}
@@ -117,7 +117,7 @@ const BookingTemplate = ({
       {/* Портфолио (если включен модуль) */}
       {config.modules.portfolio && (
         <>
-          <div className="h-2 bg-gray-100" />
+          <div className="h-2 bg-sakura-cream" />
           <PortfolioModule 
             partnerId={partner?.chat_id}
             photos={portfolioPhotos}
@@ -127,7 +127,7 @@ const BookingTemplate = ({
       )}
       
       {/* Локация и контакты */}
-      <div className="h-2 bg-gray-100" />
+      <div className="h-2 bg-sakura-cream" />
       <LocationModule 
         partner={partner}
         showMap={true}

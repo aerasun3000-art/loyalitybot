@@ -10,6 +10,7 @@ import useCurrencyStore from '../store/currencyStore'
 import { formatPriceWithPoints, fetchExchangeRates } from '../utils/currency'
 import { supabase } from '../services/supabase'
 import Loader from '../components/Loader'
+import Layout from '../components/Layout'
 import LocationSelector from '../components/LocationSelector'
 import { PartnerCardSkeleton } from '../components/SkeletonCard'
 import ServicesFilterBar from '../components/ServicesFilterBar'
@@ -56,7 +57,11 @@ const Services = () => {
   const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false)
   const [selectedCity, setSelectedCity] = useState(cityParam || '')
   const [selectedDistrict, setSelectedDistrict] = useState(districtParam || '')
-  const [favoritePartnerIds, setFavoritePartnerIds] = useState([])
+  const [favoritePartnerIds, setFavoritePartnerIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`fav_partners_${chatId}`) || '[]')
+    } catch { return [] }
+  })
   const [categoryFilter, setCategoryFilter] = useState(categoryParam || null)
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false)
   const [partnersMetrics, setPartnersMetrics] = useState({})
@@ -148,9 +153,17 @@ const Services = () => {
       ])
       setServices(servicesData)
       setBalance(balanceData?.balance || 0)
-      setSelectedCity(cityParam || '')
-      setSelectedDistrict(districtParam || '')
-      setFavoritePartnerIds(ratedPartners || [])
+      // Автоопределение города: URL param → localStorage → город реферального партнёра
+      const autoCity = cityParam
+        || localStorage.getItem('selectedCity')
+        || (partnerInfo?.city && partnerInfo.city !== 'Online' && partnerInfo.city !== 'Все' ? partnerInfo.city : '')
+        || ''
+      setSelectedCity(autoCity)
+      setSelectedDistrict('')
+      // Объединяем оценённых (из БД) + избранных (из localStorage)
+      const localFavs = (() => { try { return JSON.parse(localStorage.getItem(`fav_partners_${chatId}`) || '[]') } catch { return [] } })()
+      const merged = [...new Set([...(ratedPartners || []), ...localFavs])]
+      setFavoritePartnerIds(merged)
 
       // Загружаем метрики партнёров
       const partnerIds = [...new Set(servicesData.map(s => s.partner_chat_id).filter(Boolean))]
@@ -169,11 +182,16 @@ const Services = () => {
   const handleLocationSelect = (location) => {
     const params = new URLSearchParams()
     if (location.city) params.set('city', location.city)
-    if (location.district) params.set('district', location.district)
     if (categoryFilter) params.set('category', categoryFilter)
     setSearchParams(params)
     setSelectedCity(location.city || '')
-    setSelectedDistrict(location.district || '')
+    setSelectedDistrict('')
+    // Если выбран город — активируем фильтр "Город", если сброшен — "Мировой"
+    if (location.city) {
+      setFilter('my_district')
+    } else {
+      setFilter('all')
+    }
     loadData()
   }
 
@@ -246,21 +264,16 @@ const Services = () => {
       groupsMap[key].services.push(service)
     })
     
-    // Сортируем: сначала по категории, потом по метрикам (NPS, затем средняя оценка)
+    // Сортируем: по категории, затем NPS → кол-во голосов
     return Object.values(groupsMap).sort((a, b) => {
       const categoryDiff = getCategorySortValue(a.categoryCode) - getCategorySortValue(b.categoryCode)
       if (categoryDiff !== 0) return categoryDiff
-      
-      // В рамках одной категории сортируем по метрикам (лучшие партнёры выше)
-      // 1. По NPS (выше = лучше)
+
+      // 1. NPS (выше = лучше)
       const npsDiff = (b.npsScore || 0) - (a.npsScore || 0)
       if (npsDiff !== 0) return npsDiff
-      
-      // 2. По средней оценке (выше = лучше)
-      const ratingDiff = (b.rating || 0) - (a.rating || 0)
-      if (ratingDiff !== 0) return ratingDiff
-      
-      // 3. По количеству отзывов (больше = лучше, так как больше доверия)
+
+      // 2. Количество голосов (больше = лучше)
       return (b.ratingsCount || 0) - (a.ratingsCount || 0)
     })
   }
@@ -467,15 +480,31 @@ const Services = () => {
     }, referralPartnerInfo, isPartnerUser))
 
     if (filter === 'my_district') {
-      groups = groups.filter(matchesDistrict)
+      // Город: только локальные или гибрид в этом городе (без чисто-онлайн)
+      groups = groups.filter(group => {
+        if (!selectedCity) return true
+        const partner = group.partner
+        const workMode = partner?.work_mode || partner?.workMode
+        const partnerCity = partner?.city?.trim()
+        // Гибрид в нужном городе — ок
+        if (workMode === 'hybrid' && partnerCity === selectedCity) return true
+        // Офлайн в нужном городе — ок
+        if (partnerCity === selectedCity && workMode !== 'online') return true
+        return false
+      })
     } else if (filter === 'favorites') {
-      groups = groups
-        .filter(group => favoritePartnerIdsSet.has(group.partnerId))
-        .filter(matchesCity)
+      // Мои: только отмеченные сердечком
+      groups = groups.filter(group => favoritePartnerIdsSet.has(group.partnerId))
     } else if (filter === 'all') {
-      groups = groups.filter(group => isOnlinePartner(group.partner))
+      // Мировой ТОП: все партнёры, онлайн сначала, ТОП-10 по категории
+      // Сортируем: онлайн выше офлайн
+      groups = groups.sort((a, b) => {
+        const aOnline = isOnlinePartner(a.partner) ? 0 : 1
+        const bOnline = isOnlinePartner(b.partner) ? 0 : 1
+        return aOnline - bOnline
+      })
     } else {
-      groups = groups.filter(matchesCity)
+      // none / search без фильтра — все
     }
 
     if (filter === 'search' && debouncedQuery) {
@@ -510,17 +539,18 @@ const Services = () => {
   ])
 
   const sortedGroups = useMemo(() => {
+    const sorted = [...filteredGroups]
     if (sortBy === 'rating') {
-      return [...filteredGroups].sort((a, b) => {
-        return (b.rating || 0) - (a.rating || 0)
+      sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    } else if (sortBy === 'nps') {
+      sorted.sort((a, b) => {
+        const npsDiff = (b.npsScore || 0) - (a.npsScore || 0)
+        if (npsDiff !== 0) return npsDiff
+        return (b.ratingsCount || 0) - (a.ratingsCount || 0)
       })
     }
-    if (sortBy === 'nps') {
-      return [...filteredGroups].sort((a, b) => {
-        return (b.npsScore || 0) - (a.npsScore || 0)
-      })
-    }
-    return filteredGroups
+    // По умолчанию уже отсортировано в getGroupedServices: NPS → голоса
+    return sorted
   }, [filteredGroups, sortBy])
 
   const rankingMap = useMemo(() => {
@@ -559,21 +589,25 @@ const Services = () => {
       .sort((a, b) => a.order - b.order)
       .map(section => ({
         ...section,
-        items: section.items
+        // Мировой ТОП: максимум 10 партнёров на категорию
+        items: filter === 'all' ? section.items.slice(0, 10) : section.items
       }))
-  }, [sortedGroups, normalizeCategoryCode, getCategorySortValue])
+  }, [sortedGroups, normalizeCategoryCode, getCategorySortValue, filter])
 
   const handleFilterChange = (newFilter) => {
     hapticFeedback('light')
+
+    // "Город" — всегда открываем модалку для выбора/смены города
+    if (newFilter === 'my_district') {
+      setSearchQuery('')
+      setIsLocationSelectorOpen(true)
+      return
+    }
 
     const nextFilter = filter === newFilter ? 'none' : newFilter
 
     if (nextFilter !== 'search') {
       setSearchQuery('')
-    }
-
-    if (nextFilter === 'my_district' && !selectedDistrict) {
-      setIsLocationSelectorOpen(true)
     }
 
     if (nextFilter === 'none') {
@@ -769,6 +803,21 @@ const Services = () => {
     hapticFeedback('medium')
   }
 
+  const toggleFavorite = useCallback((partnerId) => {
+    hapticFeedback('light')
+    setFavoritePartnerIds(prev => {
+      const set = new Set(prev)
+      if (set.has(partnerId)) {
+        set.delete(partnerId)
+      } else {
+        set.add(partnerId)
+      }
+      const arr = [...set]
+      try { localStorage.setItem(`fav_partners_${chatId}`, JSON.stringify(arr)) } catch {}
+      return arr
+    })
+  }, [chatId])
+
   const handleRefresh = useCallback(async () => {
     setPullRefreshing(true)
     await loadData()
@@ -800,103 +849,90 @@ const Services = () => {
 
   if (loading && !pullRefreshing) {
     return (
-      <div className="relative min-h-screen overflow-hidden pb-24 text-sakura-dark">
-        <div className="absolute inset-0 -z-20">
-          <img src="/bg/sakura.jpg" alt="" className="w-full h-full object-cover opacity-85" />
-        </div>
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
-        <div className="sticky top-0 z-20 px-4 pt-6 pb-4 bg-sakura-surface/15 backdrop-blur-xl border-b border-sakura-border/40">
-          <div className="h-12 mb-4 bg-sakura-surface/20 rounded-xl animate-pulse w-3/4 mx-auto" />
+      <Layout>
+        <div className="max-w-screen-sm mx-auto px-4 flex flex-col gap-4 pt-2">
+          <div className="h-7 w-48 rounded-lg animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }} />
           <div className="flex gap-2 overflow-x-auto pb-2">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex-shrink-0 h-10 w-24 bg-sakura-surface/20 rounded-full animate-pulse" />
+              <div key={i} className="flex-shrink-0 h-10 w-24 rounded-full animate-pulse" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }} />
+            ))}
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <PartnerCardSkeleton key={i} />
             ))}
           </div>
         </div>
-        <div className="relative z-10 px-4 py-6 space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <PartnerCardSkeleton key={i} />
-          ))}
-        </div>
-      </div>
+      </Layout>
     )
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden pb-24 text-sakura-dark">
-      <div className="absolute inset-0 -z-20">
-        <img
-          src="/bg/sakura.jpg"
-          alt="Sakura background"
-          className="w-full h-full object-cover opacity-85"
-        />
-      </div>
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
-
+    <Layout>
+    <div className="max-w-screen-sm mx-auto">
       {/* Шапка */}
-      <div className="sticky top-0 z-20 px-4 pt-6 pb-4 bg-sakura-surface/15 backdrop-blur-xl border-b border-sakura-border/40">
-        <div className="flex items-center justify-between mb-4">
+      <div
+        className="sticky top-0 z-20 px-4 pt-2 pb-3"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color) 92%, transparent)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 12%, transparent)',
+        }}
+      >
+        <div className="flex items-center justify-between mb-3">
           <button
-            onClick={() => navigate('/')}
-            className="p-2 -ml-2 rounded-full border border-sakura-border/40 bg-sakura-surface/10 text-sakura-dark/80 hover:border-sakura-accent transition-colors"
+            onClick={() => navigate(-1)}
+            className="p-2 -ml-2 rounded-xl transition-all active:scale-90"
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M19 12H5M12 19l-7-7 7-7" />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
-          <div className="flex-1 text-center">
-            <h1 className="text-2xl font-bold drop-shadow-sm adaptive-text">Мои мастера</h1>
-          </div>
+          <h1 className="text-lg font-bold">{language === 'ru' ? 'Мои мастера' : 'My Masters'}</h1>
           <div className="relative">
             <button
               onClick={() => {
                 hapticFeedback('light')
                 setIsCategoryMenuOpen(prev => !prev)
               }}
-              className="p-2 pl-4 pr-3 rounded-full border border-sakura-border/40 bg-sakura-surface/10 text-sakura-dark/80 hover:border-sakura-accent transition-colors flex items-center gap-2"
+              className="p-2 pl-3 pr-2 rounded-xl flex items-center gap-1.5 transition-all active:scale-95"
+              style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
             >
-              <span className="text-sm font-semibold">
-                {categoryFilter ? (getCategoryByCode(categoryFilter)?.name || 'Категория') : 'Все виды'}
+              <span className="text-sm font-medium">
+                {categoryFilter ? (getCategoryByCode(categoryFilter)?.name || (language === 'ru' ? 'Категория' : 'Category')) : (language === 'ru' ? 'Все' : 'All')}
               </span>
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <circle cx="5" cy="12" r="1.5" />
-                <circle cx="12" cy="12" r="1.5" />
-                <circle cx="19" cy="12" r="1.5" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 9l6 6 6-6" />
               </svg>
             </button>
             {isCategoryMenuOpen && (
-              <div className="absolute right-0 mt-3 w-56 bg-sakura-surface border border-sakura-border/40 rounded-2xl shadow-xl overflow-hidden z-30">
+              <div
+                className="absolute right-0 mt-2 w-56 rounded-2xl shadow-xl overflow-hidden z-30"
+                style={{
+                  backgroundColor: 'var(--tg-theme-bg-color)',
+                  border: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)',
+                }}
+              >
                 <button
                   onClick={resetCategoryFilter}
-                  className={`w-full text-left px-4 py-3 text-sm font-semibold transition-colors ${
-                    !categoryFilter ? 'bg-sakura-accent/20 text-sakura-dark' : 'text-sakura-dark/80 hover:bg-sakura-surface/10'
-                  }`}
+                  className="w-full text-left px-4 py-3 text-sm font-semibold transition-colors active:bg-black/5"
+                  style={{
+                    backgroundColor: !categoryFilter ? 'color-mix(in srgb, var(--tg-theme-button-color) 12%, transparent)' : 'transparent',
+                    color: !categoryFilter ? 'var(--tg-theme-button-color)' : 'var(--tg-theme-text-color)',
+                  }}
                 >
-                  Все виды услуг
+                  {language === 'ru' ? 'Все виды услуг' : 'All service types'}
                 </button>
                 {categoryOptions.map(({ code, data }) => (
                   <button
                     key={code}
                     onClick={() => handleCategorySelect(code)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${
-                      categoryFilter === code
-                        ? 'bg-sakura-accent/30 text-white'
-                        : 'text-sakura-dark/80 hover:bg-sakura-surface/10'
-                    }`}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors active:bg-black/5"
+                    style={{
+                      backgroundColor: categoryFilter === code ? 'color-mix(in srgb, var(--tg-theme-button-color) 12%, transparent)' : 'transparent',
+                      color: categoryFilter === code ? 'var(--tg-theme-button-color)' : 'var(--tg-theme-text-color)',
+                    }}
                   >
                     <span className="text-lg">{data.emoji || '⭐'}</span>
                     <span className="flex-1 text-left">{data.name}</span>
@@ -921,13 +957,13 @@ const Services = () => {
 
       {/* Список категорий/компаний */}
       {pullRefreshing && (
-        <div className="relative z-10 px-4 pt-2 text-center">
-          <span className="text-sm text-sakura-dark/70">{language === 'ru' ? 'Обновление...' : 'Refreshing...'}</span>
+        <div className="px-4 pt-2 text-center">
+          <span className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{language === 'ru' ? 'Обновление...' : 'Refreshing...'}</span>
         </div>
       )}
       <div
         ref={listContainerRef}
-        className="relative z-10 px-4 py-6 space-y-3"
+        className="px-4 py-4 space-y-3"
         onTouchStart={(e) => {
           const el = listContainerRef.current
           if (el?.scrollTop === 0) pullStartY.current = e.touches[0]?.clientY ?? 0
@@ -941,10 +977,13 @@ const Services = () => {
         style={{ touchAction: 'pan-y' }}
       >
         {sortedGroups.length === 0 ? (
-          <div className="bg-sakura-surface/10 backdrop-blur-xl rounded-3xl p-8 text-center border border-sakura-border/40 shadow-xl">
-            <span className="text-6xl leading-none mx-auto mb-4 block">🌸</span>
-            <h3 className="text-xl font-bold mb-2">Мастера не найдены</h3>
-            <p className="text-sm text-sakura-dark/80 mb-4">
+          <div
+            className="rounded-2xl p-8 text-center"
+            style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
+          >
+            <span className="text-5xl leading-none mx-auto mb-3 block">🔍</span>
+            <h3 className="text-lg font-bold mb-2">{language === 'ru' ? 'Мастера не найдены' : 'No masters found'}</h3>
+            <p className="text-sm mb-4" style={{ color: 'var(--tg-theme-hint-color)' }}>
               {filter === 'search' && searchQuery
                 ? (language === 'ru' ? 'Попробуйте изменить поисковый запрос' : 'Try changing your search')
                 : (language === 'ru' ? 'Попробуйте изменить фильтры или выбрать другую локацию' : 'Try changing filters or location')}
@@ -952,13 +991,21 @@ const Services = () => {
             <div className="flex flex-col gap-2 max-w-xs mx-auto">
               <button
                 onClick={() => { hapticFeedback('medium'); setFilter('all') }}
-                className="w-full py-2.5 rounded-full bg-sakura-accent text-white font-semibold text-sm"
+                className="w-full py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-[0.98]"
+                style={{
+                  backgroundColor: 'var(--tg-theme-button-color)',
+                  color: 'var(--tg-theme-button-text-color, #fff)',
+                }}
               >
                 {language === 'ru' ? 'Показать мировой ТОП' : 'Show world TOP'}
               </button>
               <button
                 onClick={() => { hapticFeedback('light'); setFilter('none'); setSearchQuery(''); resetCategoryFilter() }}
-                className="w-full py-2.5 rounded-full bg-sakura-surface/40 text-sakura-dark border border-sakura-border/50 font-semibold text-sm"
+                className="w-full py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-[0.98]"
+                style={{
+                  backgroundColor: 'var(--tg-theme-bg-color)',
+                  border: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 20%, transparent)',
+                }}
               >
                 {language === 'ru' ? 'Сбросить фильтры' : 'Reset filters'}
               </button>
@@ -967,9 +1014,9 @@ const Services = () => {
         ) : (
           groupedSections.map((section) => (
             <div key={section.key} className="space-y-3">
-              <div className="flex items-center gap-2 px-1 pt-4">
-                <span className="text-2xl">{section.emoji}</span>
-                <h2 className="text-lg font-bold text-sakura-dark/80 tracking-wide uppercase">
+              <div className="flex items-center gap-2 px-1 pt-3">
+                <span className="text-xl">{section.emoji}</span>
+                <h2 className="text-sm font-bold tracking-wide uppercase" style={{ color: 'var(--tg-theme-hint-color)' }}>
                   {section.title}
                 </h2>
               </div>
@@ -978,36 +1025,37 @@ const Services = () => {
                   const isExpanded = expandedItem === group.id
                   // Ранг внутри секции (каждая категория начинается с #1)
                   const rank = index + 1
-                  const ratingDisplay = group.ratingsCount > 0 ? group.rating.toFixed(1) : '—'
 
-                  let containerHighlight = 'bg-sakura-surface/15 border-sakura-border/40'
-                  let rankBadge = 'bg-sakura-surface/40 text-sakura-dark/70'
+                  const isTop3 = rank <= 3
+                  let containerStyle = { backgroundColor: 'var(--tg-theme-secondary-bg-color)' }
+                  let rankBadgeStyle = { backgroundColor: 'var(--tg-theme-secondary-bg-color)', color: 'var(--tg-theme-hint-color)' }
+                  let cardTextColor = 'var(--tg-theme-text-color)'
+                  let cardHintColor = 'var(--tg-theme-hint-color)'
                   if (rank === 1) {
-                    containerHighlight = 'bg-gradient-to-r from-amber-200/80 to-amber-100/60 border-amber-300/70 shadow-xl'
-                    rankBadge = 'bg-amber-500 text-white'
+                    containerStyle = { background: 'linear-gradient(135deg, #fef3c7, #fde68a)' }
+                    rankBadgeStyle = { backgroundColor: '#f59e0b', color: '#fff' }
+                    cardTextColor = '#1c1917'
+                    cardHintColor = '#78716c'
                   } else if (rank === 2) {
-                    containerHighlight = 'bg-gradient-to-r from-sky-200/80 to-sky-100/60 border-sky-300/70 shadow-xl'
-                    rankBadge = 'bg-sky-500 text-white'
+                    containerStyle = { background: 'linear-gradient(135deg, #e0f2fe, #bae6fd)' }
+                    rankBadgeStyle = { backgroundColor: '#0ea5e9', color: '#fff' }
+                    cardTextColor = '#0c4a6e'
+                    cardHintColor = '#64748b'
                   } else if (rank === 3) {
-                    containerHighlight = 'bg-gradient-to-r from-violet-200/80 to-violet-100/60 border-violet-300/70 shadow-xl'
-                    rankBadge = 'bg-violet-500 text-white'
+                    containerStyle = { background: 'linear-gradient(135deg, #ede9fe, #ddd6fe)' }
+                    rankBadgeStyle = { backgroundColor: '#8b5cf6', color: '#fff' }
+                    cardTextColor = '#3b0764'
+                    cardHintColor = '#7c6f9b'
                   }
 
-                  let npsClass = 'bg-sakura-surface/40 text-sakura-dark/70'
-                  if (group.npsScore >= 50) {
-                    npsClass = 'bg-green-100 text-green-700'
-                  } else if (group.npsScore > 0) {
-                    npsClass = 'bg-yellow-100 text-yellow-700'
-                  } else if (group.npsScore < 0) {
-                    npsClass = 'bg-red-100 text-red-700'
-                  }
 
                   const photoUrl = group.partner?.photo_url
 
                   return (
                     <div
                       key={group.id}
-                      className={`backdrop-blur-lg rounded-3xl border transition-all duration-300 overflow-hidden ${containerHighlight}`}
+                      className="rounded-2xl overflow-hidden"
+                      style={containerStyle}
                     >
                       <div
                         className="flex items-center gap-3 px-4 py-3 cursor-pointer"
@@ -1018,103 +1066,104 @@ const Services = () => {
                           handlePlayClick(group.id, e)
                         }}
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className={`flex flex-col items-center justify-center w-9 shrink-0 text-xs font-bold uppercase ${rank <= 3 ? 'text-sakura-deep' : 'text-sakura-dark/60'}`}>
-                            <span className={`px-2 py-1 rounded-full ${rankBadge}`}>#{rank}</span>
-                          </div>
-                          <div className="relative w-12 h-12 shrink-0 rounded-full overflow-hidden border border-white/40 bg-sakura-surface/40 shadow-inner">
-                            {photoUrl ? (
-                              <img
-                                src={photoUrl}
-                                alt={group.companyName}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-2xl">
-                                {group.categoryEmoji || '⭐'}
-                              </div>
-                            )}
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <div className="relative shrink-0">
+                            <div className="w-10 h-10 rounded-xl overflow-hidden" style={{ backgroundColor: isTop3 ? 'rgba(255,255,255,0.45)' : 'color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)' }}>
+                              {photoUrl ? (
+                                <img
+                                  src={photoUrl}
+                                  alt={group.companyName}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-xl">
+                                  {group.categoryEmoji || '⭐'}
+                                </div>
+                              )}
+                            </div>
+                            <span
+                              className="absolute -top-1.5 -left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none"
+                              style={rankBadgeStyle}
+                            >
+                              {rank}
+                            </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="text-lg font-semibold text-sakura-dark/90 truncate">
-                                {group.companyName}
-                              </h3>
-                              <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-white/60 text-sakura-dark/70">
-                                {group.categoryName}
-                              </span>
-                            </div>
-                            <div className="mt-1 flex items-center gap-3 text-xs text-sakura-dark/70 flex-wrap">
+                            <h3 className="text-[15px] font-semibold truncate leading-snug" style={{ color: cardTextColor }}>
+                              {group.companyName}
+                            </h3>
+                            <div className="mt-0.5 flex items-center gap-1.5 text-xs" style={{ color: cardHintColor }}>
                               {group.ratingsCount > 0 ? (
-                                <span>⭐ {group.rating.toFixed(1)} ({group.ratingsCount})</span>
+                                <>
+                                  <span className="font-bold" style={{ color: isTop3 ? cardTextColor : 'var(--tg-theme-button-color)' }}>
+                                    ⭐ {group.rating.toFixed(1)}
+                                  </span>
+                                  <span style={{ opacity: 0.5 }}>({group.ratingsCount})</span>
+                                </>
                               ) : (
-                                <span className="italic text-sakura-dark/50">{language === 'ru' ? 'Нет отзывов' : 'No reviews yet'}</span>
+                                <span className="italic" style={{ opacity: 0.6 }}>{language === 'ru' ? 'Нет оценок' : 'No ratings'}</span>
                               )}
-                              <span className="text-sakura-dark/40">•</span>
-                              <span className="text-sakura-dark/70">
-                                {language === 'ru' ? `${group.services.length} услуг` : `${group.services.length} services`}
-                              </span>
+                              <span style={{ opacity: 0.3 }}>·</span>
+                              <span>{group.services.length} {language === 'ru' ? 'усл.' : 'svc'}</span>
+                              {group.npsScore !== 0 && (
+                                <>
+                                  <span style={{ opacity: 0.3 }}>·</span>
+                                  <span className="font-semibold" style={{ color: group.npsScore >= 50 ? '#15803d' : group.npsScore > 0 ? '#a16207' : '#b91c1c' }}>
+                                    NPS {group.npsScore > 0 ? `+${group.npsScore}` : group.npsScore}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-2 shrink-0">
-                          <span className={`text-2xl font-extrabold ${group.ratingsCount > 0 ? 'text-sakura-deep drop-shadow-[0_1px_4px_rgba(255,255,255,0.6)]' : 'text-sakura-dark/40'}`}>
-                            {ratingDisplay}
-                          </span>
-                          {group.npsScore !== 0 && (
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${npsClass}`}>
-                              NPS {group.npsScore > 0 ? `+${group.npsScore}` : group.npsScore}
-                            </span>
-                          )}
-                          <div className="flex items-center gap-2">
-                            {group.partnerId && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (favoritePartnerIdsSet.has(group.partnerId)) return
-                                  hapticFeedback('light')
-                                  setQuickRatingModal({ open: true, group, rating: 0 })
-                                }}
-                                className={`p-2.5 rounded-full border transition-colors ${favoritePartnerIdsSet.has(group.partnerId) ? 'border-red-300 bg-red-100 text-red-600' : 'border-sakura-border/60 bg-white/70 text-sakura-dark/70 hover:border-sakura-accent'}`}
-                                title={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'Уже в любимых' : 'Already in favorites') : (language === 'ru' ? 'Оценить и добавить в любимые' : 'Rate and add to favorites')}
-                                aria-label={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'В любимых' : 'In favorites') : (language === 'ru' ? 'Добавить в любимые' : 'Add to favorites')}
-                              >
-                                {favoritePartnerIdsSet.has(group.partnerId) ? (
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                                  </svg>
-                                ) : (
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                                  </svg>
-                                )}
-                              </button>
-                            )}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {group.partnerId && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handlePlayClick(group.id, e)
+                                toggleFavorite(group.partnerId)
                               }}
-                              className="p-2.5 rounded-full border border-sakura-border/60 bg-white/70 text-sakura-dark hover:border-sakura-accent transition-colors"
-                              aria-label={isExpanded ? (language === 'ru' ? 'Свернуть' : 'Collapse') : (language === 'ru' ? 'Подробнее' : 'Details')}
+                              className="p-1.5 rounded-lg"
+                              style={favoritePartnerIdsSet.has(group.partnerId)
+                                ? { color: '#dc2626' }
+                                : { color: cardHintColor }
+                              }
+                              aria-label={favoritePartnerIdsSet.has(group.partnerId) ? (language === 'ru' ? 'Убрать из Моих' : 'Remove from favorites') : (language === 'ru' ? 'Добавить в Мои' : 'Add to favorites')}
                             >
-                              {isExpanded ? (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M6 15l6-6 6 6" />
+                              {favoritePartnerIdsSet.has(group.partnerId) ? (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                                 </svg>
                               ) : (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M6 9l6 6 6-6" />
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                                 </svg>
                               )}
                             </button>
-                          </div>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handlePlayClick(group.id, e)
+                            }}
+                            className="p-1.5 rounded-lg"
+                            style={{ color: cardHintColor }}
+                            aria-label={isExpanded ? (language === 'ru' ? 'Свернуть' : 'Collapse') : (language === 'ru' ? 'Подробнее' : 'Details')}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d={isExpanded ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6"} />
+                            </svg>
+                          </button>
                         </div>
                       </div>
 
                       {isExpanded && (
-                        <div 
-                          className="border-t border-sakura-border/30 bg-white/60"
+                        <div
+                          className="border-t"
+                          style={{
+                            borderColor: 'color-mix(in srgb, var(--tg-theme-hint-color) 12%, transparent)',
+                            backgroundColor: 'color-mix(in srgb, var(--tg-theme-secondary-bg-color) 60%, transparent)',
+                          }}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
@@ -1125,21 +1174,25 @@ const Services = () => {
                                   e.stopPropagation()
                                   handleServiceClick(service)
                                 }}
-                                className="flex items-center justify-between p-3 rounded-xl bg-sakura-surface/10 border border-sakura-border/20 hover:bg-sakura-surface/20 cursor-pointer transition-colors"
+                                className="flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors active:scale-[0.98]"
+                                style={{
+                                  backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color) 70%, transparent)',
+                                  borderColor: 'color-mix(in srgb, var(--tg-theme-hint-color) 10%, transparent)',
+                                }}
                               >
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="text-sm font-semibold text-sakura-dark mb-1">
+                                  <h4 className="text-sm font-semibold mb-1" style={{ color: 'var(--tg-theme-text-color)' }}>
                                     {service.title}
                                   </h4>
                                   {service.description && (
-                                    <p className="text-xs text-sakura-dark/60 line-clamp-1">
+                                    <p className="text-xs line-clamp-1" style={{ color: 'var(--tg-theme-hint-color)' }}>
                                       {service.description}
                                     </p>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2 ml-3">
-                                  <span className="text-xs text-sakura-dark/80">💸</span>
-                                  <span className="text-sm font-bold text-sakura-deep drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]">
+                                  <span className="text-xs">💸</span>
+                                  <span className="text-sm font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>
                                     {formatPriceWithPoints(service.price_points, currency, rates, true, language)}
                                   </span>
                                 </div>
@@ -1205,34 +1258,15 @@ const Services = () => {
         onClose={() => setIsEmptyCategoryModalOpen(false)}
       />
 
-      {/* Скрыть скроллбар и адаптивный цвет текста */}
       <style>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .line-clamp-1 {
-          display: -webkit-box;
-          -webkit-line-clamp: 1;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-        /* Адаптивный цвет текста относительно подложки */
-        .adaptive-text {
-          color: #ffffff;
-          mix-blend-mode: difference;
-        }
-        .adaptive-subtext {
-          color: rgba(255,255,255,0.8);
-          mix-blend-mode: difference;
-        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
       `}</style>
 
       {toast && <Toast message={toast.message} type={toast.type} key={toast.key} onClose={hideToast} />}
     </div>
+    </Layout>
   )
 }
 

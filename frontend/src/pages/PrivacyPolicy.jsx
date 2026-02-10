@@ -8,7 +8,7 @@ const PrivacyPolicy = () => {
   const { t } = useTranslation(language)
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-sakura-cream">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}>
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-500 to-blue-600 px-4 pt-6 pb-8 sticky top-0 z-10 shadow-md">
         <div className="flex items-center justify-between mb-4">
@@ -35,7 +35,7 @@ const PrivacyPolicy = () => {
 
       {/* Content */}
       <div className="px-4 py-6 pb-20">
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <div className="bg-sakura-surface rounded-2xl p-6 shadow-sm">
           {language === 'ru' ? (
             // Русская версия
             <div className="prose prose-sm max-w-none">
@@ -134,7 +134,7 @@ const PrivacyPolicy = () => {
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">Как реализовать права</h3>
                 <p className="text-gray-600 text-sm leading-relaxed mb-2">Отправьте запрос через:</p>
                 <ul className="list-disc pl-5 text-gray-600 text-sm space-y-1">
-                  <li>Telegram бот: команда <code className="bg-gray-100 px-1 rounded">/support</code> или <code className="bg-gray-100 px-1 rounded">поддержка</code></li>
+                  <li>Telegram бот: команда <code className="bg-sakura-cream px-1 rounded">/support</code> или <code className="bg-sakura-cream px-1 rounded">поддержка</code></li>
                   <li>Email: <strong>support@loyalitybot.com</strong></li>
                 </ul>
                 <p className="text-gray-600 text-sm leading-relaxed mt-2">
@@ -261,7 +261,7 @@ const PrivacyPolicy = () => {
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">How to Exercise Your Rights</h3>
                 <p className="text-gray-600 text-sm leading-relaxed mb-2">Send a request via:</p>
                 <ul className="list-disc pl-5 text-gray-600 text-sm space-y-1">
-                  <li>Telegram bot: <code className="bg-gray-100 px-1 rounded">/support</code> or <code className="bg-gray-100 px-1 rounded">support</code> command</li>
+                  <li>Telegram bot: <code className="bg-sakura-cream px-1 rounded">/support</code> or <code className="bg-sakura-cream px-1 rounded">support</code> command</li>
                   <li>Email: <strong>support@loyalitybot.com</strong></li>
                 </ul>
                 <p className="text-gray-600 text-sm leading-relaxed mt-2">

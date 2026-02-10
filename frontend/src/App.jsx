@@ -5,6 +5,7 @@ import { getTelegramWebApp, getChatId, getColorScheme } from './utils/telegram'
 
 // Pages
 import Home from './pages/Home'
+import HomeMini from './pages/HomeMini'
 import Promotions from './pages/Promotions'
 import PromotionDetail from './pages/PromotionDetail'
 import Services from './pages/Services'
@@ -34,7 +35,7 @@ import Message from './pages/Message'
 import PalettePreview from './pages/PalettePreview'
 
 // Components
-import Navigation from './components/Navigation'
+import BottomNav from './components/BottomNav'
 import ErrorBoundary from './components/ErrorBoundary'
 
 // Публичные маршруты, которые не требуют Telegram авторизации
@@ -61,7 +62,10 @@ function AppContent() {
   
   // Проверяем, является ли текущий маршрут публичным
   const isPublicRoute = PUBLIC_ROUTES.some(route => location.pathname.startsWith(route))
-  
+  // Определяем основные маршруты с BottomNav
+  const MAIN_ROUTES = ['/', '/history', '/promotions', '/community', '/profile', '/services', '/all-categories']
+  const isMainRoute = MAIN_ROUTES.includes(location.pathname)
+
   // Для приватных маршрутов требуем авторизацию
   // if (!isPublicRoute && !chatId) {
   //   return (
@@ -82,6 +86,8 @@ function AppContent() {
       <main className={isPublicRoute ? "flex-1" : "flex-1 pb-16"}>
         <Routes>
           <Route path="/" element={<Home />} />
+          {/* Экспериментальный экран с новым дизайном (черновик) */}
+          <Route path="/mini-home" element={<HomeMini />} />
           <Route path="/promotions" element={<Promotions />} />
           <Route path="/promotions/:id" element={<PromotionDetail />} />
           <Route path="/services" element={<Services />} />
@@ -115,8 +121,8 @@ function AppContent() {
         </Routes>
       </main>
 
-      {/* Нижняя навигация - только для приватных страниц */}
-      {!isPublicRoute && <Navigation />}
+      {/* BottomNav — для основных разделов */}
+      {!isPublicRoute && isMainRoute && <BottomNav />}
     </div>
   )
 }

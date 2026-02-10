@@ -116,13 +116,13 @@ const CTAFooterModule = ({
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white/95 backdrop-blur-sm border-t border-gray-200 safe-area-bottom">
+    <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-sakura-surface/95 backdrop-blur-sm border-t border-sakura-border/20 safe-area-bottom">
       <div className="flex gap-3 max-w-lg mx-auto">
         {/* Вторичная кнопка (если есть) */}
         {secondaryCTA && (
           <button
             onClick={handleSecondaryAction}
-            className="flex-shrink-0 flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl bg-gray-100 text-gray-700 font-medium transition-colors active:bg-gray-200"
+            className="flex-shrink-0 flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl bg-sakura-cream text-sakura-deep font-medium transition-colors active:bg-sakura-cream/80"
           >
             <span>{secondaryCTA.icon}</span>
             <span className="hidden sm:inline">{secondaryCTA.label}</span>
@@ -133,11 +133,11 @@ const CTAFooterModule = ({
         <button
           onClick={handlePrimaryAction}
           disabled={disabled || isLoading}
-          className={`flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl font-semibold text-white transition-all active:scale-[0.98] ${
-            disabled || isLoading
-              ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-gradient-to-r from-sakura-accent to-sakura-dark shadow-lg shadow-sakura-accent/25'
-          }`}
+          className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl font-semibold active:scale-[0.98]"
+          style={disabled || isLoading
+            ? { backgroundColor: 'var(--tg-theme-hint-color)', color: 'var(--tg-theme-bg-color)', cursor: 'not-allowed', opacity: 0.5 }
+            : { backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)', boxShadow: '0 4px 12px color-mix(in srgb, var(--tg-theme-button-color) 25%, transparent)' }
+          }
         >
           {isLoading ? (
             <>

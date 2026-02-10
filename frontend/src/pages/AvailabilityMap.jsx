@@ -84,7 +84,7 @@ const AvailabilityMap = () => {
   const { language, toggleLanguage } = useLanguageStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+
   const [availability, setAvailability] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedDistrict, setSelectedDistrict] = useState(searchParams.get('district') || 'all');
@@ -100,7 +100,7 @@ const AvailabilityMap = () => {
   const fetchAvailability = async () => {
     try {
       setLoading(true);
-      
+
       // Запрос к Supabase напрямую через REST API
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/partners?select=district,business_type,status,name&city=eq.New York&district=not.is.null&business_type=not.is.null`,
@@ -117,7 +117,7 @@ const AvailabilityMap = () => {
       }
 
       const partners = await response.json();
-      
+
       // Формируем карту доступности
       const availMap = {};
       DISTRICTS.forEach(district => {
@@ -126,7 +126,7 @@ const AvailabilityMap = () => {
           const partner = partners.find(
             p => p.district === district && p.business_type === service.id
           );
-          
+
           if (partner) {
             if (partner.status === 'Approved') {
               availMap[district][service.id] = {
@@ -171,13 +171,13 @@ const AvailabilityMap = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'taken':
-        return 'bg-red-200 border-red-400 hover:bg-red-300';
+        return 'bg-sakura-accent/10 border-sakura-accent hover:bg-sakura-accent/20';
       case 'pending':
-        return 'bg-yellow-200 border-yellow-400 hover:bg-yellow-300';
+        return 'bg-sakura-gold/10 border-sakura-gold hover:bg-sakura-gold/20';
       case 'available':
-        return 'bg-green-200 border-green-400 hover:bg-green-300';
+        return 'bg-sakura-mid/10 border-sakura-mid hover:bg-sakura-mid/20';
       default:
-        return 'bg-gray-200 border-gray-400';
+        return 'bg-sakura-cream border-sakura-border';
     }
   };
 
@@ -203,12 +203,12 @@ const AvailabilityMap = () => {
   };
 
   // Фильтрация данных
-  const filteredDistricts = selectedDistrict === 'all' 
-    ? DISTRICTS 
+  const filteredDistricts = selectedDistrict === 'all'
+    ? DISTRICTS
     : [selectedDistrict];
-  
-  const filteredServices = selectedService === 'all' 
-    ? SERVICES 
+
+  const filteredServices = selectedService === 'all'
+    ? SERVICES
     : SERVICES.filter(s => s.id === selectedService);
 
   // Статистика
@@ -234,64 +234,73 @@ const AvailabilityMap = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sakura-light via-white to-sakura-cream">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, var(--tg-theme-bg-color, #f9fafb), var(--tg-theme-secondary-bg-color, #f3f4f6))' }}>
       {/* Переключатель языка */}
       <div className="fixed top-4 right-4 z-50">
         <button
           onClick={handleLanguageToggle}
-          className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border-2 border-sakura-mid/30 hover:border-sakura-mid transition-colors"
+          className="flex items-center gap-2 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg"
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--tg-theme-bg-color, #fff) 90%, transparent)',
+            border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)'
+          }}
         >
           <span className="text-xl">{language === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
-          <span className="font-bold text-sakura-dark">{language === 'ru' ? 'RU' : 'EN'}</span>
+          <span className="font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>{language === 'ru' ? 'RU' : 'EN'}</span>
         </button>
       </div>
 
       {/* Заголовок */}
-      <div className="bg-white py-12 border-b-2 border-sakura-mid/20">
+      <div className="py-12" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)', borderBottom: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 20%, transparent)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-6xl font-bold text-sakura-dark mb-4">
+            <h1 className="text-4xl md:text-6xl font-bold mb-4" style={{ color: 'var(--tg-theme-text-color)' }}>
               {t('title')}
             </h1>
-            <p className="text-xl text-gray-600">
+            <p className="text-xl" style={{ color: 'var(--tg-theme-hint-color)' }}>
               {t('subtitle')}
             </p>
           </div>
 
           {/* Статистика */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
-            <div className="bg-gradient-to-br from-sakura-light to-sakura-cream rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold text-sakura-dark">{stats.total}</div>
-              <div className="text-sm text-gray-600">{t('totalPositions')}</div>
+            <div className="rounded-xl p-4 text-center" style={{ background: 'linear-gradient(135deg, var(--tg-theme-secondary-bg-color), color-mix(in srgb, var(--tg-theme-button-color) 10%, transparent))' }}>
+              <div className="text-2xl font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>{stats.total}</div>
+              <div className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('totalPositions')}</div>
             </div>
             <div className="bg-green-50 rounded-xl p-4 text-center border-2 border-green-300">
               <div className="text-2xl font-bold text-green-600">{stats.available}</div>
-              <div className="text-sm text-gray-600">{t('availablePositions')}</div>
+              <div className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('availablePositions')}</div>
             </div>
-            <div className="bg-yellow-50 rounded-xl p-4 text-center border-2 border-yellow-300">
+            <div className="bg-sakura-cream rounded-xl p-4 text-center border-2 border-sakura-gold">
               <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-              <div className="text-sm text-gray-600">{t('pendingPositions')}</div>
+              <div className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('pendingPositions')}</div>
             </div>
             <div className="bg-red-50 rounded-xl p-4 text-center border-2 border-red-300">
               <div className="text-2xl font-bold text-red-600">{stats.taken}</div>
-              <div className="text-sm text-gray-600">{t('takenPositions')}</div>
+              <div className="text-sm" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('takenPositions')}</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Фильтры */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+      <div className="sticky top-0 z-40 shadow-sm" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)', borderBottom: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-wrap gap-4 items-center justify-center">
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-sakura-dark">
+              <label className="text-sm font-medium" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('filterByDistrict')}:
               </label>
               <select
                 value={selectedDistrict}
                 onChange={(e) => setSelectedDistrict(e.target.value)}
-                className="border-2 border-sakura-mid/30 rounded-lg px-3 py-2 text-sm focus:border-sakura-mid focus:outline-none"
+                className="rounded-lg px-3 py-2 text-sm focus:outline-none"
+                style={{
+                  border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)',
+                  backgroundColor: 'var(--tg-theme-bg-color)',
+                  color: 'var(--tg-theme-text-color)'
+                }}
               >
                 <option value="all">{t('showAll')}</option>
                 {DISTRICTS.map(district => (
@@ -301,13 +310,18 @@ const AvailabilityMap = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-sakura-dark">
+              <label className="text-sm font-medium" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('filterByService')}:
               </label>
               <select
                 value={selectedService}
                 onChange={(e) => setSelectedService(e.target.value)}
-                className="border-2 border-sakura-mid/30 rounded-lg px-3 py-2 text-sm focus:border-sakura-mid focus:outline-none"
+                className="rounded-lg px-3 py-2 text-sm focus:outline-none"
+                style={{
+                  border: '2px solid color-mix(in srgb, var(--tg-theme-button-color) 30%, transparent)',
+                  backgroundColor: 'var(--tg-theme-bg-color)',
+                  color: 'var(--tg-theme-text-color)'
+                }}
               >
                 <option value="all">{t('showAll')}</option>
                 {SERVICES.map(service => (
@@ -325,27 +339,28 @@ const AvailabilityMap = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
           <div className="text-center py-20">
-            <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-2 border-sakura-dark"></div>
-            <p className="mt-4 text-lg text-gray-600">{t('loading')}</p>
+            <div className="inline-block animate-spin rounded-full h-16 w-16" style={{ borderBottom: '2px solid var(--tg-theme-button-color)' }}></div>
+            <p className="mt-4 text-lg" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('loading')}</p>
           </div>
         ) : filteredDistricts.length === 0 || filteredServices.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-xl text-gray-600">{t('noPositionsFound')}</p>
+            <p className="text-xl" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('noPositionsFound')}</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-xl p-6 overflow-x-auto">
+          <div className="rounded-2xl shadow-xl p-6 overflow-x-auto" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
             <div className="inline-block min-w-full">
               <table className="min-w-full border-collapse">
                 <thead>
                   <tr>
-                    <th className="bg-gray-50 p-4 text-left font-bold text-sm text-sakura-dark border-b-2 sticky left-0 z-10">
+                    <th className="bg-sakura-cream p-4 text-left font-bold text-sm border-b-2 sticky left-0 z-10" style={{ color: 'var(--tg-theme-text-color)' }}>
                       {t('filterByDistrict')}
                     </th>
                     {filteredServices.map(service => (
                       <th
                         key={service.id}
-                        className="bg-gray-50 p-3 text-center font-medium text-xs text-sakura-dark border-b-2 min-w-[80px]"
+                        className="bg-sakura-cream p-3 text-center font-medium text-xs border-b-2 min-w-[80px]"
                         title={service.name}
+                        style={{ color: 'var(--tg-theme-text-color)' }}
                       >
                         <div className="text-2xl mb-1">{service.emoji}</div>
                         <div className="text-xs">{service.name}</div>
@@ -355,8 +370,8 @@ const AvailabilityMap = () => {
                 </thead>
                 <tbody>
                   {filteredDistricts.map(district => (
-                    <tr key={district} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-4 font-bold text-sm text-sakura-dark border-b sticky left-0 bg-white z-10">
+                    <tr key={district} className="hover:bg-sakura-cream/40 transition-colors">
+                      <td className="p-4 font-bold text-sm border-b sticky left-0 z-10" style={{ color: 'var(--tg-theme-text-color)', backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
                         {district}
                       </td>
                       {filteredServices.map(service => {
@@ -380,7 +395,7 @@ const AvailabilityMap = () => {
                             onMouseEnter={() => setHoveredCell(`${district}_${service.id}`)}
                             onMouseLeave={() => setHoveredCell(null)}
                             title={
-                              isClickable 
+                              isClickable
                                 ? t('clickToApply')
                                 : `${district} - ${service.name}: ${status}${partnerName ? ` (${partnerName})` : ''}`
                             }
@@ -405,36 +420,36 @@ const AvailabilityMap = () => {
         )}
 
         {/* Легенда */}
-        <div className="mt-8 bg-white rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold text-sakura-dark mb-4 text-center">
+        <div className="mt-8 rounded-xl p-6 shadow-lg" style={{ backgroundColor: 'var(--tg-theme-bg-color, #fff)' }}>
+          <h3 className="text-xl font-bold mb-4 text-center" style={{ color: 'var(--tg-theme-text-color)' }}>
             {language === 'ru' ? 'Легенда' : 'Legend'}
           </h3>
           <div className="flex flex-wrap gap-6 justify-center text-sm">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-green-200 border-2 border-green-400 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-sakura-mid/10 border-2 border-sakura-mid rounded-lg flex items-center justify-center">
                 <span className="text-xl">✓</span>
               </div>
               <div>
-                <div className="font-bold">{t('available')}</div>
-                <div className="text-xs text-gray-500">{t('positionAvailable')}</div>
+                <div className="font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>{t('available')}</div>
+                <div className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('positionAvailable')}</div>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-yellow-200 border-2 border-yellow-400 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-sakura-gold/10 border-2 border-sakura-gold rounded-lg flex items-center justify-center">
                 <span className="text-xl">⏳</span>
               </div>
               <div>
-                <div className="font-bold">{t('pending')}</div>
-                <div className="text-xs text-gray-500">{t('positionPending')}</div>
+                <div className="font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>{t('pending')}</div>
+                <div className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('positionPending')}</div>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-red-200 border-2 border-red-400 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-sakura-accent/10 border-2 border-sakura-accent rounded-lg flex items-center justify-center">
                 <span className="text-xl">✗</span>
               </div>
               <div>
-                <div className="font-bold">{t('taken')}</div>
-                <div className="text-xs text-gray-500">{t('positionTaken')}</div>
+                <div className="font-bold" style={{ color: 'var(--tg-theme-text-color)' }}>{t('taken')}</div>
+                <div className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>{t('positionTaken')}</div>
               </div>
             </div>
           </div>
@@ -444,7 +459,8 @@ const AvailabilityMap = () => {
         <div className="mt-8 text-center">
           <button
             onClick={() => navigate('/onepager/partner')}
-            className="px-8 py-3 bg-gradient-to-r from-sakura-mid to-sakura-dark text-white rounded-xl font-bold hover:shadow-xl transition-all transform hover:scale-105"
+            className="px-8 py-3 rounded-xl font-bold hover:shadow-xl transition-all transform hover:scale-105"
+            style={{ backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }}
           >
             {t('backToHome')}
           </button>
@@ -455,14 +471,3 @@ const AvailabilityMap = () => {
 };
 
 export default AvailabilityMap;
-
-
-
-
-
-
-
-
-
-
-

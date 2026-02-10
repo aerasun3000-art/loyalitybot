@@ -61,38 +61,32 @@ const Loader = ({ text }) => {
   const { language } = useLanguageStore()
   const [quote] = useState(() => quotes[Math.floor(Math.random() * quotes.length)])
   const [translatedQuote, setTranslatedQuote] = useState(quote)
-  const [bgImage, setBgImage] = useState((import.meta.env && import.meta.env.VITE_BG_IMAGE) || '/bg/sakura.jpg')
-  
+  const [bgImage, setBgImage] = useState((import.meta.env && import.meta.env.VITE_BG_IMAGE) || '/bg/default.jpg')
+
   // Переводим цитату при изменении языка
   useEffect(() => {
     if (language === 'en' && quote) {
       // Сначала показываем оригинал, чтобы не было пустого экрана
       setTranslatedQuote(quote)
-      
+
       // Затем загружаем перевод из кэша Supabase в фоне
-      // Пока цитата показывается, параллельно загружаем перевод из базы
       const loadTranslation = async () => {
         try {
-          // Используем translateDynamicContent - он сам проверит все кэши
-          // (localStorage -> in-memory -> Supabase -> API)
           const translated = await translateDynamicContent(quote, 'en', 'ru')
           if (translated && translated !== quote) {
-            // Обновляем только если получили перевод
             setTranslatedQuote(translated)
           }
         } catch (error) {
-          // При ошибке оставляем оригинал
           console.warn('Failed to load translation:', error)
         }
       }
-      
-      // Запускаем загрузку перевода в фоне
+
       loadTranslation()
     } else {
       setTranslatedQuote(quote)
     }
   }, [quote, language])
-  
+
   const displayText = text !== undefined && text !== null && text !== '' ? text : translatedQuote
 
   useEffect(() => {
@@ -117,12 +111,14 @@ const Loader = ({ text }) => {
         style={{ backgroundImage: `url(${bgImage})` }}
       />
       {/* Gradient overlay */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-sakura-mid/20 via-sakura-dark/20 to-sakura-deep/30" />
-      
+      <div className="absolute inset-0 -z-10"
+        style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.2))' }} />
+
       {/* Content - изречение на весь экран */}
       <div className="relative z-10 w-full h-full flex flex-col items-center justify-center px-4 sm:px-6 md:px-8 py-8">
         {displayText && (
-          <div className="text-sakura-deep text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl leading-relaxed w-full h-full flex items-center justify-center font-medium italic drop-shadow-2xl px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+          <div className="text-center text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl leading-relaxed w-full h-full flex items-center justify-center font-medium italic drop-shadow-2xl px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16"
+            style={{ color: 'var(--tg-theme-text-color)' }}>
             <div className="w-full">
               {displayText}
             </div>
@@ -137,4 +133,3 @@ const Loader = ({ text }) => {
 }
 
 export default Loader
-

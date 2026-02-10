@@ -142,7 +142,7 @@ const MenuTemplate = ({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-sakura-bg pb-24">
       {/* Hero изображение */}
       <HeroModule 
         partner={partner}
@@ -153,7 +153,7 @@ const MenuTemplate = ({
       
       {/* Заголовок */}
       <div className="-mt-6 relative z-10">
-        <div className="bg-white rounded-t-3xl">
+        <div className="bg-sakura-surface rounded-t-3xl">
           <HeaderModule 
             partner={partner}
             rating={rating}
@@ -176,7 +176,8 @@ const MenuTemplate = ({
             {cartSummary.totalItems > 0 && (
               <button
                 onClick={() => setIsCartOpen(true)}
-                className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-sakura-accent text-white font-medium transition-colors active:bg-sakura-dark relative"
+                className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium active:opacity-90 relative"
+                style={{ backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }}
               >
                 <span>🛒</span>
                 <span>{cartSummary.totalItems}</span>
@@ -199,7 +200,7 @@ const MenuTemplate = ({
       {/* Портфолио (если включен модуль) */}
       {config.modules.portfolio && portfolioPhotos.length > 0 && (
         <>
-          <div className="h-2 bg-gray-100" />
+          <div className="h-2 bg-sakura-surface/40" />
           <PortfolioModule 
             partnerId={partner?.chat_id}
             photos={portfolioPhotos}
@@ -210,7 +211,7 @@ const MenuTemplate = ({
       )}
       
       {/* Локация и контакты */}
-      <div className="h-2 bg-gray-100" />
+      <div className="h-2 bg-sakura-surface/40" />
       <LocationModule 
         partner={partner}
         showMap={true}
@@ -220,11 +221,12 @@ const MenuTemplate = ({
       
       {/* Sticky CTA кнопка - QR или забронировать */}
       {cartSummary.totalItems > 0 ? (
-        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white/95 backdrop-blur-sm border-t border-gray-200 safe-area-bottom">
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-sakura-surface/95 backdrop-blur-sm border-t border-sakura-border/20 safe-area-bottom">
           <button
             onClick={generateQR}
             disabled={qrLoading}
-            className="w-full flex items-center justify-center gap-3 py-3.5 px-6 rounded-xl font-semibold text-white bg-gradient-to-r from-sakura-accent to-sakura-dark shadow-lg shadow-sakura-accent/25 active:scale-[0.98] transition-transform"
+            className="w-full flex items-center justify-center gap-3 py-3.5 px-6 rounded-xl font-semibold active:scale-[0.98]"
+            style={{ backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)', boxShadow: '0 4px 12px color-mix(in srgb, var(--tg-theme-button-color) 25%, transparent)' }}
           >
             {qrLoading ? (
               <>
@@ -257,11 +259,11 @@ const MenuTemplate = ({
           onClick={() => setIsCartOpen(false)}
         >
           <div 
-            className="w-full bg-white rounded-t-3xl max-h-[70vh] overflow-hidden"
+            className="w-full bg-sakura-surface rounded-t-3xl max-h-[70vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Заголовок */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+            <div className="flex items-center justify-between p-4 border-b border-sakura-border/20">
               <h3 className="text-lg font-semibold">
                 🛒 {language === 'ru' ? 'Корзина' : 'Cart'}
               </h3>
@@ -276,7 +278,7 @@ const MenuTemplate = ({
             {/* Список */}
             <div className="max-h-[50vh] overflow-y-auto">
               {cartSummary.items.map(({ item, quantity }) => (
-                <div key={item.id} className="flex items-center gap-3 p-4 border-b border-gray-50">
+                <div key={item.id} className="flex items-center gap-3 p-4 border-b border-sakura-border/10">
                   <div className="flex-1">
                     <p className="font-medium">{item.title}</p>
                     <p className="text-sm text-gray-500">
@@ -286,14 +288,14 @@ const MenuTemplate = ({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleAddToCart(item, -1)}
-                      className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold"
+                      className="w-8 h-8 rounded-full bg-sakura-cream flex items-center justify-center font-bold"
                     >
                       −
                     </button>
                     <span className="w-8 text-center font-medium">{quantity}</span>
                     <button
                       onClick={() => handleAddToCart(item, 1)}
-                      className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold"
+                      className="w-8 h-8 rounded-full bg-sakura-cream flex items-center justify-center font-bold"
                     >
                       +
                     </button>
@@ -303,7 +305,7 @@ const MenuTemplate = ({
             </div>
             
             {/* Итого */}
-            <div className="p-4 border-t border-gray-100">
+            <div className="p-4 border-t border-sakura-border/20">
               <div className="flex justify-between items-center mb-4">
                 <span className="text-gray-600">{language === 'ru' ? 'Итого' : 'Total'}</span>
                 <span className="text-xl font-bold">
@@ -315,7 +317,8 @@ const MenuTemplate = ({
                   setIsCartOpen(false)
                   generateQR()
                 }}
-                className="w-full py-3.5 rounded-xl font-semibold text-white bg-gradient-to-r from-sakura-accent to-sakura-dark"
+                className="w-full py-3.5 rounded-xl font-semibold"
+                style={{ backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }}
               >
                 📱 {language === 'ru' ? 'Показать QR' : 'Show QR'}
               </button>
@@ -330,8 +333,8 @@ const MenuTemplate = ({
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
           onClick={() => setIsQRModalOpen(false)}
         >
-          <div 
-            className="bg-white rounded-3xl p-6 max-w-sm w-full text-center"
+            <div 
+              className="bg-sakura-surface rounded-3xl p-6 max-w-sm w-full text-center"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-xl font-bold mb-2">
@@ -351,12 +354,12 @@ const MenuTemplate = ({
             )}
             
             {/* Итого */}
-            <div className="text-2xl font-bold text-sakura-accent mb-4">
+            <div className="text-2xl font-bold mb-4" style={{ color: 'var(--tg-theme-button-color)' }}>
               {formatPriceWithPoints(cartSummary.totalPrice, 'USD', currency, rates)}
             </div>
             
             {/* Список */}
-            <div className="text-left text-sm text-gray-600 bg-gray-50 rounded-xl p-3 mb-4 max-h-32 overflow-y-auto">
+            <div className="text-left text-sm text-gray-600 bg-sakura-cream rounded-xl p-3 mb-4 max-h-32 overflow-y-auto">
               {cartSummary.items.map(({ item, quantity }) => (
                 <div key={item.id} className="flex justify-between py-1">
                   <span>{item.title} × {quantity}</span>
@@ -367,7 +370,7 @@ const MenuTemplate = ({
             
             <button
               onClick={() => setIsQRModalOpen(false)}
-              className="w-full py-3 rounded-xl font-medium bg-gray-100 text-gray-700"
+              className="w-full py-3 rounded-xl font-medium bg-sakura-cream text-sakura-deep"
             >
               {language === 'ru' ? 'Закрыть' : 'Close'}
             </button>
