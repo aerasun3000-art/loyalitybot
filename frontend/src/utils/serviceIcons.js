@@ -594,6 +594,88 @@ export const serviceCategories = {
     nameEn: 'Pet Services',
     color: 'from-orange-400 to-orange-600',
     emoji: '🐶'
+  },
+  
+  // B2B категории
+  consulting: {
+    code: 'consulting',
+    icon: 'consulting',
+    name: 'Консалтинг',
+    nameEn: 'Consulting',
+    color: 'from-slate-500 to-slate-700',
+    emoji: '💼',
+    displayOrder: 60,
+    isMainPage: false
+  },
+  marketing_agency: {
+    code: 'marketing_agency',
+    icon: 'marketing_agency',
+    name: 'Маркетинг и реклама',
+    nameEn: 'Marketing & Advertising',
+    color: 'from-violet-500 to-violet-700',
+    emoji: '📣',
+    displayOrder: 61,
+    isMainPage: false
+  },
+  it_services: {
+    code: 'it_services',
+    icon: 'it_services',
+    name: 'IT-услуги',
+    nameEn: 'IT Services',
+    color: 'from-cyan-500 to-cyan-700',
+    emoji: '💻',
+    displayOrder: 62,
+    isMainPage: false
+  },
+  hr_services: {
+    code: 'hr_services',
+    icon: 'hr_services',
+    name: 'HR и рекрутинг',
+    nameEn: 'HR & Recruiting',
+    color: 'from-teal-500 to-teal-700',
+    emoji: '👥',
+    displayOrder: 63,
+    isMainPage: false
+  },
+  logistics: {
+    code: 'logistics',
+    icon: 'logistics',
+    name: 'Логистика',
+    nameEn: 'Logistics',
+    color: 'from-amber-500 to-amber-700',
+    emoji: '🚚',
+    displayOrder: 64,
+    isMainPage: false
+  },
+  coworking: {
+    code: 'coworking',
+    icon: 'coworking',
+    name: 'Коворкинг',
+    nameEn: 'Coworking',
+    color: 'from-indigo-400 to-indigo-600',
+    emoji: '🏢',
+    displayOrder: 65,
+    isMainPage: false
+  },
+  business_training: {
+    code: 'business_training',
+    icon: 'business_training',
+    name: 'Бизнес-обучение',
+    nameEn: 'Business Training',
+    color: 'from-orange-500 to-orange-700',
+    emoji: '🎓',
+    displayOrder: 66,
+    isMainPage: false
+  },
+  event_management: {
+    code: 'event_management',
+    icon: 'event_management',
+    name: 'Организация мероприятий',
+    nameEn: 'Event Management',
+    color: 'from-pink-500 to-pink-700',
+    emoji: '🎪',
+    displayOrder: 67,
+    isMainPage: false
   }
 }
 
@@ -847,6 +929,21 @@ export const categoryGroups = [
     categories: ['car_service', 'car_rental', 'pet_services'],
     displayOrder: 10,
     avgDuration: '2 часа'
+  },
+  {
+    id: 'b2b',
+    code: 'b2b',
+    name: 'B2B для бизнеса',
+    nameEn: 'B2B for Business',
+    emoji: '🏢',
+    icon: 'b2b',
+    categories: [
+      'consulting', 'marketing_agency', 'it_services', 'hr_services',
+      'logistics', 'coworking', 'business_training', 'event_management',
+      'legal', 'accounting'
+    ],
+    displayOrder: 12,
+    avgDuration: '1 час'
   }
 ]
 
@@ -882,7 +979,8 @@ export const getCategoriesByGroup = (groupCode) => {
     'services': 'services',
     'travel': 'travel_tourism',
     'automotive': 'automotive_pets',
-    'self_discovery': 'self_discovery'
+    'self_discovery': 'self_discovery',
+    'b2b': 'b2b'
   }
   
   const mappedCode = groupMapping[groupCode] || groupCode

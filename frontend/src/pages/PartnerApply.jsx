@@ -133,7 +133,7 @@ const PartnerApply = () => {
     }
 
     // Категория услуг обязательна для beauty и самопознания
-    if ((formData.categoryGroup === 'beauty' || formData.categoryGroup === 'self_discovery') && !formData.businessType) {
+    if ((formData.categoryGroup === 'beauty' || formData.categoryGroup === 'self_discovery' || formData.categoryGroup === 'b2b') && !formData.businessType) {
       newErrors.businessType = t('partner_business_type_required')
     }
 
@@ -460,7 +460,7 @@ const PartnerApply = () => {
           )}
 
           {/* Категория услуг (Beauty и Самопознание) */}
-          {(formData.categoryGroup === 'beauty' || formData.categoryGroup === 'self_discovery') && (
+          {(formData.categoryGroup === 'beauty' || formData.categoryGroup === 'self_discovery' || formData.categoryGroup === 'b2b') && (
             <div className="mb-4">
               <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {language === 'ru' ? 'Категория услуг' : 'Service Category'} {t('required_field')}
