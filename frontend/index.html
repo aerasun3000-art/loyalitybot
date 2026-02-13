@@ -81,9 +81,16 @@
     
     <script>
       // Раннее применение сохранённой темы (до загрузки React) — предотвращает белую вспышку
+      // Также ставим inline-стили чтобы перебить Telegram SDK
       try {
         var t = JSON.parse(localStorage.getItem('loyalitybot-theme') || '{}')
-        if (t && t.state && t.state.theme) document.documentElement.className = t.state.theme
+        if (t && t.state && t.state.theme === 'dark') {
+          document.documentElement.className = 'dark'
+          var dv = {'--tg-theme-bg-color':'#1B0C1A','--tg-theme-text-color':'#ffffff','--tg-theme-hint-color':'#A090A3','--tg-theme-link-color':'#D4899B','--tg-theme-button-color':'#D4899B','--tg-theme-button-text-color':'#ffffff','--tg-theme-secondary-bg-color':'#2D222F'}
+          for (var k in dv) document.documentElement.style.setProperty(k, dv[k])
+        } else if (t && t.state && t.state.theme) {
+          document.documentElement.className = t.state.theme
+        }
       } catch(e) {}
     </script>
     <!-- Telegram Web App SDK -->

@@ -75,25 +75,11 @@ if (window.Telegram?.WebApp) {
   tg.ready()
   tg.expand()
 
-  // Применяем сохранённую тему из localStorage (приоритет), иначе из Telegram
-  try {
-    const stored = JSON.parse(localStorage.getItem('loyalitybot-theme') || '{}')
-    document.documentElement.className = stored?.state?.theme || tg.colorScheme || 'light'
-  } catch {
-    document.documentElement.className = tg.colorScheme || 'light'
-  }
-
   // Принудительно обновляем версию для Telegram
   console.log('📱 Telegram WebApp initialized, version:', tg.version)
-} else {
-  // Вне Telegram — применяем сохранённую тему
-  try {
-    const stored = JSON.parse(localStorage.getItem('loyalitybot-theme') || '{}')
-    document.documentElement.className = stored?.state?.theme || 'light'
-  } catch {
-    document.documentElement.className = 'light'
-  }
 }
+
+// Тема применяется через index.html (раннее) и themeStore onRehydrateStorage (с inline-стилями)
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
