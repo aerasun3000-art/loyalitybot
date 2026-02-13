@@ -49,9 +49,11 @@
         const storedVersion = sessionStorage.getItem('app_version_v13')
         const needsReload = storedVersion !== currentVersion
         
-        // АГРЕССИВНАЯ очистка кэша - всегда очищаем всё для новой версии
+        // Очистка кэша — сохраняем тему пользователя
         try {
+          var savedTheme = localStorage.getItem('loyalitybot-theme')
           localStorage.clear()
+          if (savedTheme) localStorage.setItem('loyalitybot-theme', savedTheme)
           sessionStorage.clear()
           // Очищаем все кэши
           if ('caches' in window) {
@@ -77,6 +79,13 @@
       })()
     </script>
     
+    <script>
+      // Раннее применение сохранённой темы (до загрузки React) — предотвращает белую вспышку
+      try {
+        var t = JSON.parse(localStorage.getItem('loyalitybot-theme') || '{}')
+        if (t && t.state && t.state.theme) document.documentElement.className = t.state.theme
+      } catch(e) {}
+    </script>
     <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
