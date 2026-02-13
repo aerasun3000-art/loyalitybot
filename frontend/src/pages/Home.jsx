@@ -878,6 +878,10 @@ const Home = () => {
             <CategoryGridNeo
               categories={localizedCategories}
               onSelect={(cat) => {
+                if (cat?.id === 9) {
+                  navigate('/categories')
+                  return
+                }
                 const params = new URLSearchParams()
                 if (cat?.serviceCode) {
                   params.set('category', cat.serviceCode)
