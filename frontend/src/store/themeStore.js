@@ -10,13 +10,13 @@ const useThemeStore = create(
     (set) => ({
       // По умолчанию используем тему из Telegram
       theme: getColorScheme() || 'light',
-      
+
       // Установить тему
       setTheme: (newTheme) => {
         document.documentElement.className = newTheme
         set({ theme: newTheme })
       },
-      
+
       // Переключить тему
       toggleTheme: () => set((state) => {
         const newTheme = state.theme === 'light' ? 'dark' : 'light'
@@ -26,6 +26,12 @@ const useThemeStore = create(
     }),
     {
       name: 'loyalitybot-theme',
+      onRehydrateStorage: () => (state) => {
+        // После восстановления темы из localStorage — применяем класс к DOM
+        if (state?.theme) {
+          document.documentElement.className = state.theme
+        }
+      },
     }
   )
 )

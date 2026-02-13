@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AppRoot } from '@telegram-apps/telegram-ui'
-import { getTelegramWebApp, getChatId, getColorScheme } from './utils/telegram'
+import { getTelegramWebApp, getChatId } from './utils/telegram'
+import useThemeStore from './store/themeStore'
 
 // Pages
 import Home from './pages/Home'
@@ -129,7 +130,7 @@ function AppContent() {
 
 function App() {
   const tg = getTelegramWebApp()
-  const colorScheme = getColorScheme()
+  const theme = useThemeStore((state) => state.theme)
   const initialized = useRef(false)
 
   useEffect(() => {
@@ -137,18 +138,18 @@ function App() {
     if (initialized.current) {
       return
     }
-    
+
     initialized.current = true
-    
+
     // Инициализация Telegram Web App
     if (tg) {
       tg.ready()
       tg.expand()
-      
+
       // Проверяем версию API перед вызовом неподдерживаемых функций
       const version = tg.version || '6.0'
       const majorVersion = parseInt(version.split('.')[0])
-      
+
       // Эти функции поддерживаются только в версиях < 6.0
       if (majorVersion < 6) {
         try {
@@ -164,17 +165,14 @@ function App() {
           // Игнорируем ошибки для неподдерживаемых функций
         }
       }
-      
-      // Устанавливаем цветовую схему
-      document.documentElement.className = colorScheme || 'light'
-    } else {
-      document.documentElement.className = colorScheme || 'light'
     }
+
+    // Тема уже применена через onRehydrateStorage в themeStore
   }, []) // Пустой массив зависимостей - выполняется только один раз
 
   return (
     <ErrorBoundary>
-      <AppRoot appearance={colorScheme}>
+      <AppRoot appearance={theme}>
         <BrowserRouter>
           <AppContent />
         </BrowserRouter>
