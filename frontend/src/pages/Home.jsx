@@ -205,6 +205,8 @@ const Home = () => {
       return
     }
 
+    let cancelled = false
+
     const checkApiAndTranslate = async () => {
       // Если в БД уже есть предзаполненные английские поля, используем их без обращения к API
       if (language === 'en' && news.some(item => item.title_en || item.preview_text_en)) {
@@ -213,14 +215,14 @@ const Home = () => {
           title: item.title_en || item.title,
           preview_text: item.preview_text_en || item.preview_text
         }))
-        setTranslatedNews(mapped)
+        if (!cancelled) setTranslatedNews(mapped)
         return
       }
 
       const apiUrl = import.meta.env.VITE_API_URL
       if (!apiUrl) {
         console.warn('⚠️ VITE_API_URL не установлен. Переводы отключены. Показываем оригинальный текст.')
-        setTranslatedNews(news)
+        if (!cancelled) setTranslatedNews(news)
         return
       }
 
@@ -242,16 +244,17 @@ const Home = () => {
             }
           })
         )
-        setTranslatedNews(translated)
+        if (!cancelled) setTranslatedNews(translated)
       } catch (error) {
         console.error('Error translating news:', error)
-        setTranslatedNews(news)
+        if (!cancelled) setTranslatedNews(news)
       } finally {
-        setTranslating(false)
+        if (!cancelled) setTranslating(false)
       }
     }
 
     checkApiAndTranslate()
+    return () => { cancelled = true }
   }, [news, language])
 
   // Автоматический перевод акций при изменении языка
@@ -261,11 +264,13 @@ const Home = () => {
       return
     }
 
+    let cancelled = false
+
     const checkApiAndTranslate = async () => {
       const apiUrl = import.meta.env.VITE_API_URL
       if (!apiUrl) {
         console.warn('⚠️ VITE_API_URL не установлен. Переводы отключены. Показываем оригинальный текст.')
-        setTranslatedPromotions(promotions)
+        if (!cancelled) setTranslatedPromotions(promotions)
         return
       }
 
@@ -287,16 +292,17 @@ const Home = () => {
             }
           })
         )
-        setTranslatedPromotions(translated)
+        if (!cancelled) setTranslatedPromotions(translated)
       } catch (error) {
         console.error('Error translating promotions:', error)
-        setTranslatedPromotions(promotions)
+        if (!cancelled) setTranslatedPromotions(promotions)
       } finally {
-        setTranslating(false)
+        if (!cancelled) setTranslating(false)
       }
     }
 
     checkApiAndTranslate()
+    return () => { cancelled = true }
   }, [promotions, language])
 
   const loadData = async () => {

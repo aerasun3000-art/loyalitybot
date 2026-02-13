@@ -45,7 +45,7 @@ function Community() {
 
   const getReferralLink = () => {
     if (!referralCode) return ''
-    const botUsername = import.meta.env.VITE_BOT_USERNAME || 'mindbeatybot'
+    const botUsername = import.meta.env.VITE_CLIENT_BOT_USERNAME || 'mindbeatybot'
     return `https://t.me/${botUsername.replace('@', '')}?start=ref_${referralCode}`
   }
 

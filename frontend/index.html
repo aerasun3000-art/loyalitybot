@@ -44,17 +44,49 @@
         }
         
         // Принудительная перезагрузка при обнаружении старой версии
-        // ВАЖНО: Проверяем версию ПЕРЕД очисткой sessionStorage
         const currentVersion = 'v13-new-project-fix'
         const storedVersion = sessionStorage.getItem('app_version_v13')
         const needsReload = storedVersion !== currentVersion
         
-        // Очистка кэша — сохраняем тему пользователя
+        // Очистка кэша — сохраняем критичные данные пользователя и версию
         try {
-          var savedTheme = localStorage.getItem('loyalitybot-theme')
+          // Массив ключей и префиксов которые нужно сохранить
+          var keysToKeep = ['loyalitybot-theme', 'selectedCity', 'loyalitybot_onboarding_seen']
+          var prefixesToKeep = ['fav_partners_', 'translation_cache_']
+          
+          // Сохраняем все критичные данные
+          var savedData = {}
+          for (var i = 0; i < localStorage.length; i++) {
+            var key = localStorage.key(i)
+            var shouldKeep = keysToKeep.indexOf(key) !== -1
+            if (!shouldKeep) {
+              for (var j = 0; j < prefixesToKeep.length; j++) {
+                if (key.indexOf(prefixesToKeep[j]) === 0) {
+                  shouldKeep = true
+                  break
+                }
+              }
+            }
+            if (shouldKeep) {
+              savedData[key] = localStorage.getItem(key)
+            }
+          }
+          
+          // Очищаем localStorage
           localStorage.clear()
-          if (savedTheme) localStorage.setItem('loyalitybot-theme', savedTheme)
+          
+          // Восстанавливаем сохранённые данные
+          for (var key in savedData) {
+            localStorage.setItem(key, savedData[key])
+          }
+          
+          // Сохраняем версию перед очисткой sessionStorage
+          var savedVersion = sessionStorage.getItem('app_version_v13')
           sessionStorage.clear()
+          // Восстанавливаем версию чтобы избежать бесконечного reload
+          if (savedVersion) {
+            sessionStorage.setItem('app_version_v13', savedVersion)
+          }
           // Очищаем все кэши
           if ('caches' in window) {
             caches.keys().then(function(names) {

@@ -1104,7 +1104,7 @@ const Services = () => {
                                 <span className="italic" style={{ opacity: 0.6 }}>{language === 'ru' ? 'Нет оценок' : 'No ratings'}</span>
                               )}
                               <span style={{ opacity: 0.3 }}>·</span>
-                              <span>{group.services.length} {language === 'ru' ? 'усл.' : 'svc'}</span>
+                              <span>{(group.services || []).length} {language === 'ru' ? 'усл.' : 'svc'}</span>
                               {group.npsScore !== 0 && (
                                 <>
                                   <span style={{ opacity: 0.3 }}>·</span>
@@ -1167,7 +1167,7 @@ const Services = () => {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
-                            {group.services.map((service) => (
+                            {(group.services || []).map((service) => (
                               <div
                                 key={service.id}
                                 onClick={(e) => {
