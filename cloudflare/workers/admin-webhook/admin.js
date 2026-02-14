@@ -72,7 +72,7 @@ async function getAllPartnerApplications(env) {
  */
 async function getAllApprovedPartners(env) {
   try {
-    const result = await supabaseRequest(env, 'partners?select=*&order=created_at.desc');
+    const result = await supabaseRequest(env, 'partners?select=*&status=eq.Approved&order=created_at.desc');
     return result || [];
   } catch (error) {
     logError('getAllApprovedPartners', error, {});
@@ -416,6 +416,55 @@ export async function handleCallbackQuery(env, update) {
     
     if (data === 'cancel_broadcast') {
       return await handleCancelBroadcast(env, callbackQuery);
+    }
+    
+    if (data === 'admin_stats') {
+      return await handleAdminStats(env, callbackQuery);
+    }
+    
+    // Stubs for unimplemented features
+    if (data === 'admin_news') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'Управление Новостями');
+    }
+    
+    if (data === 'admin_ugc') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'Модерация UGC');
+    }
+    
+    if (data === 'admin_promoters') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'Промоутеры');
+    }
+    
+    if (data === 'admin_leaderboard') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'Лидерборд');
+    }
+    
+    if (data === 'admin_mlm') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'MLM Revenue Share');
+    }
+    
+    if (data === 'admin_b2b_deals') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'B2B Сделки');
+    }
+    
+    if (data === 'admin_dashboard') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'Дашборд Админа');
+    }
+    
+    if (data === 'admin_onepagers') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'Одностраничники');
+    }
+    
+    if (data === 'admin_background') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'Смена Фона');
+    }
+    
+    if (data === 'admin_manage_services') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'Услуги Партнёров');
+    }
+    
+    if (data === 'admin_services') {
+      return await handleFeatureNotImplemented(env, callbackQuery, 'Модерация Услуг');
     }
     
     // Default: show main menu
@@ -1124,6 +1173,66 @@ async function handleCancelBroadcast(env, callbackQuery) {
     logError('handleCancelBroadcast', error, { chatId });
     throw error;
   }
+}
+
+/**
+ * Handle admin stats
+ */
+async function handleAdminStats(env, callbackQuery) {
+  const chatId = String(callbackQuery.message.chat.id);
+  
+  try {
+    const allApplications = await getAllPartnerApplications(env);
+    const allPartners = await getAllApprovedPartners(env);
+    
+    const totalPartners = allPartners.length;
+    const approved = allApplications.filter(p => (p.status || '').toLowerCase() === 'approved').length;
+    const pending = allApplications.filter(p => (p.status || 'pending').toLowerCase() === 'pending').length;
+    
+    const text = (
+      '📊 **Общая статистика**\n\n' +
+      `🤝 Партнёров всего: ${totalPartners}\n` +
+      `✅ Одобрено: ${approved}\n` +
+      `⏳ На модерации: ${pending}`
+    );
+    
+    const keyboard = [[{ text: '◀️ Назад', callback_data: 'back_to_main' }]];
+    
+    await editMessageText(
+      env.ADMIN_BOT_TOKEN,
+      chatId,
+      callbackQuery.message.message_id,
+      text,
+      keyboard,
+      { parseMode: 'Markdown' }
+    );
+    
+    return { success: true, handled: true, action: 'admin_stats' };
+  } catch (error) {
+    logError('handleAdminStats', error, { chatId });
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка при загрузке статистики', show_alert: true });
+    throw error;
+  }
+}
+
+/**
+ * Generic stub for unimplemented features
+ */
+async function handleFeatureNotImplemented(env, callbackQuery, featureName) {
+  const chatId = String(callbackQuery.message.chat.id);
+  
+  const keyboard = [[{ text: '◀️ Назад', callback_data: 'back_to_main' }]];
+  
+  await editMessageText(
+    env.ADMIN_BOT_TOKEN,
+    chatId,
+    callbackQuery.message.message_id,
+    `⚠️ **${featureName}**\n\nДанная функция пока не реализована в облачной версии админ-бота.\n\nДля доступа ко всем функциям используйте локальную Python-версию админ-бота.`,
+    keyboard,
+    { parseMode: 'Markdown' }
+  );
+  
+  return { success: true, handled: true, action: 'feature_not_implemented' };
 }
 
 /**
