@@ -17,6 +17,11 @@ import sentry_sdk
 from supabase_manager import SupabaseManager
 from dashboard_urls import get_admin_dashboard_url, get_onepager_url
 from partner_revenue_share import PartnerRevenueShare
+try:
+    from _legacy.ai_translation.ai_helper import translate_text_ai
+except ImportError:
+    async def translate_text_ai(text, target_lang='en', source_lang='ru'):
+        return text
 
 load_dotenv()
 
@@ -403,9 +408,9 @@ async def handle_partner_approval(callback_query: types.CallbackQuery):
             # Уведомление Партнера (имитация)
             # Отправляем уведомление в партнерский бот
             if new_status == 'Approved':
-                send_partner_notification(partner_id, "🎉 **Поздравляем!** Ваш аккаунт партнера одобрен. Нажмите /start в партнерском боте.")
+                await send_partner_notification_async(partner_id, "🎉 **Поздравляем!** Ваш аккаунт партнера одобрен. Нажмите /start в партнерском боте.")
             else:
-                send_partner_notification(partner_id, "❌ Ваша заявка Партнера была отклонена. Свяжитесь с администратором.")
+                await send_partner_notification_async(partner_id, "❌ Ваша заявка Партнера была отклонена. Свяжитесь с администратором.")
             
         else:
             logger.error(f"Failed to update partner status for partner_id: {partner_id}")
@@ -414,8 +419,6 @@ async def handle_partner_approval(callback_query: types.CallbackQuery):
     except Exception as e:
         logger.exception(f"Error in handle_partner_approval: {e}")
         await callback_query.answer("Произошла ошибка при обработке запроса.", show_alert=True)
-        
-    await callback_query.answer()
 
 
 # --- Фоновая задача: авто-уведомление администраторов о новых заявках партнёров ---
@@ -576,9 +579,9 @@ async def handle_service_approval(callback_query: types.CallbackQuery):
                 svc = service_res.data[0]
                 title = svc.get('title') or 'N/A'
                 if new_status == 'Approved':
-                    send_partner_notification(str(svc['partner_chat_id']), f"✅ **Ваша услуга одобрена!**\n\nУслуга \"{title}\" теперь доступна клиентам.")
+                    await send_partner_notification_async(str(svc['partner_chat_id']), f"✅ **Ваша услуга одобрена!**\n\nУслуга \"{title}\" теперь доступна клиентам.")
                 else:
-                    send_partner_notification(str(svc['partner_chat_id']), f"❌ **Ваша услуга отклонена**\n\nУслуга \"{title}\" была отклонена администратором.")
+                    await send_partner_notification_async(str(svc['partner_chat_id']), f"❌ **Ваша услуга отклонена**\n\nУслуга \"{title}\" была отклонена администратором.")
         except Exception as e:
             logger.warning(f"Не удалось отправить уведомление партнёру об услуге {service_id}: {e}")
             
@@ -965,6 +968,34 @@ async def back_to_main_menu(callback_query: types.CallbackQuery):
     await callback_query.answer()
 
 
+@dp.callback_query(F.data == "admin_stats")
+async def show_admin_stats(callback_query: types.CallbackQuery):
+    """Показывает общую статистику системы."""
+    if not is_admin(callback_query.from_user.id):
+        await callback_query.answer("У вас нет прав администратора")
+        return
+    await callback_query.answer("Загрузка статистики...")
+    try:
+        partners_df = db_manager.get_all_partners()
+        total_partners = len(partners_df) if not partners_df.empty else 0
+        approved = len(partners_df[partners_df['status'].str.lower() == 'approved']) if not partners_df.empty else 0
+        pending = len(partners_df[partners_df['status'].str.lower() == 'pending']) if not partners_df.empty else 0
+
+        text = (
+            "📊 **Общая статистика**\n\n"
+            f"🤝 Партнёров всего: {total_partners}\n"
+            f"✅ Одобрено: {approved}\n"
+            f"⏳ На модерации: {pending}\n"
+        )
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")]
+        ])
+        await callback_query.message.edit_text(text, reply_markup=keyboard)
+    except Exception as e:
+        logger.error(f"Ошибка получения статистики: {e}")
+        await callback_query.message.edit_text("❌ Ошибка при загрузке статистики.")
+
+
 @dp.callback_query(F.data == "menu_settings")
 async def show_menu_settings_soon(callback_query: types.CallbackQuery):
     """Заглушка: Настройки будут доступны в ближайшее время."""
@@ -1030,7 +1061,6 @@ async def process_news_content(message: types.Message, state: FSMContext):
 @dp.message(NewsCreation.waiting_for_preview)
 async def process_news_preview(message: types.Message, state: FSMContext):
     """Обрабатывает превью новости."""
-    print(f"[PROCESS_NEWS_PREVIEW] Handler called! text={message.text}", flush=True)
     
     if message.text == '/cancel':
         await state.clear()
@@ -1040,11 +1070,7 @@ async def process_news_preview(message: types.Message, state: FSMContext):
     if message.text != '/skip':
         await state.update_data(preview_text=message.text)
     
-    current_state = await state.get_state()
-    print(f"[PROCESS_NEWS_PREVIEW] Current state before set_state: {current_state}", flush=True)
     await state.set_state(NewsCreation.waiting_for_image)
-    new_state = await state.get_state()
-    print(f"[PROCESS_NEWS_PREVIEW] New state after set_state: {new_state}", flush=True)
     await message.answer(
         "✅ Превью сохранено!\n\n"
         "Шаг 4/4: Отправьте URL изображения для новости.\n\n"
@@ -1055,10 +1081,6 @@ async def process_news_preview(message: types.Message, state: FSMContext):
 @dp.message(NewsCreation.waiting_for_image)
 async def process_news_image(message: types.Message, state: FSMContext):
     """Обрабатывает изображение новости и создает ее."""
-    import sys
-    sys.stdout.flush()
-    print(f"[PROCESS_NEWS_IMAGE] Handler called! text={message.text}, photo={message.photo is not None}, caption={message.caption}", flush=True)
-    sys.stdout.flush()
     
     if message.text and message.text == '/cancel':
         await state.clear()
@@ -1067,35 +1089,6 @@ async def process_news_image(message: types.Message, state: FSMContext):
     
     data = await state.get_data()
     
-    # #region agent log
-    try:
-        import json as _json
-        _payload = {
-            "sessionId": "debug-session",
-            "runId": "pre-fix",
-            "hypothesisId": "H1-H5",
-            "location": "admin_bot.py:process_news_image:entry",
-            "message": "Entered process_news_image",
-            "data": {
-                "has_text": message.text is not None,
-                "text_value": message.text[:100] if message.text else None,
-                "has_photo": message.photo is not None and len(message.photo) > 0,
-                "has_caption": message.caption is not None,
-                "caption_value": message.caption[:100] if message.caption else None,
-            },
-            "timestamp": __import__("time").time(),
-        }
-        _log_msg = f"[DEBUG] {_json.dumps(_payload, ensure_ascii=False)}"
-        logging.info(_log_msg)
-        print(_log_msg, flush=True)  # Гарантированный вывод в stdout
-        try:
-            with open("/Users/ghbi/Downloads/loyalitybot/.cursor/debug.log", "a", encoding="utf-8") as _f:
-                _f.write(_json.dumps(_payload, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
-    except Exception:
-        pass
-    # #endregion agent log
     
     # Обрабатываем изображение: принимаем URL из текста или подписи к фото
     if message.text and message.text != '/skip':
@@ -1120,36 +1113,6 @@ async def process_news_image(message: types.Message, state: FSMContext):
         content = data.get('content', '')
         preview_source = data.get('preview_text') or (content[:200] if content else '')
 
-        # #region agent log
-        try:
-            import json as _json
-            _payload = {
-                "sessionId": "debug-session",
-                "runId": "pre-fix",
-                "hypothesisId": "H1-H3",
-                "location": "admin_bot.py:process_news_image:before_translate",
-                "message": "Before AI translate in process_news_image",
-                "data": {
-                    "has_title": bool(title),
-                    "content_len": len(content) if isinstance(content, str) else None,
-                    "has_preview_text": bool(data.get("preview_text")),
-                    "has_image_url": bool(data.get("image_url")),
-                    "author_chat_id": str(data.get("author_chat_id", "")),
-                },
-                "timestamp": __import__("time").time(),
-            }
-            _log_msg = f"[DEBUG] {_json.dumps(_payload, ensure_ascii=False)}"
-            logging.info(_log_msg)
-            print(_log_msg, flush=True)  # Гарантированный вывод в stdout
-            try:
-                with open("/Users/ghbi/Downloads/loyalitybot/.cursor/debug.log", "a", encoding="utf-8") as _f:
-                    _f.write(_json.dumps(_payload, ensure_ascii=False) + "\n")
-            except Exception:
-                pass
-        except Exception:
-            pass
-        # #endregion agent log
-
         # Переводим поля параллельно, чтобы сократить общее время ожидания
         title_task = asyncio.create_task(translate_text_ai(title, target_lang='en', source_lang='ru')) if title else None
         preview_task = asyncio.create_task(translate_text_ai(preview_source, target_lang='en', source_lang='ru')) if preview_source else None
@@ -1165,46 +1128,11 @@ async def process_news_image(message: types.Message, state: FSMContext):
         logging.error(f"Error auto-translating news to English: {e}")
     
     # Создаем новость в БД
-    # #region agent log
-    try:
-        import json as _json
-        _payload = {
-            "sessionId": "debug-session",
-            "runId": "pre-fix",
-            "hypothesisId": "H1-H4",
-            "location": "admin_bot.py:process_news_image:before_create_news",
-            "message": "Before db_manager.create_news call",
-            "data": {
-                "has_title": bool(data.get("title")),
-                "has_content": bool(data.get("content")),
-                "has_title_en": bool(data.get("title_en")),
-                "has_preview_text_en": bool(data.get("preview_text_en")),
-                "has_content_en": bool(data.get("content_en")),
-                "image_url": data.get("image_url")[:100] if data.get("image_url") else None,
-                "keys": sorted(list(data.keys())),
-            },
-            "timestamp": __import__("time").time(),
-        }
-        _log_msg = f"[DEBUG] {_json.dumps(_payload, ensure_ascii=False)}"
-        logging.info(_log_msg)
-        print(_log_msg, flush=True)  # Гарантированный вывод в stdout
-        try:
-            with open("/Users/ghbi/Downloads/loyalitybot/.cursor/debug.log", "a", encoding="utf-8") as _f:
-                _f.write(_json.dumps(_payload, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
-    except Exception:
-        pass
-    # #endregion agent log
-
     try:
         success, news_id = db_manager.create_news(data)
     except Exception as e:
         _error_msg = f"Exception in create_news call: {e}"
         logging.error(_error_msg, exc_info=True)
-        print(f"[ERROR] {_error_msg}", flush=True)
-        import traceback
-        print(f"[ERROR] Traceback: {traceback.format_exc()}", flush=True)
         await message.answer(
             f"❌ Ошибка при создании новости: {str(e)[:200]}\n\n"
             "Проверьте логи или попробуйте снова."
@@ -1212,32 +1140,6 @@ async def process_news_image(message: types.Message, state: FSMContext):
         await state.clear()
         return
     
-    # #region agent log
-    try:
-        import json as _json
-        _payload = {
-            "sessionId": "debug-session",
-            "runId": "pre-fix",
-            "hypothesisId": "H1-H5",
-            "location": "admin_bot.py:process_news_image:after_create_news",
-            "message": "After db_manager.create_news call",
-            "data": {
-                "success": success,
-                "news_id": news_id,
-            },
-            "timestamp": __import__("time").time(),
-        }
-        _log_msg = f"[DEBUG] {_json.dumps(_payload, ensure_ascii=False)}"
-        logging.info(_log_msg)
-        print(_log_msg, flush=True)  # Гарантированный вывод в stdout
-        try:
-            with open("/Users/ghbi/Downloads/loyalitybot/.cursor/debug.log", "a", encoding="utf-8") as _f:
-                _f.write(_json.dumps(_payload, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
-    except Exception:
-        pass
-    # #endregion agent log
     
     if success:
         await message.answer(
@@ -1249,7 +1151,6 @@ async def process_news_image(message: types.Message, state: FSMContext):
     else:
         _error_msg = f"create_news returned success=False, news_id={news_id}"
         logging.error(_error_msg)
-        print(f"[ERROR] {_error_msg}", flush=True)
         await message.answer(
             "❌ Ошибка при создании новости. Проверьте логи или попробуйте снова."
         )
@@ -1915,6 +1816,19 @@ async def reject_pending_b2b_deal(callback_query: types.CallbackQuery):
         await callback_query.message.edit_text("❌ Ошибка при отклонении сделки.")
 
 
+@dp.callback_query(F.data == "b2b_find")
+async def find_b2b_deal(callback_query: types.CallbackQuery):
+    """Заглушка: поиск B2B сделки."""
+    await callback_query.answer()
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="admin_b2b_deals")]
+    ])
+    await callback_query.message.edit_text(
+        "🔍 **Поиск B2B сделки**\n\nФункция будет доступна в ближайшее время.",
+        reply_markup=keyboard
+    )
+
+
 @dp.callback_query(F.data == "b2b_create")
 async def create_b2b_deal_start(callback_query: types.CallbackQuery, state: FSMContext):
     """Начинает процесс создания B2B сделки."""
@@ -1928,7 +1842,7 @@ async def create_b2b_deal_start(callback_query: types.CallbackQuery, state: FSMC
     )
     
     # Устанавливаем состояние ожидания ввода
-    await state.set_state("b2b_waiting_source_partner")
+    await state.set_state(B2BDealCreation.waiting_source_partner)
 
 
 @dp.message(B2BDealCreation.waiting_source_partner)
@@ -2243,7 +2157,7 @@ async def approve_ugc_content(callback_query: types.CallbackQuery):
                 )
                 
                 # Уведомляем промоутера (через клиентский бот)
-                send_partner_notification(
+                await send_partner_notification_async(
                     promoter_id,
                     f"✅ Ваш UGC контент одобрен!\n\n"
                     f"📸 Ссылка: {ugc_info.data[0].get('content_url', 'N/A')}\n"
@@ -2281,7 +2195,7 @@ async def reject_ugc_content(callback_query: types.CallbackQuery):
             await callback_query.message.edit_text(f"❌ **UGC контент отклонён.**\n\nID: {ugc_id}")
             
             # Уведомляем промоутера
-            send_partner_notification(
+            await send_partner_notification_async(
                 promoter_id,
                 f"❌ Ваш UGC контент был отклонён.\n\n"
                 f"Пожалуйста, проверьте требования к контенту и попробуйте снова."
@@ -2375,8 +2289,6 @@ async def show_promoter_info(callback_query: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка при загрузке информации о промоутере: {e}")
         await callback_query.answer("Произошла ошибка.", show_alert=True)
-    
-    await callback_query.answer()
 
 
 @dp.callback_query(F.data == "admin_leaderboard")
@@ -2464,8 +2376,6 @@ async def show_full_leaderboard(callback_query: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка при загрузке полного лидерборда: {e}")
         await callback_query.answer("Произошла ошибка.", show_alert=True)
-    
-    await callback_query.answer()
 
 
 @dp.callback_query(F.data == "leaderboard_create")
@@ -2491,8 +2401,6 @@ async def create_leaderboard_period(callback_query: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка при создании периода: {e}")
         await callback_query.answer("Произошла ошибка.", show_alert=True)
-    
-    await callback_query.answer()
 
 
 @dp.callback_query(F.data == "leaderboard_distribute_prizes")
@@ -2529,8 +2437,6 @@ async def distribute_prizes(callback_query: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка при распределении призов: {e}")
         await callback_query.answer("Произошла ошибка.", show_alert=True)
-    
-    await callback_query.answer()
 
 
 async def _notify_admins_about_ugc(ugc_row) -> None:
@@ -2673,7 +2579,7 @@ async def show_mlm_statistics(callback_query: types.CallbackQuery = None, messag
 
 💰 **REVENUE SHARE:**
 ├─ Общая сумма выплат: ${total_revenue_share:,.2f}/мес
-└─ Средняя выплата: ${total_revenue_share/active_revenue_share:,.2f}/мес (если активных > 0)
+└─ Средняя выплата: ${(total_revenue_share/active_revenue_share if active_revenue_share > 0 else 0):,.2f}/мес
 
 📈 **РАСПРЕДЕЛЕНИЕ ПО УРОВНЯМ PV:**
 ├─ Новичок (3%): {pv_levels['novice']}
@@ -2954,6 +2860,7 @@ async def handle_mlm_partner_command(message: types.Message):
 #     )
 # except Exception as e:
 #     logger.warning(f"Ошибка инициализации InstagramOutreachManager: {e}")
+outreach_manager = None
 
 # FSM States для outreach
 class OutreachAdd(StatesGroup):
@@ -3551,13 +3458,13 @@ async def quick_update_status(callback_query: types.CallbackQuery):
         return
     
     # Парсим данные: quick_status_handle_STATUS
-    parts = callback_query.data.replace("quick_status_", "").split("_", 1)
-    if len(parts) != 2:
+    raw = callback_query.data.replace("quick_status_", "")
+    last_underscore = raw.rfind("_")
+    if last_underscore == -1:
         await callback_query.answer("Ошибка формата", show_alert=True)
         return
-    
-    instagram_handle = parts[0]
-    new_status = parts[1]
+    instagram_handle = raw[:last_underscore]
+    new_status = raw[last_underscore + 1:]
     
     if not outreach_manager:
         await callback_query.answer("Instagram Outreach Manager не инициализирован", show_alert=True)
@@ -3694,13 +3601,13 @@ async def use_response_template(callback_query: types.CallbackQuery):
         return
     
     # Парсим: template_use_handle_key
-    parts = callback_query.data.replace("template_use_", "").split("_", 1)
-    if len(parts) != 2:
+    raw = callback_query.data.replace("template_use_", "")
+    last_underscore = raw.rfind("_")
+    if last_underscore == -1:
         await callback_query.answer("Ошибка формата", show_alert=True)
         return
-    
-    instagram_handle = parts[0]
-    template_key = parts[1]
+    instagram_handle = raw[:last_underscore]
+    template_key = raw[last_underscore + 1:]
     
     try:
         # Получаем данные контакта для переменных
@@ -3839,12 +3746,12 @@ async def edit_response_template(callback_query: types.CallbackQuery, state: FSM
 
     # Формат: template_edit_{instagram_handle}_{template_key}
     raw = callback_query.data.replace("template_edit_", "")
-    parts = raw.split("_", 1)
-    if len(parts) != 2:
+    last_underscore = raw.rfind("_")
+    if last_underscore == -1:
         await callback_query.answer("Ошибка формата", show_alert=True)
         return
-
-    instagram_handle, template_key = parts
+    instagram_handle = raw[:last_underscore]
+    template_key = raw[last_underscore + 1:]
 
     # Получаем текущий текст шаблона (с учётом оверрайда)
     current = await render_response_template(template_key, {})
@@ -4219,8 +4126,6 @@ async def quick_schedule_time(callback_query: types.CallbackQuery, state: FSMCon
     except Exception as e:
         logger.exception(f"Error scheduling call: {e}")
         await callback_query.answer(f"Ошибка: {str(e)}", show_alert=True)
-    
-    await callback_query.answer()
 
 @dp.callback_query(F.data == "manual_time")
 async def manual_time_input(callback_query: types.CallbackQuery, state: FSMContext):
@@ -4351,8 +4256,6 @@ async def process_call_duration(callback_query: types.CallbackQuery, state: FSMC
     except Exception as e:
         logger.exception(f"Error scheduling call: {e}")
         await callback_query.answer(f"Ошибка: {str(e)}", show_alert=True)
-    
-    await callback_query.answer()
 
 @dp.callback_query(F.data == "cancel_schedule")
 async def cancel_schedule(callback_query: types.CallbackQuery, state: FSMContext):
@@ -4585,15 +4488,15 @@ async def process_broadcast_message(message: types.Message, state: FSMContext):
         
         if group_type == "all":
             # Все партнёры из таблицы partners
-            response = db_manager.client.from_('partners').select('chat_id, name, company_name').execute()
+            response = db_manager.client.from_('partners').select('chat_id, name, company_name').eq('status', 'Approved').execute()
             partners = response.data or []
         elif group_type == "city":
             city = data.get("city")
-            response = db_manager.client.from_('partners').select('chat_id, name, company_name').eq('city', city).execute()
+            response = db_manager.client.from_('partners').select('chat_id, name, company_name').eq('city', city).eq('status', 'Approved').execute()
             partners = response.data or []
         elif group_type == "category":
             category = data.get("category")
-            response = db_manager.client.from_('partners').select('chat_id, name, company_name').eq('business_type', category).execute()
+            response = db_manager.client.from_('partners').select('chat_id, name, company_name').eq('business_type', category).eq('status', 'Approved').execute()
             partners = response.data or []
         
         if not partners:
