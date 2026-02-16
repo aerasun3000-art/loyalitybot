@@ -319,15 +319,34 @@ export async function handleCallbackQuery(env, update) {
       return await promoters.handlePromoterInfo(env, callbackQuery, promoterChatId);
     }
     
-    // Stubs for unimplemented features
-    if (data === 'admin_leaderboard') {
-      return await leaderboard.handleFeatureStub(env, callbackQuery, 'Лидерборд');
-    }
+    // MLM
     if (data === 'admin_mlm') {
-      return await mlm.handleFeatureStub(env, callbackQuery, 'MLM Revenue Share');
+      return await mlm.handleMLMMenu(env, callbackQuery);
     }
+    if (data === 'mlm_stats') {
+      return await mlm.handleMLMStats(env, callbackQuery);
+    }
+    if (data === 'mlm_network') {
+      return await mlm.handleMLMNetwork(env, callbackQuery);
+    }
+    
+    // Leaderboard
+    if (data === 'admin_leaderboard') {
+      return await leaderboard.handleLeaderboardMenu(env, callbackQuery);
+    }
+    if (data === 'leaderboard_full') {
+      return await leaderboard.handleFullLeaderboard(env, callbackQuery);
+    }
+    
+    // B2B
     if (data === 'admin_b2b_deals') {
-      return await b2b.handleFeatureStub(env, callbackQuery, 'B2B Сделки');
+      return await b2b.handleB2BMenu(env, callbackQuery);
+    }
+    if (data === 'b2b_list_all') {
+      return await b2b.handleListAll(env, callbackQuery);
+    }
+    if (data === 'b2b_list_pending') {
+      return await b2b.handleListPending(env, callbackQuery);
     }
     
     // Default: show main menu
