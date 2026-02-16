@@ -297,13 +297,29 @@ export async function handleCallbackQuery(env, update) {
       return await news.handleCancelNews(env, callbackQuery);
     }
     
-    // Stubs for unimplemented features
+    // UGC
     if (data === 'admin_ugc') {
-      return await ugc.handleFeatureStub(env, callbackQuery, 'Модерация UGC');
+      return await ugc.handleAdminUGC(env, callbackQuery);
     }
+    if (data.startsWith('ugc_approve_')) {
+      const ugcId = data.replace('ugc_approve_', '');
+      return await ugc.handleUGCApproval(env, callbackQuery, ugcId, 'approved');
+    }
+    if (data.startsWith('ugc_reject_')) {
+      const ugcId = data.replace('ugc_reject_', '');
+      return await ugc.handleUGCApproval(env, callbackQuery, ugcId, 'rejected');
+    }
+    
+    // Promoters
     if (data === 'admin_promoters') {
-      return await promoters.handleFeatureStub(env, callbackQuery, 'Промоутеры');
+      return await promoters.handleAdminPromoters(env, callbackQuery);
     }
+    if (data.startsWith('promoter_info_')) {
+      const promoterChatId = data.replace('promoter_info_', '');
+      return await promoters.handlePromoterInfo(env, callbackQuery, promoterChatId);
+    }
+    
+    // Stubs for unimplemented features
     if (data === 'admin_leaderboard') {
       return await leaderboard.handleFeatureStub(env, callbackQuery, 'Лидерборд');
     }

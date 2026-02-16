@@ -508,3 +508,76 @@ export async function deleteNews(env, id) {
     throw error;
   }
 }
+
+/**
+ * Get pending UGC
+ */
+export async function getPendingUGC(env) {
+  try {
+    const result = await supabaseRequest(env, 'ugc_content?status=eq.pending&select=*&order=created_at.desc');
+    return result || [];
+  } catch (error) {
+    console.error('[getPendingUGC] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Update UGC status
+ */
+export async function updateUGCStatus(env, id, status) {
+  try {
+    const updateData = { 
+      status,
+      approved_at: status === 'approved' ? new Date().toISOString() : null,
+    };
+    
+    const result = await supabaseRequest(env, `ugc_content?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updateData),
+    });
+    return result && result.length > 0;
+  } catch (error) {
+    console.error('[updateUGCStatus] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all promoters
+ */
+export async function getPromoters(env) {
+  try {
+    const result = await supabaseRequest(env, 'promoters?select=*&order=points.desc');
+    return result || [];
+  } catch (error) {
+    console.error('[getPromoters] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get promoter by chat_id
+ */
+export async function getPromoterByChat(env, chatId) {
+  try {
+    const result = await supabaseRequest(env, `promoters?chat_id=eq.${chatId}&select=*`);
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[getPromoterByChat] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Get promoter UGC content
+ */
+export async function getPromoterUGC(env, chatId) {
+  try {
+    const result = await supabaseRequest(env, `ugc_content?promoter_chat_id=eq.${chatId}&select=*&order=created_at.desc`);
+    return result || [];
+  } catch (error) {
+    console.error('[getPromoterUGC] Error:', error);
+    return [];
+  }
+}
