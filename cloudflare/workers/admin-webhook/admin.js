@@ -255,10 +255,49 @@ export async function handleCallbackQuery(env, update) {
       return await stats.handleAdminStats(env, callbackQuery);
     }
     
-    // Stubs for unimplemented features
+    // News
     if (data === 'admin_news') {
-      return await news.handleFeatureStub(env, callbackQuery, 'Управление Новостями');
+      return await news.handleNewsMenu(env, callbackQuery);
     }
+    if (data === 'news_create') {
+      return await news.handleCreateNews(env, callbackQuery);
+    }
+    if (data === 'news_list') {
+      return await news.handleNewsList(env, callbackQuery);
+    }
+    if (data === 'news_edit') {
+      return await news.handleEditNewsStart(env, callbackQuery);
+    }
+    if (data.startsWith('news_select_edit_')) {
+      const newsId = data.replace('news_select_edit_', '');
+      return await news.handleSelectNewsForEdit(env, callbackQuery, newsId);
+    }
+    if (data.startsWith('news_edit_field_')) {
+      const parts = data.replace('news_edit_field_', '').split('_');
+      const field = parts[0];
+      const newsId = parts.slice(1).join('_');
+      return await news.handleEditNewsField(env, callbackQuery, field, newsId);
+    }
+    if (data.startsWith('news_toggle_published_')) {
+      const newsId = data.replace('news_toggle_published_', '');
+      return await news.handleTogglePublished(env, callbackQuery, newsId);
+    }
+    if (data === 'news_delete') {
+      return await news.handleDeleteNewsStart(env, callbackQuery);
+    }
+    if (data.startsWith('news_delete_select_')) {
+      const newsId = data.replace('news_delete_select_', '');
+      return await news.handleDeleteNewsSelect(env, callbackQuery, newsId);
+    }
+    if (data.startsWith('news_delete_confirm_')) {
+      const newsId = data.replace('news_delete_confirm_', '');
+      return await news.handleDeleteNewsConfirm(env, callbackQuery, newsId);
+    }
+    if (data === 'news_cancel') {
+      return await news.handleCancelNews(env, callbackQuery);
+    }
+    
+    // Stubs for unimplemented features
     if (data === 'admin_ugc') {
       return await ugc.handleFeatureStub(env, callbackQuery, 'Модерация UGC');
     }
@@ -323,7 +362,10 @@ export async function routeUpdate(env, update) {
           if (state.state.startsWith('svc_')) {
             return await services.handleMessage(env, update, state.data);
           }
-          // Future: add routing for other FSM states (news_, b2b_, etc.)
+          if (state.state.startsWith('news_')) {
+            return await news.handleMessage(env, update, state.data);
+          }
+          // Future: add routing for other FSM states (b2b_, etc.)
         }
       }
       

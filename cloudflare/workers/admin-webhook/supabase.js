@@ -431,3 +431,80 @@ export async function getDistrictsForCity(env, city) {
     return [];
   }
 }
+
+/**
+ * Get all news
+ */
+export async function getAllNews(env) {
+  try {
+    const result = await supabaseRequest(env, 'news?select=*&order=created_at.desc');
+    return result || [];
+  } catch (error) {
+    console.error('[getAllNews] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get news by ID
+ */
+export async function getNewsById(env, id) {
+  try {
+    const result = await supabaseRequest(env, `news?id=eq.${id}&select=*`);
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[getNewsById] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Create news
+ */
+export async function createNews(env, newsData) {
+  try {
+    const result = await supabaseRequest(env, 'news', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...newsData,
+        is_published: false,
+        created_at: new Date().toISOString(),
+      }),
+    });
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[createNews] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update news
+ */
+export async function updateNews(env, id, data) {
+  try {
+    const result = await supabaseRequest(env, `news?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return result && result.length > 0;
+  } catch (error) {
+    console.error('[updateNews] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete news
+ */
+export async function deleteNews(env, id) {
+  try {
+    await supabaseRequest(env, `news?id=eq.${id}`, {
+      method: 'DELETE',
+    });
+    return true;
+  } catch (error) {
+    console.error('[deleteNews] Error:', error);
+    throw error;
+  }
+}
