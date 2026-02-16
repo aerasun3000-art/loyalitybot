@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Referral Program</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6d13ec",
+                        "background-light": "#f7f6f8",
+                        "background-dark": "#181022",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .ios-blur {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex justify-center">
+<div class="relative flex h-full min-h-screen w-full max-w-md flex-col bg-background-light dark:bg-background-dark overflow-x-hidden shadow-2xl">
+<!-- Top App Bar (iOS Native Style for Telegram) -->
+<div class="sticky top-0 z-50 flex items-center bg-background-light/80 dark:bg-background-dark/80 ios-blur p-4 pb-2 justify-between">
+<div class="text-primary flex size-10 shrink-0 items-center justify-start cursor-pointer">
+<span class="material-symbols-outlined text-[28px]">chevron_left</span>
+</div>
+<h2 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-tight flex-1 text-center pr-10">Invite &amp; Earn</h2>
+<div class="flex w-10 items-center justify-end">
+<button class="flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-primary/10 text-primary">
+<span class="material-symbols-outlined text-[22px]">info</span>
+</button>
+</div>
+</div>
+<!-- Hero Section -->
+<div class="px-4 py-6">
+<div class="relative w-full aspect-video rounded-xl overflow-hidden bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+<div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+<!-- Illustration Placeholder -->
+<div class="flex flex-col items-center">
+<div class="relative">
+<span class="material-symbols-outlined text-[100px] text-primary/40">celebration</span>
+<span class="material-symbols-outlined absolute -top-2 -right-2 text-[48px] text-primary">card_giftcard</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Value Proposition -->
+<div class="px-6 text-center">
+<h1 class="text-slate-900 dark:text-white text-3xl font-extrabold leading-tight tracking-tight mb-3">
+                Invite a friend &amp; <br/> get <span class="text-primary">500 points</span>
+</h1>
+<p class="text-slate-500 dark:text-slate-400 text-base font-medium leading-relaxed max-w-[280px] mx-auto">
+                Share your unique link. When they join, you both receive a bonus reward!
+            </p>
+</div>
+<!-- Main Action Section -->
+<div class="px-4 py-8 space-y-4">
+<button class="w-full flex cursor-pointer items-center justify-center rounded-xl h-16 bg-primary text-white gap-3 text-lg font-bold shadow-lg shadow-primary/25 active:scale-95 transition-transform">
+<span class="material-symbols-outlined">share</span>
+<span>Share Invite Link</span>
+</button>
+<div class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 p-2 pl-4 rounded-xl border border-slate-200 dark:border-slate-700">
+<span class="text-slate-400 dark:text-slate-500 text-sm truncate flex-1 font-mono">t.me/loyalty_bot?start=ref721...</span>
+<button class="bg-white dark:bg-slate-700 p-2.5 rounded-lg text-primary shadow-sm active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[20px]">content_copy</span>
+</button>
+</div>
+</div>
+<!-- Referral Stats Dashboard -->
+<div class="px-4 pb-8">
+<div class="bg-white dark:bg-slate-800/40 rounded-2xl p-6 border border-slate-200 dark:border-slate-800">
+<h3 class="text-slate-900 dark:text-white text-sm font-bold uppercase tracking-wider mb-6 opacity-60">Your Stats</h3>
+<div class="grid grid-cols-2 gap-4">
+<div class="flex flex-col gap-1 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-2 text-primary mb-1">
+<span class="material-symbols-outlined text-[18px]">group</span>
+<span class="text-xs font-bold uppercase tracking-tight">Invited</span>
+</div>
+<span class="text-2xl font-extrabold text-slate-900 dark:text-white leading-none">12</span>
+<span class="text-[10px] text-slate-400 font-medium">Friends joined</span>
+</div>
+<div class="flex flex-col gap-1 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+<div class="flex items-center gap-2 text-primary mb-1">
+<span class="material-symbols-outlined text-[18px]">database</span>
+<span class="text-xs font-bold uppercase tracking-tight">Earned</span>
+</div>
+<span class="text-2xl font-extrabold text-slate-900 dark:text-white leading-none">6,000</span>
+<span class="text-[10px] text-slate-400 font-medium">Total points</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Step Instructions -->
+<div class="px-6 pb-12">
+<h3 class="text-slate-900 dark:text-white text-sm font-bold uppercase tracking-wider mb-6 opacity-60">How it works</h3>
+<div class="space-y-6">
+<div class="flex items-start gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">1</div>
+<div class="flex flex-col">
+<span class="font-bold text-slate-900 dark:text-white">Send invitation</span>
+<p class="text-sm text-slate-500 dark:text-slate-400">Send your referral link to your friends on Telegram.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">2</div>
+<div class="flex flex-col">
+<span class="font-bold text-slate-900 dark:text-white">They join the app</span>
+<p class="text-sm text-slate-500 dark:text-slate-400">Your friend clicks the link and starts using the bot.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">3</div>
+<div class="flex flex-col">
+<span class="font-bold text-slate-900 dark:text-white">Both get rewarded</span>
+<p class="text-sm text-slate-500 dark:text-slate-400">You get 500 points and your friend gets a welcome bonus.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Background Decor -->
+<div class="fixed bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background-light dark:from-background-dark to-transparent pointer-events-none"></div>
+</div>
+</body></html>

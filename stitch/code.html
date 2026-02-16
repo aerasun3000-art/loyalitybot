@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Telegram Loyalty Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6d13ec",
+                        "background-light": "#f7f6f8",
+                        "background-dark": "#181022",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display">
+<!-- Top AppBar / Header -->
+<div class="fixed top-0 left-0 right-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md px-4 pt-4 pb-2">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="size-10 rounded-full border-2 border-primary overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="User profile avatar with friendly smile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBEUzbqcri2U1YKhDgfDCRr_GnqWmifE_9OlgNd-xHLdfW0Ga75NFxd6DUSnWct_zVGNoNGXa9uP7Qz3ULyiL7MBkIiMsDoDKXBiOdTKfL8qOkv9ytNJblVLasEGS0wBwts3Di4AkTz5rGSkG2LiZsl-LKCrmcyrHwItZ3F61lAiGkdmaLK6VaffKRvH8ilPFqvJPvwTwch_Y6OxWs5wkpC3XOSYLTUcAEzxfvksUlJLYJcbESvemvYLQRvqCpw1uqL03t_KE9nFbID"/>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-bold text-sm tracking-tight">Alex Smith</span>
+<span class="material-symbols-outlined text-[14px] text-yellow-500 fill-1">verified</span>
+</div>
+<span class="text-[11px] font-semibold text-primary uppercase tracking-wider bg-primary/10 px-1.5 py-0.5 rounded">Premium Member</span>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="p-2 rounded-full bg-slate-200 dark:bg-white/10">
+<span class="material-symbols-outlined text-[22px]">history</span>
+</button>
+<button class="p-2 rounded-full bg-slate-200 dark:bg-white/10">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Main Content Area -->
+<main class="pt-20 pb-24 px-4 space-y-6">
+<!-- Loyalty Card -->
+<div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary to-[#4a0db1] p-5 shadow-xl shadow-primary/20">
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-4">
+<div>
+<p class="text-white/70 text-xs font-medium uppercase tracking-widest">Total Balance</p>
+<h2 class="text-white text-3xl font-extrabold tracking-tight">2,450 <span class="text-lg font-normal text-white/80">PTS</span></h2>
+</div>
+<div class="bg-white/20 backdrop-blur-md rounded-lg px-3 py-1.5">
+<p class="text-white text-[10px] font-bold">GOLD TIER</p>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="space-y-2">
+<div class="flex justify-between items-center text-[10px] text-white/80 font-bold uppercase tracking-tighter">
+<div class="flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-xs">star</span>
+<span>Silver</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-white">
+<span class="material-symbols-outlined text-xs fill-1">favorite</span>
+<span>Gold</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-50">
+<span class="material-symbols-outlined text-xs">diamond</span>
+<span>Diamond</span>
+</div>
+</div>
+<div class="h-2.5 w-full bg-black/20 rounded-full overflow-hidden p-0.5">
+<div class="h-full bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.5)]" style="width: 72%;"></div>
+</div>
+<p class="text-white/80 text-[11px] text-center pt-1 font-medium">550 pts until Diamond status</p>
+</div>
+</div>
+<!-- Decorative circle -->
+<div class="absolute -top-12 -right-12 size-40 bg-white/10 rounded-full blur-2xl"></div>
+</div>
+<!-- Quick Actions Horizontal Scroll -->
+<div class="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
+<button class="flex flex-col items-center justify-center min-w-[90px] aspect-square rounded-xl bg-primary text-white shadow-lg shadow-primary/30">
+<span class="material-symbols-outlined text-2xl mb-1">qr_code_scanner</span>
+<span class="text-[11px] font-bold">Scan QR</span>
+</button>
+<button class="flex flex-col items-center justify-center min-w-[90px] aspect-square rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10">
+<span class="material-symbols-outlined text-2xl mb-1 text-primary">credit_card</span>
+<span class="text-[11px] font-bold">My Cards</span>
+</button>
+<button class="flex flex-col items-center justify-center min-w-[90px] aspect-square rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10">
+<span class="material-symbols-outlined text-2xl mb-1 text-primary">person_add</span>
+<span class="text-[11px] font-bold">Invite</span>
+</button>
+<button class="flex flex-col items-center justify-center min-w-[90px] aspect-square rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10">
+<span class="material-symbols-outlined text-2xl mb-1 text-primary">redeem</span>
+<span class="text-[11px] font-bold">Store</span>
+</button>
+</div>
+<!-- Latest Promotions Carousel -->
+<div>
+<div class="flex justify-between items-end mb-3">
+<h3 class="text-lg font-bold tracking-tight">Latest Promotions</h3>
+<span class="text-primary text-xs font-bold">View all</span>
+</div>
+<div class="flex gap-4 overflow-x-auto hide-scrollbar snap-x">
+<div class="min-w-[280px] snap-center rounded-xl overflow-hidden bg-slate-100 dark:bg-white/5 relative group">
+<div class="h-32 w-full bg-center bg-cover" data-alt="Aesthetic coffee cup with latte art" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDQ-w4iI-HgKia-KwsVtWuqoFCnCpmilfSBn8JW3KrfpP6FwNDlZMeyXQTs7lMQIPju54fhHe9awa9J9hTmTf4JNppf7AoT9gvbRo1Cw07RcUFXo5Uw-AYXCipPdk-cPCZ_XEiGBf31DkSZ3Lcjru_kPlhtW3vG3GuKaXWJ-AkueCwhjcScFQQFW0zXfjpg8mIGIKAfQPSlz83NKAFyUG3_krK1Lg5UkXww8UAaiiyWo9YtACHE6kb91nQazgS6GJthNPQlayaLN1a4');"></div>
+<div class="p-3">
+<p class="font-bold text-sm">Morning Fuel Special</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Get 2x points on all coffee orders</p>
+</div>
+<div class="absolute top-2 right-2 bg-primary px-2 py-1 rounded text-[10px] font-bold text-white">LIMITED</div>
+</div>
+<div class="min-w-[280px] snap-center rounded-xl overflow-hidden bg-slate-100 dark:bg-white/5 relative group">
+<div class="h-32 w-full bg-center bg-cover" data-alt="Modern fitness gym equipment" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAIZNAny7qu1a65STqnbBQaqtAyD326N-g3PEsGe1IikTbb_NoUzdveYa_rP9gkhMsCLItvX0oUB_FCL8Kz10T-Whjg_lu4vL6pKgmsLQoIcIdZwLuZySsVzwoxzaPmKPrEAmB4SXz4I2HaZA93NnuW3ce0kWlBFNbtuHxXFXvvS7Q2M8kOUsAFyoVAXXSyLwAoE2Nc2MMsUydXscSVEOlUwSG5_PU_AZthkvAT6F314wFV5gKu2aaLlhd21aOb6eiE0bFjCQWE8A6C');"></div>
+<div class="p-3">
+<p class="font-bold text-sm">New Gym Partner</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Free 1-day pass for Gold members</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Categories Grid -->
+<div>
+<h3 class="text-lg font-bold tracking-tight mb-3">Categories</h3>
+<div class="grid grid-cols-2 gap-3">
+<div class="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10">
+<div class="size-10 rounded-lg bg-pink-100 dark:bg-pink-500/20 flex items-center justify-center text-pink-500">
+<span class="material-symbols-outlined">face_5</span>
+</div>
+<span class="text-sm font-bold">Beauty</span>
+</div>
+<div class="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10">
+<div class="size-10 rounded-lg bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center text-orange-500">
+<span class="material-symbols-outlined">restaurant</span>
+</div>
+<span class="text-sm font-bold">Food</span>
+</div>
+<div class="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10">
+<div class="size-10 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center text-blue-500">
+<span class="material-symbols-outlined">fitness_center</span>
+</div>
+<span class="text-sm font-bold">Fitness</span>
+</div>
+<div class="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10">
+<div class="size-10 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+<span class="material-symbols-outlined">local_mall</span>
+</div>
+<span class="text-sm font-bold">Shopping</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 right-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-xl border-t border-slate-200 dark:border-white/5 px-6 pb-8 pt-3">
+<div class="flex justify-between items-center max-w-md mx-auto">
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined fill-1">home</span>
+<span class="text-[10px] font-bold">Home</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">task_alt</span>
+<span class="text-[10px] font-bold">Tasks</span>
+</button>
+<div class="relative -mt-10">
+<button class="size-14 rounded-full bg-primary text-white shadow-lg shadow-primary/40 flex items-center justify-center border-4 border-background-light dark:border-background-dark">
+<span class="material-symbols-outlined text-3xl">qr_code_2</span>
+</button>
+</div>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="text-[10px] font-bold">Wallet</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-bold">Settings</span>
+</button>
+</div>
+</nav>
+</body></html>

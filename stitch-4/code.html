@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Loyalty Program Categories</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6d13ec",
+                        "background-light": "#f7f6f8",
+                        "background-dark": "#181022",
+                        "telegram-bg": "#ffffff",
+                        "telegram-dark-bg": "#1c1c1d",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        /* Smooth scrolling */
+        html { scroll-behavior: smooth; }
+        /* Hide scrollbar for clean horizontal scroll */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none;  scrollbar-width: none; }
+        
+        /* Active state touch feedback */
+        .touch-active:active {
+            transform: scale(0.96);
+            opacity: 0.8;
+            transition: transform 0.1s ease, opacity 0.1s ease;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display antialiased min-h-screen flex flex-col">
+<!-- Top App Bar / Header -->
+<div class="sticky top-0 z-50 bg-white/90 dark:bg-telegram-dark-bg/90 backdrop-blur-md border-b border-gray-100 dark:border-white/5 px-4 py-3 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center p-2 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 touch-active text-gray-800 dark:text-white">
+<span class="material-symbols-outlined">arrow_back_ios_new</span>
+</button>
+<h1 class="text-lg font-bold text-gray-900 dark:text-white leading-tight">Loyalty Rewards</h1>
+</div>
+<div class="flex items-center">
+<button class="flex items-center justify-center p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 touch-active text-primary dark:text-primary">
+<span class="material-symbols-outlined">search</span>
+</button>
+</div>
+</div>
+<!-- Main Content -->
+<div class="flex-1 overflow-y-auto w-full max-w-md mx-auto pb-8">
+<!-- Hero Section / Points Summary -->
+<div class="p-4 pt-6">
+<div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary via-[#8b3dff] to-[#a66aff] p-6 shadow-lg shadow-primary/20">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-9xl text-white">loyalty</span>
+</div>
+<div class="relative z-10 text-white">
+<p class="text-sm font-medium opacity-90 mb-1">Available Points</p>
+<h2 class="text-4xl font-extrabold tracking-tight mb-4">2,450</h2>
+<button class="bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/40 rounded-full px-4 py-2 text-sm font-semibold transition-colors touch-active flex items-center gap-2">
+<span>My History</span>
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Categories Section -->
+<div class="px-4 mt-2">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Explore Categories</h2>
+<button class="text-sm font-medium text-primary hover:opacity-80 touch-active">See All</button>
+</div>
+<!-- Grid Layout: 3 Columns -->
+<div class="grid grid-cols-3 gap-y-6 gap-x-4">
+<!-- Beauty Category -->
+<div class="flex flex-col items-center gap-2 group touch-active cursor-pointer">
+<div class="relative flex items-center justify-center w-20 h-20 rounded-full bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300 transition-transform duration-200 group-hover:scale-105">
+<span class="material-symbols-outlined text-[32px]">face_3</span>
+</div>
+<span class="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Beauty</span>
+</div>
+<!-- Food Category -->
+<div class="flex flex-col items-center gap-2 group touch-active cursor-pointer">
+<div class="relative flex items-center justify-center w-20 h-20 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300 transition-transform duration-200 group-hover:scale-105">
+<span class="material-symbols-outlined text-[32px]">restaurant</span>
+</div>
+<span class="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Food</span>
+</div>
+<!-- Electronics Category -->
+<div class="flex flex-col items-center gap-2 group touch-active cursor-pointer">
+<div class="relative flex items-center justify-center w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 transition-transform duration-200 group-hover:scale-105">
+<span class="material-symbols-outlined text-[32px]">devices</span>
+</div>
+<span class="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Electronics</span>
+</div>
+<!-- Fashion Category -->
+<div class="flex flex-col items-center gap-2 group touch-active cursor-pointer">
+<div class="relative flex items-center justify-center w-20 h-20 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 transition-transform duration-200 group-hover:scale-105">
+<span class="material-symbols-outlined text-[32px]">apparel</span>
+</div>
+<span class="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Fashion</span>
+</div>
+<!-- Travel Category -->
+<div class="flex flex-col items-center gap-2 group touch-active cursor-pointer">
+<div class="relative flex items-center justify-center w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300 transition-transform duration-200 group-hover:scale-105">
+<span class="material-symbols-outlined text-[32px]">flight</span>
+</div>
+<span class="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Travel</span>
+</div>
+<!-- Services Category -->
+<div class="flex flex-col items-center gap-2 group touch-active cursor-pointer">
+<div class="relative flex items-center justify-center w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-transform duration-200 group-hover:scale-105">
+<span class="material-symbols-outlined text-[32px]">build</span>
+</div>
+<span class="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Services</span>
+</div>
+<!-- Gaming Category -->
+<div class="flex flex-col items-center gap-2 group touch-active cursor-pointer">
+<div class="relative flex items-center justify-center w-20 h-20 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 transition-transform duration-200 group-hover:scale-105">
+<span class="material-symbols-outlined text-[32px]">sports_esports</span>
+</div>
+<span class="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Gaming</span>
+</div>
+<!-- Health Category -->
+<div class="flex flex-col items-center gap-2 group touch-active cursor-pointer">
+<div class="relative flex items-center justify-center w-20 h-20 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-300 transition-transform duration-200 group-hover:scale-105">
+<span class="material-symbols-outlined text-[32px]">cardiology</span>
+</div>
+<span class="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Health</span>
+</div>
+<!-- More Category -->
+<div class="flex flex-col items-center gap-2 group touch-active cursor-pointer">
+<div class="relative flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-600 transition-transform duration-200 group-hover:scale-105">
+<span class="material-symbols-outlined text-[32px]">grid_view</span>
+</div>
+<span class="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">More</span>
+</div>
+</div>
+</div>
+<!-- Popular Offers Section -->
+<div class="mt-8 px-4">
+<h2 class="text-xl font-bold text-gray-900 dark:text-white tracking-tight mb-4">Popular Offers</h2>
+<div class="flex overflow-x-auto no-scrollbar gap-4 pb-4 -mx-4 px-4 snap-x">
+<!-- Offer 1 -->
+<div class="snap-start shrink-0 w-64 flex flex-col gap-3 rounded-2xl bg-white dark:bg-white/5 p-3 border border-gray-100 dark:border-white/5 touch-active">
+<div class="w-full aspect-[4/3] rounded-xl overflow-hidden relative">
+<div class="absolute inset-0 bg-gray-200 animate-pulse" data-alt="Abstract summer cosmetic kit arrangement"></div>
+<img alt="Summer Glow Kit" class="w-full h-full object-cover relative z-10" data-alt="Cosmetic bottles on a pastel background" loading="lazy" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmsK_lxyMRG2jWY0LdU3EFYKDyvRw3sNy3LqIEqnBOWMdB98OeEFQ5V2-wumdhionjyHukYcG_VAIc2glp_3XMWMFX5ykBpT-xntLa89SZvADTXfZvRDqOlZv78mMW1t8TlUg80pJ3t78BSaBgb-fcCnsg_I7gjub93ariEeZ_LqHh6_PIALcvzC-_vmfGmb1FHKExP6Jv9BuWbsiRlMIqsvckWdrZv_YCHbyj0iZt2MqzwV3knuqJT0oxYHMWtpyJEPhhELe7WF0E"/>
+<div class="absolute top-2 left-2 bg-white/90 dark:bg-black/80 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold text-primary shadow-sm z-20">
+                            -20%
+                        </div>
+</div>
+<div class="px-1 pb-1">
+<h3 class="text-gray-900 dark:text-white text-base font-bold leading-tight">Summer Glow Kit</h3>
+<p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Beauty Essentials</p>
+</div>
+</div>
+<!-- Offer 2 -->
+<div class="snap-start shrink-0 w-64 flex flex-col gap-3 rounded-2xl bg-white dark:bg-white/5 p-3 border border-gray-100 dark:border-white/5 touch-active">
+<div class="w-full aspect-[4/3] rounded-xl overflow-hidden relative">
+<div class="absolute inset-0 bg-gray-200 animate-pulse" data-alt="Delicious gourmet burger meal"></div>
+<img alt="Lunch Special" class="w-full h-full object-cover relative z-10" data-alt="Gourmet burger with fresh ingredients" loading="lazy" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_sAPYNPasSTCwpPyEMr69yxJQk9VhHWDhNDDLmknpv9yk1QDmp6o11AQlqQ2PDohwcPZ6nINbrqxIR3XnM3-nIjY9rMn3O4t5yrjIuKswx76lUNEvcPDwdR3m1wi-xB7V7oVIhrjWDnpOvKFn3xMddrNm_qPUER_W3Y_rMaajeGkkuwMx81jY8HJh3BfB0luHj6nfAfbVOVCehmG5YKkuR_CWsF5C86IBtp7OrpiWADLx5R6qqfkIYJG9vA3yppI2UnsFKSXOBKR9"/>
+<div class="absolute top-2 left-2 bg-white/90 dark:bg-black/80 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold text-primary shadow-sm z-20">
+                            BOGO
+                        </div>
+</div>
+<div class="px-1 pb-1">
+<h3 class="text-gray-900 dark:text-white text-base font-bold leading-tight">Lunch Special</h3>
+<p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Tasty Bites</p>
+</div>
+</div>
+<!-- Offer 3 -->
+<div class="snap-start shrink-0 w-64 flex flex-col gap-3 rounded-2xl bg-white dark:bg-white/5 p-3 border border-gray-100 dark:border-white/5 touch-active">
+<div class="w-full aspect-[4/3] rounded-xl overflow-hidden relative">
+<div class="absolute inset-0 bg-gray-200 animate-pulse" data-alt="Modern headphones on a desk"></div>
+<img alt="Tech Gadgets" class="w-full h-full object-cover relative z-10" data-alt="Silver headphones on a yellow background" loading="lazy" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA-RsNYjFLeLnmsGJozxJouoDj8AHr_8_Zh2ySS1wJI9hRycwi9GctKLZvgTYOZvhNtDRDrpD93WtNk625aIrsPKVMqAfNPMj-Stocqc4ZUCy6oXIy-OEIibq0OUz2UMb6bmBKZp9ku8fzAk27fCRLPF5RbwYLMLjPlhKBpvQFFT1-E8NdII_2TlGgDYlTkp_RtIT_loQv_B_BsHT9UED1-BiOl3p4G9HXW3P2v9iGBu-2IH9KC4dBsHa463XFTwIFtrJugRofgt2Ma"/>
+<div class="absolute top-2 left-2 bg-white/90 dark:bg-black/80 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold text-primary shadow-sm z-20">
+                            Limited
+                        </div>
+</div>
+<div class="px-1 pb-1">
+<h3 class="text-gray-900 dark:text-white text-base font-bold leading-tight">Gadget Sale</h3>
+<p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Electronics Hub</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Navigation (Telegram Style) -->
+<div class="sticky bottom-0 bg-white dark:bg-telegram-dark-bg border-t border-gray-200 dark:border-white/5 pb-6 pt-2 px-6 flex justify-between items-center z-50">
+<div class="flex flex-col items-center gap-1 text-primary cursor-pointer touch-active">
+<span class="material-symbols-outlined text-[28px] filled">grid_view</span>
+<span class="text-[10px] font-medium">Browse</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 cursor-pointer touch-active transition-colors">
+<span class="material-symbols-outlined text-[28px]">favorite</span>
+<span class="text-[10px] font-medium">Saved</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 cursor-pointer touch-active transition-colors">
+<span class="material-symbols-outlined text-[28px]">account_balance_wallet</span>
+<span class="text-[10px] font-medium">Wallet</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 cursor-pointer touch-active transition-colors">
+<span class="material-symbols-outlined text-[28px]">person</span>
+<span class="text-[10px] font-medium">Profile</span>
+</div>
+</div>
+</body></html>

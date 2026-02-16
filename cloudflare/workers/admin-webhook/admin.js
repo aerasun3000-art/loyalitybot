@@ -164,7 +164,10 @@ export async function handleCallbackQuery(env, update) {
       return await partners.handlePartnerDeleteConfirm(env, callbackQuery, partnerId);
     }
     
-    // Services
+    // Services - moderation
+    if (data === 'admin_services') {
+      return await services.handleAdminServices(env, callbackQuery);
+    }
     if (data.startsWith('service_approve_')) {
       const serviceId = data.replace('service_approve_', '');
       return await services.handleServiceApproval(env, callbackQuery, serviceId, 'Approved');
@@ -172,6 +175,54 @@ export async function handleCallbackQuery(env, update) {
     if (data.startsWith('service_reject_')) {
       const serviceId = data.replace('service_reject_', '');
       return await services.handleServiceApproval(env, callbackQuery, serviceId, 'Rejected');
+    }
+    
+    // Services - management
+    if (data === 'admin_manage_services') {
+      return await services.handleManageServices(env, callbackQuery);
+    }
+    if (data === 'svc_edit_category') {
+      return await services.handleEditCategory(env, callbackQuery);
+    }
+    if (data.startsWith('svc_set_cat_')) {
+      const category = data.replace('svc_set_cat_', '');
+      return await services.handleSetCategory(env, callbackQuery, category);
+    }
+    if (data === 'svc_manage_services') {
+      return await services.handleServicesMenu(env, callbackQuery);
+    }
+    if (data === 'svc_add') {
+      return await services.handleAddServiceStart(env, callbackQuery);
+    }
+    if (data === 'svc_edit') {
+      return await services.handleEditServiceStart(env, callbackQuery);
+    }
+    if (data === 'svc_delete') {
+      return await services.handleDeleteServiceStart(env, callbackQuery);
+    }
+    if (data.startsWith('svc_delete_confirm_')) {
+      const serviceId = data.replace('svc_delete_confirm_', '');
+      return await services.handleDeleteServiceConfirm(env, callbackQuery, serviceId);
+    }
+    if (data.startsWith('svc_choose_edit_')) {
+      const serviceId = data.replace('svc_choose_edit_', '');
+      return await services.handleChooseServiceForEdit(env, callbackQuery, serviceId);
+    }
+    if (data.startsWith('svc_edit_field_')) {
+      const parts = data.replace('svc_edit_field_', '').split('_');
+      const field = parts[0];
+      const serviceId = parts.slice(1).join('_');
+      return await services.handleEditServiceField(env, callbackQuery, field, serviceId);
+    }
+    if (data.startsWith('svc_set_service_cat_')) {
+      const category = data.replace('svc_set_service_cat_', '');
+      return await services.handleSetServiceCategory(env, callbackQuery, category);
+    }
+    if (data === 'svc_back_to_partner') {
+      return await services.handleBackToPartner(env, callbackQuery);
+    }
+    if (data === 'svc_cancel') {
+      return await services.handleCancel(env, callbackQuery);
     }
     
     // Broadcast
@@ -269,7 +320,10 @@ export async function routeUpdate(env, update) {
           if (state.state.startsWith('broadcast_')) {
             return await broadcast.handleBroadcastMessage(env, update, state.data);
           }
-          // Future: add routing for other FSM states (news_, svc_, b2b_, etc.)
+          if (state.state.startsWith('svc_')) {
+            return await services.handleMessage(env, update, state.data);
+          }
+          // Future: add routing for other FSM states (news_, b2b_, etc.)
         }
       }
       

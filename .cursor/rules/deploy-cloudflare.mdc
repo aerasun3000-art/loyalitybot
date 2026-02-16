@@ -1,0 +1,8 @@
+---
+description: Деплой только на Cloudflare — не предлагать Render, Fly.io и др.
+alwaysApply: true
+---
+
+# Деплой
+
+- **Деплой (бэкенд и фронтенд) — только Cloudflare.** Никаких других платформ не предлагать и не упоминать (Render, Fly.io, Vercel, Netlify, свой сервер и т.п.).

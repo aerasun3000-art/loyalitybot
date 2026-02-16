@@ -1,0 +1,15 @@
+/* Дизайн-токены для Telegram Mini App */
+:root {
+  --tg-primary: #2481cc;
+  --card-gradient: linear-gradient(135deg, #8e44ad 0%, #3498db 100%);
+  --border-radius-lg: 20px;
+  --border-radius-md: 12px;
+  --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Настройка для темной темы Telegram */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+}

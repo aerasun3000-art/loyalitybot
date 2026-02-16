@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Telegram Mini App Home</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#30abe8",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#111c21",
+                        "surface-light": "#ffffff",
+                        "surface-dark": "#1e2a30",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar hiding for horizontal scroll */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Safe area padding for iOS TMA */
+        .safe-area-top {
+            padding-top: env(safe-area-inset-top, 20px);
+        }
+        .safe-area-bottom {
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased overflow-x-hidden">
+<div class="relative flex h-full min-h-screen w-full flex-col max-w-md mx-auto bg-background-light dark:bg-background-dark shadow-2xl">
+<!-- TMA Header -->
+<header class="flex items-center justify-between p-4 pb-2 bg-surface-light dark:bg-surface-dark sticky top-0 z-20 safe-area-top border-b border-gray-100 dark:border-gray-800">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBIs7CCSeX-4dNyl-afqTo7AWVTrBbK_yD0RhUMz1hyl6S9IrxRQhoEkyJGGPX2N9_jx0g7RI1me9vKTIAZN_YZOqedcUXMF1i3jnejpQ9qDMbqLePnXeB6S-MuYgJsrsEbckZM8601mbDtu7RSiWUGjlypo-r19fgvvl8K6VZNgI_o9L701GXc0o8h8af0mFvHsPz746S2Bvs95CsnRpqNjuyCXF8Q_BpWxNPorgaKLQ8hDzWWwVplKZ1LPbg5bX6z3xkhM-E1ivjR"/>
+</div>
+<div>
+<p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Welcome back,</p>
+<h2 class="text-lg font-bold leading-tight tracking-[-0.015em]">Alex</h2>
+</div>
+</div>
+<button class="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-slate-600 dark:text-slate-300" style="font-size: 20px;">close</span>
+</button>
+</header>
+<!-- Main Content Area with padding for bottom nav -->
+<main class="flex-1 flex flex-col gap-6 p-4 pb-24 overflow-y-auto">
+<!-- Loyalty Card Section -->
+<section class="@container">
+<div class="flex flex-col rounded-2xl shadow-lg bg-surface-light dark:bg-surface-dark overflow-hidden">
+<!-- Card Background & Content -->
+<div class="relative w-full p-5 bg-gradient-to-br from-primary to-blue-600 text-white">
+<!-- Decorative Circles -->
+<div class="absolute top-[-20px] right-[-20px] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+<div class="absolute bottom-[-10px] left-[-10px] w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+<div class="relative z-10 flex justify-between items-start mb-6">
+<div>
+<p class="text-white/80 text-sm font-medium mb-1">Total Balance</p>
+<h3 class="text-3xl font-extrabold tracking-tight">2,450 <span class="text-lg font-bold text-white/80">pts</span></h3>
+</div>
+<div class="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/10">
+<span class="text-xs font-bold uppercase tracking-wider">Gold Tier</span>
+</div>
+</div>
+<div class="relative z-10">
+<div class="flex justify-between text-xs font-medium text-white/90 mb-2">
+<span>Progress to Platinum</span>
+<span>750 pts left</span>
+</div>
+<div class="h-2 w-full bg-black/20 rounded-full overflow-hidden backdrop-blur-sm">
+<div class="h-full bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]" style="width: 75%;"></div>
+</div>
+<p class="mt-2 text-xs text-white/70">Next Reward: $10 Voucher</p>
+</div>
+</div>
+<!-- Card Actions -->
+<div class="flex p-3 bg-surface-light dark:bg-surface-dark gap-3">
+<button class="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-[18px]">history</span>
+                            History
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-primary text-white text-sm font-bold shadow-md shadow-primary/30 hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined text-[18px]">qr_code_2</span>
+                            Show QR
+                        </button>
+</div>
+</div>
+</section>
+<!-- Quick Actions Grid -->
+<section>
+<h3 class="text-slate-900 dark:text-white text-lg font-bold mb-3 px-1">Quick Actions</h3>
+<div class="grid grid-cols-2 gap-3">
+<button class="flex flex-col gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-surface-light dark:bg-surface-dark p-4 items-start hover:shadow-md transition-shadow active:scale-95 duration-200 group">
+<div class="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+<span class="material-symbols-outlined">qr_code_scanner</span>
+</div>
+<div class="text-left">
+<h2 class="text-slate-900 dark:text-white text-base font-bold leading-tight">Scan</h2>
+<p class="text-slate-500 dark:text-slate-400 text-xs mt-0.5">Earn points now</p>
+</div>
+</button>
+<button class="flex flex-col gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-surface-light dark:bg-surface-dark p-4 items-start hover:shadow-md transition-shadow active:scale-95 duration-200 group">
+<div class="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+<span class="material-symbols-outlined">local_offer</span>
+</div>
+<div class="text-left">
+<h2 class="text-slate-900 dark:text-white text-base font-bold leading-tight">Offers</h2>
+<p class="text-slate-500 dark:text-slate-400 text-xs mt-0.5">12 active deals</p>
+</div>
+</button>
+<button class="flex flex-col gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-surface-light dark:bg-surface-dark p-4 items-start hover:shadow-md transition-shadow active:scale-95 duration-200 group">
+<div class="w-10 h-10 rounded-full bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center text-pink-500 group-hover:bg-pink-500 group-hover:text-white transition-colors">
+<span class="material-symbols-outlined">card_giftcard</span>
+</div>
+<div class="text-left">
+<h2 class="text-slate-900 dark:text-white text-base font-bold leading-tight">Gift Cards</h2>
+<p class="text-slate-500 dark:text-slate-400 text-xs mt-0.5">Send to friends</p>
+</div>
+</button>
+<button class="flex flex-col gap-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-surface-light dark:bg-surface-dark p-4 items-start hover:shadow-md transition-shadow active:scale-95 duration-200 group">
+<div class="w-10 h-10 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+<span class="material-symbols-outlined">support_agent</span>
+</div>
+<div class="text-left">
+<h2 class="text-slate-900 dark:text-white text-base font-bold leading-tight">Support</h2>
+<p class="text-slate-500 dark:text-slate-400 text-xs mt-0.5">We're here 24/7</p>
+</div>
+</button>
+</div>
+</section>
+<!-- News & Promotions Horizontal Scroll -->
+<section>
+<div class="flex items-center justify-between px-1 mb-3">
+<h3 class="text-slate-900 dark:text-white text-lg font-bold">News &amp; Promotions</h3>
+<button class="text-primary text-sm font-semibold hover:text-primary/80">View All</button>
+</div>
+<div class="flex gap-4 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4 snap-x">
+<!-- Promo Card 1 -->
+<div class="snap-center shrink-0 w-[260px] flex flex-col rounded-2xl overflow-hidden bg-surface-light dark:bg-surface-dark shadow-sm border border-slate-100 dark:border-slate-800 group cursor-pointer">
+<div class="h-32 w-full bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" data-alt="Colorful shopping bags with holiday lights blurred background" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDEaHQLHQCCY3D8hntwiJEu_N6XjphL_C5FeosgbkFNyJ2H41_IWn7Rubt1UGoEAFlWQ_hBEMTOFjzeRNXm88CQKrUpf0rckhG451rH3WXRcrm5qoZ3jYRaYXpHhVJUphouajfI3aHd0F8HdLmyk8kh6zYwCeuOAMIrUh_EeIQKJvosfDxvWD-EgdIg4XihvVb4ul0jQ8-8kHOLZfP1xQzZNBvp2Z8Srnvts-y-uGgiJ_03dbDpCqAX5fZaJuR4Bfuw73p8aKbL-WFs');"></div>
+<div class="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase">Hot</div>
+</div>
+<div class="p-3">
+<h4 class="text-slate-900 dark:text-white font-bold text-sm mb-1 line-clamp-1">Double Points Weekend!</h4>
+<p class="text-slate-500 dark:text-slate-400 text-xs line-clamp-2">Get 2x points on all coffee purchases this Saturday and Sunday only.</p>
+</div>
+</div>
+<!-- Promo Card 2 -->
+<div class="snap-center shrink-0 w-[260px] flex flex-col rounded-2xl overflow-hidden bg-surface-light dark:bg-surface-dark shadow-sm border border-slate-100 dark:border-slate-800 group cursor-pointer">
+<div class="h-32 w-full bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" data-alt="Close up of delicious iced coffee drink on wooden table" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDn5ztP7C17ztkdzvCJyj19wpL0J-tL5fnRv2g4Go5t0vocmaZ9tbOCYQ5JVupOkM3ZGyLndnxbAwWKA72-bxkA44CHeCWHJE6Ozbzglop5IWro9kIzCNJwxF9M38755XWVmcm1LyLwU-kw4BxVNb9dDAtHLeiIwQ22bQ5Tirz7FZBcErwcKpb3QXTq8boclRBsk8JyIl91Ti490q9BtQ9Vrc7H3s-rGnbLT6ZkbDVJxqJLw04vQu58aSMlJvAq2XjYQLfgwpwSr7F0');"></div>
+<div class="absolute top-2 left-2 bg-primary text-white text-[10px] font-bold px-2 py-1 rounded-md uppercase">New</div>
+</div>
+<div class="p-3">
+<h4 class="text-slate-900 dark:text-white font-bold text-sm mb-1 line-clamp-1">Summer Menu is Here</h4>
+<p class="text-slate-500 dark:text-slate-400 text-xs line-clamp-2">Try our refreshing new iced teas and lemonades starting today.</p>
+</div>
+</div>
+<!-- Promo Card 3 -->
+<div class="snap-center shrink-0 w-[260px] flex flex-col rounded-2xl overflow-hidden bg-surface-light dark:bg-surface-dark shadow-sm border border-slate-100 dark:border-slate-800 group cursor-pointer">
+<div class="h-32 w-full bg-gray-200 dark:bg-gray-700 relative overflow-hidden">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105" data-alt="Person holding a credit card making a payment" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDUwjWyvF4JWrWgLzIlob2AjKQcNSWCx1mtKLeg3e8l09SUhXm6CLggfF-97KZCvi61R42rmJORFtxHuODz9MFCUDYKkpSFrtka-l6LUWR_DBfpGaxDgj6pM-gf4ddhG_rlsKkl8VZzwwJvktZ3_z3sKw1FFb7AVOHx8fJgaIpofsP3BypFSTWhRDmfQSVdXjZXlMV6-NCxqs1LBO0qvPLFwzlCVzEY55YHI5mX5x0o65ntgGOFfWNzmaG813EaXlKdz5ZALqSwQLw9');"></div>
+</div>
+<div class="p-3">
+<h4 class="text-slate-900 dark:text-white font-bold text-sm mb-1 line-clamp-1">Refer a Friend</h4>
+<p class="text-slate-500 dark:text-slate-400 text-xs line-clamp-2">Earn 500 bonus points for every friend who signs up.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Activity Snippet -->
+<section class="pb-4">
+<h3 class="text-slate-900 dark:text-white text-lg font-bold mb-3 px-1">Recent Activity</h3>
+<div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-slate-100 dark:border-slate-800 p-2">
+<div class="flex items-center gap-4 p-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
+<div class="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-bold text-slate-900 dark:text-white truncate">Purchase at Downtown</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Today, 10:23 AM</p>
+</div>
+<span class="text-sm font-bold text-green-600">+120 pts</span>
+</div>
+<div class="flex items-center gap-4 p-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
+<div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 text-red-500 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[20px]">remove</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-bold text-slate-900 dark:text-white truncate">Reward Redemption</p>
+<p class="text-xs text-slate-500 dark:text-slate-400">Yesterday, 4:15 PM</p>
+</div>
+<span class="text-sm font-bold text-slate-900 dark:text-white">-500 pts</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Fixed Bottom Navigation -->
+<nav class="fixed bottom-0 w-full max-w-md bg-surface-light dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 pb-[env(safe-area-inset-bottom)] safe-area-bottom z-50 rounded-t-2xl shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+<div class="flex justify-around items-center h-16 px-2">
+<button class="flex flex-col items-center justify-center w-full h-full gap-1 text-primary group">
+<span class="material-symbols-outlined filled group-hover:scale-110 transition-transform">home</span>
+<span class="text-[10px] font-bold">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center w-full h-full gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">stars</span>
+<span class="text-[10px] font-medium">Rewards</span>
+</button>
+<button class="flex flex-col items-center justify-center w-full h-full gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">receipt_long</span>
+<span class="text-[10px] font-medium">History</span>
+</button>
+<button class="flex flex-col items-center justify-center w-full h-full gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">person</span>
+<span class="text-[10px] font-medium">Profile</span>
+</button>
+</div>
+</nav>
+</div>
+<script>
+        // Simple logic to toggle dark mode for demonstration
+        // In a real TMA, this would likely be controlled by Telegram's theme params
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+</body></html>

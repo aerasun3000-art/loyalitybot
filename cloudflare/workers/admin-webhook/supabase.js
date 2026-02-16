@@ -298,3 +298,136 @@ export async function updateBotStateData(env, chatId, newData) {
     throw error;
   }
 }
+
+/**
+ * Get services by partner chat_id
+ */
+export async function getServicesByPartner(env, partnerChatId) {
+  try {
+    const result = await supabaseRequest(env, `services?partner_chat_id=eq.${partnerChatId}&select=*&order=created_at.desc`);
+    return result || [];
+  } catch (error) {
+    console.error('[getServicesByPartner] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get service categories
+ */
+export async function getServiceCategories(env) {
+  try {
+    const result = await supabaseRequest(env, 'service_categories?select=*&order=name');
+    return result || [];
+  } catch (error) {
+    console.error('[getServiceCategories] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get pending services for moderation
+ */
+export async function getPendingServices(env) {
+  try {
+    const result = await supabaseRequest(env, 'services?approval_status=eq.Pending&select=*&order=created_at.desc');
+    return result || [];
+  } catch (error) {
+    console.error('[getPendingServices] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Add new service
+ */
+export async function addService(env, serviceData) {
+  try {
+    const result = await supabaseRequest(env, 'services', {
+      method: 'POST',
+      body: JSON.stringify(serviceData),
+    });
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[addService] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update service
+ */
+export async function updateService(env, serviceId, data) {
+  try {
+    const encodedServiceId = encodeURIComponent(serviceId);
+    const result = await supabaseRequest(env, `services?id=eq.${encodedServiceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return result && result.length > 0;
+  } catch (error) {
+    console.error('[updateService] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete service
+ */
+export async function deleteService(env, serviceId) {
+  try {
+    const encodedServiceId = encodeURIComponent(serviceId);
+    await supabaseRequest(env, `services?id=eq.${encodedServiceId}`, {
+      method: 'DELETE',
+    });
+    return true;
+  } catch (error) {
+    console.error('[deleteService] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update partner field
+ */
+export async function updatePartnerField(env, partnerChatId, field, value) {
+  try {
+    const data = { [field]: value };
+    const result = await supabaseRequest(env, `partners?chat_id=eq.${partnerChatId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return result && result.length > 0;
+  } catch (error) {
+    console.error('[updatePartnerField] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get distinct cities from partners
+ */
+export async function getDistinctCitiesFromPartners(env) {
+  try {
+    const partners = await supabaseRequest(env, 'partners?select=city');
+    const cities = [...new Set(partners.map(p => p.city).filter(c => c && c.trim()))];
+    return cities.sort();
+  } catch (error) {
+    console.error('[getDistinctCitiesFromPartners] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get districts for a city
+ */
+export async function getDistrictsForCity(env, city) {
+  try {
+    const partners = await supabaseRequest(env, `partners?city=eq.${encodeURIComponent(city)}&select=district`);
+    const districts = [...new Set(partners.map(p => p.district).filter(d => d && d.trim()))];
+    return districts.sort();
+  } catch (error) {
+    console.error('[getDistrictsForCity] Error:', error);
+    return [];
+  }
+}

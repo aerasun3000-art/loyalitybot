@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Rewards Catalog</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#6d13ec",
+                        "background-light": "#f7f6f8",
+                        "background-dark": "#181022",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "lg": "1rem",
+                        "xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white antialiased">
+<!-- Main Container (Telegram Mini App Viewport) -->
+<div class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
+<!-- Telegram Header Emulator -->
+<header class="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md px-4 py-3">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined cursor-pointer text-slate-600 dark:text-slate-400">close</span>
+</div>
+<h1 class="text-lg font-extrabold tracking-tight">Rewards Store</h1>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined cursor-pointer text-slate-600 dark:text-slate-400">more_horiz</span>
+</div>
+</div>
+<!-- Points Balance Chip -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2 px-4 py-2 bg-primary/10 dark:bg-primary/20 rounded-full border border-primary/20">
+<span class="text-primary text-sm font-bold">✨ 2,450 Points</span>
+</div>
+<div class="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tier: Silver</div>
+</div>
+</header>
+<!-- Search and Filters -->
+<section class="px-4 pt-2">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-slate-400">search</span>
+<input class="w-full bg-white dark:bg-white/5 border-none rounded-xl py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-primary placeholder:text-slate-400 shadow-sm" placeholder="Search rewards..." type="text"/>
+</div>
+<!-- Category Chips -->
+<div class="flex gap-2 py-4 overflow-x-auto hide-scrollbar">
+<button class="px-5 py-2 bg-primary text-white rounded-full text-sm font-semibold shadow-lg shadow-primary/20 shrink-0">All</button>
+<button class="px-5 py-2 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-full text-sm font-medium shrink-0">Food</button>
+<button class="px-5 py-2 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-full text-sm font-medium shrink-0">Gaming</button>
+<button class="px-5 py-2 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-full text-sm font-medium shrink-0">Shopping</button>
+<button class="px-5 py-2 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-full text-sm font-medium shrink-0">Travel</button>
+</div>
+</section>
+<!-- Rewards List -->
+<main class="flex-1 px-4 pb-24 space-y-4">
+<!-- Featured Reward -->
+<div class="group relative overflow-hidden rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm">
+<div class="aspect-[16/9] w-full bg-slate-200 dark:bg-slate-800 relative">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="A cozy coffee shop atmosphere with latte art" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBhzdj9i-hkL8FQdTtqEv_shH7g9FwO_DuCgB_rLq1_XNXfQVcKCwSkqgoeSPpscy2pIP-LmKUOn94hcb7egQecdLkBc6ROp0MbYuGAKn_V7dDWdgvM-Gihs0LjKgAHHtMA8a4etQM3BJLHn1fWvnjAw0n69QIiTFjMMubvEiix15kLugHdspHu8AKVYB7k_Xo6h07YvO-KtFt7p5B9HRnPal7QKH72p2qhwWvrnwGoBvwKvX3bFHrGHItuC56KM9eXbuqHpd3yYyWt')"></div>
+<div class="absolute top-3 left-3 bg-primary text-white text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">Hot Deal</div>
+</div>
+<div class="p-4">
+<div class="flex justify-between items-start mb-2">
+<div>
+<h3 class="text-lg font-bold leading-tight">Starbucks $5 Gift Card</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Redeemable at all locations nationwide.</p>
+</div>
+<div class="text-right shrink-0">
+<span class="text-primary font-extrabold text-lg leading-none">500</span>
+<span class="text-[10px] text-primary uppercase font-bold block">Points</span>
+</div>
+</div>
+<button class="w-full mt-3 bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg transition-all active:scale-[0.98]">
+                        Redeem Now
+                    </button>
+</div>
+</div>
+<!-- Reward Item 2 -->
+<div class="flex bg-white dark:bg-white/5 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm">
+<div class="w-32 h-32 shrink-0 bg-slate-200 dark:bg-slate-800">
+<div class="w-full h-full bg-cover bg-center" data-alt="Spotify music logo abstract on purple background" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCUqvRL0X8-fTvm1Iz7RnHcA9SecZJpE1qvHBKAdl7A2S1C2KMLRXzBZriof1Uvg453HgNH1Ht0oUzmi76rw5BoyB436pDCsBRspBzOiuNbLOy8s7z8NDszGwNlqwEU9rcigsUWRnux7AHRIHLLFL52Dnjegh2hVQMJH0vVP9lMG8BTd706okyH7fNaySLWBE8OYvEO2I6N345ASe81yCIyE1LCp0jhsX0aM3C9WhEY1VQ-XUcclMJQejI1Kl-TKA0ju0iQ2O5ydR4b')"></div>
+</div>
+<div class="flex flex-col justify-center p-4 flex-1">
+<h3 class="font-bold text-base leading-tight">1 Month Spotify Premium</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Ad-free music and offline play.</p>
+<div class="flex items-center justify-between mt-3">
+<span class="text-primary font-bold">1,200 pts</span>
+<button class="bg-primary/10 dark:bg-primary/20 text-primary text-xs font-bold px-4 py-2 rounded-lg active:scale-95">
+                            Redeem
+                        </button>
+</div>
+</div>
+</div>
+<!-- Reward Item 3 -->
+<div class="flex bg-white dark:bg-white/5 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm">
+<div class="w-32 h-32 shrink-0 bg-slate-200 dark:bg-slate-800">
+<div class="w-full h-full bg-cover bg-center" data-alt="Red Nike sneakers on a clean studio background" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBst19kUdVKy_S_j9jiiKDj2-35328IvZCsN0P68fnsMop9v5arSE7hDnnl9a38u_oVB3qo6EuVaC3cRr8vrmJAFE-3vPM2Cc9CorkUUoXqvFgnuKA7bErrOdJ-kw5cOPu-nccqBOoAjBnk88FfzJsehj3tP5qycNF9xt-fMoyl2X5AZCkIZ5KXT4b3QQmvNw1xV-yuTc3aziPt9jfdX2U-AHhlIXIrrmqQCMMWb_P3zD6lPFmcqGEWh-Jqu-O0gj6KcHYZipn-BUtj')"></div>
+</div>
+<div class="flex flex-col justify-center p-4 flex-1">
+<h3 class="font-bold text-base leading-tight">Nike 20% Discount Code</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Valid on all footwear and apparel.</p>
+<div class="flex items-center justify-between mt-3">
+<span class="text-primary font-bold">350 pts</span>
+<button class="bg-primary/10 dark:bg-primary/20 text-primary text-xs font-bold px-4 py-2 rounded-lg active:scale-95">
+                            Redeem
+                        </button>
+</div>
+</div>
+</div>
+<!-- Reward Item 4 -->
+<div class="flex bg-white dark:bg-white/5 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm">
+<div class="w-32 h-32 shrink-0 bg-slate-200 dark:bg-slate-800">
+<div class="w-full h-full bg-cover bg-center" data-alt="Gaming console controller and headset" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBv6cZHIxNwaNBD0rCmP-TvX6oNcWpsTSu1duVuFQvxoP5q2VM-4a55uCbS2NEd-eOeCIDMups9PEeLaQ3bzd6G_Zo56o2HkyBGi8-0RdcPvcwMBZzJCX-rM7Fu6KGgew--_Dr2O_AunVMd-fCJK7UJ7EBBkR_td0j7AkjIHCgKb6cDF40BA7x2FXEXzo61BFQFF_F3VDEZ2C31ExohvwEgYnedod2CZU4ZJego3thOcYGennP8ncr6ifbTFiqpZyqZQb3jYveMNH8w')"></div>
+</div>
+<div class="flex flex-col justify-center p-4 flex-1">
+<h3 class="font-bold text-base leading-tight">Xbox $10 Gift Card</h3>
+<p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Digital code for games and DLC.</p>
+<div class="flex items-center justify-between mt-3">
+<span class="text-primary font-bold">1,000 pts</span>
+<button class="bg-primary/10 dark:bg-primary/20 text-primary text-xs font-bold px-4 py-2 rounded-lg active:scale-95">
+                            Redeem
+                        </button>
+</div>
+</div>
+</div>
+<!-- Bottom Spacer -->
+<div class="h-4"></div>
+</main>
+<!-- Bottom Navigation (iOS Style) -->
+<nav class="fixed bottom-0 left-0 right-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-xl border-t border-slate-200 dark:border-white/10 pb-6 pt-2">
+<div class="flex justify-around items-center">
+<div class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined font-variation-fill">grid_view</span>
+<span class="text-[10px] font-bold">Catalog</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined">confirmation_number</span>
+<span class="text-[10px] font-medium">My Perks</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined">history</span>
+<span class="text-[10px] font-medium">History</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-medium">Profile</span>
+</div>
+</div>
+</nav>
+</div>
+</body></html>
