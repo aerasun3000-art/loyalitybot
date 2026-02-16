@@ -56,7 +56,7 @@ export async function getAllPartnerApplications(env) {
  */
 export async function getAllApprovedPartners(env) {
   try {
-    const result = await supabaseRequest(env, 'partners?select=*&status=eq.Approved&order=created_at.desc');
+    const result = await supabaseRequest(env, 'partners?select=*&order=created_at.desc');
     return result || [];
   } catch (error) {
     logError('getAllApprovedPartners', error, {});

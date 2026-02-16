@@ -57,6 +57,11 @@ export async function showMainMenu(env, chatId) {
         { text: '💎 MLM Revenue Share', callback_data: 'admin_mlm' },
         { text: '🤝 B2B Сделки', callback_data: 'admin_b2b_deals' },
       ],
+      [
+        { text: '📈 Дашборд', callback_data: 'admin_dashboard' },
+        { text: '📄 Одностраничники', callback_data: 'admin_onepagers' },
+        { text: '🎨 Смена фона', callback_data: 'admin_background' },
+      ],
     ];
     
     console.log('[showMainMenu] Calling sendTelegramMessageWithKeyboard');
@@ -224,6 +229,19 @@ export async function handleCallbackQuery(env, update) {
     if (data === 'svc_cancel') {
       return await services.handleCancel(env, callbackQuery);
     }
+    if (data === 'svc_edit_location') {
+      return await services.handleEditLocation(env, callbackQuery);
+    }
+    if (data.startsWith('svc_city_')) {
+      const city = data.replace('svc_city_', '');
+      return await services.handleSetCity(env, callbackQuery, city);
+    }
+    if (data.startsWith('svc_district_')) {
+      const parts = data.replace('svc_district_', '').split('_');
+      const city = parts[0];
+      const district = parts.slice(1).join('_');
+      return await services.handleSetDistrict(env, callbackQuery, city, district);
+    }
     
     // Broadcast
     if (data === 'admin_broadcast') {
@@ -253,6 +271,23 @@ export async function handleCallbackQuery(env, update) {
     // Stats
     if (data === 'admin_stats') {
       return await stats.handleAdminStats(env, callbackQuery);
+    }
+    if (data === 'admin_dashboard') {
+      return await stats.handleDashboard(env, callbackQuery);
+    }
+    if (data === 'admin_onepagers') {
+      return await stats.handleOnepagers(env, callbackQuery);
+    }
+    if (data.startsWith('onepager_')) {
+      const type = data.replace('onepager_', '');
+      return await stats.handleOnepagerView(env, callbackQuery, type);
+    }
+    if (data === 'admin_background') {
+      return await stats.handleBackgroundMenu(env, callbackQuery);
+    }
+    if (data.startsWith('bg_set_')) {
+      const theme = data.replace('bg_set_', '');
+      return await stats.handleSetBackground(env, callbackQuery, theme);
     }
     
     // News
@@ -329,6 +364,20 @@ export async function handleCallbackQuery(env, update) {
     if (data === 'mlm_network') {
       return await mlm.handleMLMNetwork(env, callbackQuery);
     }
+    if (data === 'mlm_set_pv') {
+      return await mlm.handleSetPVMenu(env, callbackQuery);
+    }
+    if (data === 'mlm_approve_payments') {
+      return await mlm.handleApprovePayments(env, callbackQuery);
+    }
+    if (data.startsWith('mlm_pay_approve_')) {
+      const paymentId = data.replace('mlm_pay_approve_', '');
+      return await mlm.handlePaymentAction(env, callbackQuery, paymentId, 'approve');
+    }
+    if (data.startsWith('mlm_pay_reject_')) {
+      const paymentId = data.replace('mlm_pay_reject_', '');
+      return await mlm.handlePaymentAction(env, callbackQuery, paymentId, 'reject');
+    }
     
     // Leaderboard
     if (data === 'admin_leaderboard') {
@@ -336,6 +385,12 @@ export async function handleCallbackQuery(env, update) {
     }
     if (data === 'leaderboard_full') {
       return await leaderboard.handleFullLeaderboard(env, callbackQuery);
+    }
+    if (data === 'leaderboard_create') {
+      return await leaderboard.handleCreatePeriod(env, callbackQuery);
+    }
+    if (data === 'leaderboard_distribute') {
+      return await leaderboard.handleDistributePrizes(env, callbackQuery);
     }
     
     // B2B
@@ -347,6 +402,17 @@ export async function handleCallbackQuery(env, update) {
     }
     if (data === 'b2b_list_pending') {
       return await b2b.handleListPending(env, callbackQuery);
+    }
+    if (data === 'b2b_create') {
+      return await b2b.handleCreateStart(env, callbackQuery);
+    }
+    if (data.startsWith('b2b_accept_')) {
+      const dealId = data.replace('b2b_accept_', '');
+      return await b2b.handleDealAction(env, callbackQuery, dealId, 'accept');
+    }
+    if (data.startsWith('b2b_reject_')) {
+      const dealId = data.replace('b2b_reject_', '');
+      return await b2b.handleDealAction(env, callbackQuery, dealId, 'reject');
     }
     
     // Default: show main menu
@@ -400,7 +466,12 @@ export async function routeUpdate(env, update) {
           if (state.state.startsWith('news_')) {
             return await news.handleMessage(env, update, state.data);
           }
-          // Future: add routing for other FSM states (b2b_, etc.)
+          if (state.state.startsWith('b2b_')) {
+            return await b2b.handleMessage(env, update, state.data);
+          }
+          if (state.state.startsWith('mlm_')) {
+            return await mlm.handleMessage(env, update, state.data);
+          }
         }
       }
       

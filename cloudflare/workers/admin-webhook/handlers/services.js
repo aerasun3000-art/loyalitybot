@@ -16,6 +16,7 @@ import {
   getDistinctCitiesFromPartners,
   getDistrictsForCity,
   getPartnerByChatId,
+  getBotState,
   setBotState,
   clearBotState,
   updateBotStateData,
@@ -30,6 +31,7 @@ import {
   logError,
 } from '../common.js';
 import { sendPartnerNotification } from './partners.js';
+import { showMainMenu } from '../admin.js';
 
 /**
  * Handle service moderation menu
@@ -175,7 +177,7 @@ export async function handleManageServices(env, callbackQuery) {
 /**
  * Handle partner menu after selecting partner
  */
-async function showPartnerServicesMenu(env, chatId, partnerChatId, messageId = null) {
+export async function showPartnerServicesMenu(env, chatId, partnerChatId, messageId = null) {
   const partner = await getPartnerByChatId(env, partnerChatId);
   
   if (!partner) {
@@ -256,7 +258,7 @@ export async function handleSetCategory(env, callbackQuery, category) {
   const chatId = String(callbackQuery.message.chat.id);
   
   try {
-    const state = await import('../supabase.js').then(m => m.getBotState(env, chatId));
+    const state = await getBotState(env, chatId);
     const partnerChatId = state?.data?.partner_chat_id;
     
     if (!partnerChatId) {
@@ -288,7 +290,7 @@ export async function handleServicesMenu(env, callbackQuery) {
   const chatId = String(callbackQuery.message.chat.id);
   
   try {
-    const state = await import('../supabase.js').then(m => m.getBotState(env, chatId));
+    const state = await getBotState(env, chatId);
     const partnerChatId = state?.data?.partner_chat_id;
     
     if (!partnerChatId) {
@@ -334,7 +336,7 @@ export async function handleAddServiceStart(env, callbackQuery) {
     { parseMode: 'Markdown' }
   );
   
-  const state = await import('../supabase.js').then(m => m.getBotState(env, chatId));
+  const state = await getBotState(env, chatId);
   await setBotState(env, chatId, 'svc_adding_title', state?.data || {});
   
   return { success: true, handled: true, action: 'add_service_start' };
@@ -347,7 +349,7 @@ export async function handleEditServiceStart(env, callbackQuery) {
   const chatId = String(callbackQuery.message.chat.id);
   
   try {
-    const state = await import('../supabase.js').then(m => m.getBotState(env, chatId));
+    const state = await getBotState(env, chatId);
     const partnerChatId = state?.data?.partner_chat_id;
     
     if (!partnerChatId) {
@@ -394,7 +396,7 @@ export async function handleDeleteServiceStart(env, callbackQuery) {
   const chatId = String(callbackQuery.message.chat.id);
   
   try {
-    const state = await import('../supabase.js').then(m => m.getBotState(env, chatId));
+    const state = await getBotState(env, chatId);
     const partnerChatId = state?.data?.partner_chat_id;
     
     if (!partnerChatId) {
@@ -456,7 +458,7 @@ export async function handleDeleteServiceConfirm(env, callbackQuery, serviceId) 
       `🗑 **Услуга удалена**\n\nУслуга "${service.title}" была удалена администратором.`
     );
     
-    const state = await import('../supabase.js').then(m => m.getBotState(env, chatId));
+    const state = await getBotState(env, chatId);
     const partnerChatId = state?.data?.partner_chat_id;
     
     if (partnerChatId) {
@@ -553,8 +555,9 @@ export async function handleEditServiceField(env, callbackQuery, field, serviceI
     { parseMode: 'Markdown' }
   );
   
+  const currentState = await getBotState(env, chatId);
   await setBotState(env, chatId, 'svc_waiting_new_value', {
-    partner_chat_id: (await import('../supabase.js').then(m => m.getBotState(env, chatId)))?.data?.partner_chat_id,
+    partner_chat_id: currentState?.data?.partner_chat_id,
     editing_service_id: serviceId,
     editing_field: field,
   });
@@ -569,7 +572,7 @@ export async function handleBackToPartner(env, callbackQuery) {
   const chatId = String(callbackQuery.message.chat.id);
   
   try {
-    const state = await import('../supabase.js').then(m => m.getBotState(env, chatId));
+    const state = await getBotState(env, chatId);
     const partnerChatId = state?.data?.partner_chat_id;
     
     if (!partnerChatId) {
@@ -594,7 +597,6 @@ export async function handleCancel(env, callbackQuery) {
   await clearBotState(env, chatId);
   await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Отменено' });
   
-  const { showMainMenu } = await import('../admin.js');
   await showMainMenu(env, chatId);
   
   return { success: true, handled: true, action: 'cancelled' };
@@ -607,7 +609,7 @@ export async function handleMessage(env, update, stateData) {
   const message = update.message;
   const chatId = String(message.chat.id);
   const text = message.text || '';
-  const state = (await import('../supabase.js').then(m => m.getBotState(env, chatId)))?.state;
+  const state = (await getBotState(env, chatId))?.state;
   
   try {
     // Handle selecting partner
@@ -697,7 +699,7 @@ export async function handleMessage(env, update, stateData) {
         return { success: true, handled: true };
       }
       
-      const currentState = await import('../supabase.js').then(m => m.getBotState(env, chatId));
+      const currentState = await getBotState(env, chatId);
       const serviceId = currentState?.data?.editing_service_id;
       const field = currentState?.data?.editing_field;
       const partnerChatId = currentState?.data?.partner_chat_id;
@@ -742,7 +744,7 @@ export async function handleSetServiceCategory(env, callbackQuery, category) {
   const chatId = String(callbackQuery.message.chat.id);
   
   try {
-    const state = await import('../supabase.js').then(m => m.getBotState(env, chatId));
+    const state = await getBotState(env, chatId);
     const stateData = state?.data || {};
     const partnerChatId = stateData.partner_chat_id;
     
@@ -785,6 +787,118 @@ export async function handleSetServiceCategory(env, callbackQuery, category) {
   } catch (error) {
     logError('handleSetServiceCategory', error, { chatId, category });
     await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка', show_alert: true });
+    throw error;
+  }
+}
+
+/**
+ * Handle edit location
+ */
+export async function handleEditLocation(env, callbackQuery) {
+  const chatId = String(callbackQuery.message.chat.id);
+  
+  try {
+    const cities = await getDistinctCitiesFromPartners(env);
+    
+    if (cities.length === 0) {
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Нет городов', show_alert: true });
+      return { success: false, handled: true };
+    }
+    
+    const keyboard = cities.map(city => [{
+      text: `🏙 ${city}`,
+      callback_data: `svc_city_${encodeURIComponent(city)}`,
+    }]);
+    keyboard.push([{ text: '◀️ Назад', callback_data: 'svc_back_to_partner' }]);
+    
+    await editMessageText(
+      env.ADMIN_BOT_TOKEN,
+      chatId,
+      callbackQuery.message.message_id,
+      '🏙 **Выберите город:**',
+      keyboard,
+      { parseMode: 'Markdown' }
+    );
+    
+    return { success: true, handled: true, action: 'edit_location' };
+  } catch (error) {
+    logError('handleEditLocation', error, { chatId });
+    throw error;
+  }
+}
+
+/**
+ * Handle set city
+ */
+export async function handleSetCity(env, callbackQuery, city) {
+  const chatId = String(callbackQuery.message.chat.id);
+  const decodedCity = decodeURIComponent(city);
+  
+  try {
+    const state = await getBotState(env, chatId);
+    const partnerChatId = state?.data?.partner_chat_id;
+    
+    if (!partnerChatId) {
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка: партнёр не найден', show_alert: true });
+      return { success: false, handled: true };
+    }
+    
+    // Get districts for this city
+    const districts = await getDistrictsForCity(env, decodedCity);
+    
+    if (districts.length === 0) {
+      // No districts - save city only
+      await updatePartnerField(env, partnerChatId, 'city', decodedCity);
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: `✅ Город: ${decodedCity}` });
+      await showPartnerServicesMenu(env, chatId, partnerChatId, callbackQuery.message.message_id);
+      return { success: true, handled: true, action: 'city_set' };
+    }
+    
+    const keyboard = districts.map(d => [{
+      text: `📍 ${d}`,
+      callback_data: `svc_district_${encodeURIComponent(decodedCity)}_${encodeURIComponent(d)}`,
+    }]);
+    keyboard.push([{ text: '◀️ Назад', callback_data: 'svc_edit_location' }]);
+    
+    await editMessageText(
+      env.ADMIN_BOT_TOKEN,
+      chatId,
+      callbackQuery.message.message_id,
+      `🏙 Город: **${decodedCity}**\n\n📍 Выберите район:`,
+      keyboard,
+      { parseMode: 'Markdown' }
+    );
+    
+    return { success: true, handled: true, action: 'city_selected' };
+  } catch (error) {
+    logError('handleSetCity', error, { chatId, city });
+    throw error;
+  }
+}
+
+/**
+ * Handle set district
+ */
+export async function handleSetDistrict(env, callbackQuery, city, district) {
+  const chatId = String(callbackQuery.message.chat.id);
+  
+  try {
+    const state = await getBotState(env, chatId);
+    const partnerChatId = state?.data?.partner_chat_id;
+    
+    if (!partnerChatId) {
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка: партнёр не найден', show_alert: true });
+      return { success: false, handled: true };
+    }
+    
+    await updatePartnerField(env, partnerChatId, 'city', decodeURIComponent(city));
+    await updatePartnerField(env, partnerChatId, 'district', decodeURIComponent(district));
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: '✅ Локация обновлена' });
+    await showPartnerServicesMenu(env, chatId, partnerChatId, callbackQuery.message.message_id);
+    
+    return { success: true, handled: true, action: 'location_updated' };
+  } catch (error) {
+    logError('handleSetDistrict', error, { chatId, city, district });
     throw error;
   }
 }

@@ -6,10 +6,13 @@
  */
 async function safeJsonResponse(response) {
   try {
-    return await response.json();
+    const text = await response.text();
+    if (!text || text.trim() === '') {
+      return { ok: true };
+    }
+    return JSON.parse(text);
   } catch (e) {
-    const text = await response.text().catch(() => '');
-    console.error('[Telegram API] Failed to parse JSON response:', text);
+    console.error('[Telegram API] Failed to parse response:', e.message);
     return { ok: false, error: 'Invalid JSON response' };
   }
 }

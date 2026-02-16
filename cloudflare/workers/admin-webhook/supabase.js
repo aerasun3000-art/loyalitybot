@@ -581,3 +581,120 @@ export async function getPromoterUGC(env, chatId) {
     return [];
   }
 }
+
+/**
+ * Get pending payments for MLM
+ */
+export async function getPendingPayments(env) {
+  try {
+    const result = await supabaseRequest(env, 'revenue_share_payments?status=eq.pending&select=*&order=created_at.desc');
+    return result || [];
+  } catch (error) {
+    console.error('[getPendingPayments] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Update payment status
+ */
+export async function updatePaymentStatus(env, id, status) {
+  try {
+    const result = await supabaseRequest(env, `revenue_share_payments?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ 
+        status, 
+        processed_at: new Date().toISOString() 
+      }),
+    });
+    return result && result.length > 0;
+  } catch (error) {
+    console.error('[updatePaymentStatus] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get active leaderboard period
+ */
+export async function getActiveLeaderboardPeriod(env) {
+  try {
+    const result = await supabaseRequest(env, 'leaderboard_periods?is_active=eq.true&select=*&limit=1');
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[getActiveLeaderboardPeriod] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Create leaderboard period
+ */
+export async function createLeaderboardPeriod(env, name) {
+  try {
+    const result = await supabaseRequest(env, 'leaderboard_periods', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        start_date: new Date().toISOString(),
+        is_active: true,
+      }),
+    });
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[createLeaderboardPeriod] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Deactivate all leaderboard periods
+ */
+export async function deactivateLeaderboardPeriods(env) {
+  try {
+    await supabaseRequest(env, 'leaderboard_periods?is_active=eq.true', {
+      method: 'PATCH',
+      body: JSON.stringify({ is_active: false }),
+    });
+    return true;
+  } catch (error) {
+    console.error('[deactivateLeaderboardPeriods] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create B2B deal
+ */
+export async function createDeal(env, dealData) {
+  try {
+    const result = await supabaseRequest(env, 'partner_deals', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...dealData,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      }),
+    });
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[createDeal] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update deal status
+ */
+export async function updateDealStatus(env, id, status) {
+  try {
+    const result = await supabaseRequest(env, `partner_deals?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+    return result && result.length > 0;
+  } catch (error) {
+    console.error('[updateDealStatus] Error:', error);
+    throw error;
+  }
+}

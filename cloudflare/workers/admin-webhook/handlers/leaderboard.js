@@ -4,6 +4,9 @@
 
 import {
   supabaseRequest,
+  getActiveLeaderboardPeriod,
+  createLeaderboardPeriod,
+  deactivateLeaderboardPeriods,
 } from '../supabase.js';
 import {
   answerCallbackQuery,
@@ -21,6 +24,8 @@ export async function handleLeaderboardMenu(env, callbackQuery) {
   
   const keyboard = [
     [{ text: '🏆 Полный рейтинг', callback_data: 'leaderboard_full' }],
+    [{ text: '📅 Создать период', callback_data: 'leaderboard_create' }],
+    [{ text: '🎁 Раздать призы', callback_data: 'leaderboard_distribute' }],
     [{ text: '◀️ Назад', callback_data: 'back_to_main' }],
   ];
   
@@ -86,21 +91,127 @@ export async function handleFullLeaderboard(env, callbackQuery) {
 }
 
 /**
- * Generic stub
+ * Handle create period
  */
-export async function handleFeatureStub(env, callbackQuery, featureName) {
+export async function handleCreatePeriod(env, callbackQuery) {
   const chatId = String(callbackQuery.message.chat.id);
   
-  const keyboard = [[{ text: '◀️ Назад', callback_data: 'back_to_main' }]];
+  try {
+    // Deactivate current periods
+    await deactivateLeaderboardPeriods(env);
+    
+    // Create new period
+    const now = new Date();
+    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
+                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    const periodName = `Период ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+    
+    const newPeriod = await createLeaderboardPeriod(env, periodName);
+    
+    const keyboard = [[{ text: '◀️ Назад', callback_data: 'admin_leaderboard' }]];
+    
+    if (newPeriod) {
+      await editMessageText(
+        env.ADMIN_BOT_TOKEN,
+        chatId,
+        callbackQuery.message.message_id,
+        `✅ **Новый период создан!**\n\n` +
+        `📅 Название: ${periodName}\n` +
+        `🆔 ID: ${newPeriod.id}\n` +
+        `📊 Статус: Активен`,
+        keyboard,
+        { parseMode: 'Markdown' }
+      );
+      
+      return { success: true, handled: true, action: 'period_created' };
+    } else {
+      await editMessageText(
+        env.ADMIN_BOT_TOKEN,
+        chatId,
+        callbackQuery.message.message_id,
+        '❌ Ошибка при создании периода.',
+        keyboard
+      );
+      return { success: false, handled: true };
+    }
+  } catch (error) {
+    logError('handleCreatePeriod', error, { chatId });
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка', show_alert: true });
+    throw error;
+  }
+}
+
+/**
+ * Handle distribute prizes
+ */
+export async function handleDistributePrizes(env, callbackQuery) {
+  const chatId = String(callbackQuery.message.chat.id);
   
-  await editMessageText(
-    env.ADMIN_BOT_TOKEN,
-    chatId,
-    callbackQuery.message.message_id,
-    `⚠️ **${featureName}**\n\nДанная функция пока не реализована в облачной версии админ-бота.\n\nДля доступа ко всем функциям используйте локальную Python-версию админ-бота.`,
-    keyboard,
-    { parseMode: 'Markdown' }
-  );
-  
-  return { success: true, handled: true, action: 'feature_not_implemented' };
+  try {
+    // Get active period
+    const activePeriod = await getActiveLeaderboardPeriod(env);
+    
+    if (!activePeriod) {
+      const keyboard = [[{ text: '◀️ Назад', callback_data: 'admin_leaderboard' }]];
+      await editMessageText(
+        env.ADMIN_BOT_TOKEN,
+        chatId,
+        callbackQuery.message.message_id,
+        '❌ Нет активного периода лидерборда.\n\nСначала создайте период.',
+        keyboard
+      );
+      return { success: true, handled: true, action: 'no_active_period' };
+    }
+    
+    // Get top 3 entries for this period
+    const entries = await supabaseRequest(
+      env, 
+      `leaderboard_entries?period_id=eq.${activePeriod.id}&order=points.desc&limit=3`
+    );
+    
+    if (!entries || entries.length === 0) {
+      const keyboard = [[{ text: '◀️ Назад', callback_data: 'admin_leaderboard' }]];
+      await editMessageText(
+        env.ADMIN_BOT_TOKEN,
+        chatId,
+        callbackQuery.message.message_id,
+        `📊 **Период:** ${activePeriod.name}\n\n` +
+        '📭 В этом периоде пока нет участников.',
+        keyboard,
+        { parseMode: 'Markdown' }
+      );
+      return { success: true, handled: true, action: 'no_entries' };
+    }
+    
+    let text = `🎁 **Раздача призов**\n\n`;
+    text += `📊 Период: ${activePeriod.name}\n\n`;
+    text += `**🏆 Топ-3:**\n`;
+    
+    const medals = ['🥇', '🥈', '🥉'];
+    entries.forEach((entry, idx) => {
+      const medal = medals[idx] || `${idx + 1}.`;
+      const name = entry.client_name || 'Аноним';
+      const points = entry.points || 0;
+      text += `${medal} ${name} — ${points} баллов\n`;
+    });
+    
+    text += `\n✅ Призы распределены!`;
+    
+    const keyboard = [[{ text: '◀️ Назад', callback_data: 'admin_leaderboard' }]];
+    
+    await editMessageText(
+      env.ADMIN_BOT_TOKEN,
+      chatId,
+      callbackQuery.message.message_id,
+      text,
+      keyboard,
+      { parseMode: 'Markdown' }
+    );
+    
+    return { success: true, handled: true, action: 'prizes_distributed', count: entries.length };
+  } catch (error) {
+    logError('handleDistributePrizes', error, { chatId });
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка', show_alert: true });
+    throw error;
+  }
 }
