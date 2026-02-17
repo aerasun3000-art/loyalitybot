@@ -602,7 +602,7 @@ export async function executeTransaction(env, clientChatId, partnerChatId, txnTy
     
     if (txnType === 'accrual') {
       // Calculate points from dollar amount (1 USD = 1 point by default, can be configured)
-      const pointsPerDollar = parseFloat(env.POINTS_PER_DOLLAR) || 1;
+      const pointsPerDollar = parseFloat(env.POINTS_PER_DOLLAR) || 0.05;
       points = Math.round(amount * pointsPerDollar);
       newBalance = currentBalance + points;
     } else if (txnType === 'spend') {
@@ -621,15 +621,18 @@ export async function executeTransaction(env, clientChatId, partnerChatId, txnTy
       body: JSON.stringify({ balance: newBalance }),
     });
     
-    // Create transaction record
+    // Create transaction record (matches DB schema: client_chat_id, partner_chat_id, date_time, total_amount, earned_points, spent_points, operation_type, description)
+    const earned = txnType === 'accrual' ? points : 0;
+    const spent = txnType === 'spend' ? points : 0;
     const transactionData = {
-      user_chat_id: clientChatId,
+      client_chat_id: clientChatId,
       partner_chat_id: partnerChatId,
-      type: txnType,
-      amount: amount,
-      points: points,
-      balance_after: newBalance,
-      created_at: new Date().toISOString(),
+      date_time: new Date().toISOString(),
+      total_amount: amount,
+      earned_points: earned,
+      spent_points: spent,
+      operation_type: txnType,
+      description: txnType === 'accrual' ? `Начисление ${points} баллов (чек $${amount})` : `Списание ${points} баллов`,
     };
     
     await createTransaction(env, transactionData);
@@ -1043,4 +1046,58 @@ export async function markMessageAsRead(env, messageId) {
     console.error('[markMessageAsRead] Error:', error);
     return false;
   }
+}
+
+/**
+ * Get exchange rate for currency (how many units of currency per 1 USD)
+ * @param {Object} env - Environment variables
+ * @param {string} currency - Currency code (VND, RUB, KZT)
+ * @returns {number} - Exchange rate (e.g., 25000 for VND means 1 USD = 25000 VND)
+ */
+export async function getExchangeRate(env, currency) {
+  try {
+    if (currency === 'USD') {
+      return 1;
+    }
+    
+    const result = await supabaseRequest(env, `currency_exchange_rates?currency=eq.${currency}&select=rate`);
+    
+    if (result && result.length > 0 && result[0].rate) {
+      return parseFloat(result[0].rate);
+    }
+    
+    // Default fallback rates if not found in DB
+    const fallbackRates = {
+      VND: 25000,
+      RUB: 100,
+      KZT: 520,
+    };
+    
+    return fallbackRates[currency] || 1;
+  } catch (error) {
+    console.error('[getExchangeRate] Error:', error);
+    // Return fallback rates on error
+    const fallbackRates = {
+      VND: 25000,
+      RUB: 100,
+      KZT: 520,
+    };
+    return fallbackRates[currency] || 1;
+  }
+}
+
+/**
+ * Convert amount from local currency to USD
+ * @param {Object} env - Environment variables
+ * @param {number} amount - Amount in local currency
+ * @param {string} currency - Currency code (VND, RUB, KZT, USD)
+ * @returns {number} - Amount in USD
+ */
+export async function convertToUSD(env, amount, currency) {
+  if (currency === 'USD') {
+    return amount;
+  }
+  
+  const rate = await getExchangeRate(env, currency);
+  return amount / rate;
 }
