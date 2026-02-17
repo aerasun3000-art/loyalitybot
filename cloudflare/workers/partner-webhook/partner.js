@@ -63,7 +63,9 @@ const CATEGORY_MAPPING = {
   'makeup': 'makeup_pmu',
   'skincare': 'facial_aesthetics',
   'nutrition': 'nutrition_coaching',
-  'psychology': 'mindfulness_coaching'
+  'psychology': 'mindfulness_coaching',
+  'delivery': 'food_delivery',
+  'spa': 'body_wellness',
 };
 
 function mapOldCategoryToNew(oldCode) {
@@ -2796,6 +2798,12 @@ export async function handleStateBasedMessage(env, update, botState) {
             ['🧠', 'mindfulness_coaching', 'Ментальное здоровье'],
             ['👗', 'image_consulting', 'Стиль']
           ],
+          self_discovery: [
+            ['🔮', 'astrology', 'Астрология'],
+            ['🔢', 'numerology', 'Нумерология'],
+            ['🧠', 'psychology_coaching', 'Психология и коучинг'],
+            ['🧘‍♀️', 'meditation_spirituality', 'Медитации и духовные практики']
+          ],
           food: [
             ['🍽️', 'restaurant', 'Рестораны'],
             ['☕', 'cafe', 'Кафе и кофейни'],
@@ -2803,12 +2811,54 @@ export async function handleStateBasedMessage(env, update, botState) {
             ['🥖', 'bakery', 'Пекарни'],
             ['🍸', 'bar', 'Бары и пабы']
           ],
+          education: [
+            ['📚', 'education', 'Образование'],
+            ['🌍', 'language_school', 'Языковая школа'],
+            ['📝', 'training', 'Тренинги и курсы'],
+            ['💻', 'online_education', 'Онлайн-образование']
+          ],
           retail: [
             ['🛍️', 'retail', 'Магазины'],
             ['👔', 'fashion', 'Мода и одежда'],
             ['💄', 'cosmetics_shop', 'Косметика'],
             ['📱', 'electronics', 'Электроника'],
             ['🎁', 'gift_shop', 'Подарки']
+          ],
+          sports_fitness: [
+            ['🏃‍♀️', 'fitness', 'Фитнес'],
+            ['🧘‍♀️', 'yoga', 'Йога'],
+            ['⚽', 'sports', 'Спорт'],
+            ['🏊', 'swimming', 'Плавание']
+          ],
+          entertainment: [
+            ['🎉', 'entertainment', 'Развлечения'],
+            ['🎬', 'cinema', 'Кино'],
+            ['🎭', 'events', 'Мероприятия'],
+            ['🎮', 'gaming', 'Игры'],
+            ['🎵', 'music', 'Музыка']
+          ],
+          healthcare: [
+            ['🏥', 'healthcare', 'Здравоохранение'],
+            ['🦷', 'dental', 'Стоматология'],
+            ['🐾', 'veterinary', 'Ветеринария'],
+            ['💊', 'pharmacy', 'Аптека']
+          ],
+          services: [
+            ['🧹', 'cleaning', 'Уборка и клининг'],
+            ['🔧', 'repair', 'Ремонт'],
+            ['📷', 'photography', 'Фотография'],
+            ['⚖️', 'legal', 'Юридические услуги'],
+            ['📊', 'accounting', 'Бухгалтерия']
+          ],
+          travel: [
+            ['✈️', 'travel', 'Путешествия'],
+            ['🏨', 'hotel', 'Отели'],
+            ['🗺️', 'tours', 'Туры']
+          ],
+          automotive: [
+            ['🔧', 'car_service', 'Автосервис'],
+            ['🚗', 'car_rental', 'Аренда авто'],
+            ['🐶', 'pet_services', 'Услуги для животных']
           ],
           influencer: [
             ['💄', 'beauty_influencer', 'Бьюти-блогер'],
@@ -2818,13 +2868,16 @@ export async function handleStateBasedMessage(env, update, botState) {
             ['✈️', 'travel_influencer', 'Тревел-блогер']
           ],
           b2b: [
-            ['⚖️', 'legal', 'Юридические услуги'],
-            ['📊', 'accounting', 'Бухгалтерия'],
             ['💼', 'consulting', 'Консалтинг'],
-            ['📈', 'marketing', 'Маркетинг'],
+            ['📣', 'marketing_agency', 'Маркетинг и реклама'],
             ['💻', 'it_services', 'IT-услуги'],
+            ['👥', 'hr_services', 'HR и рекрутинг'],
             ['🚛', 'logistics', 'Логистика'],
-            ['👥', 'hr_services', 'HR-услуги']
+            ['🏢', 'coworking', 'Коворкинг'],
+            ['🎓', 'business_training', 'Бизнес-обучение'],
+            ['🎪', 'event_management', 'Организация мероприятий'],
+            ['⚖️', 'legal', 'Юридические услуги'],
+            ['📊', 'accounting', 'Бухгалтерия']
           ]
         };
         return categoriesMap[group] || categoriesMap.beauty;
