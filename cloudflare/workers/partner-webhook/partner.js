@@ -2354,7 +2354,8 @@ export async function handleCallback(env, update) {
         return { success: false };
       }
       
-      await setBotState(env, chatId, 'awaiting_amount', {
+      // For accrual: show currency selection
+      await setBotState(env, chatId, 'awaiting_currency_selection', {
         partner_chat_id: chatId,
         client_id: clientId,
         client_name: client.name || client.username || 'Клиент',
@@ -2362,14 +2363,27 @@ export async function handleCallback(env, update) {
         txn_type: 'accrual'
       });
       
+      const currencyKeyboard = {
+        inline_keyboard: [
+          [
+            { text: '🇺🇸 USD', callback_data: 'currency_USD' },
+            { text: '🇻🇳 VND', callback_data: 'currency_VND' },
+          ],
+          [
+            { text: '🇷🇺 RUB', callback_data: 'currency_RUB' },
+            { text: '🇰🇿 KZT', callback_data: 'currency_KZT' },
+          ],
+        ],
+      };
+      
       await sendTelegramMessage(
         env.TOKEN_PARTNER,
         chatId,
         `➕ <b>Начисление баллов</b>\n\n` +
         `👤 Клиент: ${client.name || client.username || 'Клиент'}\n` +
         `💰 Баланс: <b>${client.balance || 0}</b> баллов\n\n` +
-        `Введите <b>сумму чека</b> (в долларах):`,
-        { parseMode: 'HTML' }
+        `💱 Выберите валюту чека:`,
+        { parseMode: 'HTML', reply_markup: currencyKeyboard }
       );
       return { success: true, handled: true };
     }
@@ -2388,7 +2402,8 @@ export async function handleCallback(env, update) {
         client_id: clientId,
         client_name: client.name || client.username || 'Клиент',
         current_balance: client.balance || 0,
-        txn_type: 'spend'
+        txn_type: 'spend',
+        currency: 'USD'
       });
       
       await sendTelegramMessage(
@@ -2583,30 +2598,61 @@ export async function handleWebAppData(env, update) {
       
       const currentBalance = client.balance || 0;
       
-      // Set state for amount input
-      await setBotState(env, chatId, 'awaiting_amount', {
-        partner_chat_id: chatId,
-        client_id: client.chat_id,
-        client_name: client.name || client.username || 'Клиент',
-        current_balance: currentBalance,
-        txn_type: txnType
-      });
-      
-      const txnTypeText = txnType === 'accrual' ? 'начисления' : 'списания';
-      const amountPrompt = txnType === 'accrual' 
-        ? 'Введите <b>сумму чека</b> (в долларах):'
-        : 'Введите <b>количество баллов</b> для списания:';
-      
-      await sendTelegramMessage(
-        env.TOKEN_PARTNER,
-        chatId,
-        `✅ QR-код распознан!\n\n` +
-        `👤 ${client.name || client.username || 'Клиент'}\n` +
-        `🆔 ID: <code>${client.chat_id}</code>\n` +
-        `💰 Баланс: <b>${currentBalance}</b> баллов\n\n` +
-        amountPrompt,
-        { parseMode: 'HTML' }
-      );
+      if (txnType === 'accrual') {
+        // For accrual: show currency selection
+        await setBotState(env, chatId, 'awaiting_currency_selection', {
+          partner_chat_id: chatId,
+          client_id: client.chat_id,
+          client_name: client.name || client.username || 'Клиент',
+          current_balance: currentBalance,
+          txn_type: txnType
+        });
+        
+        const currencyKeyboard = {
+          inline_keyboard: [
+            [
+              { text: '🇺🇸 USD', callback_data: 'currency_USD' },
+              { text: '🇻🇳 VND', callback_data: 'currency_VND' },
+            ],
+            [
+              { text: '🇷🇺 RUB', callback_data: 'currency_RUB' },
+              { text: '🇰🇿 KZT', callback_data: 'currency_KZT' },
+            ],
+          ],
+        };
+        
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER,
+          chatId,
+          `✅ QR-код распознан!\n\n` +
+          `👤 ${client.name || client.username || 'Клиент'}\n` +
+          `🆔 ID: <code>${client.chat_id}</code>\n` +
+          `💰 Баланс: <b>${currentBalance}</b> баллов\n\n` +
+          `💱 Выберите валюту чека:`,
+          { parseMode: 'HTML', reply_markup: currencyKeyboard }
+        );
+      } else {
+        // For spend: go directly to amount input
+        await setBotState(env, chatId, 'awaiting_amount', {
+          partner_chat_id: chatId,
+          client_id: client.chat_id,
+          client_name: client.name || client.username || 'Клиент',
+          current_balance: currentBalance,
+          txn_type: txnType,
+          currency: 'USD'
+        });
+        
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER,
+          chatId,
+          `✅ QR-код распознан!\n\n` +
+          `👤 ${client.name || client.username || 'Клиент'}\n` +
+          `🆔 ID: <code>${client.chat_id}</code>\n` +
+          `💰 Баланс: <b>${currentBalance}</b> баллов\n\n` +
+          `Введите <b>количество баллов</b> для списания:`,
+          { parseMode: 'HTML' }
+        );
+      }
       
       return { success: true, handled: true };
     }
