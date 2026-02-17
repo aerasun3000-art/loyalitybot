@@ -746,6 +746,35 @@ export async function handleMoreMenu(env, chatId) {
 }
 
 /**
+ * Handle Settings menu
+ */
+export async function handleSettingsMenu(env, chatId) {
+  const keyboard = [[
+    { text: 'ℹ️ Моя информация', callback_data: 'settings_info' }
+  ], [
+    { text: '🎁 Приветственный бонус', callback_data: 'settings_bonus' }
+  ], [
+    { text: '✏️ Редактировать данные', callback_data: 'settings_edit' }
+  ], [
+    { text: '💰 Комиссия сети', callback_data: 'settings_commission' }
+  ], [
+    { text: '🤝 B2B Сделки', callback_data: 'settings_deals' }
+  ], [
+    { text: '⬅️ Назад', callback_data: 'more_menu' }
+  ]];
+
+  await sendTelegramMessageWithKeyboard(
+    env.TOKEN_PARTNER,
+    chatId,
+    '⚙️ <b>Настройки партнёра:</b>\nВыберите действие:',
+    keyboard,
+    { parseMode: 'HTML' }
+  );
+
+  return { success: true };
+}
+
+/**
  * Handle Invite Client
  */
 export async function handleInviteClient(env, chatId) {
@@ -2221,6 +2250,200 @@ export async function handleCallback(env, update) {
     
     // ==================== END B2B PARTNERSHIP CALLBACKS ====================
     
+    // ==================== SETTINGS CALLBACKS ====================
+    
+    if (callbackData === 'menu_settings') {
+      return await handleSettingsMenu(env, chatId);
+    }
+    
+    if (callbackData === 'settings_info') {
+      try {
+        const partner = await getPartnerByChatId(env, chatId);
+        if (partner) {
+          const infoText =
+            `ℹ️ <b>Информация о вашем аккаунте:</b>\n\n` +
+            `👤 Имя: ${partner.name || 'Не указано'}\n` +
+            `🏢 Компания: ${partner.company_name || 'Не указано'}\n` +
+            `📱 Телефон: ${partner.phone || 'Не указан'}\n` +
+            `📊 Статус: ${partner.status || 'Неизвестно'}\n` +
+            `🆔 Chat ID: <code>${chatId}</code>`;
+
+          const keyboard = [[
+            { text: '⬅️ Назад', callback_data: 'menu_settings' }
+          ]];
+          await sendTelegramMessageWithKeyboard(
+            env.TOKEN_PARTNER, chatId, infoText, keyboard, { parseMode: 'HTML' }
+          );
+        } else {
+          await sendTelegramMessage(env.TOKEN_PARTNER, chatId, 'Информация о партнёре не найдена.');
+          await handleSettingsMenu(env, chatId);
+        }
+      } catch (error) {
+        logError('settings_info', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при получении информации.');
+        await handleSettingsMenu(env, chatId);
+      }
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'settings_bonus') {
+      const welcomeBonus = env.WELCOME_BONUS_AMOUNT || '100';
+      const keyboard = [[
+        { text: '⬅️ Назад', callback_data: 'menu_settings' }
+      ]];
+      await sendTelegramMessageWithKeyboard(
+        env.TOKEN_PARTNER,
+        chatId,
+        `🎁 <b>Приветственный бонус</b>\n\n` +
+        `Текущий приветственный бонус для новых клиентов: <b>${welcomeBonus}</b> баллов.\n\n` +
+        `Для изменения этой настройки обратитесь к администратору системы.`,
+        keyboard,
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'settings_edit') {
+      const keyboard = [[
+        { text: '👤 Редактировать имя', callback_data: 'edit_name' }
+      ], [
+        { text: '🏢 Редактировать компанию', callback_data: 'edit_company' }
+      ], [
+        { text: '📱 Редактировать телефон', callback_data: 'edit_phone' }
+      ], [
+        { text: '📅 Редактировать ссылку на бронирование', callback_data: 'edit_booking_url' }
+      ], [
+        { text: '⬅️ Назад', callback_data: 'menu_settings' }
+      ]];
+      await sendTelegramMessageWithKeyboard(
+        env.TOKEN_PARTNER,
+        chatId,
+        '✏️ <b>Редактирование данных:</b>\n\nВыберите поле, которое хотите изменить:',
+        keyboard,
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'edit_name') {
+      await setBotState(env, chatId, 'awaiting_edit_name', { partner_chat_id: chatId });
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER, chatId,
+        '✏️ <b>Редактирование имени</b>\n\nВведите новое имя:',
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'edit_company') {
+      await setBotState(env, chatId, 'awaiting_edit_company', { partner_chat_id: chatId });
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER, chatId,
+        '✏️ <b>Редактирование названия компании</b>\n\nВведите новое название компании:',
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'edit_phone') {
+      await setBotState(env, chatId, 'awaiting_edit_phone', { partner_chat_id: chatId });
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER, chatId,
+        '✏️ <b>Редактирование телефона</b>\n\nВведите новый номер телефона:',
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'edit_booking_url') {
+      await setBotState(env, chatId, 'awaiting_edit_booking_url', { partner_chat_id: chatId });
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER, chatId,
+        '✏️ <b>Редактирование ссылки на бронирование</b>\n\nВведите новую ссылку на систему бронирования (или отправьте "удалить" для удаления):',
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'settings_commission') {
+      try {
+        const partner = await getPartnerByChatId(env, chatId);
+        const currentPercent = partner?.base_reward_percent || 0.05;
+        const percentDisplay = `${(currentPercent * 100).toFixed(1)}%`;
+
+        const keyboard = [[
+          { text: '⬅️ Назад', callback_data: 'menu_settings' }
+        ]];
+        await sendTelegramMessageWithKeyboard(
+          env.TOKEN_PARTNER,
+          chatId,
+          `💰 <b>Комиссия сети</b>\n\n` +
+          `Текущий процент комиссионного фонда: <b>${percentDisplay}</b>\n\n` +
+          `Это процент от суммы чека, который вы отдаёте в комиссионный фонд для стандартной MLM логики.\n` +
+          `Он распределяется по цепочке рефералов (5%/5%/5%) и системе (85%).\n\n` +
+          `<i>Для изменения этого процента обратитесь к администратору.</i>`,
+          keyboard,
+          { parseMode: 'HTML' }
+        );
+      } catch (error) {
+        logError('settings_commission', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при получении информации о комиссии.');
+        await handleSettingsMenu(env, chatId);
+      }
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'settings_deals') {
+      try {
+        const deals = await getPartnerB2BDeals(env, chatId);
+
+        let message = '🤝 <b>B2B Сделки</b>\n\n';
+
+        if (deals.totalCount === 0) {
+          message += 'У вас пока нет активных B2B сделок.\n\n';
+          message += '<b>B2B сделка</b> — это персональное соглашение с другим партнером о повышенных условиях комиссии.\n\n';
+          message += '📩 Для создания сделки обратитесь к администратору.';
+        } else {
+          message += `Активных сделок: <b>${deals.totalCount}</b>\n\n`;
+
+          if (deals.asSource.length > 0) {
+            message += '<b>🔹 Вы привели клиентов к:</b>\n';
+            for (const deal of deals.asSource) {
+              const sellerPays = deal.seller_pays_percent || deal.referral_commission_percent * 100 || 0;
+              const buyerGets = deal.buyer_gets_percent || deal.client_cashback_percent * 100 || 0;
+              message += `  • ${deal.partner_name}\n`;
+              message += `    └ Продавец платит: ${sellerPays}%, Кэшбэк: ${buyerGets}%\n`;
+            }
+            message += '\n';
+          }
+
+          if (deals.asTarget.length > 0) {
+            message += '<b>🔸 К вам привели клиентов:</b>\n';
+            for (const deal of deals.asTarget) {
+              const sellerPays = deal.seller_pays_percent || deal.referral_commission_percent * 100 || 0;
+              const buyerGets = deal.buyer_gets_percent || deal.client_cashback_percent * 100 || 0;
+              message += `  • ${deal.partner_name}\n`;
+              message += `    └ Вы платите: ${sellerPays}%, Кэшбэк: ${buyerGets}%\n`;
+            }
+          }
+        }
+
+        const keyboard = [[
+          { text: '⬅️ Назад', callback_data: 'menu_settings' }
+        ]];
+        await sendTelegramMessageWithKeyboard(
+          env.TOKEN_PARTNER, chatId, message, keyboard, { parseMode: 'HTML' }
+        );
+      } catch (error) {
+        logError('settings_deals', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при получении информации о сделках.');
+        await handleSettingsMenu(env, chatId);
+      }
+      return { success: true, handled: true };
+    }
+    
+    // ==================== END SETTINGS CALLBACKS ====================
+    
     // ==================== OPERATIONS CALLBACKS ====================
     
     if (callbackData === 'menu_add_points') {
@@ -3406,6 +3629,142 @@ export async function handleStateBasedMessage(env, update, botState) {
     }
     
     // ==================== END TRANSACTION STATES ====================
+    
+    // ==================== SETTINGS EDIT STATES ====================
+    
+    if (state === 'awaiting_edit_name') {
+      const newName = text.trim();
+      await clearBotState(env, chatId);
+
+      if (newName.length < 2) {
+        await setBotState(env, chatId, 'awaiting_edit_name', { partner_chat_id: chatId });
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER, chatId,
+          '❌ Имя слишком короткое. Введите имя ещё раз:'
+        );
+        return { success: true, handled: true };
+      }
+
+      try {
+        await supabaseRequest(env, `partners?chat_id=eq.${chatId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: newName }),
+        });
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER, chatId,
+          `✅ Имя успешно обновлено на: <b>${newName}</b>`,
+          { parseMode: 'HTML' }
+        );
+      } catch (error) {
+        logError('edit_name', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при обновлении имени. Попробуйте позже.');
+      }
+      await handleSettingsMenu(env, chatId);
+      return { success: true, handled: true };
+    }
+
+    if (state === 'awaiting_edit_company') {
+      const newCompany = text.trim();
+      await clearBotState(env, chatId);
+
+      if (newCompany.length < 2) {
+        await setBotState(env, chatId, 'awaiting_edit_company', { partner_chat_id: chatId });
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER, chatId,
+          '❌ Название компании слишком короткое. Введите название ещё раз:'
+        );
+        return { success: true, handled: true };
+      }
+
+      try {
+        await supabaseRequest(env, `partners?chat_id=eq.${chatId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ company_name: newCompany }),
+        });
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER, chatId,
+          `✅ Название компании обновлено на: <b>${newCompany}</b>`,
+          { parseMode: 'HTML' }
+        );
+      } catch (error) {
+        logError('edit_company', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при обновлении названия компании. Попробуйте позже.');
+      }
+      await handleSettingsMenu(env, chatId);
+      return { success: true, handled: true };
+    }
+
+    if (state === 'awaiting_edit_phone') {
+      const newPhone = text.trim();
+      await clearBotState(env, chatId);
+      const digits = newPhone.replace(/\D/g, '');
+
+      if (digits.length < 10) {
+        await setBotState(env, chatId, 'awaiting_edit_phone', { partner_chat_id: chatId });
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER, chatId,
+          '❌ Номер телефона слишком короткий. Введите корректный номер телефона:'
+        );
+        return { success: true, handled: true };
+      }
+
+      try {
+        await supabaseRequest(env, `partners?chat_id=eq.${chatId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ phone: newPhone }),
+        });
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER, chatId,
+          `✅ Номер телефона обновлён на: <b>${newPhone}</b>`,
+          { parseMode: 'HTML' }
+        );
+      } catch (error) {
+        logError('edit_phone', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при обновлении номера телефона. Попробуйте позже.');
+      }
+      await handleSettingsMenu(env, chatId);
+      return { success: true, handled: true };
+    }
+
+    if (state === 'awaiting_edit_booking_url') {
+      const input = text.trim();
+      await clearBotState(env, chatId);
+
+      const shouldDelete = ['удалить', 'delete', 'нет', 'no', ''].includes(input.toLowerCase());
+
+      if (!shouldDelete && !input.startsWith('http://') && !input.startsWith('https://')) {
+        await setBotState(env, chatId, 'awaiting_edit_booking_url', { partner_chat_id: chatId });
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER, chatId,
+          '❌ Ссылка должна начинаться с http:// или https://. Введите корректную ссылку (или отправьте "удалить" для удаления):'
+        );
+        return { success: true, handled: true };
+      }
+
+      try {
+        const newUrl = shouldDelete ? null : input;
+        await supabaseRequest(env, `partners?chat_id=eq.${chatId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ booking_url: newUrl }),
+        });
+        if (newUrl) {
+          await sendTelegramMessage(
+            env.TOKEN_PARTNER, chatId,
+            `✅ Ссылка на бронирование обновлена на: <b>${newUrl}</b>`,
+            { parseMode: 'HTML' }
+          );
+        } else {
+          await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '✅ Ссылка на бронирование успешно удалена.');
+        }
+      } catch (error) {
+        logError('edit_booking_url', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при обновлении ссылки на бронирование. Попробуйте позже.');
+      }
+      await handleSettingsMenu(env, chatId);
+      return { success: true, handled: true };
+    }
+    
+    // ==================== END SETTINGS EDIT STATES ====================
     
     return { success: true, handled: false };
   } catch (error) {
