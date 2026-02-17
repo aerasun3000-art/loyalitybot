@@ -56,6 +56,18 @@ export async function handleStart(env, update) {
       
       user = await upsertUser(env, userData);
       
+      // Record welcome bonus transaction
+      try {
+        await createTransaction(env, {
+          user_chat_id: chatId,
+          amount: welcomeBonus,
+          type: 'welcome_bonus',
+          description: 'Приветственный бонус за регистрацию',
+        });
+      } catch (txError) {
+        logError('handleStart:welcomeBonusTransaction', txError, { chatId });
+      }
+      
       // Send welcome message
       const frontendUrl = env.FRONTEND_URL || 'https://your-frontend-domain.com';
       const keyboard = [[

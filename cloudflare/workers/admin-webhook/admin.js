@@ -60,7 +60,6 @@ export async function showMainMenu(env, chatId) {
       [
         { text: '📈 Дашборд', callback_data: 'admin_dashboard' },
         { text: '📄 Одностраничники', callback_data: 'admin_onepagers' },
-        { text: '🎨 Смена фона', callback_data: 'admin_background' },
       ],
     ];
     

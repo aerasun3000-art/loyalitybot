@@ -19,6 +19,7 @@ import { getAllPartnerApplications, getAllApprovedPartners } from './partners.js
  */
 export async function handleAdminStats(env, callbackQuery) {
   const chatId = String(callbackQuery.message.chat.id);
+  console.log('[handleAdminStats] Called for chatId:', chatId);
   
   try {
     const allApplications = await getAllPartnerApplications(env);
@@ -32,7 +33,7 @@ export async function handleAdminStats(env, callbackQuery) {
     const services = await supabaseRequest(env, 'services?select=approval_status');
     const news = await supabaseRequest(env, 'news?select=is_published');
     const ugc = await supabaseRequest(env, 'ugc_content?select=status');
-    const promoters = await supabaseRequest(env, 'promoters?select=chat_id');
+    const promoters = await supabaseRequest(env, 'promoters?select=id');
     const deals = await supabaseRequest(env, 'partner_deals?select=status');
     
     const servicesTotal = services?.length || 0;
@@ -46,27 +47,29 @@ export async function handleAdminStats(env, callbackQuery) {
     const dealsPending = deals?.filter(d => d.status === 'pending').length || 0;
     
     const text = (
-      '📊 **Расширенная статистика**\n\n' +
-      `**ПАРТНЁРЫ:**\n` +
+      '📊 *Расширенная статистика*\n\n' +
+      `*ПАРТНЁРЫ:*\n` +
       `├─ Всего: ${totalPartners}\n` +
       `├─ Одобрено: ${approved}\n` +
       `└─ На модерации: ${pending}\n\n` +
-      `**УСЛУГИ:**\n` +
+      `*УСЛУГИ:*\n` +
       `├─ Всего: ${servicesTotal}\n` +
       `└─ На модерации: ${servicesPending}\n\n` +
-      `**НОВОСТИ:**\n` +
+      `*НОВОСТИ:*\n` +
       `├─ Всего: ${newsTotal}\n` +
       `└─ Опубликовано: ${newsPublished}\n\n` +
-      `**UGC:**\n` +
+      `*UGC:*\n` +
       `├─ Всего: ${ugcTotal}\n` +
       `└─ На модерации: ${ugcPending}\n\n` +
-      `**ПРОМОУТЕРЫ:** ${promotersTotal}\n\n` +
-      `**B2B СДЕЛКИ:**\n` +
+      `*ПРОМОУТЕРЫ:* ${promotersTotal}\n\n` +
+      `*B2B СДЕЛКИ:*\n` +
       `├─ Всего: ${dealsTotal}\n` +
       `└─ На модерации: ${dealsPending}`
     );
     
     const keyboard = [[{ text: '◀️ Назад', callback_data: 'back_to_main' }]];
+    
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id);
     
     await editMessageText(
       env.ADMIN_BOT_TOKEN,

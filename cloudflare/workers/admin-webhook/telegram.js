@@ -84,17 +84,55 @@ export async function answerCallbackQuery(token, callbackQueryId, options = {}) 
 
 /**
  * Edit message text
+ * @param {string} token - Bot token
+ * @param {string} chatId - Chat ID
+ * @param {number} messageId - Message ID to edit
+ * @param {string} text - New text
+ * @param {Array|Object} keyboardOrOptions - Inline keyboard array OR options object
+ * @param {Object} options - Options (if keyboard provided as 5th arg)
  */
-export async function editMessageText(token, chatId, messageId, text, options = {}) {
+export async function editMessageText(token, chatId, messageId, text, keyboardOrOptions = {}, options = {}) {
   const url = `https://api.telegram.org/bot${token}/editMessageText`;
+  
+  // Determine if 5th argument is keyboard array or options object
+  let keyboard = null;
+  let finalOptions = options;
+  
+  if (Array.isArray(keyboardOrOptions)) {
+    keyboard = keyboardOrOptions;
+  } else if (typeof keyboardOrOptions === 'object' && keyboardOrOptions !== null) {
+    // Check if it looks like an options object (has parseMode or other known keys)
+    // or if it's empty, treat as options
+    if (!keyboardOrOptions.text && !keyboardOrOptions.callback_data) {
+      finalOptions = { ...keyboardOrOptions, ...options };
+    } else {
+      // It might be a single-row keyboard passed as object array element
+      keyboard = keyboardOrOptions;
+    }
+  }
   
   const payload = {
     chat_id: chatId,
     message_id: messageId,
     text: text,
-    parse_mode: options.parseMode || 'Markdown',
-    ...options,
+    parse_mode: finalOptions.parseMode || 'Markdown',
   };
+  
+  // Add reply_markup if keyboard provided
+  if (keyboard && Array.isArray(keyboard) && keyboard.length > 0) {
+    payload.reply_markup = {
+      inline_keyboard: keyboard,
+    };
+  }
+  
+  // Add any other options (but not parseMode again, and not arrays that look like keyboards)
+  for (const [key, value] of Object.entries(finalOptions)) {
+    if (key !== 'parseMode' && key !== 'parse_mode' && !payload[key]) {
+      payload[key] = value;
+    }
+  }
+
+  console.log('[editMessageText] Payload:', JSON.stringify(payload));
 
   const response = await fetch(url, {
     method: 'POST',
@@ -104,7 +142,11 @@ export async function editMessageText(token, chatId, messageId, text, options = 
     body: JSON.stringify(payload),
   });
 
-  return safeJsonResponse(response);
+  const result = await safeJsonResponse(response);
+  if (!result.ok) {
+    console.error('[editMessageText] Error:', JSON.stringify(result));
+  }
+  return result;
 }
 
 /**

@@ -731,45 +731,51 @@ export async function getRevenueShareHistory(env, partnerChatId, limit = 10) {
  */
 export async function getPartnerNetwork(env, partnerChatId) {
   try {
-    // Get direct referrals (level 1)
-    const directReferrals = await supabaseRequest(
+    // Level 1: direct referrals
+    const level1 = await supabaseRequest(
       env,
       `partners?referred_by_chat_id=eq.${partnerChatId}&select=chat_id,name,company_name,is_revenue_share_active,personal_income_monthly`
-    );
-    
-    // Get level 2 referrals (with referrer info)
-    const level2Referrals = [];
-    for (const ref of (directReferrals || [])) {
-      const referrerName = ref.company_name || ref.name || 'партнёр';
-      const l2 = await supabaseRequest(
-        env,
-        `partners?referred_by_chat_id=eq.${ref.chat_id}&select=chat_id,name,company_name,is_revenue_share_active`
-      );
-      // Add referrer name to each level 2 partner
-      for (const p of (l2 || [])) {
-        level2Referrals.push({ ...p, referrer_name: referrerName });
-      }
+    ) || [];
+
+    if (level1.length === 0) {
+      return { level1: [], level2: [], level3: [], totalCount: 0 };
     }
-    
-    // Get level 3 referrals (with referrer info)
-    const level3Referrals = [];
-    for (const ref of level2Referrals) {
-      const referrerName = ref.company_name || ref.name || 'партнёр';
-      const l3 = await supabaseRequest(
+
+    // Level 2: batch query by all level1 chat_ids
+    const l1Ids = level1.map(p => p.chat_id).join(',');
+    const level2Raw = await supabaseRequest(
+      env,
+      `partners?referred_by_chat_id=in.(${l1Ids})&select=chat_id,name,company_name,is_revenue_share_active,referred_by_chat_id`
+    ) || [];
+
+    // Build referrer name map for level 2
+    const l1Map = Object.fromEntries(level1.map(p => [p.chat_id, p.company_name || p.name || 'партнёр']));
+    const level2 = level2Raw.map(p => ({
+      ...p,
+      referrer_name: l1Map[p.referred_by_chat_id] || 'партнёр'
+    }));
+
+    // Level 3: batch query by all level2 chat_ids
+    let level3 = [];
+    if (level2.length > 0) {
+      const l2Ids = level2.map(p => p.chat_id).join(',');
+      const level3Raw = await supabaseRequest(
         env,
-        `partners?referred_by_chat_id=eq.${ref.chat_id}&select=chat_id,name,company_name,is_revenue_share_active`
-      );
-      // Add referrer name to each level 3 partner
-      for (const p of (l3 || [])) {
-        level3Referrals.push({ ...p, referrer_name: referrerName });
-      }
+        `partners?referred_by_chat_id=in.(${l2Ids})&select=chat_id,name,company_name,is_revenue_share_active,referred_by_chat_id`
+      ) || [];
+
+      const l2Map = Object.fromEntries(level2.map(p => [p.chat_id, p.company_name || p.name || 'партнёр']));
+      level3 = level3Raw.map(p => ({
+        ...p,
+        referrer_name: l2Map[p.referred_by_chat_id] || 'партнёр'
+      }));
     }
-    
+
     return {
-      level1: directReferrals || [],
-      level2: level2Referrals,
-      level3: level3Referrals,
-      totalCount: (directReferrals || []).length + level2Referrals.length + level3Referrals.length
+      level1,
+      level2,
+      level3,
+      totalCount: level1.length + level2.length + level3.length
     };
   } catch (error) {
     console.error('[getPartnerNetwork] Error:', error);

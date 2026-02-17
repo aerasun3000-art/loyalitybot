@@ -50,6 +50,24 @@ import {
   logError,
 } from './common.js';
 
+const CATEGORY_MAPPING = {
+  'manicure': 'nail_care',
+  'hairstyle': 'hair_salon',
+  'massage': 'massage_therapy',
+  'cosmetologist': 'facial_aesthetics',
+  'eyebrows': 'brow_design',
+  'eyelashes': 'lash_services',
+  'laser': 'hair_removal',
+  'makeup': 'makeup_pmu',
+  'skincare': 'facial_aesthetics',
+  'nutrition': 'nutrition_coaching',
+  'psychology': 'mindfulness_coaching'
+};
+
+function mapOldCategoryToNew(oldCode) {
+  return CATEGORY_MAPPING[oldCode] || oldCode;
+}
+
 /**
  * Check if partner exists and get status
  */
@@ -2625,7 +2643,7 @@ export async function handleStateBasedMessage(env, update, botState) {
         const serviceData = {
           ...botState.data,
           price_points: price,
-          category: partner.business_type.trim(),
+          category: mapOldCategoryToNew(partner.business_type.trim()),
           is_active: true,
         };
         try {
@@ -2662,24 +2680,6 @@ export async function handleStateBasedMessage(env, update, botState) {
       
       // Получаем данные партнёра для определения category_group (используем уже загруженные данные)
       const categoryGroup = partner?.category_group || 'beauty';
-      
-      // Маппинг старых кодов на новые (канонические)
-      const mapOldCategoryToNew = (oldCode) => {
-        const mapping = {
-          'manicure': 'nail_care',
-          'hairstyle': 'hair_salon',
-          'massage': 'massage_therapy',
-          'cosmetologist': 'facial_aesthetics',
-          'eyebrows': 'brow_design',
-          'eyelashes': 'lash_services',
-          'laser': 'hair_removal',
-          'makeup': 'makeup_pmu',
-          'skincare': 'facial_aesthetics',
-          'nutrition': 'nutrition_coaching',
-          'psychology': 'mindfulness_coaching'
-        };
-        return mapping[oldCode] || oldCode;
-      };
       
       // Категории по группам бизнеса
       const getCategoriesByGroup = (group) => {
@@ -3284,24 +3284,6 @@ export async function handleServiceCategorySelection(env, chatId, category) {
       return { success: false };
     }
     
-    // Маппинг старых кодов на новые (канонические)
-    const mapOldCategoryToNew = (oldCode) => {
-      const mapping = {
-        'manicure': 'nail_care',
-        'hairstyle': 'hair_salon',
-        'massage': 'massage_therapy',
-        'cosmetologist': 'facial_aesthetics',
-        'eyebrows': 'brow_design',
-        'eyelashes': 'lash_services',
-        'laser': 'hair_removal',
-        'makeup': 'makeup_pmu',
-        'skincare': 'facial_aesthetics',
-        'nutrition': 'nutrition_coaching',
-        'psychology': 'mindfulness_coaching'
-      };
-      return mapping[oldCode] || oldCode;
-    };
-    
     // Преобразуем старый код в новый (если нужно)
     const canonicalCategory = mapOldCategoryToNew(category);
     
@@ -3318,7 +3300,7 @@ export async function handleServiceCategorySelection(env, chatId, category) {
       if (categoriesResult && categoriesResult.length > 0) {
         // Используем основную категорию партнера
         const primaryCategory = categoriesResult.find(c => c.is_primary) || categoriesResult[0];
-        finalCategory = primaryCategory.business_type;
+        finalCategory = mapOldCategoryToNew(primaryCategory.business_type);
         console.log(`[handleServiceCategorySelection] Using primary category from partner_categories: ${finalCategory}`);
       } else if (partner?.business_type) {
         // Обратная совместимость: используем business_type из partners

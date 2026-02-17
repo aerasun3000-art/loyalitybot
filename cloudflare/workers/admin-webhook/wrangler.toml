@@ -4,7 +4,14 @@ name = "loyalitybot-admin-webhook"
 main = "index.js"
 compatibility_date = "2024-01-01"
 
-# Environment variables (set via wrangler secret put)
+# Public environment variables
+[vars]
+DASHBOARD_URL = "https://loyalitybot-frontend.pages.dev/admin/analytics"
+ONEPAGER_PARTNER_URL = "https://loyalitybot-frontend.pages.dev/onepager/partner"
+ONEPAGER_CLIENT_URL = "https://loyalitybot-frontend.pages.dev/onepager/client"
+ONEPAGER_INVESTOR_URL = "https://loyalitybot-frontend.pages.dev/onepager/investor"
+
+# Secret environment variables (set via wrangler secret put)
 # ADMIN_BOT_TOKEN - Telegram bot token
 # ADMIN_CHAT_ID - Admin chat ID(s), comma-separated
 # SUPABASE_URL - Supabase project URL
