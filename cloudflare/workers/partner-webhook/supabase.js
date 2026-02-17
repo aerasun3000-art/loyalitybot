@@ -863,28 +863,29 @@ export async function getPartnerStats(env, partnerChatId) {
     const last30DaysClients = new Set();
     
     for (const txn of (transactions || [])) {
-      const txnDate = new Date(txn.created_at || txn.date_time);
-      const amount = parseFloat(txn.amount) || parseFloat(txn.check_amount) || 0;
-      const points = parseInt(txn.points) || parseInt(txn.points_change) || 0;
+      const txnDate = new Date(txn.date_time || txn.created_at);
+      const amount = parseFloat(txn.total_amount) || 0;
+      const earnedPoints = parseInt(txn.earned_points) || 0;
+      const spentPoints = parseInt(txn.spent_points) || 0;
       
-      if (txn.type === 'accrual' || txn.transaction_type === 'accrual') {
+      if (txn.operation_type === 'accrual') {
         totalTurnover += amount;
-        totalPointsIssued += Math.abs(points);
+        totalPointsIssued += earnedPoints;
       } else {
-        totalPointsSpent += Math.abs(points);
+        totalPointsSpent += spentPoints;
       }
       
-      if (txn.user_chat_id) {
-        uniqueClients.add(txn.user_chat_id);
+      if (txn.client_chat_id) {
+        uniqueClients.add(txn.client_chat_id);
       }
       
       if (txnDate >= thirtyDaysAgo) {
         last30DaysTransactions++;
-        if (txn.type === 'accrual' || txn.transaction_type === 'accrual') {
+        if (txn.operation_type === 'accrual') {
           last30DaysTurnover += amount;
         }
-        if (txn.user_chat_id) {
-          last30DaysClients.add(txn.user_chat_id);
+        if (txn.client_chat_id) {
+          last30DaysClients.add(txn.client_chat_id);
         }
       }
     }
