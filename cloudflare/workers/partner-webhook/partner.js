@@ -2893,6 +2893,13 @@ export async function handleStateBasedMessage(env, update, botState) {
         updateData.approval_status = 'Pending';
         
         await updateService(env, serviceId, updateData);
+        
+        // Get updated service data and notify admins
+        const updatedService = await getServiceById(env, serviceId);
+        if (updatedService) {
+          await notifyAdminsAboutNewService(env, serviceId, updatedService);
+        }
+        
         await clearBotState(env, chatId);
         
         await sendTelegramMessage(
