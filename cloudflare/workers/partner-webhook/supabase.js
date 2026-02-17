@@ -840,6 +840,105 @@ export async function getPartnerB2BDeals(env, partnerChatId) {
 }
 
 /**
+ * Get pending B2B deals for partner (where partner is target, awaiting acceptance)
+ */
+export async function getPendingB2BDealsForPartner(env, targetChatId) {
+  try {
+    const deals = await supabaseRequest(
+      env,
+      `partner_deals?target_partner_chat_id=eq.${targetChatId}&status=eq.pending&select=*&order=created_at.desc`
+    );
+    if (!deals || deals.length === 0) {
+      return [];
+    }
+    const enriched = [];
+    for (const deal of deals) {
+      const sourcePartner = await supabaseRequest(
+        env,
+        `partners?chat_id=eq.${deal.source_partner_chat_id}&select=name,company_name`
+      );
+      enriched.push({
+        ...deal,
+        partner_name: sourcePartner?.[0]?.company_name || sourcePartner?.[0]?.name || 'Партнёр'
+      });
+    }
+    return enriched;
+  } catch (error) {
+    console.error('[getPendingB2BDealsForPartner] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Create B2B deal (partner-initiated)
+ */
+export async function createPartnerDeal(env, dealData) {
+  try {
+    const result = await supabaseRequest(env, 'partner_deals', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...dealData,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+      }),
+    });
+    return Array.isArray(result) && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[createPartnerDeal] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update B2B deal status
+ */
+export async function updatePartnerDealStatus(env, dealId, status, extraFields = {}) {
+  try {
+    const body = { status, ...extraFields };
+    if (status === 'active') {
+      body.accepted_at = new Date().toISOString();
+    }
+    const result = await supabaseRequest(env, `partner_deals?id=eq.${dealId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+    return result !== undefined;
+  } catch (error) {
+    console.error('[updatePartnerDealStatus] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get deal by ID
+ */
+export async function getDealById(env, dealId) {
+  try {
+    const result = await supabaseRequest(env, `partner_deals?id=eq.${dealId}&select=*`);
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[getDealById] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Get deal by source and target (check existing)
+ */
+export async function getDealBySourceAndTarget(env, sourceChatId, targetChatId) {
+  try {
+    const result = await supabaseRequest(
+      env,
+      `partner_deals?source_partner_chat_id=eq.${sourceChatId}&target_partner_chat_id=eq.${targetChatId}&select=*`
+    );
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[getDealBySourceAndTarget] Error:', error);
+    return null;
+  }
+}
+
+/**
  * Get partner statistics
  */
 export async function getPartnerStats(env, partnerChatId) {

@@ -30,6 +30,11 @@ import {
   getRevenueShareHistory,
   getPartnerNetwork,
   getPartnerB2BDeals,
+  getPendingB2BDealsForPartner,
+  createPartnerDeal,
+  updatePartnerDealStatus,
+  getDealById,
+  getDealBySourceAndTarget,
   getPartnerConversations,
   getClientDetailsForPartner,
   getConversation,
@@ -72,6 +77,13 @@ function mapOldCategoryToNew(oldCode) {
   return CATEGORY_MAPPING[oldCode] || oldCode;
 }
 
+/** B2B deal presets: { cashback%, commission% } — кэшбэк везде 5% для упрощения выплат */
+const B2B_PRESETS = {
+  standard: { cashback: 5, commission: 8, label: 'Стандарт' },
+  partner_plus: { cashback: 5, commission: 12, label: 'Партнёр+' },
+  premium: { cashback: 5, commission: 15, label: 'Премиум' },
+};
+
 /**
  * Check if partner exists and get status
  */
@@ -112,6 +124,12 @@ export async function handleStart(env, update) {
         '⏳ Ваша заявка принята и ожидает одобрения.'
       );
       return { success: true, handled: true };
+    }
+
+    // B2B invite link: b2b_<source_chat_id>_<preset>
+    if (payload.startsWith('b2b_')) {
+      const result = await handleB2BInviteLink(env, chatId, payload);
+      if (result) return result;
     }
     
     // Check partner status
@@ -657,50 +675,34 @@ export async function handleOperationsQueue(env, chatId) {
 }
 
 /**
- * Handle B2B Partnership menu
+ * Handle B2B Partnership menu (submenu)
  */
 export async function handlePartnershipMenu(env, chatId) {
   try {
-    const deals = await getPartnerB2BDeals(env, chatId);
-    
+    const [deals, pendingCount] = await Promise.all([
+      getPartnerB2BDeals(env, chatId),
+      getPendingB2BDealsForPartner(env, chatId).then((p) => p.length),
+    ]);
+
     let message = '🤝 <b>B2B Партнёрство</b>\n\n';
-    
-    if (deals.totalCount === 0) {
-      message += 'У вас пока нет активных B2B сделок.\n\n';
-      message += '<b>Что такое B2B сделка?</b>\n';
-      message += '• Вы приводите клиентов к другому партнёру\n';
-      message += '• Ваши клиенты получают повышенный кэшбэк\n';
-      message += '• Вы получаете комиссию с их покупок\n\n';
-      message += '📩 Для создания сделки обратитесь к администратору.';
-    } else {
-      message += `📊 Всего активных сделок: <b>${deals.totalCount}</b>\n\n`;
-      
-      if (deals.asSource.length > 0) {
-        message += '<b>🔹 Вы приводите клиентов к:</b>\n';
-        for (const deal of deals.asSource) {
-          const sellerPays = deal.seller_pays_percent || 0;
-          const buyerGets = deal.buyer_gets_percent || 0;
-          message += `  • ${deal.partner_name}\n`;
-          message += `    └ Комиссия: ${sellerPays}%, Кэшбэк клиентам: ${buyerGets}%\n`;
-        }
-        message += '\n';
-      }
-      
-      if (deals.asTarget.length > 0) {
-        message += '<b>🔸 К вам приводят клиентов:</b>\n';
-        for (const deal of deals.asTarget) {
-          const sellerPays = deal.seller_pays_percent || 0;
-          const buyerGets = deal.buyer_gets_percent || 0;
-          message += `  • ${deal.partner_name}\n`;
-          message += `    └ Вы платите: ${sellerPays}%, Кэшбэк их клиентам: ${buyerGets}%\n`;
-        }
-      }
+    message += '<b>Что такое B2B сделка?</b>\n';
+    message += '• Вы приводите клиентов к другому партнёру\n';
+    message += '• Ваши клиенты получают повышенный кэшбэк\n';
+    message += '• Вы получаете комиссию с их покупок\n\n';
+    if (deals.totalCount > 0) {
+      message += `📊 Активных сделок: <b>${deals.totalCount}</b>\n`;
     }
-    
-    const keyboard = [[
-      { text: '⬅️ Назад', callback_data: 'more_menu' }
-    ]];
-    
+    if (pendingCount > 0) {
+      message += `📩 Входящих предложений: <b>${pendingCount}</b>\n`;
+    }
+
+    const keyboard = [
+      [{ text: '📋 Мои сделки', callback_data: 'b2b_my_deals' }],
+      [{ text: '📩 Входящие предложения', callback_data: 'b2b_incoming' }],
+      [{ text: '➕ Предложить сделку', callback_data: 'b2b_propose' }],
+      [{ text: '⬅️ Назад', callback_data: 'more_menu' }],
+    ];
+
     await sendTelegramMessageWithKeyboard(
       env.TOKEN_PARTNER,
       chatId,
@@ -708,16 +710,410 @@ export async function handlePartnershipMenu(env, chatId) {
       keyboard,
       { parseMode: 'HTML' }
     );
-    
+
     return { success: true };
   } catch (error) {
     console.error('[handlePartnershipMenu] Error:', error);
     await sendTelegramMessage(
       env.TOKEN_PARTNER,
       chatId,
-      '❌ Ошибка при загрузке B2B сделок. Попробуйте позже.'
+      '❌ Ошибка при загрузке. Попробуйте позже.'
     );
     return { success: false };
+  }
+}
+
+/**
+ * Handle "My deals" - list active B2B deals
+ */
+export async function handleB2BMyDeals(env, chatId) {
+  try {
+    const deals = await getPartnerB2BDeals(env, chatId);
+
+    let message = '📋 <b>Мои B2B сделки</b>\n\n';
+
+    if (deals.totalCount === 0) {
+      message += 'У вас пока нет активных сделок.\n';
+      message += 'Нажмите «Предложить сделку», чтобы создать первую.';
+    } else {
+      if (deals.asSource.length > 0) {
+        message += '<b>🔹 Вы приводите клиентов к:</b>\n';
+        for (const deal of deals.asSource) {
+          const comm = deal.referral_commission_percent ?? deal.seller_pays_percent ?? 0;
+          const cash = deal.client_cashback_percent ?? deal.buyer_gets_percent ?? 0;
+          message += `  • ${deal.partner_name}\n`;
+          message += `    └ Комиссия: ${comm}%, Кэшбэк клиентам: ${cash}%\n`;
+        }
+        message += '\n';
+      }
+      if (deals.asTarget.length > 0) {
+        message += '<b>🔸 К вам приводят клиентов:</b>\n';
+        for (const deal of deals.asTarget) {
+          const comm = deal.referral_commission_percent ?? deal.seller_pays_percent ?? 0;
+          const cash = deal.client_cashback_percent ?? deal.buyer_gets_percent ?? 0;
+          message += `  • ${deal.partner_name}\n`;
+          message += `    └ Вы платите: ${comm}%, Кэшбэк их клиентам: ${cash}%\n`;
+        }
+      }
+    }
+
+    const keyboard = [[{ text: '⬅️ Назад', callback_data: 'menu_partnership' }]];
+    await sendTelegramMessageWithKeyboard(
+      env.TOKEN_PARTNER,
+      chatId,
+      message,
+      keyboard,
+      { parseMode: 'HTML' }
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('[handleB2BMyDeals] Error:', error);
+    await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при загрузке.');
+    return { success: false };
+  }
+}
+
+/**
+ * Handle "Incoming" - pending deals where partner is target
+ */
+export async function handleB2BIncoming(env, chatId) {
+  try {
+    const pending = await getPendingB2BDealsForPartner(env, chatId);
+
+    let message = '📩 <b>Входящие предложения</b>\n\n';
+
+    if (pending.length === 0) {
+      message += 'Нет новых предложений.';
+    } else {
+      for (const deal of pending) {
+        const comm = deal.referral_commission_percent ?? 0;
+        const cash = deal.client_cashback_percent ?? 0;
+        message += `• <b>${deal.partner_name}</b>\n`;
+        message += `  Кэшбэк клиентам: ${cash}%, Ваша комиссия партнёру: ${comm}%\n\n`;
+      }
+    }
+
+    const keyboard = [];
+    for (const deal of pending) {
+      keyboard.push([
+        { text: `✅ Принять ${deal.partner_name}`, callback_data: `b2b_accept_${deal.id}` },
+        { text: `❌ Отклонить`, callback_data: `b2b_reject_${deal.id}` },
+      ]);
+    }
+    keyboard.push([{ text: '⬅️ Назад', callback_data: 'menu_partnership' }]);
+
+    await sendTelegramMessageWithKeyboard(
+      env.TOKEN_PARTNER,
+      chatId,
+      message,
+      keyboard,
+      { parseMode: 'HTML' }
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('[handleB2BIncoming] Error:', error);
+    await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при загрузке.');
+    return { success: false };
+  }
+}
+
+/**
+ * Handle "Propose deal" - select preset
+ */
+export async function handleB2BPropose(env, chatId) {
+  const keyboard = [
+    [
+      { text: '🟢 Стандарт (5%/8%)', callback_data: 'b2b_preset_standard' },
+    ],
+    [
+      { text: '🔵 Партнёр+ (5%/12%)', callback_data: 'b2b_preset_partner_plus' },
+    ],
+    [
+      { text: '🟡 Премиум (5%/15%)', callback_data: 'b2b_preset_premium' },
+    ],
+    [{ text: '⬅️ Назад', callback_data: 'menu_partnership' }],
+  ];
+
+  await sendTelegramMessageWithKeyboard(
+    env.TOKEN_PARTNER,
+    chatId,
+    '➕ <b>Предложить сделку</b>\n\nВыберите условия (кэшбэк клиентам везде 5%):\n' +
+      '🟢 Стандарт — комиссия 8%\n' +
+      '🔵 Партнёр+ — комиссия 12%\n' +
+      '🟡 Премиум — комиссия 15%',
+    keyboard,
+    { parseMode: 'HTML' }
+  );
+  return { success: true };
+}
+
+/**
+ * Handle preset selection - show link + option to enter chat_id
+ */
+export async function handleB2BPresetSelected(env, chatId, presetKey, callbackQuery) {
+  const preset = B2B_PRESETS[presetKey];
+  if (!preset) return { success: false };
+
+  const botUsername = env.PARTNER_BOT_USERNAME || env.BOT_USERNAME || 'mindbeatybot';
+  const inviteLink = `https://t.me/${botUsername}?start=b2b_${chatId}_${presetKey}`;
+
+  const message =
+    `✅ <b>Условия: ${preset.label}</b> — кэшбэк ${preset.cashback}%, комиссия ${preset.commission}%\n\n` +
+    `📤 Отправьте эту ссылку партнёру:\n\n` +
+    `<code>${inviteLink}</code>\n\n` +
+    `Партнёр откроет ссылку и сможет принять или отклонить предложение.\n\n` +
+    `Или введите chat_id партнёра, если знаете:`;
+
+  await setBotState(env, chatId, 'b2b_awaiting_target', {
+    preset: presetKey,
+    cashback: preset.cashback,
+    commission: preset.commission,
+  });
+
+  const keyboard = [[{ text: '❌ Отмена', callback_data: 'menu_partnership' }]];
+
+  await editMessageText(
+    env.TOKEN_PARTNER,
+    chatId,
+    callbackQuery.message.message_id,
+    message,
+    keyboard,
+    { parseMode: 'HTML' }
+  );
+  return { success: true };
+}
+
+/**
+ * Handle deal accept
+ */
+export async function handleB2BAccept(env, chatId, dealId, callbackQuery) {
+  try {
+    const deal = await getDealById(env, dealId);
+    if (!deal || deal.target_partner_chat_id !== chatId) {
+      await answerCallbackQuery(env.TOKEN_PARTNER, callbackQuery.id, {
+        text: 'Сделка не найдена',
+        show_alert: true,
+      });
+      return { success: false };
+    }
+    if (deal.status !== 'pending') {
+      await answerCallbackQuery(env.TOKEN_PARTNER, callbackQuery.id, {
+        text: 'Сделка уже обработана',
+        show_alert: true,
+      });
+      return { success: false };
+    }
+
+    await updatePartnerDealStatus(env, dealId, 'active');
+
+    const sourcePartner = await getPartnerByChatId(env, deal.source_partner_chat_id);
+    const sourceNameDisplay = sourcePartner?.company_name || sourcePartner?.name || 'Партнёр';
+
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      deal.source_partner_chat_id,
+      `✅ <b>B2B сделка принята!</b>\n\n` +
+        `Партнёр принял ваше предложение.\n` +
+        `Сделка активна.`,
+      { parseMode: 'HTML' }
+    );
+
+    await editMessageText(
+      env.TOKEN_PARTNER,
+      chatId,
+      callbackQuery.message.message_id,
+      `✅ Сделка с ${sourceNameDisplay} принята и активна.`,
+      [[{ text: '⬅️ Назад', callback_data: 'menu_partnership' }]],
+      { parseMode: 'HTML' }
+    );
+
+    await answerCallbackQuery(env.TOKEN_PARTNER, callbackQuery.id, { text: '✅ Сделка принята' });
+    return { success: true };
+  } catch (error) {
+    console.error('[handleB2BAccept] Error:', error);
+    await answerCallbackQuery(env.TOKEN_PARTNER, callbackQuery.id, {
+      text: 'Ошибка',
+      show_alert: true,
+    });
+    return { success: false };
+  }
+}
+
+/**
+ * Handle deal reject
+ */
+export async function handleB2BReject(env, chatId, dealId, callbackQuery) {
+  try {
+    const deal = await getDealById(env, dealId);
+    if (!deal || deal.target_partner_chat_id !== chatId) {
+      await answerCallbackQuery(env.TOKEN_PARTNER, callbackQuery.id, {
+        text: 'Сделка не найдена',
+        show_alert: true,
+      });
+      return { success: false };
+    }
+    if (deal.status !== 'pending') {
+      await answerCallbackQuery(env.TOKEN_PARTNER, callbackQuery.id, {
+        text: 'Сделка уже обработана',
+        show_alert: true,
+      });
+      return { success: false };
+    }
+
+    await updatePartnerDealStatus(env, dealId, 'rejected');
+
+    const partner = await getPartnerByChatId(env, deal.source_partner_chat_id);
+    const sourceNameDisplay = partner?.company_name || partner?.name || 'Партнёр';
+
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      deal.source_partner_chat_id,
+      `❌ <b>B2B предложение отклонено</b>\n\n` +
+        `Партнёр ${sourceNameDisplay} отклонил ваше предложение.`,
+      { parseMode: 'HTML' }
+    );
+
+    await editMessageText(
+      env.TOKEN_PARTNER,
+      chatId,
+      callbackQuery.message.message_id,
+      `❌ Предложение отклонено.`,
+      [[{ text: '⬅️ Назад', callback_data: 'menu_partnership' }]],
+      { parseMode: 'HTML' }
+    );
+
+    await answerCallbackQuery(env.TOKEN_PARTNER, callbackQuery.id, { text: 'Отклонено' });
+    return { success: true };
+  } catch (error) {
+    console.error('[handleB2BReject] Error:', error);
+    await answerCallbackQuery(env.TOKEN_PARTNER, callbackQuery.id, {
+      text: 'Ошибка',
+      show_alert: true,
+    });
+    return { success: false };
+  }
+}
+
+/**
+ * Handle B2B invite link: /start b2b_<source_chat_id>_<preset>
+ */
+export async function handleB2BInviteLink(env, chatId, payload) {
+  try {
+    const parts = payload.replace('b2b_', '').split('_');
+    const sourceChatId = parts[0];
+    const presetKey = parts[1] || 'standard';
+    const preset = B2B_PRESETS[presetKey] || B2B_PRESETS.standard;
+
+    const partnerStatus = await checkPartnerStatus(env, chatId);
+    if (!partnerStatus.exists || partnerStatus.status !== 'Approved') {
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER,
+        chatId,
+        '❌ Только одобренные партнёры могут заключать B2B сделки.\nЗарегистрируйтесь как партнёр.'
+      );
+      return { success: true, handled: true };
+    }
+
+    if (sourceChatId === chatId) {
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER,
+        chatId,
+        '❌ Нельзя заключить сделку с самим собой.'
+      );
+      return { success: true, handled: true };
+    }
+
+    const sourcePartner = await getPartnerByChatId(env, sourceChatId);
+    if (!sourcePartner || sourcePartner.status !== 'Approved') {
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER,
+        chatId,
+        '❌ Партнёр, отправивший ссылку, не найден или не одобрен.'
+      );
+      return { success: true, handled: true };
+    }
+
+    const sourceName = sourcePartner.company_name || sourcePartner.name || 'Партнёр';
+
+    const existing = await getDealBySourceAndTarget(env, sourceChatId, chatId);
+    if (existing) {
+      if (existing.status === 'active') {
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER,
+          chatId,
+          `✅ У вас уже есть активная сделка с ${sourceName}.`,
+          { parseMode: 'HTML' }
+        );
+      } else if (existing.status === 'pending') {
+        const keyboard = [
+          [
+            { text: '✅ Принять', callback_data: `b2b_accept_${existing.id}` },
+            { text: '❌ Отклонить', callback_data: `b2b_reject_${existing.id}` },
+          ],
+        ];
+        await sendTelegramMessageWithKeyboard(
+          env.TOKEN_PARTNER,
+          chatId,
+          `📩 <b>Предложение от ${sourceName}</b>\n\n` +
+            `Кэшбэк клиентам: ${preset.cashback}%\n` +
+            `Ваша комиссия партнёру: ${preset.commission}%\n\n` +
+            `Принять или отклонить?`,
+          keyboard,
+          { parseMode: 'HTML' }
+        );
+      } else {
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER,
+          chatId,
+          `Сделка с ${sourceName} уже была обработана ранее.`,
+          { parseMode: 'HTML' }
+        );
+      }
+      return { success: true, handled: true };
+    }
+
+    const newDeal = await createPartnerDeal(env, {
+      source_partner_chat_id: sourceChatId,
+      target_partner_chat_id: chatId,
+      client_cashback_percent: preset.cashback,
+      referral_commission_percent: preset.commission,
+    });
+
+    if (!newDeal) {
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER,
+        chatId,
+        '❌ Не удалось создать сделку. Попробуйте позже.'
+      );
+      return { success: true, handled: true };
+    }
+
+    const keyboard = [
+      [
+        { text: '✅ Принять', callback_data: `b2b_accept_${newDeal.id}` },
+        { text: '❌ Отклонить', callback_data: `b2b_reject_${newDeal.id}` },
+      ],
+    ];
+    await sendTelegramMessageWithKeyboard(
+      env.TOKEN_PARTNER,
+      chatId,
+      `📩 <b>Предложение от ${sourceName}</b>\n\n` +
+        `Партнёр предлагает B2B сделку:\n` +
+        `• Кэшбэк вашим клиентам: ${preset.cashback}%\n` +
+        `• Комиссия партнёру: ${preset.commission}%\n\n` +
+        `Принять или отклонить?`,
+      keyboard,
+      { parseMode: 'HTML' }
+    );
+    return { success: true, handled: true };
+  } catch (error) {
+    console.error('[handleB2BInviteLink] Error:', error);
+    await sendTelegramMessage(
+      env.TOKEN_PARTNER,
+      chatId,
+      '❌ Ошибка при обработке ссылки. Попробуйте позже.'
+    );
+    return { success: true, handled: true };
   }
 }
 
@@ -2225,6 +2621,27 @@ export async function handleCallback(env, update) {
     if (callbackData === 'menu_partnership') {
       return await handlePartnershipMenu(env, chatId);
     }
+    if (callbackData === 'b2b_my_deals') {
+      return await handleB2BMyDeals(env, chatId);
+    }
+    if (callbackData === 'b2b_incoming') {
+      return await handleB2BIncoming(env, chatId);
+    }
+    if (callbackData === 'b2b_propose') {
+      return await handleB2BPropose(env, chatId);
+    }
+    if (callbackData.startsWith('b2b_preset_')) {
+      const presetKey = callbackData.replace('b2b_preset_', '');
+      return await handleB2BPresetSelected(env, chatId, presetKey, callbackQuery);
+    }
+    if (callbackData.startsWith('b2b_accept_')) {
+      const dealId = callbackData.replace('b2b_accept_', '');
+      return await handleB2BAccept(env, chatId, dealId, callbackQuery);
+    }
+    if (callbackData.startsWith('b2b_reject_')) {
+      const dealId = callbackData.replace('b2b_reject_', '');
+      return await handleB2BReject(env, chatId, dealId, callbackQuery);
+    }
     
     if (callbackData === 'more_menu') {
       return await handleMoreMenu(env, chatId);
@@ -2394,52 +2811,7 @@ export async function handleCallback(env, update) {
     }
     
     if (callbackData === 'settings_deals') {
-      try {
-        const deals = await getPartnerB2BDeals(env, chatId);
-
-        let message = '🤝 <b>B2B Сделки</b>\n\n';
-
-        if (deals.totalCount === 0) {
-          message += 'У вас пока нет активных B2B сделок.\n\n';
-          message += '<b>B2B сделка</b> — это персональное соглашение с другим партнером о повышенных условиях комиссии.\n\n';
-          message += '📩 Для создания сделки обратитесь к администратору.';
-        } else {
-          message += `Активных сделок: <b>${deals.totalCount}</b>\n\n`;
-
-          if (deals.asSource.length > 0) {
-            message += '<b>🔹 Вы привели клиентов к:</b>\n';
-            for (const deal of deals.asSource) {
-              const sellerPays = deal.seller_pays_percent || deal.referral_commission_percent * 100 || 0;
-              const buyerGets = deal.buyer_gets_percent || deal.client_cashback_percent * 100 || 0;
-              message += `  • ${deal.partner_name}\n`;
-              message += `    └ Продавец платит: ${sellerPays}%, Кэшбэк: ${buyerGets}%\n`;
-            }
-            message += '\n';
-          }
-
-          if (deals.asTarget.length > 0) {
-            message += '<b>🔸 К вам привели клиентов:</b>\n';
-            for (const deal of deals.asTarget) {
-              const sellerPays = deal.seller_pays_percent || deal.referral_commission_percent * 100 || 0;
-              const buyerGets = deal.buyer_gets_percent || deal.client_cashback_percent * 100 || 0;
-              message += `  • ${deal.partner_name}\n`;
-              message += `    └ Вы платите: ${sellerPays}%, Кэшбэк: ${buyerGets}%\n`;
-            }
-          }
-        }
-
-        const keyboard = [[
-          { text: '⬅️ Назад', callback_data: 'menu_settings' }
-        ]];
-        await sendTelegramMessageWithKeyboard(
-          env.TOKEN_PARTNER, chatId, message, keyboard, { parseMode: 'HTML' }
-        );
-      } catch (error) {
-        logError('settings_deals', error, { chatId });
-        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при получении информации о сделках.');
-        await handleSettingsMenu(env, chatId);
-      }
-      return { success: true, handled: true };
+      return await handlePartnershipMenu(env, chatId);
     }
     
     // ==================== END SETTINGS CALLBACKS ====================
@@ -2776,7 +3148,8 @@ export async function routeUpdate(env, update) {
     if (botState && (
       botState.state.startsWith('awaiting_') || 
       botState.state.startsWith('editing_service_') ||
-      botState.state.startsWith('editing_promo_')
+      botState.state.startsWith('editing_promo_') ||
+      botState.state.startsWith('b2b_')
     )) {
       // User is in a multi-step process, handle state-based message
       return await handleStateBasedMessage(env, update, botState);
@@ -2906,6 +3279,75 @@ export async function handleStateBasedMessage(env, update, botState) {
   console.log('[handleStateBasedMessage] Processing:', { chatId, state, textLength: text.length });
   
   try {
+    if (state === 'b2b_awaiting_target') {
+      const targetChatId = text.trim();
+      if (!targetChatId) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Введите chat_id партнёра.');
+        return { success: true, handled: true };
+      }
+      if (targetChatId === chatId) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Нельзя заключить сделку с самим собой.');
+        return { success: true, handled: true };
+      }
+      const targetPartner = await getPartnerByChatId(env, targetChatId);
+      if (!targetPartner || targetPartner.status !== 'Approved') {
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER,
+          chatId,
+          `❌ Партнёр с chat_id ${targetChatId} не найден или не одобрен.`
+        );
+        return { success: true, handled: true };
+      }
+      const existing = await getDealBySourceAndTarget(env, chatId, targetChatId);
+      if (existing && (existing.status === 'active' || existing.status === 'pending')) {
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER,
+          chatId,
+          `У вас уже есть сделка с этим партнёром (статус: ${existing.status}).`
+        );
+        await clearBotState(env, chatId);
+        return { success: true, handled: true };
+      }
+      const { cashback, commission } = botState.data;
+      const newDeal = await createPartnerDeal(env, {
+        source_partner_chat_id: chatId,
+        target_partner_chat_id: targetChatId,
+        client_cashback_percent: cashback,
+        referral_commission_percent: commission,
+      });
+      await clearBotState(env, chatId);
+      if (!newDeal) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Не удалось создать сделку.');
+        return { success: true, handled: true };
+      }
+      const targetName = targetPartner.company_name || targetPartner.name || 'Партнёр';
+      const sourcePartnerData = await getPartnerByChatId(env, chatId);
+      const sourceName = sourcePartnerData?.company_name || sourcePartnerData?.name || 'Партнёр';
+      await sendTelegramMessageWithKeyboard(
+        env.TOKEN_PARTNER,
+        targetChatId,
+        `📩 <b>Новое B2B предложение от ${sourceName}!</b>\n\n` +
+          `• Кэшбэк клиентам: ${cashback}%\n` +
+          `• Комиссия вам: ${commission}%\n\n` +
+          `Принять или отклонить?`,
+        [
+          [
+            { text: '✅ Принять', callback_data: `b2b_accept_${newDeal.id}` },
+            { text: '❌ Отклонить', callback_data: `b2b_reject_${newDeal.id}` },
+          ],
+        ],
+        { parseMode: 'HTML' }
+      );
+      await sendTelegramMessageWithKeyboard(
+        env.TOKEN_PARTNER,
+        chatId,
+        `✅ Предложение отправлено партнёру ${targetName}.\nОжидайте ответа.`,
+        [[{ text: '⬅️ В меню', callback_data: 'menu_partnership' }]],
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+
     if (state === 'awaiting_service_title') {
       // Step 1: Title received, move to description
       console.log('[handleStateBasedMessage] Step 1: Title received:', text.trim());
