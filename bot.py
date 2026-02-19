@@ -667,9 +667,38 @@ def handle_invite_callbacks(call):
             bot.send_message(chat_id, "⚠️ Рассылка возможна не чаще одного раза в сутки. Попробуйте завтра.")
             bot.answer_callback_query(call.id)
             return
-        recipient_ids = sm.get_partner_client_chat_ids_for_broadcast(partner_id, limit=500)
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(types.InlineKeyboardButton("👥 По реферальной ссылке", callback_data="invite_broadcast_audience_referral"))
+        markup.add(types.InlineKeyboardButton("🛒 По визитам", callback_data="invite_broadcast_audience_transactions"))
+        markup.add(types.InlineKeyboardButton("📋 Все мои клиенты", callback_data="invite_broadcast_audience_combined"))
+        markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data="invite_broadcast_cancel"))
+        bot.send_message(
+            chat_id,
+            "📢 *Выберите аудиторию для рассылки:*\n\n"
+            "• *По реферальной ссылке* — клиенты, пришедшие по вашей ссылке\n"
+            "• *По визитам* — клиенты, которые были у вас (делали покупки)\n"
+            "• *Все мои клиенты* — объединённый список без повторов",
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+
+    elif call.data in ('invite_broadcast_audience_referral', 'invite_broadcast_audience_transactions', 'invite_broadcast_audience_combined'):
+        partner_id = str(chat_id)
+        audience_map = {
+            'invite_broadcast_audience_referral': ('referral', sm.get_partner_client_chat_ids_for_broadcast),
+            'invite_broadcast_audience_transactions': ('transactions', sm.get_partner_client_chat_ids_by_transactions),
+            'invite_broadcast_audience_combined': ('combined', sm.get_partner_client_chat_ids_combined),
+        }
+        audience_type, get_method = audience_map[call.data]
+        recipient_ids = get_method(partner_id, limit=500)
         if not recipient_ids:
-            bot.send_message(chat_id, "У вас пока нет активированных клиентов для рассылки. Сначала пригласите клиентов по реферальной ссылке.")
+            empty_msgs = {
+                'referral': "У вас пока нет клиентов, пришедших по реферальной ссылке.",
+                'transactions': "У вас пока нет клиентов с визитами (транзакциями).",
+                'combined': "У вас пока нет клиентов для рассылки.",
+            }
+            bot.send_message(chat_id, f"У вас пока нет клиентов для рассылки по этому критерию. {empty_msgs.get(audience_type, '')}")
             bot.answer_callback_query(call.id)
             return
         ref_code = (sm.get_or_create_referral_code(partner_id) if sm else None) or partner_id
@@ -688,7 +717,12 @@ def handle_invite_callbacks(call):
             f"для этого нужна ваша реферальная ссылка и индивидуальный регламент B2B deals.\n\n"
             f"Перейдите по ссылке и получите приветственные баллы:\n{ref_link}"
         )
-        TEMP_DATA[chat_id] = {'broadcast_recipients': recipient_ids, 'broadcast_template': template_text, 'broadcast_partner_id': partner_id}
+        TEMP_DATA[chat_id] = {
+            'broadcast_recipients': recipient_ids,
+            'broadcast_template': template_text,
+            'broadcast_partner_id': partner_id,
+            'broadcast_audience_type': audience_type,
+        }
         markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(types.InlineKeyboardButton("✅ Разослать", callback_data="invite_broadcast_confirm"))
         markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data="invite_broadcast_cancel"))
@@ -709,7 +743,10 @@ def handle_invite_callbacks(call):
             bot.send_message(chat_id, "❌ Данные рассылки устарели. Начните заново: «👥 Пригласить клиента» → «Разослать всем».")
             bot.answer_callback_query(call.id)
             return
-        campaign_id = sm.create_broadcast_campaign(partner_id, 'referral_program', len(recipient_ids))
+        campaign_id = sm.create_broadcast_campaign(
+            partner_id, 'referral_program', len(recipient_ids),
+            audience_type=data.get('broadcast_audience_type')
+        )
         if not campaign_id:
             bot.send_message(chat_id, "❌ Не удалось создать кампанию. Попробуйте позже.")
             bot.answer_callback_query(call.id)

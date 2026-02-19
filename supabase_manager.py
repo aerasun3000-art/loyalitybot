@@ -2169,6 +2169,54 @@ class SupabaseManager:
             logging.error(f"Error get_partner_client_chat_ids_for_broadcast: {e}")
             return []
 
+    def get_partner_client_chat_ids_by_transactions(self, partner_chat_id: str, limit: int = 500) -> List[str]:
+        """
+        Возвращает chat_id клиентов, у которых есть хотя бы одна транзакция с партнёром.
+        Исключает VIA_PARTNER_*, только числовые chat_id.
+        """
+        if not self.client:
+            return []
+        try:
+            response = self.client.from_(TRANSACTION_TABLE).select('client_chat_id').eq(
+                'partner_chat_id', str(partner_chat_id)
+            ).limit(limit * 3).execute()
+            seen = set()
+            chat_ids = []
+            for row in (response.data or []):
+                cid = row.get('client_chat_id')
+                if not cid:
+                    continue
+                cid_str = str(cid)
+                if cid_str in seen or cid_str.startswith('VIA_PARTNER_'):
+                    continue
+                try:
+                    int(cid)
+                except (ValueError, TypeError):
+                    continue
+                seen.add(cid_str)
+                chat_ids.append(cid_str)
+                if len(chat_ids) >= limit:
+                    break
+            return chat_ids
+        except Exception as e:
+            logging.error(f"Error get_partner_client_chat_ids_by_transactions: {e}")
+            return []
+
+    def get_partner_client_chat_ids_combined(self, partner_chat_id: str, limit: int = 500) -> List[str]:
+        """
+        Объединённый список: referral_source + client_chat_id из transactions, без дублей.
+        """
+        if not self.client:
+            return []
+        try:
+            ref_ids = set(self.get_partner_client_chat_ids_for_broadcast(partner_chat_id, limit=limit))
+            txn_ids = set(self.get_partner_client_chat_ids_by_transactions(partner_chat_id, limit=limit))
+            combined = list(ref_ids | txn_ids)[:limit]
+            return combined
+        except Exception as e:
+            logging.error(f"Error get_partner_client_chat_ids_combined: {e}")
+            return []
+
     def can_partner_run_broadcast(self, partner_chat_id: str, max_per_day: int = 1) -> bool:
         """Проверяет, может ли партнёр запустить рассылку (лимит 1 раз в сутки)."""
         if not self.client:
@@ -2184,18 +2232,21 @@ class SupabaseManager:
             logging.error(f"Error can_partner_run_broadcast: {e}")
             return False
 
-    def create_broadcast_campaign(self, partner_chat_id: str, template_id: str, recipient_count: int) -> Optional[int]:
-        """Создаёт запись кампании рассылки, возвращает id."""
+    def create_broadcast_campaign(self, partner_chat_id: str, template_id: str, recipient_count: int, audience_type: Optional[str] = None) -> Optional[int]:
+        """Создаёт запись кампании рассылки, возвращает id. audience_type: referral, transactions, combined."""
         if not self.client:
             return None
         try:
-            r = self.client.from_('partner_broadcast_campaigns').insert({
+            payload = {
                 'partner_chat_id': str(partner_chat_id),
                 'template_id': template_id,
                 'recipient_count': recipient_count,
                 'sent_count': 0,
                 'status': 'running'
-            }).execute()
+            }
+            if audience_type:
+                payload['audience_type'] = audience_type
+            r = self.client.from_('partner_broadcast_campaigns').insert(payload).execute()
             if r.data and len(r.data) > 0:
                 return r.data[0].get('id')
             return None

@@ -411,6 +411,9 @@ class TestInviteAndBroadcastCallbacks:
             'invite_get_qr',
             'invite_download_promo',
             'invite_broadcast_start',
+            'invite_broadcast_audience_referral',
+            'invite_broadcast_audience_transactions',
+            'invite_broadcast_audience_combined',
             'invite_broadcast_confirm',
             'invite_broadcast_cancel',
         ]

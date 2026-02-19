@@ -65,6 +65,7 @@ class TestDatabaseSchema:
             'finished_at',
             'status',
             'error_message',
+            'audience_type',
         ]
         assert 'partner_chat_id' in columns
         assert 'template_id' in columns

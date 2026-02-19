@@ -338,6 +338,40 @@ class TestPartnerBroadcastAndInfluencer:
         assert '222' in result
         assert 'VIA_PARTNER_79991234567' not in result
 
+    def test_get_partner_client_chat_ids_by_transactions_empty(self, manager, mock_supabase):
+        """get_partner_client_chat_ids_by_transactions: нет транзакций — пустой список"""
+        mock_response = Mock()
+        mock_response.data = []
+        mock_supabase.from_().select().eq().limit().execute.return_value = mock_response
+        result = manager.get_partner_client_chat_ids_by_transactions('123456')
+        assert result == []
+
+    def test_get_partner_client_chat_ids_by_transactions_filters_via_partner(self, manager, mock_supabase):
+        """get_partner_client_chat_ids_by_transactions: отфильтровывает VIA_PARTNER_* и дубли"""
+        mock_response = Mock()
+        mock_response.data = [
+            {'client_chat_id': '111'},
+            {'client_chat_id': 'VIA_PARTNER_79991234567'},
+            {'client_chat_id': '222'},
+            {'client_chat_id': '111'},
+        ]
+        mock_supabase.from_().select().eq().limit().execute.return_value = mock_response
+        result = manager.get_partner_client_chat_ids_by_transactions('123456', limit=500)
+        assert '111' in result
+        assert '222' in result
+        assert 'VIA_PARTNER_79991234567' not in result
+        assert result.count('111') == 1
+
+    def test_get_partner_client_chat_ids_combined_merges_without_duplicates(self, manager, mock_supabase):
+        """get_partner_client_chat_ids_combined: объединяет referral и transactions без дублей"""
+        ref_response = Mock()
+        ref_response.data = [{'chat_id': '111'}, {'chat_id': '222'}]
+        txn_response = Mock()
+        txn_response.data = [{'client_chat_id': '222'}, {'client_chat_id': '333'}]
+        mock_supabase.from_().select().eq().limit().execute.side_effect = [ref_response, txn_response]
+        result = manager.get_partner_client_chat_ids_combined('123456', limit=500)
+        assert set(result) == {'111', '222', '333'}
+
     def test_can_partner_run_broadcast_true_when_no_campaigns_today(self, manager, mock_supabase):
         """can_partner_run_broadcast: True если сегодня рассылок не было"""
         mock_response = Mock()
