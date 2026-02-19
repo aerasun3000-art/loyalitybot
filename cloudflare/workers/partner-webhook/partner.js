@@ -11,6 +11,12 @@ import {
   setBotState,
   clearBotState,
   updateBotStateData,
+  getPartnerClientChatIdsForBroadcast,
+  getPartnerClientChatIdsByTransactions,
+  getPartnerClientChatIdsCombined,
+  canPartnerRunBroadcast,
+  createBroadcastCampaign,
+  updateBroadcastCampaignFinished,
   addService,
   getServicesByPartner,
   getServiceById,
@@ -1179,13 +1185,18 @@ export async function handleInviteClient(env, chatId) {
     const botUsername = env.BOT_USERNAME || 'your_client_bot_username';
     const referralLink = `https://t.me/${botUsername}?start=partner_${chatId}`;
     
-    await sendTelegramMessage(
+    const keyboard = [[
+      { text: '📢 Разослать всем моим клиентам', callback_data: 'invite_broadcast_start' }
+    ]];
+    
+    await sendTelegramMessageWithKeyboard(
       env.TOKEN_PARTNER,
       chatId,
       `👥 <b>Пригласить клиента</b>\n\n` +
       `Поделитесь этой ссылкой с клиентами:\n\n` +
       `🔗 <a href="${referralLink}">${referralLink}</a>\n\n` +
       `Клиенты, зарегистрированные по этой ссылке, будут привязаны к вам.`,
+      keyboard,
       { parseMode: 'HTML' }
     );
     
@@ -2426,6 +2437,108 @@ export async function handleCallback(env, update) {
       return await showPartnerMainMenu(env, chatId);
     }
     
+    // ==================== INVITE BROADCAST CALLBACKS ====================
+    if (callbackData === 'invite_broadcast_start') {
+      const canRun = await canPartnerRunBroadcast(env, chatId);
+      if (!canRun) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '⚠️ Рассылка возможна не чаще одного раза в сутки.');
+        return { success: true, handled: true };
+      }
+      const keyboard = [
+        [{ text: '👥 По реферальной ссылке', callback_data: 'invite_broadcast_audience_referral' }],
+        [{ text: '🛒 По визитам', callback_data: 'invite_broadcast_audience_transactions' }],
+        [{ text: '📋 Все мои клиенты', callback_data: 'invite_broadcast_audience_combined' }],
+        [{ text: '❌ Отмена', callback_data: 'invite_broadcast_cancel' }],
+      ];
+      await sendTelegramMessageWithKeyboard(
+        env.TOKEN_PARTNER,
+        chatId,
+        '📢 <b>Выберите аудиторию для рассылки:</b>\n\n' +
+        '• <b>По реферальной ссылке</b> — клиенты, пришедшие по вашей ссылке\n' +
+        '• <b>По визитам</b> — клиенты, которые были у вас (делали покупки)\n' +
+        '• <b>Все мои клиенты</b> — объединённый список без повторов',
+        keyboard,
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'invite_broadcast_audience_referral' || callbackData === 'invite_broadcast_audience_transactions' || callbackData === 'invite_broadcast_audience_combined') {
+      const audienceMap = {
+        'invite_broadcast_audience_referral': ['referral', getPartnerClientChatIdsForBroadcast],
+        'invite_broadcast_audience_transactions': ['transactions', getPartnerClientChatIdsByTransactions],
+        'invite_broadcast_audience_combined': ['combined', getPartnerClientChatIdsCombined],
+      };
+      const [audienceType, getMethod] = audienceMap[callbackData];
+      const recipients = await getMethod(env, chatId, 500);
+      const emptyMsgs = {
+        referral: 'У вас пока нет клиентов, пришедших по реферальной ссылке.',
+        transactions: 'У вас пока нет клиентов с визитами (транзакциями).',
+        combined: 'У вас пока нет клиентов для рассылки.',
+      };
+      if (!recipients || recipients.length === 0) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, `У вас пока нет клиентов для рассылки по этому критерию. ${emptyMsgs[audienceType]}`);
+        return { success: true, handled: true };
+      }
+      await setBotState(env, chatId, 'awaiting_broadcast_message', {
+        recipients,
+        audienceType,
+        partnerId: chatId,
+      });
+      const keyboard = [[{ text: '❌ Отмена', callback_data: 'invite_broadcast_cancel' }]];
+      await sendTelegramMessageWithKeyboard(
+        env.TOKEN_PARTNER,
+        chatId,
+        `📢 <b>Рассылка</b>\n\nПолучателей: <b>${recipients.length}</b>\n\nВведите текст сообщения для рассылки (до 4096 символов):`,
+        keyboard,
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'invite_broadcast_confirm') {
+      const botState = await getBotState(env, chatId);
+      if (!botState || botState.state !== 'broadcast_preview' || !botState.data?.recipients?.length) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Данные рассылки устарели. Начните заново: «👥 Пригласить клиента» → «Разослать всем».');
+        return { success: true, handled: true };
+      }
+      const { recipients, audienceType, templateText } = botState.data;
+      const campaignId = await createBroadcastCampaign(env, chatId, 'referral_program', recipients.length, audienceType);
+      if (!campaignId) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Не удалось создать кампанию. Попробуйте позже.');
+        return { success: true, handled: true };
+      }
+      if (!env.TOKEN_CLIENT) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Рассылка недоступна: не настроен TOKEN_CLIENT.');
+        await clearBotState(env, chatId);
+        return { success: true, handled: true };
+      }
+      await sendTelegramMessage(env.TOKEN_PARTNER, chatId, `📤 Отправка сообщений ${recipients.length} клиентам… Не закрывайте бота.`);
+      let sentCount = 0;
+      let errorCount = 0;
+      for (const cid of recipients) {
+        try {
+          await sendTelegramMessage(env.TOKEN_CLIENT, cid, templateText);
+          sentCount++;
+        } catch (e) {
+          errorCount++;
+          console.warn('[invite_broadcast_confirm] Send failed for', cid, e?.message);
+        }
+        await new Promise(r => setTimeout(r, 50));
+      }
+      await updateBroadcastCampaignFinished(env, campaignId, sentCount, 'completed', errorCount > 0 ? `Errors: ${errorCount}` : null);
+      await clearBotState(env, chatId);
+      await sendTelegramMessage(env.TOKEN_PARTNER, chatId, `✅ Рассылка завершена. Отправлено: <b>${sentCount}</b> сообщений${errorCount > 0 ? `, ошибок: ${errorCount}` : ''}.`, { parseMode: 'HTML' });
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData === 'invite_broadcast_cancel') {
+      await clearBotState(env, chatId);
+      await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Рассылка отменена.');
+      return { success: true, handled: true };
+    }
+    // ==================== END INVITE BROADCAST ====================
+    
     // Handle services menu
     if (callbackData === 'menu_services') {
       return await handleServicesMenu(env, chatId);
@@ -3279,6 +3392,49 @@ export async function handleStateBasedMessage(env, update, botState) {
   console.log('[handleStateBasedMessage] Processing:', { chatId, state, textLength: text.length });
   
   try {
+    if (state === 'awaiting_broadcast_message') {
+      if (text.trim() === '/cancel') {
+        await clearBotState(env, chatId);
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Рассылка отменена.');
+        return { success: true, handled: true };
+      }
+      const trimmed = text.trim();
+      if (!trimmed) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Введите непустой текст сообщения.');
+        return { success: true, handled: true };
+      }
+      if (trimmed.length > 4096) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, `❌ Сообщение слишком длинное (${trimmed.length} символов). Максимум 4096.`);
+        return { success: true, handled: true };
+      }
+      const { recipients, audienceType, partnerId } = botState.data || {};
+      if (!recipients || recipients.length === 0) {
+        await clearBotState(env, chatId);
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Данные рассылки устарели. Начните заново.');
+        return { success: true, handled: true };
+      }
+      await setBotState(env, chatId, 'broadcast_preview', {
+        recipients,
+        audienceType,
+        partnerId,
+        templateText: trimmed,
+      });
+      const keyboard = [
+        [{ text: `✅ Разослать ${recipients.length} клиентам`, callback_data: 'invite_broadcast_confirm' }],
+        [{ text: '❌ Отмена', callback_data: 'invite_broadcast_cancel' }],
+      ];
+      const previewRaw = trimmed.length > 400 ? trimmed.slice(0, 400) + '...' : trimmed;
+      const previewEscaped = previewRaw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      await sendTelegramMessageWithKeyboard(
+        env.TOKEN_PARTNER,
+        chatId,
+        `📢 <b>Рассылка по вашей базе</b>\n\nПолучателей: <b>${recipients.length}</b>\n\n<b>Предпросмотр:</b>\n\n${previewEscaped}`,
+        keyboard,
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+
     if (state === 'b2b_awaiting_target') {
       const targetChatId = text.trim();
       if (!targetChatId) {

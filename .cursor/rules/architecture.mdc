@@ -1,0 +1,32 @@
+---
+description: Архитектура проекта — Cloudflare Workers, не Python-боты
+alwaysApply: true
+---
+
+# Архитектура проекта
+
+## Продакшн стек
+
+Все боты работают как **Cloudflare Workers** (JavaScript/ESM):
+
+| Бот | Воркер |
+|-----|--------|
+| Партнёрский | `cloudflare/workers/partner-webhook/` |
+| Клиентский | `cloudflare/workers/client-webhook/` |
+| Админский | `cloudflare/workers/admin-webhook/` |
+| API | `cloudflare/workers/api/` |
+
+Состояние (multi-step flow) хранится в Supabase через `getBotState` / `setBotState` / `clearBotState`.
+
+## Запрещено
+
+- **`bot.py`, `admin_bot.py`, `client_handler.py`** — устаревшие Python-файлы на polling. **Не читать, не изменять, не упоминать.** Любой новый функционал реализовывать только в Cloudflare Workers.
+- Python-библиотеки (`telebot`, `pyTelegramBotAPI` и т.п.) — не использовать и не предлагать.
+- Polling-архитектура — не применять. Только webhook через Cloudflare Workers.
+
+## При реализации фичи
+
+1. Бизнес-логика → `cloudflare/workers/<bot>-webhook/partner.js` (или `index.js`)
+2. Supabase-запросы → `cloudflare/workers/<bot>-webhook/supabase.js`
+3. Telegram API → через хелперы из `telegram.js` / `common.js`
+4. Деплой → `wrangler deploy` из директории воркера

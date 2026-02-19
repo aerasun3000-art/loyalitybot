@@ -6,6 +6,7 @@ compatibility_date = "2024-01-01"
 
 # Environment variables (set via wrangler secret put)
 # TOKEN_PARTNER - Telegram bot token
+# TOKEN_CLIENT - Client bot token (for partner broadcast to clients)
 # SUPABASE_URL - Supabase project URL
 # SUPABASE_KEY - Supabase API key
 # WEBHOOK_SECRET_TOKEN - Optional secret token for webhook validation

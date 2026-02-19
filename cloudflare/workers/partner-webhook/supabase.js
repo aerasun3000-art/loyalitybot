@@ -1201,3 +1201,142 @@ export async function convertToUSD(env, amount, currency) {
   const rate = await getExchangeRate(env, currency);
   return amount / rate;
 }
+
+// ==================== PARTNER BROADCAST ====================
+
+function isValidChatIdForBroadcast(cid) {
+  if (!cid || typeof cid !== 'string') return false;
+  if (cid.startsWith('VIA_PARTNER_')) return false;
+  const n = parseInt(cid, 10);
+  return !isNaN(n) && String(n) === cid;
+}
+
+/**
+ * Get client chat_ids who came via partner's referral link
+ */
+export async function getPartnerClientChatIdsForBroadcast(env, partnerChatId, limit = 500) {
+  try {
+    const result = await supabaseRequest(env,
+      `users?referral_source=eq.${encodeURIComponent(partnerChatId)}&select=chat_id&limit=${limit * 3}`
+    );
+    const seen = new Set();
+    const chatIds = [];
+    for (const row of result || []) {
+      const cid = row.chat_id != null ? String(row.chat_id) : null;
+      if (!cid || seen.has(cid) || !isValidChatIdForBroadcast(cid)) continue;
+      seen.add(cid);
+      chatIds.push(cid);
+      if (chatIds.length >= limit) break;
+    }
+    return chatIds;
+  } catch (error) {
+    console.error('[getPartnerClientChatIdsForBroadcast]', error);
+    return [];
+  }
+}
+
+/**
+ * Get client chat_ids who have at least one transaction with this partner
+ */
+export async function getPartnerClientChatIdsByTransactions(env, partnerChatId, limit = 500) {
+  try {
+    const result = await supabaseRequest(env,
+      `transactions?partner_chat_id=eq.${encodeURIComponent(partnerChatId)}&select=client_chat_id&limit=${limit * 3}`
+    );
+    const seen = new Set();
+    const chatIds = [];
+    for (const row of result || []) {
+      const cid = row.client_chat_id != null ? String(row.client_chat_id) : null;
+      if (!cid || seen.has(cid) || !isValidChatIdForBroadcast(cid)) continue;
+      seen.add(cid);
+      chatIds.push(cid);
+      if (chatIds.length >= limit) break;
+    }
+    return chatIds;
+  } catch (error) {
+    console.error('[getPartnerClientChatIdsByTransactions]', error);
+    return [];
+  }
+}
+
+/**
+ * Combined list: referral + transactions, no duplicates
+ */
+export async function getPartnerClientChatIdsCombined(env, partnerChatId, limit = 500) {
+  try {
+    const [refIds, txnIds] = await Promise.all([
+      getPartnerClientChatIdsForBroadcast(env, partnerChatId, limit),
+      getPartnerClientChatIdsByTransactions(env, partnerChatId, limit),
+    ]);
+    const combined = [...new Set([...refIds, ...txnIds])].slice(0, limit);
+    return combined;
+  } catch (error) {
+    console.error('[getPartnerClientChatIdsCombined]', error);
+    return [];
+  }
+}
+
+/**
+ * Check if partner can run broadcast (max maxPerDay per day)
+ */
+export async function canPartnerRunBroadcast(env, partnerChatId, maxPerDay = 1) {
+  try {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const result = await supabaseRequest(env,
+      `partner_broadcast_campaigns?partner_chat_id=eq.${encodeURIComponent(partnerChatId)}&started_at=gte.${startOfToday}&status=in.(running,completed)&select=id&limit=5`
+    );
+    const count = (result || []).length;
+    return count < maxPerDay;
+  } catch (error) {
+    console.error('[canPartnerRunBroadcast]', error);
+    return false;
+  }
+}
+
+/**
+ * Create broadcast campaign record
+ */
+export async function createBroadcastCampaign(env, partnerChatId, templateId, recipientCount, audienceType = null) {
+  try {
+    const payload = {
+      partner_chat_id: String(partnerChatId),
+      template_id: templateId,
+      recipient_count: recipientCount,
+      sent_count: 0,
+      status: 'running',
+    };
+    if (audienceType) payload.audience_type = audienceType;
+    const result = await supabaseRequest(env, 'partner_broadcast_campaigns', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    const row = Array.isArray(result) ? result[0] : result;
+    return row && row.id != null ? row.id : null;
+  } catch (error) {
+    console.error('[createBroadcastCampaign]', error);
+    return null;
+  }
+}
+
+/**
+ * Update broadcast campaign when finished
+ */
+export async function updateBroadcastCampaignFinished(env, campaignId, sentCount, status = 'completed', errorMessage = null) {
+  try {
+    const payload = {
+      sent_count: sentCount,
+      status,
+      finished_at: new Date().toISOString(),
+    };
+    if (errorMessage) payload.error_message = errorMessage;
+    await supabaseRequest(env, `partner_broadcast_campaigns?id=eq.${campaignId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return true;
+  } catch (error) {
+    console.error('[updateBroadcastCampaignFinished]', error);
+    return false;
+  }
+}
