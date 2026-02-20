@@ -43,6 +43,9 @@ export async function showMainMenu(env, chatId) {
       ],
       [
         { text: '🤝 Заявки Партнеров', callback_data: 'admin_partners' },
+        { text: '🛠 Услуги Партнёров', callback_data: 'admin_manage_services' },
+      ],
+      [
         { text: '📊 Общая статистика', callback_data: 'admin_stats' },
       ],
       [

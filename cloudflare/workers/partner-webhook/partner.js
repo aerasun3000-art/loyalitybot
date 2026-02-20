@@ -201,14 +201,14 @@ export async function showPartnerMainMenu(env, chatId) {
       // Influencer menu
       keyboard.push(
         [{ text: '📊 Аналитика' }, { text: '💎 Revenue Share' }],
-        [{ text: '👥 Пригласить клиента' }, { text: '⚙️ Ещё' }]
+        [{ text: '👥  Работа с базой' }, { text: '⚙️ Ещё' }]
       );
     } else {
       // Standard partner menu
       keyboard.push(
         [{ text: '💰 Операции' }, { text: '📝 Контент' }],
         [{ text: '📊 Аналитика' }, { text: '💎 Revenue Share' }],
-        [{ text: '👥 Пригласить клиента' }, { text: '⚙️ Ещё' }]
+        [{ text: '👥  Работа с базой' }, { text: '⚙️ Ещё' }]
       );
     }
     
@@ -257,7 +257,7 @@ export async function handleMenuButton(env, update) {
       return await handleRevenueShareMenu(env, chatId);
     } else if (text === '⚙️ Ещё') {
       return await handleMoreMenu(env, chatId);
-    } else if (text === '👥 Пригласить клиента') {
+    } else if (text === '👥  Работа с базой') {
       return await handleInviteClient(env, chatId);
     }
     
@@ -1192,7 +1192,7 @@ export async function handleInviteClient(env, chatId) {
     await sendTelegramMessageWithKeyboard(
       env.TOKEN_PARTNER,
       chatId,
-      `👥 <b>Пригласить клиента</b>\n\n` +
+      `👥 <b>Работа с базой</b>\n\n` +
       `Поделитесь этой ссылкой с клиентами:\n\n` +
       `🔗 <a href="${referralLink}">${referralLink}</a>\n\n` +
       `Клиенты, зарегистрированные по этой ссылке, будут привязаны к вам.`,
@@ -2499,7 +2499,7 @@ export async function handleCallback(env, update) {
     if (callbackData === 'invite_broadcast_confirm') {
       const botState = await getBotState(env, chatId);
       if (!botState || botState.state !== 'broadcast_preview' || !botState.data?.recipients?.length) {
-        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Данные рассылки устарели. Начните заново: «👥 Пригласить клиента» → «Разослать всем».');
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Данные рассылки устарели. Начните заново: «👥  Работа с базой» → «Разослать всем».');
         return { success: true, handled: true };
       }
       const { recipients, audienceType, templateText } = botState.data;
@@ -3232,7 +3232,7 @@ export async function routeUpdate(env, update) {
     // Handle main menu buttons - clear state and process
     const menuButtons = [
       '💰 Операции', '📝 Контент', '📊 Аналитика',
-      '💎 Revenue Share', '⚙️ Ещё', '👥 Пригласить клиента'
+      '💎 Revenue Share', '⚙️ Ещё', '👥  Работа с базой'
     ];
     
     if (menuButtons.includes(text)) {
