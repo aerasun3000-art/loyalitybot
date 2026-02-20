@@ -224,13 +224,13 @@ export async function handleEditCategory(env, callbackQuery) {
     const categories = await getServiceCategories(env);
     
     if (categories.length === 0) {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Нет категорий', show_alert: true });
+      await sendTelegramMessage(env.ADMIN_BOT_TOKEN, chatId, '❌ Категории не найдены. Добавьте категории в базу данных.');
       return { success: false, handled: true };
     }
     
     const keyboard = categories.map(cat => [{
       text: `${cat.emoji || '📂'} ${cat.name}`,
-      callback_data: `svc_set_cat_${encodeURIComponent(cat.name)}`,
+      callback_data: `svc_set_cat_${cat.name}`.slice(0, 64),
     }]);
     
     keyboard.push([{ text: '◀️ Назад', callback_data: 'svc_back_to_partner' }]);
@@ -266,8 +266,7 @@ export async function handleSetCategory(env, callbackQuery, category) {
       return { success: false, handled: true };
     }
     
-    const decodedCategory = decodeURIComponent(category);
-    const success = await updatePartnerField(env, partnerChatId, 'business_type', decodedCategory);
+    const success = await updatePartnerField(env, partnerChatId, 'business_type', category);
     
     if (success) {
       await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: `✅ Категория изменена на: ${decodedCategory}` });
@@ -674,7 +673,7 @@ export async function handleMessage(env, update, stateData) {
       const categories = await getServiceCategories(env);
       const keyboard = categories.map(cat => [{
         text: `${cat.emoji || '📂'} ${cat.name}`,
-        callback_data: `svc_set_service_cat_${encodeURIComponent(cat.name)}`,
+        callback_data: `svc_set_service_cat_${cat.name}`.slice(0, 64),
       }]);
       
       keyboard.push([{ text: '❌ Отмена', callback_data: 'svc_cancel' }]);
@@ -753,7 +752,7 @@ export async function handleSetServiceCategory(env, callbackQuery, category) {
       return { success: false, handled: true };
     }
     
-    const decodedCategory = decodeURIComponent(category);
+    const decodedCategory = category;
     
     const serviceData = {
       partner_chat_id: partnerChatId,
@@ -807,7 +806,7 @@ export async function handleEditLocation(env, callbackQuery) {
     
     const keyboard = cities.map(city => [{
       text: `🏙 ${city}`,
-      callback_data: `svc_city_${encodeURIComponent(city)}`,
+      callback_data: `svc_city_${city}`.slice(0, 64),
     }]);
     keyboard.push([{ text: '◀️ Назад', callback_data: 'svc_back_to_partner' }]);
     
@@ -832,7 +831,7 @@ export async function handleEditLocation(env, callbackQuery) {
  */
 export async function handleSetCity(env, callbackQuery, city) {
   const chatId = String(callbackQuery.message.chat.id);
-  const decodedCity = decodeURIComponent(city);
+  const decodedCity = city;
   
   try {
     const state = await getBotState(env, chatId);
@@ -856,7 +855,7 @@ export async function handleSetCity(env, callbackQuery, city) {
     
     const keyboard = districts.map(d => [{
       text: `📍 ${d}`,
-      callback_data: `svc_district_${encodeURIComponent(decodedCity)}_${encodeURIComponent(d)}`,
+      callback_data: `svc_district_${decodedCity}_${d}`.slice(0, 64),
     }]);
     keyboard.push([{ text: '◀️ Назад', callback_data: 'svc_edit_location' }]);
     
@@ -891,8 +890,8 @@ export async function handleSetDistrict(env, callbackQuery, city, district) {
       return { success: false, handled: true };
     }
     
-    await updatePartnerField(env, partnerChatId, 'city', decodeURIComponent(city));
-    await updatePartnerField(env, partnerChatId, 'district', decodeURIComponent(district));
+    await updatePartnerField(env, partnerChatId, 'city', city);
+    await updatePartnerField(env, partnerChatId, 'district', district);
     await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: '✅ Локация обновлена' });
     await showPartnerServicesMenu(env, chatId, partnerChatId, callbackQuery.message.message_id);
     
