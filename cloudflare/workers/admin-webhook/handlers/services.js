@@ -164,9 +164,9 @@ export async function handleManageServices(env, callbackQuery) {
     env.ADMIN_BOT_TOKEN,
     chatId,
     callbackQuery.message.message_id,
-    '🛠 **Управление услугами партнёра**\n\nВведите chat_id партнёра:',
+    '🛠 <b>Управление услугами партнёра</b>\n\nВведите chat_id партнёра:',
     [[{ text: '❌ Отмена', callback_data: 'back_to_main' }]],
-    { parseMode: 'Markdown' }
+    { parseMode: 'HTML' }
   );
   
   await setBotState(env, chatId, 'svc_selecting_partner', {});
@@ -191,24 +191,24 @@ export async function showPartnerServicesMenu(env, chatId, partnerChatId, messag
   }
   
   const text = (
-    `👤 **Партнёр:** ${partner.name || 'N/A'}\n` +
-    `🏢 **Компания:** ${partner.company_name || 'N/A'}\n` +
-    `📂 **Категория:** ${partner.business_type || 'N/A'}\n` +
-    `🏙 **Локация:** ${partner.city || 'N/A'}, ${partner.district || 'N/A'}\n\n` +
+    `👤 <b>Партнёр:</b> ${partner.name || 'N/A'}\n` +
+    `🏢 <b>Компания:</b> ${partner.company_name || 'N/A'}\n` +
+    `📂 <b>Категория:</b> ${partner.business_type || 'N/A'}\n` +
+    `🏙 <b>Локация:</b> ${partner.city || 'N/A'}, ${partner.district || 'N/A'}\n\n` +
     `Выберите действие:`
   );
-  
+
   const keyboard = [
     [{ text: '📂 Изменить категорию бизнеса', callback_data: 'svc_edit_category' }],
     [{ text: '🏙 Изменить локацию', callback_data: 'svc_edit_location' }],
     [{ text: '🛠 Управление услугами', callback_data: 'svc_manage_services' }],
     [{ text: '◀️ Назад', callback_data: 'back_to_main' }],
   ];
-  
+
   if (messageId) {
-    await editMessageText(env.ADMIN_BOT_TOKEN, chatId, messageId, text, keyboard, { parseMode: 'Markdown' });
+    await editMessageText(env.ADMIN_BOT_TOKEN, chatId, messageId, text, keyboard, { parseMode: 'HTML' });
   } else {
-    await sendTelegramMessageWithKeyboard(env.ADMIN_BOT_TOKEN, chatId, text, keyboard, { parseMode: 'Markdown' });
+    await sendTelegramMessageWithKeyboard(env.ADMIN_BOT_TOKEN, chatId, text, keyboard, { parseMode: 'HTML' });
   }
   
   await setBotState(env, chatId, 'svc_partner_menu', { partner_chat_id: partnerChatId });
