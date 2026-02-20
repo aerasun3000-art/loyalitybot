@@ -723,9 +723,11 @@ export const updatePartnerInfo = async (partnerChatId, updateData) => {
   }
   
   // Если партнер не одобрен, обновляем partner_applications
+  // photo_url есть только в partners, исключаем его
+  const { photo_url, ...updateDataForApplications } = updateData
   const { data, error } = await supabase
     .from('partner_applications')
-    .update(updateData)
+    .update(updateDataForApplications)
     .eq('chat_id', partnerChatId)
     .select()
     .single()
