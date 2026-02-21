@@ -7,7 +7,10 @@ import {
   getUserByChatId, 
   upsertUser, 
   createTransaction,
-  getPartnerByChatId 
+  getPartnerByChatId,
+  resolveReferralSourceToChatId,
+  createReferralTreeLinks,
+  processReferralRegistrationBonuses,
 } from './supabase.js';
 import {
   sendTelegramMessage,
@@ -43,6 +46,9 @@ export async function handleStart(env, update) {
       // Create new user
       const welcomeBonus = parseInt(env.WELCOME_BONUS_AMOUNT || '100');
       
+      const referralSource = referralId ? (text.includes('partner_') ? `partner_${referralId}` : `ref_${referralId}`) : null;
+      const directReferrerChatId = referralSource ? await resolveReferralSourceToChatId(env, referralSource) : null;
+
       const userData = {
         chat_id: chatId,
         user_id: userId,
@@ -51,10 +57,16 @@ export async function handleStart(env, update) {
         last_name: message.from.last_name || null,
         registration_date: new Date().toISOString(),
         balance: welcomeBonus,
-        referral_source: referralId ? (text.includes('partner_') ? `partner_${referralId}` : `ref_${referralId}`) : null,
+        referral_source: referralSource,
+        referred_by_chat_id: directReferrerChatId || undefined,
       };
-      
+
       user = await upsertUser(env, userData);
+
+      if (directReferrerChatId) {
+        await createReferralTreeLinks(env, chatId, directReferrerChatId);
+        await processReferralRegistrationBonuses(env, chatId, directReferrerChatId);
+      }
       
       // Record welcome bonus transaction
       try {

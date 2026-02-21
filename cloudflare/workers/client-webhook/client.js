@@ -7,7 +7,10 @@ import {
   getUserByChatId, 
   upsertUser, 
   createTransaction,
-  getPartnerByChatId 
+  getPartnerByChatId,
+  resolveReferralSourceToChatId,
+  createReferralTreeLinks,
+  processReferralRegistrationBonuses,
 } from './supabase.js';
 import {
   sendTelegramMessage,
@@ -89,16 +92,25 @@ export async function handleStart(env, update) {
         .filter(Boolean)
         .join(' ') || from.username || null) : chatId;
       
+      const referralSource = referralId ? (text.includes('partner_') ? `partner_${referralId}` : `ref_${referralId}`) : null;
+      const directReferrerChatId = referralSource ? await resolveReferralSourceToChatId(env, referralSource) : null;
+
       const userData = {
         chat_id: chatId,
         name: name,
         reg_date: new Date().toISOString(),
         balance: welcomeBonus,
-        referral_source: referralId ? (text.includes('partner_') ? `partner_${referralId}` : `ref_${referralId}`) : null,
+        referral_source: referralSource,
+        referred_by_chat_id: directReferrerChatId || undefined,
         status: 'active',
       };
-      
+
       user = await upsertUser(env, userData);
+
+      if (directReferrerChatId) {
+        await createReferralTreeLinks(env, chatId, directReferrerChatId);
+        await processReferralRegistrationBonuses(env, chatId, directReferrerChatId);
+      }
       
       // Send welcome message
       // IMPORTANT: Always use Cloudflare Pages URL

@@ -141,6 +141,81 @@ export async function createTransaction(env, transactionData) {
   });
 }
 
+/** REFERRAL_CONFIG: 8%/4%/2% с покупок */
+const REFERRAL_TRANSACTION_PERCENT = { level_1: 0.08, level_2: 0.04, level_3: 0.02 };
+
+async function buildReferralTree(env, referredChatId, level = 1, maxLevel = 3) {
+  if (level > maxLevel) return [];
+  try {
+    const rows = await supabaseRequest(env, `referral_tree?referred_chat_id=eq.${encodeURIComponent(referredChatId)}&level=eq.${level}&select=referrer_chat_id,level`);
+    const tree = [];
+    for (const r of rows || []) {
+      tree.push({ chat_id: r.referrer_chat_id, level: r.level });
+      const next = await buildReferralTree(env, r.referrer_chat_id, level + 1, maxLevel);
+      tree.push(...next);
+    }
+    return tree;
+  } catch (e) {
+    console.error('[buildReferralTree]', e);
+    return [];
+  }
+}
+
+async function processReferralTransactionBonuses(env, clientChatId, earnedPoints, transactionId) {
+  if (!earnedPoints || earnedPoints <= 0) return;
+  try {
+    const tree = await buildReferralTree(env, clientChatId, 1, 3);
+    if (!tree || tree.length === 0) return;
+
+    for (const ref of tree) {
+      const percent = REFERRAL_TRANSACTION_PERCENT[`level_${ref.level}`] || 0;
+      if (percent <= 0) continue;
+
+      const bonusPoints = Math.floor(earnedPoints * percent);
+      if (bonusPoints <= 0) continue;
+
+      const userRows = await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(ref.chat_id)}&select=commission_balance`);
+      const current = (userRows && userRows[0] && (userRows[0].commission_balance ?? 0)) || 0;
+      const next = Number(current) + bonusPoints;
+
+      await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(ref.chat_id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ commission_balance: next }),
+      });
+
+      await supabaseRequest(env, 'referral_rewards', {
+        method: 'POST',
+        body: JSON.stringify({
+          referrer_chat_id: ref.chat_id,
+          referred_chat_id: clientChatId,
+          reward_type: 'transaction',
+          level: ref.level,
+          points: bonusPoints,
+          transaction_id: transactionId,
+          description: `Бонус ${Math.round(percent * 100)}% с транзакции реферала уровня ${ref.level}`,
+        }),
+      });
+
+      const treeRows = await supabaseRequest(env, `referral_tree?referrer_chat_id=eq.${encodeURIComponent(ref.chat_id)}&referred_chat_id=eq.${encodeURIComponent(clientChatId)}&select=total_earned_points,total_transactions`);
+      const prev = treeRows && treeRows[0];
+      const prevEarned = (prev?.total_earned_points ?? 0) || 0;
+      const prevTxns = (prev?.total_transactions ?? 0) || 0;
+
+      await supabaseRequest(env, `referral_tree?referrer_chat_id=eq.${encodeURIComponent(ref.chat_id)}&referred_chat_id=eq.${encodeURIComponent(clientChatId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          total_earned_points: prevEarned + bonusPoints,
+          total_transactions: prevTxns + 1,
+          last_transaction_at: new Date().toISOString(),
+          is_active: true,
+        }),
+      });
+    }
+  } catch (e) {
+    console.error('[processReferralTransactionBonuses]', e);
+  }
+}
+
 /**
  * Get bot state for a chat_id
  */
@@ -635,8 +710,13 @@ export async function executeTransaction(env, clientChatId, partnerChatId, txnTy
       description: txnType === 'accrual' ? `Начисление ${points} баллов (чек $${amount})` : `Списание ${points} баллов`,
     };
     
-    await createTransaction(env, transactionData);
-    
+    const txnResult = await createTransaction(env, transactionData);
+    const transactionId = (Array.isArray(txnResult) && txnResult[0]?.id) ? txnResult[0].id : null;
+
+    if (txnType === 'accrual' && points > 0 && transactionId) {
+      await processReferralTransactionBonuses(env, clientChatId, points, transactionId);
+    }
+
     console.log('[executeTransaction] Success:', { points, newBalance });
     
     return {
