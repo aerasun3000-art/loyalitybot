@@ -55,7 +55,6 @@ export async function handleStart(env, update) {
       const userData = {
         chat_id: chatId,
         name: name,
-        username: from?.username || null,
         reg_date: new Date().toISOString(),
         balance: welcomeBonus,
         referral_source: referralId ? (text.includes('partner_') ? `partner_${referralId}` : `ref_${referralId}`) : null,
