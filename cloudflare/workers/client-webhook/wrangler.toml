@@ -11,6 +11,7 @@ compatibility_date = "2024-01-01"
 # WEBHOOK_SECRET_TOKEN - Optional secret token for webhook validation
 # WELCOME_BONUS_AMOUNT - Welcome bonus points (default: 100)
 # FRONTEND_URL - Frontend application URL
+# AUTH_SECRET - Secret for tg_auth token (optional, falls back to SUPABASE_KEY)
 # SENTRY_DSN - Sentry DSN for error tracking (optional)
 # SENTRY_ENVIRONMENT - Sentry environment (default: production)
 

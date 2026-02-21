@@ -24,6 +24,43 @@ import {
 } from './common.js';
 
 /**
+ * Generate signed tg_auth token for "open in browser" link.
+ * Token format: chatId.expiry.base64url(signature)
+ */
+async function generateBrowserAuthToken(env, chatId) {
+  const secret = env.AUTH_SECRET || env.SUPABASE_KEY;
+  if (!secret) return null;
+  const expiry = Math.floor(Date.now() / 1000) + 900; // 15 min
+  const payload = `${chatId}.${expiry}`;
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+    const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return `${payload}.${sigB64}`;
+  } catch (e) {
+    console.error('[generateBrowserAuthToken]', e);
+    return null;
+  }
+}
+
+/**
+ * Build URL for "В браузере" button (with tg_auth for user identification)
+ */
+async function getBrowserUrl(env, frontendUrl, chatId) {
+  const token = await generateBrowserAuthToken(env, chatId);
+  if (!token) return frontendUrl;
+  const sep = frontendUrl.includes('?') ? '&' : '?';
+  return `${frontendUrl}${sep}tg_auth=${encodeURIComponent(token)}`;
+}
+
+/**
  * Handle /start command with referral links
  */
 export async function handleStart(env, update) {
@@ -66,12 +103,15 @@ export async function handleStart(env, update) {
       // Send welcome message
       // IMPORTANT: Always use Cloudflare Pages URL
       const frontendUrl = env.FRONTEND_URL || 'https://loyalitybot-frontend.pages.dev';
+      const browserUrl = await getBrowserUrl(env, frontendUrl, chatId);
       console.log('[handleStart] New user - FRONTEND_URL from env:', env.FRONTEND_URL);
-      console.log('[handleStart] New user - Using URL:', frontendUrl);
-      const keyboard = [[
-        { text: '🚀 Открыть приложение', web_app: { url: frontendUrl } },
-        { text: '📊 Мой баланс', callback_data: 'balance' }
-      ]];
+      const keyboard = [
+        [
+          { text: '🚀 Открыть приложение', web_app: { url: frontendUrl } },
+          { text: '🌐 В браузере', url: browserUrl }
+        ],
+        [{ text: '📊 Мой баланс', callback_data: 'balance' }]
+      ];
       
       await sendTelegramMessageWithKeyboard(
         env.TOKEN_CLIENT,
@@ -79,7 +119,7 @@ export async function handleStart(env, update) {
         `🎉 **Добро пожаловать в программу лояльности!**\n\n` +
         `✅ Вы получили приветственный бонус: **${welcomeBonus} баллов**\n\n` +
         `💡 **Как использовать:**\n` +
-        `• Нажмите кнопку "Открыть приложение" для доступа ко всем функциям\n` +
+        `• Нажмите "Открыть приложение" или "В браузере" (если используете VPN)\n` +
         `• Получайте баллы за покупки у наших партнеров\n` +
         `• Обменивайте баллы на услуги и акции\n\n` +
         `🚀 Начните прямо сейчас!`,
@@ -92,19 +132,22 @@ export async function handleStart(env, update) {
       // User already exists
       // IMPORTANT: Always use Cloudflare Pages URL
       const frontendUrl = env.FRONTEND_URL || 'https://loyalitybot-frontend.pages.dev';
+      const browserUrl = await getBrowserUrl(env, frontendUrl, chatId);
       console.log('[handleStart] Existing user - FRONTEND_URL from env:', env.FRONTEND_URL);
-      console.log('[handleStart] Existing user - Using URL:', frontendUrl);
-      const keyboard = [[
-        { text: '🚀 Открыть приложение', web_app: { url: frontendUrl } },
-        { text: '📊 Мой баланс', callback_data: 'balance' }
-      ]];
+      const keyboard = [
+        [
+          { text: '🚀 Открыть приложение', web_app: { url: frontendUrl } },
+          { text: '🌐 В браузере', url: browserUrl }
+        ],
+        [{ text: '📊 Мой баланс', callback_data: 'balance' }]
+      ];
       
       await sendTelegramMessageWithKeyboard(
         env.TOKEN_CLIENT,
         chatId,
         `👋 С возвращением!\n\n` +
         `Ваш баланс: **${user.balance || 0} баллов**\n\n` +
-        `Нажмите кнопку "Открыть приложение" для доступа ко всем функциям.`,
+        `Нажмите "Открыть приложение" или "В браузере" (если используете VPN).`,
         keyboard,
         { parseMode: 'HTML' }
       );

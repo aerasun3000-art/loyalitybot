@@ -12,6 +12,7 @@ compatibility_date = "2024-01-01"
 # ADMIN_CHAT_ID - Admin chat ID(s) for Sentry alerts (comma-separated)
 # OPENAI_API_KEY - OpenAI API key for translation
 # SENTRY_WEBHOOK_SECRET - Optional secret for Sentry webhook validation
+# AUTH_SECRET - Secret for tg_auth verification (optional, falls back to SUPABASE_KEY)
 # SENTRY_DSN - Sentry DSN for error tracking (optional)
 
 # Note: CPU limits are not supported on Free plan

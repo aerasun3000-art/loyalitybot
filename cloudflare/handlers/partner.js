@@ -373,7 +373,7 @@ export async function handleRegistration(env, update) {
       chatId,
       '🚀 **Регистрация партнера**\n\n' +
       'Для регистрации в качестве партнера, пожалуйста, заполните заявку через веб-интерфейс:\n\n' +
-      `🔗 ${env.FRONTEND_URL || 'https://your-frontend-domain.com'}/partner/apply`
+      `🔗 ${env.FRONTEND_URL || 'https://loyalitybot-frontend.pages.dev'}/partner/apply`
     );
     
     return { success: true };

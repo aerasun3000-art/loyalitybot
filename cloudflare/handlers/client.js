@@ -57,7 +57,7 @@ export async function handleStart(env, update) {
       user = await upsertUser(env, userData);
       
       // Send welcome message
-      const frontendUrl = env.FRONTEND_URL || 'https://your-frontend-domain.com';
+      const frontendUrl = env.FRONTEND_URL || 'https://loyalitybot-frontend.pages.dev';
       const keyboard = [[
         { text: '🚀 Открыть приложение', web_app: { url: frontendUrl } },
         { text: '📊 Мой баланс', callback_data: 'balance' }

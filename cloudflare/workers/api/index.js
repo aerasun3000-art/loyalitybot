@@ -905,6 +905,53 @@ export default {
         return jsonResponse(result);
       }
       
+      // Verify tg_auth token for "open in browser" (returns chat_id)
+      if (path === '/api/auth/verify' && request.method === 'GET') {
+        const tgAuth = url.searchParams.get('tg_auth');
+        if (!tgAuth) {
+          return jsonResponse({ error: 'Missing tg_auth parameter' }, 400);
+        }
+        try {
+          const parts = tgAuth.split('.');
+          if (parts.length !== 3) {
+            return jsonResponse({ error: 'Invalid token format' }, 400);
+          }
+          const [chatId, expiryStr, sigB64] = parts;
+          const expiry = parseInt(expiryStr, 10);
+          if (isNaN(expiry) || expiry < Math.floor(Date.now() / 1000)) {
+            return jsonResponse({ error: 'Token expired' }, 400);
+          }
+          const secret = env.AUTH_SECRET || env.SUPABASE_KEY;
+          if (!secret) {
+            return jsonResponse({ error: 'Server misconfiguration' }, 500);
+          }
+          const payload = `${chatId}.${expiryStr}`;
+          const b64 = sigB64.replace(/-/g, '+').replace(/_/g, '/');
+          const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+          const sigBytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+          const key = await crypto.subtle.importKey(
+            'raw',
+            new TextEncoder().encode(secret),
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['verify']
+          );
+          const valid = await crypto.subtle.verify(
+            'HMAC',
+            key,
+            sigBytes,
+            new TextEncoder().encode(payload)
+          );
+          if (!valid) {
+            return jsonResponse({ error: 'Invalid signature' }, 400);
+          }
+          return jsonResponse({ chat_id: chatId });
+        } catch (err) {
+          logError('auth/verify', err, {});
+          return jsonResponse({ error: 'Verification failed' }, 400);
+        }
+      }
+      
       // Get or create referral code: GET /api/referral-code/:chat_id
       const referralCodeMatch = path.match(/^\/api\/referral-code\/([^/]+)$/);
       if (referralCodeMatch && request.method === 'GET') {
