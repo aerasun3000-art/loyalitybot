@@ -154,3 +154,27 @@ export async function getWebhookInfo(token) {
   const response = await fetch(url);
   return safeJsonResponse(response);
 }
+
+/**
+ * Set chat menu button to open Web App
+ * When user taps menu button in chat header, opens the app directly
+ * @param {string} token - Bot token
+ * @param {number|string|null} chatId - Chat ID, or null/undefined to set default for all users
+ */
+export async function setChatMenuButton(token, chatId, webAppUrl, buttonText = 'Открыть приложение') {
+  const url = `https://api.telegram.org/bot${token}/setChatMenuButton`;
+  const payload = {
+    menu_button: {
+      type: 'web_app',
+      text: buttonText,
+      web_app: { url: webAppUrl },
+    },
+  };
+  if (chatId != null) payload.chat_id = chatId;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return safeJsonResponse(response);
+}

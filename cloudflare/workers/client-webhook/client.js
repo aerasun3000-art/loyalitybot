@@ -14,6 +14,7 @@ import {
   sendTelegramMessageWithKeyboard,
   answerCallbackQuery,
   editMessageText,
+  setChatMenuButton,
 } from './telegram.js';
 import {
   getChatIdFromUpdate,
@@ -27,11 +28,11 @@ import {
  */
 export async function handleStart(env, update) {
   const message = update.message;
-  if (!message || !message.chat || !message.from) {
+  if (!message || !message.chat) {
     return { success: false, error: 'Invalid message structure' };
   }
   const chatId = String(message.chat.id);
-  const userId = String(message.from.id);
+  const from = message.from;
   const text = message.text || '';
   
   // Parse referral link: /start partner_123 или /start ref_ABC123
@@ -46,15 +47,15 @@ export async function handleStart(env, update) {
       // Create new user
       const welcomeBonus = parseInt(env.WELCOME_BONUS_AMOUNT || '100');
       
-      // Build name from first_name and last_name
-      const name = [message.from.first_name, message.from.last_name]
+      // Build name from first_name and last_name (from can be absent in rare cases)
+      const name = from ? ([from.first_name, from.last_name]
         .filter(Boolean)
-        .join(' ') || message.from.username || null;
+        .join(' ') || from.username || null) : chatId;
       
       const userData = {
         chat_id: chatId,
         name: name,
-        username: message.from.username || null,
+        username: from?.username || null,
         reg_date: new Date().toISOString(),
         balance: welcomeBonus,
         referral_source: referralId ? (text.includes('partner_') ? `partner_${referralId}` : `ref_${referralId}`) : null,
@@ -86,7 +87,7 @@ export async function handleStart(env, update) {
         keyboard,
         { parseMode: 'HTML' }
       );
-      
+      await setChatMenuButton(env.TOKEN_CLIENT, chatId, frontendUrl).catch(() => {});
       return { success: true, newUser: true };
     } else {
       // User already exists
@@ -108,7 +109,7 @@ export async function handleStart(env, update) {
         keyboard,
         { parseMode: 'HTML' }
       );
-      
+      await setChatMenuButton(env.TOKEN_CLIENT, chatId, frontendUrl).catch(() => {});
       return { success: true, newUser: false };
     }
   } catch (error) {
@@ -235,40 +236,38 @@ export async function handleTextMessage(env, update) {
 }
 
 /**
+ * Normalize update: use message or edited_message as message
+ */
+function getMessage(update) {
+  return update.message || update.edited_message;
+}
+
+/**
  * Route update to appropriate handler
  */
 export async function routeUpdate(env, update) {
   // Handle callback queries
   if (update.callback_query) {
     const callbackData = update.callback_query.data;
-    
-    if (callbackData.startsWith('nps_rate_')) {
+    if (callbackData?.startsWith('nps_rate_')) {
       return await handleNpsRating(env, update);
     }
-    
     if (callbackData === 'balance') {
       return await handleBalance(env, update);
     }
-    
-    // Handle other callbacks...
     return { success: true, handled: false };
   }
   
-  // Handle messages
-  if (update.message) {
-    const text = update.message.text || '';
-    
-    // Handle /start command
+  // Handle messages (including edited_message for /start)
+  const message = getMessage(update);
+  if (message) {
+    const text = message.text || '';
     if (text.startsWith('/start')) {
-      return await handleStart(env, update);
+      return await handleStart(env, { ...update, message });
     }
-    
-    // Handle other text messages
     if (text) {
-      return await handleTextMessage(env, update);
+      return await handleTextMessage(env, { ...update, message });
     }
-    
-    // Handle other message types (photos, documents, etc.)
     return { success: true, handled: false };
   }
   

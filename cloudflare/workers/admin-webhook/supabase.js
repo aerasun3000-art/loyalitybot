@@ -313,16 +313,23 @@ export async function getServicesByPartner(env, partnerChatId) {
 }
 
 /**
- * Get service categories
+ * Get service categories (hardcoded, matching category_group values in DB)
  */
 export async function getServiceCategories(env) {
-  try {
-    const result = await supabaseRequest(env, 'service_categories?select=*&order=name');
-    return result || [];
-  } catch (error) {
-    console.error('[getServiceCategories] Error:', error);
-    return [];
-  }
+  return [
+    { name: 'beauty', emoji: '💅', label: 'Красота и здоровье' },
+    { name: 'self_discovery', emoji: '🔮', label: 'Самопознание' },
+    { name: 'food', emoji: '🍽', label: 'Еда и рестораны' },
+    { name: 'education', emoji: '📚', label: 'Образование' },
+    { name: 'retail', emoji: '🛍', label: 'Розница' },
+    { name: 'sports_fitness', emoji: '🏃', label: 'Спорт и фитнес' },
+    { name: 'entertainment', emoji: '🎉', label: 'Развлечения' },
+    { name: 'healthcare', emoji: '🏥', label: 'Здравоохранение' },
+    { name: 'services', emoji: '🔧', label: 'Услуги' },
+    { name: 'travel', emoji: '✈', label: 'Путешествия' },
+    { name: 'influencer', emoji: '📸', label: 'Блогер/Инфлюенсер' },
+    { name: 'b2b', emoji: '💼', label: 'B2B' },
+  ];
 }
 
 /**
@@ -383,6 +390,22 @@ export async function deleteService(env, serviceId) {
     return true;
   } catch (error) {
     console.error('[deleteService] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update multiple partner fields at once
+ */
+export async function updatePartnerFields(env, partnerChatId, fields) {
+  try {
+    const result = await supabaseRequest(env, `partners?chat_id=eq.${partnerChatId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(fields),
+    });
+    return result && result.length > 0;
+  } catch (error) {
+    console.error('[updatePartnerFields] Error:', error);
     throw error;
   }
 }

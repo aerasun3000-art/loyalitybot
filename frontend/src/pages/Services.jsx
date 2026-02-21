@@ -456,13 +456,21 @@ const Services = () => {
     let groups = getGroupedServices()
 
     // Обработка category_group: фильтруем по всем категориям из группы
+    // Учитываем и business_type (categoryCode), и partner.category_group — чтобы партнёры,
+    // перенесённые в группу (напр. beauty→b2b), отображались до обновления business_type
     if (categoryGroupParam) {
       const group = getCategoryGroupByCode(categoryGroupParam)
       if (group && group.categories) {
         const allowedCategories = new Set(
           group.categories.map(cat => normalizeCategoryCode(cat)).filter(Boolean)
         )
-        groups = groups.filter(g => allowedCategories.has(normalizeCategoryCode(g.categoryCode)))
+        const normalizedParam = normalizeCategoryCode(categoryGroupParam)
+        groups = groups.filter(g => {
+          const codeInAllowed = allowedCategories.has(normalizeCategoryCode(g.categoryCode))
+          const partnerInGroup = normalizedParam && g.partner?.category_group &&
+            normalizeCategoryCode(g.partner.category_group) === normalizedParam
+          return codeInAllowed || partnerInGroup
+        })
       }
     }
 

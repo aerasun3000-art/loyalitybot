@@ -195,6 +195,10 @@ export async function handleCallbackQuery(env, update) {
       const category = data.replace('svc_set_cat_', '');
       return await services.handleSetCategory(env, callbackQuery, category);
     }
+    if (data.startsWith('svc_set_subcat_')) {
+      const subcat = data.replace('svc_set_subcat_', '');
+      return await services.handleSetSubCategory(env, callbackQuery, subcat);
+    }
     if (data === 'svc_manage_services') {
       return await services.handleServicesMenu(env, callbackQuery);
     }

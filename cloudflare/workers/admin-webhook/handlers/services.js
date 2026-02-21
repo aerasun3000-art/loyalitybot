@@ -2,7 +2,7 @@
  * Service management and moderation handlers
  */
 
-import { 
+import {
   supabaseRequest,
   updateServiceApprovalStatus,
   getServiceById,
@@ -13,6 +13,7 @@ import {
   updateService,
   deleteService,
   updatePartnerField,
+  updatePartnerFields,
   getDistinctCitiesFromPartners,
   getDistrictsForCity,
   getPartnerByChatId,
@@ -21,6 +22,100 @@ import {
   clearBotState,
   updateBotStateData,
 } from '../supabase.js';
+
+// Subcategories per business group (mirrors partner.js categoriesMap)
+const SUBCATEGORY_MAP = {
+  beauty: [
+    { code: 'nail_care', emoji: '💅', label: 'Ногтевой сервис' },
+    { code: 'brow_design', emoji: '👁', label: 'Коррекция бровей' },
+    { code: 'hair_salon', emoji: '💇', label: 'Парикмахерские услуги' },
+    { code: 'hair_removal', emoji: '⚡', label: 'Депиляция' },
+    { code: 'facial_aesthetics', emoji: '✨', label: 'Косметология' },
+    { code: 'lash_services', emoji: '👀', label: 'Наращивание ресниц' },
+    { code: 'massage_therapy', emoji: '💆', label: 'Массаж' },
+    { code: 'makeup_pmu', emoji: '💄', label: 'Визаж и перманент' },
+    { code: 'body_wellness', emoji: '🌸', label: 'Телесная терапия' },
+    { code: 'nutrition_coaching', emoji: '🍎', label: 'Нутрициология' },
+    { code: 'mindfulness_coaching', emoji: '🧠', label: 'Ментальное здоровье' },
+    { code: 'image_consulting', emoji: '👗', label: 'Стиль' },
+  ],
+  self_discovery: [
+    { code: 'astrology', emoji: '🔮', label: 'Астрология' },
+    { code: 'numerology', emoji: '🔢', label: 'Нумерология' },
+    { code: 'psychology_coaching', emoji: '🧠', label: 'Психология и коучинг' },
+    { code: 'meditation_spirituality', emoji: '🧘', label: 'Медитации' },
+  ],
+  food: [
+    { code: 'restaurant', emoji: '🍽', label: 'Рестораны' },
+    { code: 'cafe', emoji: '☕', label: 'Кафе и кофейни' },
+    { code: 'food_delivery', emoji: '🚚', label: 'Доставка еды' },
+    { code: 'bakery', emoji: '🥖', label: 'Пекарни' },
+    { code: 'bar', emoji: '🍸', label: 'Бары и пабы' },
+  ],
+  education: [
+    { code: 'education', emoji: '📚', label: 'Образование' },
+    { code: 'language_school', emoji: '🌍', label: 'Языковая школа' },
+    { code: 'training', emoji: '📝', label: 'Тренинги и курсы' },
+    { code: 'online_education', emoji: '💻', label: 'Онлайн-образование' },
+  ],
+  retail: [
+    { code: 'retail', emoji: '🛍', label: 'Магазины' },
+    { code: 'fashion', emoji: '👔', label: 'Мода и одежда' },
+    { code: 'cosmetics_shop', emoji: '💄', label: 'Косметика' },
+    { code: 'electronics', emoji: '📱', label: 'Электроника' },
+    { code: 'gift_shop', emoji: '🎁', label: 'Подарки' },
+  ],
+  sports_fitness: [
+    { code: 'fitness', emoji: '🏃', label: 'Фитнес' },
+    { code: 'yoga', emoji: '🧘', label: 'Йога' },
+    { code: 'sports', emoji: '⚽', label: 'Спорт' },
+    { code: 'swimming', emoji: '🏊', label: 'Плавание' },
+  ],
+  entertainment: [
+    { code: 'entertainment', emoji: '🎉', label: 'Развлечения' },
+    { code: 'cinema', emoji: '🎬', label: 'Кино' },
+    { code: 'events', emoji: '🎭', label: 'Мероприятия' },
+    { code: 'gaming', emoji: '🎮', label: 'Игры' },
+    { code: 'music', emoji: '🎵', label: 'Музыка' },
+  ],
+  healthcare: [
+    { code: 'healthcare', emoji: '🏥', label: 'Здравоохранение' },
+    { code: 'dental', emoji: '🦷', label: 'Стоматология' },
+    { code: 'veterinary', emoji: '🐾', label: 'Ветеринария' },
+    { code: 'pharmacy', emoji: '💊', label: 'Аптека' },
+  ],
+  services: [
+    { code: 'cleaning', emoji: '🧹', label: 'Уборка и клининг' },
+    { code: 'repair', emoji: '🔧', label: 'Ремонт' },
+    { code: 'photography', emoji: '📷', label: 'Фотография' },
+    { code: 'legal', emoji: '⚖', label: 'Юридические услуги' },
+    { code: 'accounting', emoji: '📊', label: 'Бухгалтерия' },
+  ],
+  travel: [
+    { code: 'travel', emoji: '✈', label: 'Путешествия' },
+    { code: 'hotel', emoji: '🏨', label: 'Отели' },
+    { code: 'tours', emoji: '🗺', label: 'Туры' },
+  ],
+  influencer: [
+    { code: 'beauty_influencer', emoji: '💄', label: 'Бьюти-блогер' },
+    { code: 'food_influencer', emoji: '🍔', label: 'Фуд-блогер' },
+    { code: 'lifestyle_influencer', emoji: '📸', label: 'Лайфстайл' },
+    { code: 'fashion_influencer', emoji: '👗', label: 'Фэшн-блогер' },
+    { code: 'travel_influencer', emoji: '✈', label: 'Тревел-блогер' },
+  ],
+  b2b: [
+    { code: 'consulting', emoji: '💼', label: 'Консалтинг' },
+    { code: 'marketing_agency', emoji: '📣', label: 'Маркетинг и реклама' },
+    { code: 'it_services', emoji: '💻', label: 'IT-услуги' },
+    { code: 'hr_services', emoji: '👥', label: 'HR и рекрутинг' },
+    { code: 'logistics', emoji: '🚛', label: 'Логистика' },
+    { code: 'coworking', emoji: '🏢', label: 'Коворкинг' },
+    { code: 'business_training', emoji: '🎓', label: 'Бизнес-обучение' },
+    { code: 'event_management', emoji: '🎪', label: 'Организация мероприятий' },
+    { code: 'legal', emoji: '⚖', label: 'Юридические услуги' },
+    { code: 'accounting', emoji: '📊', label: 'Бухгалтерия' },
+  ],
+};
 import {
   sendTelegramMessage,
   sendTelegramMessageWithKeyboard,
@@ -193,7 +288,7 @@ export async function showPartnerServicesMenu(env, chatId, partnerChatId, messag
   const text = (
     `👤 <b>Партнёр:</b> ${partner.name || 'N/A'}\n` +
     `🏢 <b>Компания:</b> ${partner.company_name || 'N/A'}\n` +
-    `📂 <b>Категория:</b> ${partner.business_type || 'N/A'}\n` +
+    `📂 <b>Категория:</b> ${partner.category_group || partner.business_type || 'N/A'}\n` +
     `🏙 <b>Локация:</b> ${partner.city || 'N/A'}, ${partner.district || 'N/A'}\n\n` +
     `Выберите действие:`
   );
@@ -229,19 +324,19 @@ export async function handleEditCategory(env, callbackQuery) {
     }
     
     const keyboard = categories.map(cat => [{
-      text: `${cat.emoji || '📂'} ${cat.name}`,
+      text: `${cat.emoji || '📂'} ${cat.label || cat.name}`,
       callback_data: `svc_set_cat_${cat.name}`.slice(0, 64),
     }]);
-    
+
     keyboard.push([{ text: '◀️ Назад', callback_data: 'svc_back_to_partner' }]);
-    
+
     await editMessageText(
       env.ADMIN_BOT_TOKEN,
       chatId,
       callbackQuery.message.message_id,
-      '📂 **Выберите категорию бизнеса:**',
+      '📂 <b>Выберите категорию бизнеса:</b>',
       keyboard,
-      { parseMode: 'Markdown' }
+      { parseMode: 'HTML' }
     );
     
     return { success: true, handled: true, action: 'edit_category' };
@@ -252,24 +347,73 @@ export async function handleEditCategory(env, callbackQuery) {
 }
 
 /**
- * Handle set category
+ * Handle set category (step 1 of 2) — show subcategories for selected group
  */
-export async function handleSetCategory(env, callbackQuery, category) {
+export async function handleSetCategory(env, callbackQuery, group) {
   const chatId = String(callbackQuery.message.chat.id);
-  
+
   try {
     const state = await getBotState(env, chatId);
     const partnerChatId = state?.data?.partner_chat_id;
-    
+
     if (!partnerChatId) {
       await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка: партнёр не найден в состоянии', show_alert: true });
       return { success: false, handled: true };
     }
-    
-    const success = await updatePartnerField(env, partnerChatId, 'business_type', category);
-    
+
+    const subcats = SUBCATEGORY_MAP[group];
+    if (!subcats || subcats.length === 0) {
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Подкатегории не найдены', show_alert: true });
+      return { success: false, handled: true };
+    }
+
+    await setBotState(env, chatId, 'svc_selecting_subcat', { partner_chat_id: partnerChatId, pending_category_group: group });
+
+    const keyboard = subcats.map(sub => [{
+      text: `${sub.emoji} ${sub.label}`,
+      callback_data: `svc_set_subcat_${sub.code}`,
+    }]);
+    keyboard.push([{ text: '◀️ Назад', callback_data: 'svc_edit_category' }]);
+
+    await editMessageText(
+      env.ADMIN_BOT_TOKEN,
+      chatId,
+      callbackQuery.message.message_id,
+      '📂 <b>Выберите подкатегорию:</b>',
+      keyboard,
+      { parseMode: 'HTML' }
+    );
+
+    return { success: true, handled: true, action: 'subcategory_selection' };
+  } catch (error) {
+    logError('handleSetCategory', error, { chatId, group });
+    throw error;
+  }
+}
+
+/**
+ * Handle set subcategory (step 2 of 2) — save both category_group and business_type
+ */
+export async function handleSetSubCategory(env, callbackQuery, subcat) {
+  const chatId = String(callbackQuery.message.chat.id);
+
+  try {
+    const state = await getBotState(env, chatId);
+    const partnerChatId = state?.data?.partner_chat_id;
+    const pendingGroup = state?.data?.pending_category_group;
+
+    if (!partnerChatId || !pendingGroup) {
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка: состояние потеряно', show_alert: true });
+      return { success: false, handled: true };
+    }
+
+    const success = await updatePartnerFields(env, partnerChatId, {
+      category_group: pendingGroup,
+      business_type: subcat,
+    });
+
     if (success) {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: `✅ Категория изменена на: ${decodedCategory}` });
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: `✅ Категория обновлена` });
       await showPartnerServicesMenu(env, chatId, partnerChatId, callbackQuery.message.message_id);
       return { success: true, handled: true, action: 'category_updated' };
     } else {
@@ -277,7 +421,7 @@ export async function handleSetCategory(env, callbackQuery, category) {
       return { success: false, handled: true };
     }
   } catch (error) {
-    logError('handleSetCategory', error, { chatId, category });
+    logError('handleSetSubCategory', error, { chatId, subcat });
     throw error;
   }
 }
@@ -672,18 +816,18 @@ export async function handleMessage(env, update, stateData) {
       
       const categories = await getServiceCategories(env);
       const keyboard = categories.map(cat => [{
-        text: `${cat.emoji || '📂'} ${cat.name}`,
+        text: `${cat.emoji || '📂'} ${cat.label || cat.name}`,
         callback_data: `svc_set_service_cat_${cat.name}`.slice(0, 64),
       }]);
-      
+
       keyboard.push([{ text: '❌ Отмена', callback_data: 'svc_cancel' }]);
-      
+
       await sendTelegramMessageWithKeyboard(
         env.ADMIN_BOT_TOKEN,
         chatId,
-        '✅ Цена сохранена!\n\n📂 **Выберите категорию услуги:**',
+        '✅ Цена сохранена!\n\n📂 <b>Выберите категорию услуги:</b>',
         keyboard,
-        { parseMode: 'Markdown' }
+        { parseMode: 'HTML' }
       );
       
       await setBotState(env, chatId, 'svc_adding_category', stateData);
