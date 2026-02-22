@@ -45,8 +45,9 @@
 
 ### 2.3 Схема данных
 
+Миграция `migrations/add_tier_to_promotions.sql` уже добавляет `min_tier` и `tier_visibility`. При отсутствии — выполнить:
+
 ```sql
--- Добавить в таблицу promotions (или аналог)
 ALTER TABLE promotions
 ADD COLUMN IF NOT EXISTS min_tier TEXT DEFAULT 'bronze'
   CHECK (min_tier IN ('bronze', 'silver', 'gold', 'platinum', 'diamond'));
@@ -121,7 +122,7 @@ const TIER_THRESHOLDS = {
 
 ```sql
 CREATE TABLE IF NOT EXISTS ambassadors (
-  chat_id TEXT PRIMARY KEY REFERENCES users(chat_id) ON DELETE CASCADE,
+  chat_id TEXT PRIMARY KEY,  -- Telegram chat_id, тот же что у клиента
   created_at TIMESTAMP DEFAULT NOW(),
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'blocked')),
   tier_at_signup TEXT NOT NULL,  -- silver, gold, platinum, diamond
@@ -167,14 +168,14 @@ CREATE TABLE IF NOT EXISTS ambassador_earnings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ambassador_chat_id TEXT NOT NULL REFERENCES ambassadors(chat_id),
   partner_chat_id TEXT NOT NULL REFERENCES partners(chat_id),
-  transaction_id UUID,  -- ссылка на транзакцию
+  transaction_id INTEGER,  -- ссылка на transactions(id)
   check_amount NUMERIC NOT NULL,
   commission_pct NUMERIC NOT NULL,  -- ambassador_commission_pct на момент сделки
   gross_amount NUMERIC NOT NULL,    -- check_amount * commission_pct
   platform_fee NUMERIC NOT NULL,   -- gross * 0.30
   ambassador_amount NUMERIC NOT NULL,  -- gross * 0.70
   created_at TIMESTAMP DEFAULT NOW(),
-  payout_id UUID  -- при выплате
+  payout_id UUID  -- при выплате (если есть таблица выплат)
 );
 ```
 
@@ -261,8 +262,17 @@ ADD COLUMN IF NOT EXISTS ambassador_chat_id TEXT REFERENCES ambassadors(chat_id)
 
 ---
 
-## 9. Связанные документы
+## 9. Совместимость с существующими миграциями
+
+- **min_tier у promotions:** `migrations/add_tier_to_promotions.sql` — проверить, применена ли. Пороги в ней: bronze 0, silver 500, gold 2000, platinum 5000, diamond 15000. В `Home.jsx` TIER_LADDER: diamond 10000. Привести к единому значению.
+- **transactions:** таблица существует, `id` — INTEGER.
+- **partners:** `chat_id` TEXT PRIMARY KEY.
+
+---
+
+## 10. Связанные документы
 
 - `docs/ROLES_DEFINITION.md` — разделение ролей
 - `REFERRAL_COMMISSION_LOGIC_TZ.md` — логика B2B комиссий (аналогия 30/70)
 - `CALCULATIONS_AND_MECHANICS.md` — механики кэшбэка и баллов
+- `migrations/add_tier_to_promotions.sql` — tier для promotions

@@ -22,6 +22,12 @@ import {
   clearBotState,
   saveNpsRating,
   updateNpsFeedback,
+  getAmbassador,
+  createAmbassador,
+  addAmbassadorPartner,
+  getAmbassadorPartners,
+  getAmbassadorEarnings,
+  getPartnersForAmbassadorSelection,
 } from './supabase.js';
 
 /** Return level info based on referral count */
@@ -30,6 +36,18 @@ function getLevelInfo(count) {
   if (count >= 10) return { level: 'Gold',     emoji: '🥇', toNext: 25 - count };
   if (count >= 5)  return { level: 'Silver',   emoji: '🥈', toNext: 10 - count };
   return             { level: 'Bronze',   emoji: '🥉', toNext: 5 - count };
+}
+
+const TIER_THRESHOLDS = { bronze: 0, silver: 500, gold: 2000, platinum: 5000, diamond: 10000 };
+const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum', 'diamond'];
+function getTierFromBalance(balance) {
+  for (const t of [...TIER_ORDER].reverse()) {
+    if ((balance || 0) >= TIER_THRESHOLDS[t]) return t;
+  }
+  return 'bronze';
+}
+function isSilverPlus(tier) {
+  return TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf('silver');
 }
 import {
   sendTelegramMessage,
@@ -94,9 +112,10 @@ export async function handleStart(env, update) {
   const from = message.from;
   const text = message.text || '';
   
-  // Parse referral link: /start partner_123 или /start ref_ABC123
-  const referralMatch = text.match(/(?:partner_|ref_)(\d+|[\w\d]+)/i);
-  const referralId = referralMatch ? referralMatch[1] : null;
+  // Parse referral link: /start partner_123, /start ref_ABC123, /start amb_abc12345
+  const referralMatch = text.match(/(partner_|ref_|amb_)([\w\d]+)/i);
+  const referralSource = referralMatch ? (referralMatch[1] + referralMatch[2]) : null;
+  const referralId = referralMatch ? referralMatch[2] : null;
   
   try {
     // Check if user exists
@@ -111,8 +130,8 @@ export async function handleStart(env, update) {
         .filter(Boolean)
         .join(' ') || from.username || null) : chatId;
       
-      const referralSource = referralId ? (text.includes('partner_') ? `partner_${referralId}` : `ref_${referralId}`) : null;
-      const directReferrerChatId = referralSource ? await resolveReferralSourceToChatId(env, referralSource) : null;
+      const directReferrerChatId = referralSource && !referralSource.startsWith('amb_')
+        ? await resolveReferralSourceToChatId(env, referralSource) : null;
 
       const userData = {
         chat_id: chatId,
@@ -181,7 +200,13 @@ export async function handleStart(env, update) {
       await setChatMenuButton(env.TOKEN_CLIENT, chatId, frontendUrl).catch(() => {});
       return { success: true, newUser: true };
     } else {
-      // User already exists
+      // User already exists — update referral_source if came via ambassador link
+      if (referralSource && referralSource.startsWith('amb_')) {
+        await upsertUser(env, { chat_id: chatId, referral_source: referralSource });
+      }
+      if (text.includes('cmd_ambassador')) {
+        return await handleAmbassadorCommand(env, chatId);
+      }
       // IMPORTANT: Always use Cloudflare Pages URL
       const frontendUrl = env.FRONTEND_URL || 'https://loyalitybot-frontend.pages.dev';
       const browserUrl = await getBrowserUrl(env, frontendUrl, chatId);
@@ -415,6 +440,256 @@ export async function handleHistory(env, chatId) {
 }
 
 /**
+ * Handle /ambassador command (text message)
+ */
+async function handleAmbassadorCommand(env, chatId) {
+  const user = await getUserByChatId(env, chatId);
+  if (!user) {
+    await sendTelegramMessage(env.TOKEN_CLIENT, chatId, '❌ Пользователь не найден. Нажмите /start');
+    return { success: false };
+  }
+  const balance = user.balance || 0;
+  const tier = getTierFromBalance(balance);
+  if (!isSilverPlus(tier)) {
+    await sendTelegramMessage(env.TOKEN_CLIENT, chatId,
+      `🔒 Достигните Silver (500 баллов), чтобы стать амбассадором.\n\nУ вас: ${balance} / 500`);
+    return { success: true };
+  }
+  const amb = await getAmbassador(env, chatId);
+  if (amb) {
+    const partners = await getAmbassadorPartners(env, chatId);
+    const count = partners?.length || 0;
+    const botUsername = (env.CLIENT_BOT_USERNAME || 'mindbeatybot').replace('@', '');
+    const link = `https://t.me/${botUsername}?start=${amb.ambassador_code || ''}`;
+    const keyboard = [
+      [{ text: '📊 История начислений', callback_data: 'ambassador_earnings' }, { text: '💳 Запросить выплату', callback_data: 'ambassador_payout' }],
+      [{ text: '➕ Добавить партнёра', callback_data: 'ambassador_add_partner' }],
+    ];
+    await sendTelegramMessageWithKeyboard(env.TOKEN_CLIENT, chatId,
+      `🌟 <b>Кабинет амбассадора</b>\n\n` +
+      `Тир: ${amb.tier_at_signup || '—'}\n` +
+      `Партнёры: ${count} / ${amb.max_partners || 3}\n` +
+      `Баланс к выплате: ${(amb.balance_pending || 0).toFixed(0)} ₽\n` +
+      `Всего заработано: ${(amb.total_earnings || 0).toFixed(0)} ₽\n\n` +
+      `🔗 Ссылка:\n<code>${link}</code>`,
+      keyboard,
+      { parseMode: 'HTML' }
+    );
+    return { success: true };
+  }
+  const maxPartners = ['gold', 'platinum', 'diamond'].includes(tier) ? 10 : 3;
+  const partners = await getPartnersForAmbassadorSelection(env);
+  if (!partners || partners.length === 0) {
+    await sendTelegramMessage(env.TOKEN_CLIENT, chatId, '❌ Нет доступных партнёров для выбора.');
+    return { success: true };
+  }
+  await setBotState(env, chatId, 'awaiting_ambassador_partners_selection', {
+    maxPartners,
+    selectedPartners: [],
+    tierAtSignup: tier,
+    partners,
+  });
+  const keyboard = partners.slice(0, 15).map(p => [
+    { text: (p.company_name || p.name || p.chat_id).slice(0, 30), callback_data: `amb_partner_${p.chat_id}` }
+  ]);
+  keyboard.push([{ text: '✅ Готово', callback_data: 'amb_confirm' }]);
+  await sendTelegramMessageWithKeyboard(env.TOKEN_CLIENT, chatId,
+    `🌟 Выберите до ${maxPartners} партнёров, которых будете продвигать:\n\nНажмите на партнёра, чтобы добавить. Затем «Готово».`,
+    keyboard,
+    { parseMode: 'HTML' }
+  );
+  return { success: true };
+}
+
+/**
+ * Handle become_ambassador / ambassador_cabinet and related callbacks
+ */
+export async function handleAmbassador(env, update) {
+  const callbackQuery = update.callback_query;
+  const chatId = String(callbackQuery.message.chat.id);
+  const data = callbackQuery.data;
+  try {
+    await answerCallbackQuery(env.TOKEN_CLIENT, callbackQuery.id);
+    const user = await getUserByChatId(env, chatId);
+    if (!user) {
+      await sendTelegramMessage(env.TOKEN_CLIENT, chatId, '❌ Пользователь не найден. Нажмите /start');
+      return { success: false };
+    }
+    const balance = user.balance || 0;
+    const tier = getTierFromBalance(balance);
+
+    if (data === 'become_ambassador' || data === 'ambassador_cabinet') {
+      if (!isSilverPlus(tier)) {
+        await editMessageText(
+          env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+          `🔒 Достигните Silver (500 баллов), чтобы стать амбассадором.\n\nУ вас: ${balance} / 500`
+        );
+        return { success: true };
+      }
+      const amb = await getAmbassador(env, chatId);
+      if (amb) {
+        return await showAmbassadorCabinet(env, chatId, amb, callbackQuery.message.message_id);
+      }
+      if (data === 'ambassador_cabinet') return { success: true };
+      const maxPartners = ['gold', 'platinum', 'diamond'].includes(tier) ? 10 : 3;
+      const partners = await getPartnersForAmbassadorSelection(env);
+      if (!partners || partners.length === 0) {
+        await editMessageText(
+          env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+          '❌ Нет доступных партнёров для выбора.'
+        );
+        return { success: true };
+      }
+      await setBotState(env, chatId, 'awaiting_ambassador_partners_selection', {
+        maxPartners,
+        selectedPartners: [],
+        tierAtSignup: tier,
+        partners,
+      });
+      const keyboard = partners.slice(0, 15).map(p => [
+        { text: (p.company_name || p.name || p.chat_id).slice(0, 30), callback_data: `amb_partner_${p.chat_id}` }
+      ]);
+      keyboard.push([{ text: '✅ Готово', callback_data: 'amb_confirm' }]);
+      await editMessageText(
+        env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+        `🌟 Выберите до ${maxPartners} партнёров, которых будете продвигать:\n\nНажмите на партнёра, чтобы добавить. Затем «Готово».`,
+        { parseMode: 'HTML', reply_markup: { inline_keyboard: keyboard } }
+      );
+      return { success: true };
+    }
+
+    if (data === 'amb_confirm') {
+      const state = await getBotState(env, chatId);
+      if (!state || state.state !== 'awaiting_ambassador_partners_selection') return { success: false };
+      const { selectedPartners, maxPartners, tierAtSignup } = state.data || {};
+      if (!selectedPartners || selectedPartners.length === 0) {
+        await editMessageText(
+          env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+          '❌ Выберите хотя бы одного партнёра.'
+        );
+        return { success: true };
+      }
+      const created = await createAmbassador(env, chatId, tierAtSignup);
+      const ambRow = Array.isArray(created) ? created[0] : created;
+      const ambassadorCode = ambRow?.ambassador_code || 'amb_unknown';
+      for (const pid of selectedPartners) {
+        await addAmbassadorPartner(env, chatId, pid).catch(() => {});
+      }
+      await clearBotState(env, chatId);
+      const botUsername = (env.CLIENT_BOT_USERNAME || 'mindbeatybot').replace('@', '');
+      const link = `https://t.me/${botUsername}?start=${ambassadorCode}`;
+      await editMessageText(
+        env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+        `✅ Вы зарегистрированы как амбассадор!\n\n` +
+        `🔗 Ваша ссылка:\n<code>${link}</code>\n\n` +
+        `Делитесь ссылкой — получайте % с покупок привлечённых клиентов.`,
+        { parseMode: 'HTML' }
+      );
+      return { success: true };
+    }
+
+    if (data?.startsWith('amb_partner_')) {
+      const state = await getBotState(env, chatId);
+      if (!state || state.state !== 'awaiting_ambassador_partners_selection') return { success: false };
+      const partnerChatId = data.replace('amb_partner_', '');
+      const { selectedPartners, maxPartners, partners: partnersList } = state.data || {};
+      const sel = selectedPartners || [];
+      if (sel.includes(partnerChatId)) {
+        sel.splice(sel.indexOf(partnerChatId), 1);
+      } else if (sel.length < maxPartners) {
+        sel.push(partnerChatId);
+      }
+      await setBotState(env, chatId, 'awaiting_ambassador_partners_selection', {
+        ...state.data,
+        selectedPartners: sel,
+        partners: state.data?.partners || await getPartnersForAmbassadorSelection(env),
+      });
+      const partners = partnersList || state.data?.partners || await getPartnersForAmbassadorSelection(env);
+      const keyboard = (partners || []).slice(0, 15).map(p => {
+        const isSel = sel.includes(p.chat_id);
+        return [{ text: `${isSel ? '✓ ' : ''}${(p.company_name || p.name || p.chat_id).slice(0, 28)}`, callback_data: `amb_partner_${p.chat_id}` }];
+      });
+      keyboard.push([{ text: '✅ Готово', callback_data: 'amb_confirm' }]);
+      await editMessageText(
+        env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+        `Выбрано: ${sel.length} / ${maxPartners}\n\nНажмите «Готово», когда закончите.`,
+        { reply_markup: { inline_keyboard: keyboard } }
+      );
+      return { success: true };
+    }
+
+    if (data === 'ambassador_earnings') {
+      const amb = await getAmbassador(env, chatId);
+      if (!amb) return { success: false };
+      const earnings = await getAmbassadorEarnings(env, chatId);
+      const lines = (earnings || []).slice(0, 10).map(e =>
+        `${new Date(e.created_at).toLocaleDateString('ru-RU')} — +${(e.ambassador_amount || 0).toFixed(0)} ₽`
+      );
+      await editMessageText(
+        env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+        `📊 История начислений:\n\n${lines.length ? lines.join('\n') : 'Пока нет начислений'}`,
+        { parseMode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '◀️ Назад', callback_data: 'ambassador_cabinet' }]] } }
+      );
+      return { success: true };
+    }
+
+    if (data === 'ambassador_add_partner') {
+      const amb = await getAmbassador(env, chatId);
+      if (!amb) return { success: false };
+      const existing = await getAmbassadorPartners(env, chatId);
+      const count = existing?.length || 0;
+      if (count >= amb.max_partners) {
+        await editMessageText(
+          env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+          `Достигнут лимит: ${amb.max_partners} партнёров.`
+        );
+        return { success: true };
+      }
+      await editMessageText(
+        env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+        '➕ Добавление партнёра — в разработке. Обратитесь в поддержку.'
+      );
+      return { success: true };
+    }
+
+    if (data === 'ambassador_payout') {
+      await editMessageText(
+        env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+        '💳 Запрос выплаты — в разработке. Обратитесь в поддержку.'
+      );
+      return { success: true };
+    }
+
+    return { success: false };
+  } catch (e) {
+    logError('handleAmbassador', e, { chatId, data });
+    throw e;
+  }
+}
+
+async function showAmbassadorCabinet(env, chatId, amb, messageId) {
+  const partners = await getAmbassadorPartners(env, chatId);
+  const count = partners?.length || 0;
+  const botUsername = (env.CLIENT_BOT_USERNAME || 'mindbeatybot').replace('@', '');
+  const link = `https://t.me/${botUsername}?start=${amb.ambassador_code || ''}`;
+  const keyboard = [
+    [{ text: '📊 История начислений', callback_data: 'ambassador_earnings' }, { text: '💳 Запросить выплату', callback_data: 'ambassador_payout' }],
+    [{ text: '➕ Добавить партнёра', callback_data: 'ambassador_add_partner' }],
+  ];
+  await editMessageText(
+    env.TOKEN_CLIENT, chatId, messageId,
+    `🌟 <b>Кабинет амбассадора</b>\n\n` +
+    `Тир: ${amb.tier_at_signup || '—'}\n` +
+    `Партнёры: ${count} / ${amb.max_partners || 3}\n` +
+    `Баланс к выплате: ${(amb.balance_pending || 0).toFixed(0)} ₽\n` +
+    `Всего заработано: ${(amb.total_earnings || 0).toFixed(0)} ₽\n\n` +
+    `🔗 Ссылка:\n<code>${link}</code>`,
+    { parseMode: 'HTML', reply_markup: { inline_keyboard: keyboard } }
+  );
+  return { success: true };
+}
+
+/**
  * Handle feedback callbacks: menu + actions
  */
 export async function handleFeedback(env, update) {
@@ -505,6 +780,12 @@ export async function routeUpdate(env, update) {
     if (callbackData?.startsWith('feedback_')) {
       return await handleFeedback(env, update);
     }
+    if (callbackData === 'become_ambassador' || callbackData === 'ambassador_cabinet' ||
+        callbackData === 'amb_confirm' || callbackData?.startsWith('amb_partner_') ||
+        callbackData === 'ambassador_earnings' || callbackData === 'ambassador_add_partner' ||
+        callbackData === 'ambassador_payout') {
+      return await handleAmbassador(env, update);
+    }
     return { success: true, handled: false };
   }
 
@@ -518,6 +799,10 @@ export async function routeUpdate(env, update) {
     if (text.startsWith('/history')) {
       const chatId = String(message.chat.id);
       return await handleHistory(env, chatId);
+    }
+    if (text.startsWith('/ambassador')) {
+      const chatId = String(message.chat.id);
+      return await handleAmbassadorCommand(env, chatId);
     }
     if (text) {
       const chatId = String(message.chat.id);

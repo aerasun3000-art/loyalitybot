@@ -438,3 +438,125 @@ export async function buildReferralTree(env, referredChatId, maxLevel = 3) {
     return [];
   }
 }
+
+/** Ambassador: resolve ambassador_code (e.g. amb_abc12345) to ambassador chat_id */
+export async function getAmbassadorChatIdByCode(env, ambassadorCode) {
+  if (!ambassadorCode || !ambassadorCode.startsWith('amb_')) return null;
+  try {
+    const rows = await supabaseRequest(env, `ambassadors?ambassador_code=eq.${encodeURIComponent(ambassadorCode)}&select=chat_id`);
+    return rows && rows[0] ? String(rows[0].chat_id) : null;
+  } catch (e) {
+    console.error('[getAmbassadorChatIdByCode]', e);
+    return null;
+  }
+}
+
+/** Ambassador: check if user is ambassador */
+export async function getAmbassador(env, chatId) {
+  try {
+    const res = await supabaseRequest(env, `ambassadors?chat_id=eq.${encodeURIComponent(chatId)}&select=*`);
+    return res?.[0] || null;
+  } catch (e) {
+    console.error('[getAmbassador]', e);
+    return null;
+  }
+}
+
+/** Ambassador: register new ambassador */
+export async function createAmbassador(env, chatId, tierAtSignup) {
+  const maxPartners = ['gold', 'platinum', 'diamond'].includes(tierAtSignup) ? 10 : 3;
+  return supabaseRequest(env, 'ambassadors', {
+    method: 'POST',
+    body: JSON.stringify({
+      chat_id: chatId,
+      tier_at_signup: tierAtSignup,
+      max_partners: maxPartners,
+      status: 'active',
+    }),
+  });
+}
+
+/** Ambassador: add partner to ambassador's list */
+export async function addAmbassadorPartner(env, ambassadorChatId, partnerChatId) {
+  return supabaseRequest(env, 'ambassador_partners', {
+    method: 'POST',
+    body: JSON.stringify({
+      ambassador_chat_id: ambassadorChatId,
+      partner_chat_id: partnerChatId,
+    }),
+  });
+}
+
+/** Ambassador: get ambassador's partners */
+export async function getAmbassadorPartners(env, ambassadorChatId) {
+  try {
+    return await supabaseRequest(env, `ambassador_partners?ambassador_chat_id=eq.${encodeURIComponent(ambassadorChatId)}&select=*,partners(name,company_name,category_group)`);
+  } catch (e) {
+    console.error('[getAmbassadorPartners]', e);
+    return [];
+  }
+}
+
+/** Ambassador: get earnings */
+export async function getAmbassadorEarnings(env, ambassadorChatId) {
+  try {
+    return await supabaseRequest(env, `ambassador_earnings?ambassador_chat_id=eq.${encodeURIComponent(ambassadorChatId)}&order=created_at.desc&limit=50&select=*`);
+  } catch (e) {
+    console.error('[getAmbassadorEarnings]', e);
+    return [];
+  }
+}
+
+/** Ambassador: attribute transaction to ambassador */
+export async function attributeTransactionToAmbassador(env, transactionId, ambassadorChatId) {
+  return supabaseRequest(env, `transactions?id=eq.${transactionId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ambassador_chat_id: ambassadorChatId }),
+  });
+}
+
+/** Ambassador: create earning and update ambassador balance */
+export async function createAmbassadorEarning(env, data) {
+  const gross = data.check_amount * data.commission_pct;
+  const platformFee = gross * 0.30;
+  const ambassadorAmount = gross * 0.70;
+  await supabaseRequest(env, 'ambassador_earnings', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...data,
+      gross_amount: gross,
+      platform_fee: platformFee,
+      ambassador_amount: ambassadorAmount,
+    }),
+  });
+  const amb = await getAmbassador(env, data.ambassador_chat_id);
+  const curPending = (amb?.balance_pending ?? 0) || 0;
+  const curTotal = (amb?.total_earnings ?? 0) || 0;
+  return supabaseRequest(env, `ambassadors?chat_id=eq.${encodeURIComponent(data.ambassador_chat_id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      balance_pending: Number(curPending) + ambassadorAmount,
+      total_earnings: Number(curTotal) + ambassadorAmount,
+    }),
+  });
+}
+
+/** Ambassador: check if partner is in ambassador's list */
+export async function isPartnerInAmbassadorList(env, ambassadorChatId, partnerChatId) {
+  try {
+    const rows = await supabaseRequest(env, `ambassador_partners?ambassador_chat_id=eq.${encodeURIComponent(ambassadorChatId)}&partner_chat_id=eq.${encodeURIComponent(partnerChatId)}&select=id`);
+    return rows && rows.length > 0;
+  } catch (e) {
+    return false;
+  }
+}
+
+/** Ambassador: get approved partners for selection (chat_id, name, company_name) */
+export async function getPartnersForAmbassadorSelection(env) {
+  try {
+    return await supabaseRequest(env, 'partners?select=chat_id,name,company_name&order=name.asc');
+  } catch (e) {
+    console.error('[getPartnersForAmbassadorSelection]', e);
+    return [];
+  }
+}

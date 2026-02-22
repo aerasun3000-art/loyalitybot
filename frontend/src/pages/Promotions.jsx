@@ -10,7 +10,7 @@ import { Search, X, Gift } from 'lucide-react'
 
 const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum', 'diamond']
 const TIER_LABELS = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum', diamond: 'Diamond' }
-const TIER_THRESHOLDS = { bronze: 0, silver: 500, gold: 2000, platinum: 5000, diamond: 15000 }
+const TIER_THRESHOLDS = { bronze: 0, silver: 500, gold: 2000, platinum: 5000, diamond: 10000 }
 
 const getTierFromBalance = (balance) => {
   for (let i = TIER_ORDER.length - 1; i >= 0; i--) {

@@ -3,7 +3,7 @@
  * Handles API requests for transactions, balance, and other operations
  */
 
-import { supabaseRequest } from './supabase.js';
+import { supabaseRequest, getUserByChatId, getPartnerByChatId, getAmbassadorChatIdByCode, isPartnerInAmbassadorList, createAmbassadorEarning, attributeTransactionToAmbassador } from './supabase.js';
 import { logError } from './common.js';
 
 /**
@@ -177,6 +177,32 @@ async function executeTransaction(env, clientChatId, partnerChatId, txnType, raw
       body: JSON.stringify(transactionData),
     });
     const transactionId = txnRows && txnRows[0] ? txnRows[0].id : null;
+
+    // Ambassador attribution (accrual only): client came via ambassador link?
+    if (txnType === 'accrual' && transactionId && rawAmount > 0) {
+      try {
+        const user = await getUserByChatId(env, clientChatId);
+        const refSource = user?.referral_source;
+        if (refSource && refSource.startsWith('amb_')) {
+          const ambassadorChatId = await getAmbassadorChatIdByCode(env, refSource);
+          const inList = ambassadorChatId ? await isPartnerInAmbassadorList(env, ambassadorChatId, partnerChatId) : false;
+          const partner = await getPartnerByChatId(env, partnerChatId);
+          const commissionPct = partner?.ambassador_commission_pct ?? 0;
+          if (ambassadorChatId && inList && commissionPct > 0) {
+            await createAmbassadorEarning(env, {
+              ambassador_chat_id: ambassadorChatId,
+              partner_chat_id: partnerChatId,
+              transaction_id: transactionId,
+              check_amount: rawAmount,
+              commission_pct: commissionPct,
+            });
+            await attributeTransactionToAmbassador(env, transactionId, ambassadorChatId);
+          }
+        }
+      } catch (e) {
+        console.error('[executeTransaction] Ambassador attribution failed:', e);
+      }
+    }
 
     // Deduct cashback from partner deposit and log (accrual only)
     if (txnType === 'accrual' && transactionPoints > 0) {

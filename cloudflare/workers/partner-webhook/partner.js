@@ -48,6 +48,7 @@ import {
   markMessageAsRead,
   getExchangeRate,
   convertToUSD,
+  updatePartnerAmbassadorCommission,
 } from './supabase.js';
 import {
   sendTelegramMessage,
@@ -1165,6 +1166,8 @@ export async function handleSettingsMenu(env, chatId) {
     { text: '💰 Комиссия сети', callback_data: 'settings_commission' }
   ], [
     { text: '🤝 B2B Сделки', callback_data: 'settings_deals' }
+  ], [
+    { text: '🌟 Комиссия для амбассадоров', callback_data: 'settings_ambassador_commission' }
   ], [
     { text: toggleText, callback_data: 'settings_toggle_messages' }
   ], [
@@ -3033,6 +3036,43 @@ export async function handleCallback(env, update) {
     
     if (callbackData === 'settings_deals') {
       return await handlePartnershipMenu(env, chatId);
+    }
+    
+    if (callbackData === 'settings_ambassador_commission') {
+      try {
+        const partner = await getPartnerByChatId(env, chatId);
+        const currentPct = (partner?.ambassador_commission_pct ?? 0.10) * 100;
+        const keyboard = [
+          [{ text: '5%', callback_data: 'amb_commission_5' }, { text: '7%', callback_data: 'amb_commission_7' }, { text: '10%', callback_data: 'amb_commission_10' }, { text: '15%', callback_data: 'amb_commission_15' }],
+          [{ text: '⬅️ Назад', callback_data: 'menu_settings' }],
+        ];
+        await sendTelegramMessageWithKeyboard(
+          env.TOKEN_PARTNER,
+          chatId,
+          `🌟 <b>Комиссия для амбассадоров</b>\n\n` +
+          `Текущая ставка: <b>${currentPct.toFixed(0)}%</b>\n\n` +
+          `Выберите процент от чека, который платите амбассадорам за привлечённый трафик:`,
+          keyboard,
+          { parseMode: 'HTML' }
+        );
+      } catch (error) {
+        logError('settings_ambassador_commission', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка.');
+        await handleSettingsMenu(env, chatId);
+      }
+      return { success: true, handled: true };
+    }
+    
+    if (callbackData?.startsWith('amb_commission_')) {
+      const pctStr = callbackData.replace('amb_commission_', '');
+      const pctNum = parseInt(pctStr, 10);
+      if (pctNum >= 1 && pctNum <= 100) {
+        const pct = pctNum / 100;
+        await updatePartnerAmbassadorCommission(env, chatId, pct);
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, `✅ Комиссия для амбассадоров установлена: <b>${pctNum}%</b>`, { parseMode: 'HTML' });
+        await handleSettingsMenu(env, chatId);
+      }
+      return { success: true, handled: true };
     }
     
     // ==================== END SETTINGS CALLBACKS ====================

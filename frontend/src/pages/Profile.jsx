@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getClientAnalytics, isApprovedPartner, getReferralStats, getOrCreateReferralCode, updateUserCurrency } from '../services/supabase'
-import { getTelegramUser, getChatId, hapticFeedback, closeApp } from '../utils/telegram'
+import { getTelegramUser, getChatId, hapticFeedback, closeApp, openTelegramLink } from '../utils/telegram'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import useCurrencyStore from '../store/currencyStore'
@@ -308,6 +308,42 @@ const Profile = () => {
                 {t('home_referral_link_soon')}
               </p>
             )}
+            {(() => {
+              const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum', 'diamond']
+              const TIER_THRESHOLDS = { bronze: 0, silver: 500, gold: 2000, platinum: 5000, diamond: 10000 }
+              const getTierFromBalance = (bal) => {
+                for (const t of [...TIER_ORDER].reverse())
+                  if ((bal || 0) >= TIER_THRESHOLDS[t]) return t
+                return 'bronze'
+              }
+              const userBalance = clientData?.balance ?? 0
+              const userTier = getTierFromBalance(userBalance)
+              const isSilverPlus = TIER_ORDER.indexOf(userTier) >= TIER_ORDER.indexOf('silver')
+              const botUsername = (import.meta.env.VITE_CLIENT_BOT_USERNAME || 'mindbeatybot').replace('@', '')
+              const ambassadorLink = `https://t.me/${botUsername}?start=cmd_ambassador`
+              return isSilverPlus ? (
+                <button
+                  onClick={() => { hapticFeedback('light'); openTelegramLink(ambassadorLink); }}
+                  className="w-full py-2 rounded-xl font-semibold text-sm mb-2 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--tg-theme-button-color) 15%, transparent)',
+                    color: 'var(--tg-theme-button-color)',
+                  }}
+                >
+                  🌟 {language === 'ru' ? 'Кабинет амбассадора' : 'Ambassador cabinet'}
+                </button>
+              ) : (
+                <div
+                  className="mb-2 p-3 rounded-xl text-sm"
+                  style={{ backgroundColor: 'var(--tg-theme-bg-color)', color: 'var(--tg-theme-hint-color)' }}
+                >
+                  🔒 {language === 'ru' ? 'Стать амбассадором — от Silver (500 баллов)' : 'Become ambassador — from Silver (500 pts)'}
+                  <div className="mt-1 font-medium" style={{ color: 'var(--tg-theme-text-color)' }}>
+                    {language === 'ru' ? 'У вас' : 'You have'}: {userBalance} / 500
+                  </div>
+                </div>
+              )
+            })()}
             <div className="flex gap-2">
               <button
                 onClick={() => { hapticFeedback('light'); navigate('/partner/apply'); }}

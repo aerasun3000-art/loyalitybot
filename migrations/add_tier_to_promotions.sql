@@ -17,7 +17,7 @@ ALTER TABLE users
 CREATE OR REPLACE FUNCTION get_tier_for_balance(bal NUMERIC)
 RETURNS TEXT AS $$
 BEGIN
-  IF bal >= 15000 THEN RETURN 'diamond';
+  IF bal >= 10000 THEN RETURN 'diamond';
   ELSIF bal >= 5000 THEN RETURN 'platinum';
   ELSIF bal >= 2000 THEN RETURN 'gold';
   ELSIF bal >= 500  THEN RETURN 'silver';
