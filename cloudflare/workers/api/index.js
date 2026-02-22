@@ -171,12 +171,43 @@ async function executeTransaction(env, clientChatId, partnerChatId, txnType, raw
       description: description,
       date_time: new Date().toISOString(),
     };
-    
-    await supabaseRequest(env, 'transactions', {
+
+    const txnRows = await supabaseRequest(env, 'transactions', {
       method: 'POST',
       body: JSON.stringify(transactionData),
     });
-    
+    const transactionId = txnRows && txnRows[0] ? txnRows[0].id : null;
+
+    // Deduct cashback from partner deposit and log (accrual only)
+    if (txnType === 'accrual' && transactionPoints > 0) {
+      const cashbackAmount = transactionPoints;
+      try {
+        const partnerRows = await supabaseRequest(env, `partners?chat_id=eq.${encodeURIComponent(partnerChatId)}&select=deposit_balance,total_cashback_issued`);
+        const currentDeposit = (partnerRows && partnerRows[0] && (partnerRows[0].deposit_balance ?? 0)) || 0;
+        const currentIssued = (partnerRows && partnerRows[0] && (partnerRows[0].total_cashback_issued ?? 0)) || 0;
+        await supabaseRequest(env, `partners?chat_id=eq.${encodeURIComponent(partnerChatId)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            deposit_balance: Number(currentDeposit) - cashbackAmount,
+            total_cashback_issued: Number(currentIssued) + cashbackAmount,
+          }),
+        });
+        await supabaseRequest(env, 'partner_cashback_log', {
+          method: 'POST',
+          body: JSON.stringify({
+            partner_chat_id: String(partnerChatId),
+            client_chat_id: String(clientChatId),
+            transaction_id: transactionId,
+            check_amount: rawAmount,
+            cashback_points: transactionPoints,
+            cashback_amount: cashbackAmount,
+          }),
+        });
+      } catch (e) {
+        console.error('[executeTransaction] cashback deposit deduction failed:', e);
+      }
+    }
+
     return {
       success: true,
       new_balance: newBalance,
@@ -963,6 +994,80 @@ export default {
         return jsonResponse({ referral_code: code });
       }
       
+      // Cashback stats: GET /partners/:partner_chat_id/cashback-stats
+      const cashbackStatsMatch = path.match(/^\/partners\/([^/]+)\/cashback-stats$/);
+      if (cashbackStatsMatch && request.method === 'GET') {
+        const partnerChatId = cashbackStatsMatch[1];
+        const periodParam = url.searchParams.get('period') || 'month';
+        const fromParam = url.searchParams.get('from');
+        const toParam = url.searchParams.get('to');
+
+        let fromDate, toDate;
+        const now = new Date();
+        if (fromParam && toParam) {
+          fromDate = fromParam;
+          toDate = toParam;
+        } else if (periodParam === 'week') {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 7);
+          fromDate = d.toISOString();
+          toDate = now.toISOString();
+        } else if (periodParam === 'quarter') {
+          const d = new Date(now);
+          d.setMonth(d.getMonth() - 3);
+          fromDate = d.toISOString();
+          toDate = now.toISOString();
+        } else {
+          // month default
+          const d = new Date(now);
+          d.setMonth(d.getMonth() - 1);
+          fromDate = d.toISOString();
+          toDate = now.toISOString();
+        }
+
+        try {
+          const [partnerRows, logRows] = await Promise.all([
+            supabaseRequest(env, `partners?chat_id=eq.${encodeURIComponent(partnerChatId)}&select=deposit_balance,total_cashback_issued`),
+            supabaseRequest(env, `partner_cashback_log?partner_chat_id=eq.${encodeURIComponent(partnerChatId)}&created_at=gte.${fromDate}&created_at=lte.${toDate}&select=cashback_amount,cashback_points,check_amount,created_at&order=created_at.asc`),
+          ]);
+
+          const depositBalance = (partnerRows && partnerRows[0] && (partnerRows[0].deposit_balance ?? 0)) || 0;
+          const totalCashbackIssued = (partnerRows && partnerRows[0] && (partnerRows[0].total_cashback_issued ?? 0)) || 0;
+
+          const rows = logRows || [];
+          const totalCashbackAmount = rows.reduce((s, r) => s + Number(r.cashback_amount || 0), 0);
+          const totalCashbackPoints = rows.reduce((s, r) => s + Number(r.cashback_points || 0), 0);
+          const transactionsCount = rows.length;
+          const avgCashbackPerCheck = transactionsCount > 0 ? Math.round(totalCashbackAmount / transactionsCount * 100) / 100 : 0;
+
+          // Group by day for chart
+          const byDay = {};
+          for (const r of rows) {
+            const day = r.created_at.slice(0, 10);
+            if (!byDay[day]) byDay[day] = { label: day, cashback_amount: 0, count: 0 };
+            byDay[day].cashback_amount += Number(r.cashback_amount || 0);
+            byDay[day].count += 1;
+          }
+          const periods = Object.values(byDay);
+
+          return jsonResponse({
+            deposit_balance: depositBalance,
+            total_cashback_issued: totalCashbackIssued,
+            total_cashback_amount: totalCashbackAmount,
+            total_cashback_points: totalCashbackPoints,
+            transactions_count: transactionsCount,
+            avg_cashback_per_check: avgCashbackPerCheck,
+            period: periodParam,
+            from: fromDate,
+            to: toDate,
+            periods,
+          });
+        } catch (e) {
+          logError('cashback-stats', e, { partnerChatId });
+          return jsonResponse({ error: 'Failed to fetch cashback stats' }, 500);
+        }
+      }
+
       // 404 for unknown routes
       return jsonResponse({ error: 'Not found' }, 404);
     } catch (error) {

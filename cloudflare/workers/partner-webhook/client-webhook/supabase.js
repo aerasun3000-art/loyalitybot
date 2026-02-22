@@ -140,17 +140,10 @@ export async function createReferralTreeLinks(env, newUserChatId, directReferrer
   }
 }
 
-export async function buildReferralTree(env, referredChatId, level = 1, maxLevel = 3) {
-  if (level > maxLevel) return [];
+export async function buildReferralTree(env, referredChatId, maxLevel = 3) {
   try {
-    const rows = await supabaseRequest(env, `referral_tree?referred_chat_id=eq.${encodeURIComponent(referredChatId)}&level=eq.${level}&select=referrer_chat_id,level`);
-    const tree = [];
-    for (const r of rows || []) {
-      tree.push({ chat_id: r.referrer_chat_id, level: r.level });
-      const next = await buildReferralTree(env, r.referrer_chat_id, level + 1, maxLevel);
-      tree.push(...next);
-    }
-    return tree;
+    const rows = await supabaseRequest(env, `referral_tree?referred_chat_id=eq.${encodeURIComponent(referredChatId)}&level=lte.${maxLevel}&select=referrer_chat_id,level`);
+    return (rows || []).map(r => ({ chat_id: r.referrer_chat_id, level: r.level }));
   } catch (e) {
     console.error('[buildReferralTree]', e);
     return [];
@@ -160,7 +153,7 @@ export async function buildReferralTree(env, referredChatId, level = 1, maxLevel
 export async function processReferralRegistrationBonuses(env, newUserChatId, referrerChatId) {
   if (!referrerChatId) return;
   try {
-    const tree = await buildReferralTree(env, newUserChatId, 1, 3);
+    const tree = await buildReferralTree(env, newUserChatId, 3);
     if (!tree || tree.length === 0) return;
 
     for (const ref of tree) {

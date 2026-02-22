@@ -3,15 +3,34 @@
  * Handles all client bot commands and callbacks
  */
 
-import { 
-  getUserByChatId, 
-  upsertUser, 
+import {
+  getUserByChatId,
+  upsertUser,
   createTransaction,
   getPartnerByChatId,
   resolveReferralSourceToChatId,
   createReferralTreeLinks,
   processReferralRegistrationBonuses,
+  checkAndAwardAchievements,
+  getClientTransactions,
+  getClientReferralCount,
+  getClientLastPartner,
+  saveClientMessage,
+  countClientMessagesLastHour,
+  getBotState,
+  setBotState,
+  clearBotState,
+  saveNpsRating,
+  updateNpsFeedback,
 } from './supabase.js';
+
+/** Return level info based on referral count */
+function getLevelInfo(count) {
+  if (count >= 25) return { level: 'Platinum', emoji: '💎', toNext: null };
+  if (count >= 10) return { level: 'Gold',     emoji: '🥇', toNext: 25 - count };
+  if (count >= 5)  return { level: 'Silver',   emoji: '🥈', toNext: 10 - count };
+  return             { level: 'Bronze',   emoji: '🥉', toNext: 5 - count };
+}
 import {
   sendTelegramMessage,
   sendTelegramMessageWithKeyboard,
@@ -109,7 +128,27 @@ export async function handleStart(env, update) {
 
       if (directReferrerChatId) {
         await createReferralTreeLinks(env, chatId, directReferrerChatId);
-        await processReferralRegistrationBonuses(env, chatId, directReferrerChatId);
+        const credited = await processReferralRegistrationBonuses(env, chatId, directReferrerChatId);
+        for (const ref of (credited || [])) {
+          await sendTelegramMessage(
+            env.TOKEN_CLIENT,
+            ref.chat_id,
+            `🎉 По вашей реферальной ссылке зарегистрировался новый пользователь!\n\n` +
+            `💰 Вам начислено <b>${ref.bonus} баллов</b>${ref.level > 1 ? ` (уровень ${ref.level})` : ''}`
+          ).catch(() => {});
+        }
+
+        // Check achievements for direct referrer
+        const achievements = await checkAndAwardAchievements(env, directReferrerChatId);
+        for (const ach of achievements) {
+          await sendTelegramMessage(
+            env.TOKEN_CLIENT,
+            directReferrerChatId,
+            `🏆 <b>Достижение разблокировано!</b>\n\n` +
+            `Вы пригласили <b>${ach.threshold} друзей</b>!\n` +
+            `💰 Бонус: <b>+${ach.bonus} баллов</b>`
+          ).catch(() => {});
+        }
       }
       
       // Send welcome message
@@ -122,15 +161,16 @@ export async function handleStart(env, update) {
           { text: '🚀 Открыть приложение', web_app: { url: frontendUrl } },
           { text: '🌐 В браузере', url: browserUrl }
         ],
-        [{ text: '📊 Мой баланс', callback_data: 'balance' }]
+        [{ text: '📊 Мой баланс', callback_data: 'balance' }, { text: '📜 История', callback_data: 'history' }],
+        [{ text: '💬 Написать партнёру', callback_data: 'feedback_menu' }]
       ];
-      
+      const greeting = name ? `<b>${name}</b>, добро` : 'Добро';
       await sendTelegramMessageWithKeyboard(
         env.TOKEN_CLIENT,
         chatId,
-        `🎉 **Добро пожаловать в программу лояльности!**\n\n` +
-        `✅ Вы получили приветственный бонус: **${welcomeBonus} баллов**\n\n` +
-        `💡 **Как использовать:**\n` +
+        `🎉 ${greeting} пожаловать в программу лояльности!\n\n` +
+        `✅ Вы получили приветственный бонус: <b>${welcomeBonus} баллов</b>\n\n` +
+        `💡 <b>Как использовать:</b>\n` +
         `• Нажмите "Открыть приложение" или "В браузере" (если используете VPN)\n` +
         `• Получайте баллы за покупки у наших партнеров\n` +
         `• Обменивайте баллы на услуги и акции\n\n` +
@@ -146,19 +186,26 @@ export async function handleStart(env, update) {
       const frontendUrl = env.FRONTEND_URL || 'https://loyalitybot-frontend.pages.dev';
       const browserUrl = await getBrowserUrl(env, frontendUrl, chatId);
       console.log('[handleStart] Existing user - FRONTEND_URL from env:', env.FRONTEND_URL);
+      const refCount = await getClientReferralCount(env, chatId);
+      const lvl = getLevelInfo(refCount);
       const keyboard = [
         [
           { text: '🚀 Открыть приложение', web_app: { url: frontendUrl } },
           { text: '🌐 В браузере', url: browserUrl }
         ],
-        [{ text: '📊 Мой баланс', callback_data: 'balance' }]
+        [{ text: '📊 Мой баланс', callback_data: 'balance' }, { text: '📜 История', callback_data: 'history' }],
+        [{ text: '💬 Написать партнёру', callback_data: 'feedback_menu' }]
       ];
-      
+      const userName = user.name ? `<b>${user.name}</b>` : 'С возвращением';
+      const levelLine = lvl.toNext !== null
+        ? `${lvl.emoji} Уровень: <b>${lvl.level}</b> (до ${lvl.level === 'Bronze' ? 'Silver' : lvl.level === 'Silver' ? 'Gold' : 'Platinum'}: ещё ${lvl.toNext} друзей)`
+        : `${lvl.emoji} Уровень: <b>${lvl.level}</b>`;
       await sendTelegramMessageWithKeyboard(
         env.TOKEN_CLIENT,
         chatId,
-        `👋 С возвращением!\n\n` +
-        `Ваш баланс: **${user.balance || 0} баллов**\n\n` +
+        `👋 ${userName}, рады видеть вас снова!\n\n` +
+        `💰 Баланс: <b>${user.balance || 0} баллов</b>\n` +
+        `${levelLine}\n\n` +
         `Нажмите "Открыть приложение" или "В браузере" (если используете VPN).`,
         keyboard,
         { parseMode: 'HTML' }
@@ -179,37 +226,69 @@ export async function handleNpsRating(env, update) {
   const callbackQuery = update.callback_query;
   const chatId = String(callbackQuery.message.chat.id);
   const rating = parseInt(callbackQuery.data.replace('nps_rate_', ''));
-  
+
   try {
-    // Answer callback query first
     await answerCallbackQuery(env.TOKEN_CLIENT, callbackQuery.id);
-    
-    // Get user
+
     const user = await getUserByChatId(env, chatId);
     if (!user) {
       await editMessageText(
-        env.TOKEN_CLIENT,
-        chatId,
-        callbackQuery.message.message_id,
+        env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
         '❌ Пользователь не найден. Пожалуйста, зарегистрируйтесь через /start'
       );
       return { success: false };
     }
-    
-    // Save NPS rating (you'll need to implement this in Supabase)
-    // For now, just acknowledge
+
+    const partnerChatId = await getClientLastPartner(env, chatId);
+    const ratingId = await saveNpsRating(env, { clientChatId: chatId, partnerChatId, rating });
+
     await editMessageText(
-      env.TOKEN_CLIENT,
-      chatId,
-      callbackQuery.message.message_id,
-      `⭐ Спасибо за вашу оценку: **${rating}**!\n\nВаше мнение помогает нам стать лучше.`,
-      { parseMode: 'HTML' }
+      env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+      `⭐ Оценка <b>${rating}/10</b> принята!\n\n✍️ Напишите короткий отзыв (или отправьте /skip чтобы пропустить):`
     );
-    
+
+    await setBotState(env, chatId, 'awaiting_nps_review', { ratingId, partnerChatId });
     return { success: true, rating };
   } catch (error) {
     logError('handleNpsRating', error, { chatId, rating });
     throw error;
+  }
+}
+
+/**
+ * Handle NPS text review when user is in awaiting_nps_review state
+ */
+export async function handleNpsReview(env, chatId, text) {
+  try {
+    const stateRow = await getBotState(env, chatId);
+    if (!stateRow || stateRow.state !== 'awaiting_nps_review') return false;
+
+    const { ratingId, partnerChatId } = stateRow.data || {};
+    await clearBotState(env, chatId);
+
+    if (text === '/skip' || !text || !text.trim()) {
+      await sendTelegramMessage(env.TOKEN_CLIENT, chatId, '✅ Спасибо за вашу оценку!');
+      return true;
+    }
+
+    if (ratingId) {
+      await updateNpsFeedback(env, ratingId, text.trim());
+    }
+
+    if (partnerChatId) {
+      const user = await getUserByChatId(env, chatId);
+      const clientName = (user && user.name) ? user.name : `ID ${chatId}`;
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER, partnerChatId,
+        `📝 <b>Отзыв от клиента</b>\n\nКлиент: <b>${clientName}</b>\nОтзыв: <i>${text.trim()}</i>`
+      ).catch(() => {});
+    }
+
+    await sendTelegramMessage(env.TOKEN_CLIENT, chatId, '✅ Спасибо за отзыв! Это поможет партнёру стать лучше.');
+    return true;
+  } catch (e) {
+    console.error('[handleNpsReview]', e);
+    return false;
   }
 }
 
@@ -234,13 +313,20 @@ export async function handleBalance(env, update) {
     }
     
     const balance = user.balance || 0;
+    const refCount = await getClientReferralCount(env, chatId);
+    const lvl = getLevelInfo(refCount);
+    const levelLine = lvl.toNext !== null
+      ? `${lvl.emoji} Уровень: <b>${lvl.level}</b> — до следующего ещё <b>${lvl.toNext}</b> друзей`
+      : `${lvl.emoji} Уровень: <b>${lvl.level}</b> — максимальный!`;
+    const userName = user.name ? `<b>${user.name}</b>, ваш` : 'Ваш';
     await sendTelegramMessage(
       env.TOKEN_CLIENT,
       chatId,
-      `💰 **Ваш баланс:** ${balance} баллов\n\n` +
-      `Используйте баллы для оплаты услуг и акций наших партнеров!`
+      `💰 ${userName} баланс: <b>${balance} баллов</b>\n` +
+      `${levelLine}\n\n` +
+      `Используйте баллы для оплаты услуг и акций наших партнёров!`
     );
-    
+
     return { success: true, balance };
   } catch (error) {
     logError('handleBalance', error, { chatId });
@@ -290,6 +376,108 @@ export async function handleTextMessage(env, update) {
 }
 
 /**
+ * Handle /history command and 'history' callback
+ */
+export async function handleHistory(env, chatId) {
+  try {
+    const [user, transactions] = await Promise.all([
+      getUserByChatId(env, chatId),
+      getClientTransactions(env, chatId, 5),
+    ]);
+    if (!user) {
+      await sendTelegramMessage(env.TOKEN_CLIENT, chatId, '❌ Пользователь не найден. Нажмите /start');
+      return { success: false };
+    }
+    if (!transactions || transactions.length === 0) {
+      const who = user.name ? `<b>${user.name}</b>, у вас` : 'У вас';
+      await sendTelegramMessage(env.TOKEN_CLIENT, chatId, `${who} пока нет транзакций.`);
+      return { success: true };
+    }
+    const lines = transactions.map(t => {
+      const date = new Date(t.date_time).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+      if (t.operation_type === 'accrual') {
+        return `📅 ${date} — <b>+${t.earned_points} баллов</b> (чек: ${t.total_amount})`;
+      } else if (t.operation_type === 'redemption') {
+        return `📅 ${date} — <b>−${t.spent_points} баллов</b> (списание)`;
+      }
+      return `📅 ${date} — ${t.earned_points || 0} баллов`;
+    });
+    const who = user.name ? `<b>${user.name}</b>, последние покупки` : 'Последние покупки';
+    await sendTelegramMessage(
+      env.TOKEN_CLIENT, chatId,
+      `📜 ${who}:\n\n${lines.join('\n')}\n\n💰 Текущий баланс: <b>${user.balance || 0} баллов</b>`
+    );
+    return { success: true };
+  } catch (error) {
+    logError('handleHistory', error, { chatId });
+    throw error;
+  }
+}
+
+/**
+ * Handle feedback callbacks: menu + actions
+ */
+export async function handleFeedback(env, update) {
+  const callbackQuery = update.callback_query;
+  const chatId = String(callbackQuery.message.chat.id);
+  const data = callbackQuery.data;
+  try {
+    await answerCallbackQuery(env.TOKEN_CLIENT, callbackQuery.id);
+    const user = await getUserByChatId(env, chatId);
+    if (!user) return { success: false };
+
+    if (data === 'feedback_menu') {
+      const keyboard = [
+        [{ text: '👍 Всё супер!', callback_data: 'feedback_great' }, { text: '❓ Есть вопрос', callback_data: 'feedback_question' }],
+        [{ text: '📅 Хочу записаться', callback_data: 'feedback_book' }],
+        [{ text: '◀️ Назад', callback_data: 'balance' }],
+      ];
+      await sendTelegramMessageWithKeyboard(env.TOKEN_CLIENT, chatId, '💬 Что хотите передать партнёру?', keyboard);
+      return { success: true };
+    }
+
+    const partnerChatId = await getClientLastPartner(env, chatId);
+    if (!partnerChatId) {
+      await sendTelegramMessage(env.TOKEN_CLIENT, chatId, '❌ Не найден партнёр. Сначала совершите покупку.');
+      return { success: false };
+    }
+
+    // Check partner allows messages
+    const partner = await getPartnerByChatId(env, partnerChatId);
+    if (partner && partner.allow_client_messages === false) {
+      await sendTelegramMessage(env.TOKEN_CLIENT, chatId, '🔕 Партнёр временно отключил приём сообщений.');
+      return { success: false };
+    }
+
+    // Rate limit: max 3 messages per hour
+    const msgCount = await countClientMessagesLastHour(env, chatId, partnerChatId);
+    if (msgCount >= 3) {
+      await sendTelegramMessage(env.TOKEN_CLIENT, chatId, '⏳ Вы уже отправили 3 сообщения за последний час. Попробуйте позже.');
+      return { success: false };
+    }
+
+    const texts = { feedback_great: '👍 Всё супер!', feedback_question: '❓ Есть вопрос', feedback_book: '📅 Хочу записаться' };
+    const messageText = texts[data];
+    if (!messageText) return { success: false };
+
+    await saveClientMessage(env, { clientChatId: chatId, partnerChatId, messageText });
+
+    const clientName = user.name || `ID ${chatId}`;
+    await sendTelegramMessageWithKeyboard(
+      env.TOKEN_PARTNER, partnerChatId,
+      `💬 <b>Сообщение от клиента</b>\n\nКлиент: <b>${clientName}</b>\nСообщение: <b>${messageText}</b>`,
+      [[{ text: '💬 Ответить клиенту', callback_data: `reply_to_client_${chatId}` }]]
+    ).catch(() => {});
+
+    await sendTelegramMessage(env.TOKEN_CLIENT, chatId, '✅ Ваше сообщение отправлено партнёру!');
+    return { success: true };
+  } catch (error) {
+    logError('handleFeedback', error, { chatId, data });
+    throw error;
+  }
+}
+
+/**
  * Normalize update: use message or edited_message as message
  */
 function getMessage(update) {
@@ -309,9 +497,17 @@ export async function routeUpdate(env, update) {
     if (callbackData === 'balance') {
       return await handleBalance(env, update);
     }
+    if (callbackData === 'history') {
+      const chatId = String(update.callback_query.message.chat.id);
+      await answerCallbackQuery(env.TOKEN_CLIENT, update.callback_query.id);
+      return await handleHistory(env, chatId);
+    }
+    if (callbackData?.startsWith('feedback_')) {
+      return await handleFeedback(env, update);
+    }
     return { success: true, handled: false };
   }
-  
+
   // Handle messages (including edited_message for /start)
   const message = getMessage(update);
   if (message) {
@@ -319,11 +515,18 @@ export async function routeUpdate(env, update) {
     if (text.startsWith('/start')) {
       return await handleStart(env, { ...update, message });
     }
+    if (text.startsWith('/history')) {
+      const chatId = String(message.chat.id);
+      return await handleHistory(env, chatId);
+    }
     if (text) {
+      const chatId = String(message.chat.id);
+      const handled = await handleNpsReview(env, chatId, text);
+      if (handled) return { success: true };
       return await handleTextMessage(env, { ...update, message });
     }
     return { success: true, handled: false };
   }
-  
+
   return { success: true, handled: false };
 }

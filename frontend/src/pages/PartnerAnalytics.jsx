@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { supabase, getPartnerInfo, updatePartnerInfo, getPartnerReactivationSettings, updatePartnerReactivationSettings, getReactivationStats } from '../services/supabase';
+import { supabase, getPartnerInfo, updatePartnerInfo, getPartnerReactivationSettings, updatePartnerReactivationSettings, getReactivationStats, getPartnerCashbackStats } from '../services/supabase';
 import { formatCurrencySimple } from '../utils/currency';
 import Loader from '../components/Loader';
 import { openTelegramLink } from '../utils/telegram';
@@ -15,6 +15,7 @@ const PartnerAnalytics = () => {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [period, setPeriod] = useState(30); // дней
+  const [cashbackStats, setCashbackStats] = useState(null);
   const [ratedClients, setRatedClients] = useState([]); // Клиенты, которые поставили оценку
   const [partnerCity, setPartnerCity] = useState(null);
   const [partnerData, setPartnerData] = useState(null);
@@ -105,7 +106,7 @@ const PartnerAnalytics = () => {
       // Загружаем NPS оценки с данными о клиентах
       const { data: npsRatings, error: npsError } = await supabase
         .from('nps_ratings')
-        .select('client_chat_id, rating, created_at, master_name')
+        .select('client_chat_id, rating, created_at, master_name, feedback')
         .eq('partner_chat_id', partnerId)
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false });
@@ -262,6 +263,11 @@ const PartnerAnalytics = () => {
         detractors,
         totalPromoters,
       });
+
+      // Загружаем статистику кэшбэка и депозита
+      const periodKey = period <= 7 ? 'week' : period <= 30 ? 'month' : 'quarter';
+      const cbStats = await getPartnerCashbackStats(partnerId, periodKey);
+      setCashbackStats(cbStats);
 
     } catch (error) {
       console.error('Ошибка загрузки статистики:', error);
@@ -878,6 +884,72 @@ const PartnerAnalytics = () => {
           </div>
         </div>
 
+        {/* Кэшбэк и депозит */}
+        {cashbackStats && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              💳 Кэшбэк и депозит
+            </h2>
+            {cashbackStats.deposit_balance < 0 && (
+              <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-4 flex items-center gap-3">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <p className="text-red-700 dark:text-red-300 font-medium">Депозит исчерпан</p>
+                  <p className="text-red-600 dark:text-red-400 text-sm">
+                    Остаток: <strong>{cashbackStats.deposit_balance.toLocaleString('ru-RU')} баллов</strong>. Пополните депозит для продолжения начисления кэшбэка.
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <MetricCard
+                icon={cashbackStats.deposit_balance >= 0 ? '🟢' : '🔴'}
+                title="Депозит"
+                value={cashbackStats.deposit_balance.toLocaleString('ru-RU')}
+                subtitle="Текущий остаток (баллы)"
+              />
+              <MetricCard
+                icon="🎁"
+                title="Выдано кэшбэка"
+                value={cashbackStats.total_cashback_amount.toLocaleString('ru-RU')}
+                subtitle={`За период (баллы)`}
+              />
+              <MetricCard
+                icon="🧾"
+                title="Транзакций"
+                value={cashbackStats.transactions_count}
+                subtitle="С начислением кэшбэка"
+              />
+              <MetricCard
+                icon="📊"
+                title="Средний кэшбэк"
+                value={cashbackStats.avg_cashback_per_check.toLocaleString('ru-RU')}
+                subtitle="На чек (баллы)"
+              />
+            </div>
+            {cashbackStats.periods && cashbackStats.periods.length > 0 && (
+              <div className="bg-sakura-surface dark:bg-sakura-surface rounded-xl p-6 shadow-sm">
+                <h3 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-4">Кэшбэк по дням</h3>
+                <div className="flex items-end gap-1 h-24 overflow-x-auto">
+                  {cashbackStats.periods.map((p) => {
+                    const max = Math.max(...cashbackStats.periods.map(x => x.cashback_amount), 1);
+                    const pct = Math.round((p.cashback_amount / max) * 100);
+                    return (
+                      <div key={p.label} className="flex flex-col items-center gap-1 min-w-[32px]" title={`${p.label}: ${p.cashback_amount} баллов`}>
+                        <div
+                          className="w-6 bg-primary-400 dark:bg-primary-500 rounded-t"
+                          style={{ height: `${Math.max(pct, 4)}%` }}
+                        />
+                        <span className="text-xs text-gray-400 rotate-45 origin-left">{p.label.slice(5)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Клиенты */}
         <div className="mb-8">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
@@ -1174,6 +1246,9 @@ const PartnerAnalytics = () => {
                         Оценка
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Отзыв
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Дата
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -1219,6 +1294,13 @@ const PartnerAnalytics = () => {
                               <span>{ratingEmoji}</span>
                               <span>{client.rating}/10</span>
                             </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-xs">
+                            {client.feedback ? (
+                              <span className="italic">«{client.feedback}»</span>
+                            ) : (
+                              <span className="text-gray-400 dark:text-gray-600">—</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {formattedDate}

@@ -144,17 +144,10 @@ export async function createTransaction(env, transactionData) {
 /** REFERRAL_CONFIG: 8%/4%/2% с покупок */
 const REFERRAL_TRANSACTION_PERCENT = { level_1: 0.08, level_2: 0.04, level_3: 0.02 };
 
-async function buildReferralTree(env, referredChatId, level = 1, maxLevel = 3) {
-  if (level > maxLevel) return [];
+async function buildReferralTree(env, referredChatId, maxLevel = 3) {
   try {
-    const rows = await supabaseRequest(env, `referral_tree?referred_chat_id=eq.${encodeURIComponent(referredChatId)}&level=eq.${level}&select=referrer_chat_id,level`);
-    const tree = [];
-    for (const r of rows || []) {
-      tree.push({ chat_id: r.referrer_chat_id, level: r.level });
-      const next = await buildReferralTree(env, r.referrer_chat_id, level + 1, maxLevel);
-      tree.push(...next);
-    }
-    return tree;
+    const rows = await supabaseRequest(env, `referral_tree?referred_chat_id=eq.${encodeURIComponent(referredChatId)}&level=lte.${maxLevel}&select=referrer_chat_id,level`);
+    return (rows || []).map(r => ({ chat_id: r.referrer_chat_id, level: r.level }));
   } catch (e) {
     console.error('[buildReferralTree]', e);
     return [];
@@ -164,7 +157,7 @@ async function buildReferralTree(env, referredChatId, level = 1, maxLevel = 3) {
 async function processReferralTransactionBonuses(env, clientChatId, earnedPoints, transactionId) {
   if (!earnedPoints || earnedPoints <= 0) return;
   try {
-    const tree = await buildReferralTree(env, clientChatId, 1, 3);
+    const tree = await buildReferralTree(env, clientChatId, 3);
     if (!tree || tree.length === 0) return;
 
     for (const ref of tree) {
@@ -174,13 +167,13 @@ async function processReferralTransactionBonuses(env, clientChatId, earnedPoints
       const bonusPoints = Math.floor(earnedPoints * percent);
       if (bonusPoints <= 0) continue;
 
-      const userRows = await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(ref.chat_id)}&select=commission_balance`);
-      const current = (userRows && userRows[0] && (userRows[0].commission_balance ?? 0)) || 0;
+      const userRows = await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(ref.chat_id)}&select=balance`);
+      const current = (userRows && userRows[0] && (userRows[0].balance ?? 0)) || 0;
       const next = Number(current) + bonusPoints;
 
       await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(ref.chat_id)}`, {
         method: 'PATCH',
-        body: JSON.stringify({ commission_balance: next }),
+        body: JSON.stringify({ balance: next }),
       });
 
       await supabaseRequest(env, 'referral_rewards', {

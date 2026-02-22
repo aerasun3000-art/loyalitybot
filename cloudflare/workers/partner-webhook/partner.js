@@ -1151,6 +1151,10 @@ export async function handleMoreMenu(env, chatId) {
  * Handle Settings menu
  */
 export async function handleSettingsMenu(env, chatId) {
+  const partner = await getPartnerByChatId(env, chatId);
+  const messagesEnabled = partner ? partner.allow_client_messages !== false : true;
+  const toggleText = messagesEnabled ? '🔕 Отключить сообщения клиентов' : '🔔 Включить сообщения клиентов';
+
   const keyboard = [[
     { text: 'ℹ️ Моя информация', callback_data: 'settings_info' }
   ], [
@@ -1161,6 +1165,8 @@ export async function handleSettingsMenu(env, chatId) {
     { text: '💰 Комиссия сети', callback_data: 'settings_commission' }
   ], [
     { text: '🤝 B2B Сделки', callback_data: 'settings_deals' }
+  ], [
+    { text: toggleText, callback_data: 'settings_toggle_messages' }
   ], [
     { text: '⬅️ Назад', callback_data: 'more_menu' }
   ]];
@@ -2697,6 +2703,90 @@ export async function handleCallback(env, update) {
       return await handlePromotionEditMenu(env, chatId, promotionId);
     }
     
+    // Tier selection during promo creation
+    if (callbackData.startsWith('promo_tier_')) {
+      const botState = await getBotState(env, chatId);
+      if (botState?.state === 'awaiting_promo_tier' && botState.data) {
+        const tierVal = callbackData.replace('promo_tier_', '');
+        if (tierVal === 'all') {
+          const promoData = {
+            partner_chat_id: chatId,
+            title: botState.data.title,
+            description: botState.data.description,
+            discount_value: botState.data.discount_value,
+            end_date: botState.data.end_date,
+            is_active: true,
+            promotion_type: 'discount',
+            min_tier: null,
+            tier_visibility: 'all',
+          };
+          try {
+            await addPromotion(env, promoData);
+            await clearBotState(env, chatId);
+            await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
+              '✅ <b>Акция успешно создана!</b>\n\n' +
+              `📝 ${promoData.title}\n💰 ${promoData.discount_value}\n📅 До: ${botState.data.date_text}`,
+              { parseMode: 'HTML' }
+            );
+            return await handlePromotionsMenu(env, chatId);
+          } catch (err) {
+            console.error('[promo_tier_all]', err);
+            await clearBotState(env, chatId);
+            await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.');
+            return { success: false };
+          }
+        }
+        // Specific tier: ask visibility
+        await setBotState(env, chatId, 'awaiting_promo_visibility', {
+          ...botState.data,
+          promo_min_tier: tierVal,
+        });
+        const visKeyboard = [
+          [{ text: '👁 Видна всем (с замком)', callback_data: 'promo_vis_all' }],
+          [{ text: '🔒 Только для выбранного уровня', callback_data: 'promo_vis_tier_only' }],
+        ];
+        await sendTelegramMessageWithKeyboard(env.TOKEN_PARTNER, chatId,
+          '✍️ <b>Создание акции (Шаг 6 из 6):</b>\n\n6. Видимость акции:',
+          visKeyboard,
+          { parseMode: 'HTML' }
+        );
+        return { success: true, handled: true };
+      }
+    }
+
+    if (callbackData.startsWith('promo_vis_')) {
+      const botState = await getBotState(env, chatId);
+      if (botState?.state === 'awaiting_promo_visibility' && botState.data?.promo_min_tier) {
+        const visVal = callbackData.replace('promo_vis_', '');
+        const promoData = {
+          partner_chat_id: chatId,
+          title: botState.data.title,
+          description: botState.data.description,
+          discount_value: botState.data.discount_value,
+          end_date: botState.data.end_date,
+          is_active: true,
+          promotion_type: 'discount',
+          min_tier: botState.data.promo_min_tier,
+          tier_visibility: visVal === 'tier_only' ? 'tier_only' : 'all',
+        };
+        try {
+          await addPromotion(env, promoData);
+          await clearBotState(env, chatId);
+          await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
+            '✅ <b>Акция успешно создана!</b>\n\n' +
+            `📝 ${promoData.title}\n💰 ${promoData.discount_value}\n📅 До: ${botState.data.date_text}`,
+            { parseMode: 'HTML' }
+          );
+          return await handlePromotionsMenu(env, chatId);
+        } catch (err) {
+          console.error('[promo_vis]', err);
+          await clearBotState(env, chatId);
+          await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.');
+          return { success: false };
+        }
+      }
+    }
+
     if (callbackData.startsWith('promo_delete_confirm_')) {
       const promotionId = callbackData.replace('promo_delete_confirm_', '');
       return await handlePromotionDeleteExecute(env, chatId, promotionId);
@@ -2855,6 +2945,24 @@ export async function handleCallback(env, update) {
       return { success: true, handled: true };
     }
     
+    if (callbackData === 'settings_toggle_messages') {
+      try {
+        const partner = await getPartnerByChatId(env, chatId);
+        const current = partner ? partner.allow_client_messages !== false : true;
+        const newValue = !current;
+        await supabaseRequest(env, `partners?chat_id=eq.${chatId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ allow_client_messages: newValue }),
+        });
+        const statusText = newValue ? '🔔 Сообщения от клиентов <b>включены</b>.' : '🔕 Сообщения от клиентов <b>отключены</b>.';
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, statusText, { parseMode: 'HTML' });
+        await handleSettingsMenu(env, chatId);
+      } catch (e) {
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка. Попробуйте позже.');
+      }
+      return { success: true, handled: true };
+    }
+
     if (callbackData === 'edit_name') {
       await setBotState(env, chatId, 'awaiting_edit_name', { partner_chat_id: chatId });
       await sendTelegramMessage(
@@ -3800,6 +3908,11 @@ export async function handleStateBasedMessage(env, update, botState) {
     
     // ==================== PROMOTION CREATION STATES ====================
     
+    if (state === 'awaiting_promo_tier' || state === 'awaiting_promo_visibility') {
+      await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '👆 Выберите вариант кнопкой выше.');
+      return { success: true, handled: true };
+    }
+    
     if (state === 'awaiting_promo_title') {
       console.log('[handleStateBasedMessage] Promo Step 1: Title received:', text.trim());
       await setBotState(env, chatId, 'awaiting_promo_description', {
@@ -3883,43 +3996,28 @@ export async function handleStateBasedMessage(env, update, botState) {
         return { success: true, handled: true };
       }
       
-      // Create promotion
-      const promoData = {
-        partner_chat_id: chatId,
-        title: botState.data.title,
-        description: botState.data.description,
-        discount_value: botState.data.discount_value,
+      // Step 5: tier selection (inline keyboard)
+      await setBotState(env, chatId, 'awaiting_promo_tier', {
+        ...botState.data,
         end_date: endDate,
-        is_active: true,
-        promotion_type: 'discount'
-      };
+        date_text: dateText,
+      });
       
-      try {
-        await addPromotion(env, promoData);
-        await clearBotState(env, chatId);
-        
-        await sendTelegramMessage(
-          env.TOKEN_PARTNER,
-          chatId,
-          '✅ <b>Акция успешно создана!</b>\n\n' +
-          `📝 ${promoData.title}\n` +
-          `💰 ${promoData.discount_value}\n` +
-          `📅 До: ${dateText}`,
-          { parseMode: 'HTML' }
-        );
-        
-        await handlePromotionsMenu(env, chatId);
-        return { success: true, handled: true };
-      } catch (error) {
-        console.error('[handleStateBasedMessage] Promo create error:', error);
-        await clearBotState(env, chatId);
-        await sendTelegramMessage(
-          env.TOKEN_PARTNER,
-          chatId,
-          '❌ Ошибка при создании акции.'
-        );
-        return { success: false };
-      }
+      const tierKeyboard = [
+        [{ text: '🏅 Все уровни', callback_data: 'promo_tier_all' }],
+        [{ text: '🥈 Silver+', callback_data: 'promo_tier_silver' }, { text: '🥇 Gold+', callback_data: 'promo_tier_gold' }],
+        [{ text: '💎 Platinum+', callback_data: 'promo_tier_platinum' }, { text: '💎 Diamond', callback_data: 'promo_tier_diamond' }],
+      ];
+      
+      await sendTelegramMessageWithKeyboard(
+        env.TOKEN_PARTNER,
+        chatId,
+        '✍️ <b>Создание акции (Шаг 5 из 6):</b>\n\n' +
+        '5. Выберите минимальный уровень клиента для акции:',
+        tierKeyboard,
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
     }
     
     // ==================== PROMOTION EDITING STATES ====================

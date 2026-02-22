@@ -57,6 +57,163 @@ export async function supabaseRequest(env, endpoint, options = {}) {
 }
 
 /**
+ * Get last 5 transactions for client
+ */
+export async function getClientTransactions(env, chatId, limit = 5) {
+  try {
+    return await supabaseRequest(env, `transactions?client_chat_id=eq.${encodeURIComponent(chatId)}&order=date_time.desc&limit=${limit}&select=date_time,operation_type,earned_points,spent_points,total_amount,partner_chat_id`);
+  } catch (e) {
+    console.error('[getClientTransactions]', e);
+    return [];
+  }
+}
+
+/**
+ * Count level-1 referrals for a user
+ */
+export async function getClientReferralCount(env, chatId) {
+  try {
+    const rows = await supabaseRequest(env, `referral_tree?referrer_chat_id=eq.${encodeURIComponent(chatId)}&level=eq.1&select=id`);
+    return rows ? rows.length : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/**
+ * Get partner_chat_id from most recent transaction
+ */
+export async function getClientLastPartner(env, chatId) {
+  try {
+    const rows = await supabaseRequest(env, `transactions?client_chat_id=eq.${encodeURIComponent(chatId)}&order=date_time.desc&limit=1&select=partner_chat_id`);
+    return rows && rows[0] ? rows[0].partner_chat_id : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Save message from client to partner
+ */
+export async function saveClientMessage(env, { clientChatId, partnerChatId, messageText, messageType = 'text' }) {
+  try {
+    await supabaseRequest(env, 'messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        client_chat_id: clientChatId,
+        partner_chat_id: partnerChatId,
+        sender_type: 'client',
+        message_text: messageText,
+        message_type: messageType,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      }),
+    });
+    return true;
+  } catch (e) {
+    console.error('[saveClientMessage]', e);
+    return false;
+  }
+}
+
+/**
+ * Count messages sent by client to partner in the last hour
+ */
+export async function countClientMessagesLastHour(env, clientChatId, partnerChatId) {
+  try {
+    const since = new Date(Date.now() - 3600_000).toISOString();
+    const rows = await supabaseRequest(env,
+      `messages?client_chat_id=eq.${encodeURIComponent(clientChatId)}&partner_chat_id=eq.${encodeURIComponent(partnerChatId)}&sender_type=eq.client&created_at=gte.${encodeURIComponent(since)}&select=id`
+    );
+    return rows ? rows.length : 0;
+  } catch (e) {
+    console.error('[countClientMessagesLastHour]', e);
+    return 0;
+  }
+}
+
+/**
+ * Get bot state for client
+ */
+export async function getBotState(env, chatId) {
+  try {
+    const result = await supabaseRequest(env, `bot_states?chat_id=eq.${chatId}&select=*`);
+    if (result && result.length > 0) {
+      const state = result[0];
+      if (state.data && typeof state.data === 'string') {
+        try { state.data = JSON.parse(state.data); } catch (e) { state.data = {}; }
+      }
+      return state;
+    }
+    return null;
+  } catch (e) {
+    console.error('[getBotState]', e);
+    return null;
+  }
+}
+
+/**
+ * Set bot state (create or update)
+ */
+export async function setBotState(env, chatId, state, data = {}) {
+  try {
+    return await supabaseRequest(env, 'bot_states', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify({ chat_id: chatId, state, data, updated_at: new Date().toISOString() }),
+    });
+  } catch (e) {
+    console.error('[setBotState]', e);
+  }
+}
+
+/**
+ * Clear bot state
+ */
+export async function clearBotState(env, chatId) {
+  try {
+    return await supabaseRequest(env, `bot_states?chat_id=eq.${chatId}`, { method: 'DELETE' });
+  } catch (e) {
+    console.error('[clearBotState]', e);
+  }
+}
+
+/**
+ * Save NPS rating to nps_ratings table. Returns the created row id.
+ */
+export async function saveNpsRating(env, { clientChatId, partnerChatId, rating }) {
+  try {
+    const result = await supabaseRequest(env, 'nps_ratings', {
+      method: 'POST',
+      body: JSON.stringify({
+        client_chat_id: clientChatId,
+        partner_chat_id: partnerChatId,
+        rating,
+        created_at: new Date().toISOString(),
+      }),
+    });
+    return result && result[0] ? result[0].id : null;
+  } catch (e) {
+    console.error('[saveNpsRating]', e);
+    return null;
+  }
+}
+
+/**
+ * Update feedback text on existing nps_ratings row
+ */
+export async function updateNpsFeedback(env, ratingId, feedbackText) {
+  try {
+    await supabaseRequest(env, `nps_ratings?id=eq.${ratingId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ feedback: feedbackText }),
+    });
+  } catch (e) {
+    console.error('[updateNpsFeedback]', e);
+  }
+}
+
+/**
  * Get user by chat_id
  */
 export async function getUserByChatId(env, chatId) {
@@ -169,23 +326,25 @@ export async function createReferralTreeLinks(env, newUserChatId, directReferrer
  * Process registration bonuses (100/25/10) for referrers.
  */
 export async function processReferralRegistrationBonuses(env, newUserChatId, referrerChatId) {
-  if (!referrerChatId) return;
+  if (!referrerChatId) return [];
+  const credited = [];
   try {
-    const tree = await buildReferralTree(env, newUserChatId, 1, 3);
-    if (!tree || tree.length === 0) return;
+    const tree = await buildReferralTree(env, newUserChatId, 3);
+    if (!tree || tree.length === 0) return credited;
 
     for (const ref of tree) {
       const bonus = REFERRAL_CONFIG.registration_bonus[`level_${ref.level}`] || 0;
       if (bonus <= 0) continue;
 
-      const userRows = await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(ref.chat_id)}&select=commission_balance`);
-      const current = (userRows && userRows[0] && (userRows[0].commission_balance ?? 0)) || 0;
+      const userRows = await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(ref.chat_id)}&select=balance`);
+      const current = (userRows && userRows[0] && (userRows[0].balance ?? 0)) || 0;
       const next = Number(current) + bonus;
 
       await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(ref.chat_id)}`, {
         method: 'PATCH',
-        body: JSON.stringify({ commission_balance: next }),
+        body: JSON.stringify({ balance: next }),
       });
+      credited.push({ chat_id: ref.chat_id, level: ref.level, bonus });
 
       await supabaseRequest(env, 'referral_rewards', {
         method: 'POST',
@@ -207,22 +366,73 @@ export async function processReferralRegistrationBonuses(env, newUserChatId, ref
   } catch (e) {
     console.error('[processReferralRegistrationBonuses]', e);
   }
+  return credited;
+}
+
+const ACHIEVEMENT_THRESHOLDS = [
+  { threshold: 5,  bonus: 200,  key: '5_referrals' },
+  { threshold: 10, bonus: 500,  key: '10_referrals' },
+  { threshold: 25, bonus: 1500, key: '25_referrals' },
+  { threshold: 50, bonus: 3000, key: '50_referrals' },
+];
+
+/**
+ * Check and award achievement bonuses for reaching referral milestones (5/10/25/50).
+ * Returns list of newly awarded achievements.
+ */
+export async function checkAndAwardAchievements(env, referrerChatId) {
+  const awarded = [];
+  try {
+    // Count level-1 referrals directly from referral_tree
+    const treeRows = await supabaseRequest(env, `referral_tree?referrer_chat_id=eq.${encodeURIComponent(referrerChatId)}&level=eq.1&select=id`);
+    const totalReferrals = treeRows ? treeRows.length : 0;
+
+    // Get already awarded achievements
+    const existingRows = await supabaseRequest(env, `referral_rewards?referrer_chat_id=eq.${encodeURIComponent(referrerChatId)}&reward_type=eq.achievement&select=description`);
+    const existingKeys = new Set((existingRows || []).map(r => r.description));
+
+    for (const { threshold, bonus, key } of ACHIEVEMENT_THRESHOLDS) {
+      if (totalReferrals < threshold) continue;
+      const desc = `Достижение: ${threshold} рефералов`;
+      if (existingKeys.has(desc)) continue;
+
+      // Credit balance
+      const userRows = await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(referrerChatId)}&select=balance`);
+      const current = (userRows && userRows[0] && (userRows[0].balance ?? 0)) || 0;
+      await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(referrerChatId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ balance: Number(current) + bonus }),
+      });
+
+      // Record achievement
+      await supabaseRequest(env, 'referral_rewards', {
+        method: 'POST',
+        body: JSON.stringify({
+          referrer_chat_id: referrerChatId,
+          referred_chat_id: referrerChatId,
+          reward_type: 'achievement',
+          level: 0,
+          points: bonus,
+          description: desc,
+        }),
+      });
+
+      awarded.push({ key, threshold, bonus, description: desc });
+    }
+  } catch (e) {
+    console.error('[checkAndAwardAchievements]', e);
+  }
+  return awarded;
 }
 
 /**
  * Build referral tree (referrers for given referred user).
+ * Flat query — all levels pointing to referredChatId in one request.
  */
-export async function buildReferralTree(env, referredChatId, level = 1, maxLevel = 3) {
-  if (level > maxLevel) return [];
+export async function buildReferralTree(env, referredChatId, maxLevel = 3) {
   try {
-    const rows = await supabaseRequest(env, `referral_tree?referred_chat_id=eq.${referredChatId}&level=eq.${level}&select=referrer_chat_id,level`);
-    const tree = [];
-    for (const r of rows || []) {
-      tree.push({ chat_id: r.referrer_chat_id, level: r.level });
-      const next = await buildReferralTree(env, r.referrer_chat_id, level + 1, maxLevel);
-      tree.push(...next);
-    }
-    return tree;
+    const rows = await supabaseRequest(env, `referral_tree?referred_chat_id=eq.${encodeURIComponent(referredChatId)}&level=lte.${maxLevel}&select=referrer_chat_id,level`);
+    return (rows || []).map(r => ({ chat_id: r.referrer_chat_id, level: r.level }));
   } catch (e) {
     console.error('[buildReferralTree]', e);
     return [];

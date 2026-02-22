@@ -2,6 +2,42 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getPromotionById, getClientBalance, redeemPromotion } from '../services/supabase'
 import { getChatId, hapticFeedback, showAlert } from '../utils/telegram'
+
+const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum', 'diamond']
+const TIER_LABELS = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum', diamond: 'Diamond' }
+const TIER_THRESHOLDS = { bronze: 0, silver: 500, gold: 2000, platinum: 5000, diamond: 15000 }
+
+const getTierFromBalance = (balance) => {
+  for (let i = TIER_ORDER.length - 1; i >= 0; i--) {
+    if ((balance || 0) >= TIER_THRESHOLDS[TIER_ORDER[i]]) return TIER_ORDER[i]
+  }
+  return 'bronze'
+}
+
+const isTierSufficient = (userTier, requiredTier) =>
+  !requiredTier || TIER_ORDER.indexOf(userTier) >= TIER_ORDER.indexOf(requiredTier)
+
+const TierProgressBar = ({ currentBalance, currentTier, requiredTier, language }) => {
+  const currentThresh = TIER_THRESHOLDS[currentTier] ?? 0
+  const requiredThresh = TIER_THRESHOLDS[requiredTier] ?? 0
+  const remaining = Math.max(0, requiredThresh - currentBalance)
+  const range = requiredThresh - currentThresh
+  const progress = range > 0 ? Math.min(100, ((currentBalance - currentThresh) / range) * 100) : 0
+
+  return (
+    <div className="mt-3 p-3 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-hint-color) 8%, transparent)' }}>
+      <p className="text-xs font-medium mb-2" style={{ color: 'var(--tg-theme-hint-color)' }}>
+        {language === 'ru' ? 'Ещё' : 'Need'} {remaining} {language === 'ru' ? 'баллов до' : 'pts to'} {TIER_LABELS[requiredTier]}
+      </p>
+      <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'color-mix(in srgb, var(--tg-theme-hint-color) 20%, transparent)' }}>
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${progress}%`, backgroundColor: 'var(--tg-theme-button-color)' }}
+        />
+      </div>
+    </div>
+  )
+}
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
@@ -19,6 +55,7 @@ const PromotionDetail = () => {
   const [qrImage, setQrImage] = useState('')
   const [qrError, setQrError] = useState(null)
   const [balance, setBalance] = useState(0)
+  const [userTier, setUserTier] = useState('bronze')
   const [pointsToSpend, setPointsToSpend] = useState(0)
   const [isRedeeming, setIsRedeeming] = useState(false)
   const [redeemData, setRedeemData] = useState(null)
@@ -57,7 +94,9 @@ const PromotionDetail = () => {
       }
 
       setPromotion(promoData)
-      setBalance(balanceData?.balance || 0)
+      const bal = balanceData?.balance || 0
+      setBalance(bal)
+      setUserTier(getTierFromBalance(bal))
 
       // Устанавливаем максимальное количество баллов по умолчанию
       if (promoData.max_points_payment && promoData.points_to_dollar_rate) {
@@ -151,6 +190,7 @@ const PromotionDetail = () => {
 
         // Обновляем баланс
         setBalance(result.current_balance)
+        setUserTier(getTierFromBalance(result.current_balance))
 
         hapticFeedback('success')
       } else {
@@ -226,6 +266,7 @@ const PromotionDetail = () => {
   }
 
   const daysLeft = getDaysRemaining(promotion.end_date)
+  const tierLocked = promotion.min_tier && !isTierSufficient(userTier, promotion.min_tier)
 
   // Рассчитываем быстрые варианты баллов
   const pointsRate = promotion.points_to_dollar_rate || 1
@@ -438,13 +479,15 @@ const PromotionDetail = () => {
               {/* Главная кнопка - Показать партнёру */}
               <button
                 onClick={() => {
-                  handleActivatePromotion()
-                  hapticFeedback('medium')
+                  if (!tierLocked) {
+                    handleActivatePromotion()
+                    hapticFeedback('medium')
+                  }
                 }}
-                disabled={isQrLoading || !chatId}
+                disabled={isQrLoading || !chatId || tierLocked}
                 className="w-full py-4 rounded-2xl font-bold text-lg shadow-lg disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]"
                 style={{
-                  backgroundColor: 'var(--tg-theme-button-color)',
+                  backgroundColor: tierLocked ? 'color-mix(in srgb, var(--tg-theme-hint-color) 30%, transparent)' : 'var(--tg-theme-button-color)',
                   color: 'var(--tg-theme-button-text-color, #fff)'
                 }}
               >
@@ -452,6 +495,11 @@ const PromotionDetail = () => {
                   <span className="flex items-center justify-center gap-2">
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     {language === 'ru' ? 'Генерируем...' : 'Generating...'}
+                  </span>
+                ) : tierLocked ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="text-2xl">🔒</span>
+                    {language === 'ru' ? 'Доступно от' : 'Available from'} {TIER_LABELS[promotion.min_tier]}
                   </span>
                 ) : (
                   <span className="flex items-center justify-center gap-2">
@@ -461,6 +509,15 @@ const PromotionDetail = () => {
                 )}
               </button>
 
+              {tierLocked && (
+                <TierProgressBar
+                  currentBalance={balance}
+                  currentTier={userTier}
+                  requiredTier={promotion.min_tier}
+                  language={language}
+                />
+              )}
+
               <p className="text-xs text-center mt-2" style={{ color: 'var(--tg-theme-hint-color)' }}>
                 {language === 'ru'
                   ? 'Партнёр сканирует ваш QR и применяет скидку'
@@ -468,8 +525,8 @@ const PromotionDetail = () => {
               </p>
             </div>
 
-            {/* Оплата баллами (если доступна) */}
-            {promotion.max_points_payment && promotion.max_points_payment > 0 && balance > 0 && (
+            {/* Оплата баллами (если доступна и не заблокировано по тиру) */}
+            {promotion.max_points_payment && promotion.max_points_payment > 0 && balance > 0 && !tierLocked && (
               <div className="pt-5" style={{ borderTop: '1px solid color-mix(in srgb, var(--tg-theme-hint-color) 15%, transparent)' }}>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold uppercase tracking-wide"

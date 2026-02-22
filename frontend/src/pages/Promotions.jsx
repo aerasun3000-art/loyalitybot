@@ -1,21 +1,37 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getActivePromotions } from '../services/supabase'
-import { hapticFeedback } from '../utils/telegram'
+import { getActivePromotions, getClientBalance } from '../services/supabase'
+import { getChatId, hapticFeedback } from '../utils/telegram'
 import { useTranslation, translateDynamicContent } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import Loader from '../components/Loader'
 import Layout from '../components/Layout'
 import { Search, X, Gift } from 'lucide-react'
 
+const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum', 'diamond']
+const TIER_LABELS = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Platinum', diamond: 'Diamond' }
+const TIER_THRESHOLDS = { bronze: 0, silver: 500, gold: 2000, platinum: 5000, diamond: 15000 }
+
+const getTierFromBalance = (balance) => {
+  for (let i = TIER_ORDER.length - 1; i >= 0; i--) {
+    if ((balance || 0) >= TIER_THRESHOLDS[TIER_ORDER[i]]) return TIER_ORDER[i]
+  }
+  return 'bronze'
+}
+
+const isTierSufficient = (userTier, requiredTier) =>
+  !requiredTier || TIER_ORDER.indexOf(userTier) >= TIER_ORDER.indexOf(requiredTier)
+
 const Promotions = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const highlightId = searchParams.get('id')
+  const chatId = getChatId()
   const { language } = useLanguageStore()
   const { t } = useTranslation(language)
 
   const [loading, setLoading] = useState(true)
+  const [userTier, setUserTier] = useState('bronze')
   const [promotions, setPromotions] = useState([])
   const [translatedPromotions, setTranslatedPromotions] = useState([])
   const [translating, setTranslating] = useState(false)
@@ -122,7 +138,13 @@ const Promotions = () => {
 
   const loadPromotions = async () => {
     try {
-      const cached = sessionStorage.getItem('promotions_cache')
+      const tier = chatId
+        ? getTierFromBalance((await getClientBalance(chatId))?.balance)
+        : 'bronze'
+      setUserTier(tier)
+
+      const cacheKey = `promotions_cache_${tier}`
+      const cached = sessionStorage.getItem(cacheKey)
       if (cached) {
         try {
           const parsed = JSON.parse(cached)
@@ -133,9 +155,9 @@ const Promotions = () => {
         } catch {}
       }
 
-      const data = await getActivePromotions()
+      const data = await getActivePromotions(tier)
       setPromotions(data)
-      sessionStorage.setItem('promotions_cache', JSON.stringify(data))
+      sessionStorage.setItem(cacheKey, JSON.stringify(data))
     } catch (error) {
       console.error('Error loading promotions:', error)
     } finally {
@@ -315,6 +337,11 @@ const Promotions = () => {
                             {timeRemaining[item.id] || `${daysLeft}д`}
                           </div>
                         )}
+                        {item.min_tier && !isTierSufficient(userTier, item.min_tier) && (
+                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-medium bg-black/60 text-white">
+                            🔒 {language === 'ru' ? 'От' : 'From'} {TIER_LABELS[item.min_tier]}
+                          </div>
+                        )}
                       </div>
 
                       <div className="p-3">
@@ -366,9 +393,16 @@ const Promotions = () => {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>
-                        {item.partner?.company_name || t('promo_promotion')}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                          {item.partner?.company_name || t('promo_promotion')}
+                        </p>
+                        {item.min_tier && !isTierSufficient(userTier, item.min_tier) && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/10" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                            🔒 {TIER_LABELS[item.min_tier]}
+                          </span>
+                        )}
+                      </div>
                       <h3 className="text-sm font-semibold leading-tight line-clamp-2">
                         {item.title}
                       </h3>

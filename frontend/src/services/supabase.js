@@ -126,13 +126,18 @@ export const getClientTransactions = async (chatId, limit = 50) => {
   return data
 }
 
+const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum', 'diamond']
+
 /**
- * Получить все активные акции
+ * Получить все активные акции (с фильтрацией по тиру для tier_only)
+ * @param {string} userTier - тир пользователя (по умолчанию bronze)
  */
-export const getActivePromotions = async () => {
+export const getActivePromotions = async (userTier = 'bronze') => {
   const today = new Date().toISOString().split('T')[0]
-  
-  const { data, error } = await supabase
+  const tierIdx = TIER_ORDER.indexOf(userTier)
+  const tiersUpToUser = tierIdx >= 0 ? TIER_ORDER.slice(0, tierIdx + 1).join(',') : 'bronze'
+
+  let query = supabase
     .from('promotions')
     .select(`
       *,
@@ -140,14 +145,19 @@ export const getActivePromotions = async () => {
     `)
     .eq('is_active', true)
     .gte('end_date', today)
-    .order('created_at', { ascending: false })
-  
+
+  // tier_visibility=all — показываем всем; tier_only — только если min_tier <= userTier
+  query = query.or(
+    `tier_visibility.eq.all,and(tier_visibility.eq.tier_only,min_tier.in.(${tiersUpToUser}))`
+  )
+
+  const { data, error } = await query.order('created_at', { ascending: false })
+
   if (error) {
     console.error('Error fetching promotions:', error)
     return []
   }
-  
-  // Переименовываем partners в partner для совместимости с кодом
+
   return data?.map(promo => ({
     ...promo,
     partner: promo.partners
@@ -155,7 +165,7 @@ export const getActivePromotions = async () => {
 }
 
 /**
- * Получить акцию по ID
+ * Получить акцию по ID (включая min_tier, tier_visibility)
  */
 export const getPromotionById = async (id) => {
   const { data, error } = await supabase
@@ -2089,6 +2099,22 @@ export const redeemPromotion = async (clientChatId, promotionId, pointsToSpend) 
       success: false,
       error: 'Ошибка сети. Проверьте подключение к интернету.'
     }
+  }
+}
+
+/**
+ * Получить статистику кэшбэка партнёра
+ */
+export const getPartnerCashbackStats = async (partnerChatId, period = 'month') => {
+  const apiBaseUrl = getApiBaseUrl()
+  if (!apiBaseUrl) return null
+  try {
+    const res = await fetch(`${apiBaseUrl}/partners/${encodeURIComponent(partnerChatId)}/cashback-stats?period=${period}`)
+    if (!res.ok) return null
+    return await res.json()
+  } catch (e) {
+    console.error('Error fetching cashback stats:', e)
+    return null
   }
 }
 
