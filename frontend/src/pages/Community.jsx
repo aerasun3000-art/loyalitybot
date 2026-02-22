@@ -372,6 +372,47 @@ function Community() {
             </div>
           </div>
         )}
+
+        {/* Список приглашённых */}
+        {referralStats?.referrals_list && referralStats.referrals_list.length > 0 && (
+          <div
+            className="rounded-2xl p-4 mb-4"
+            style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
+          >
+            <h2 className="font-bold mb-3 flex items-center gap-2">
+              <Users size={16} />
+              {t('referral_list_title')}
+            </h2>
+            <div className="space-y-2">
+              {referralStats.referrals_list.map((ref, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 rounded-xl"
+                  style={{ backgroundColor: 'var(--tg-theme-bg-color)' }}
+                >
+                  <div>
+                    <p className="text-sm font-semibold">{ref.referred_name}</p>
+                    <p className="text-xs" style={{ color: 'var(--tg-theme-hint-color)' }}>
+                      {ref.registered_at
+                        ? new Date(ref.registered_at).toLocaleDateString(language === 'ru' ? 'ru' : 'en')
+                        : '—'}
+                      {ref.level > 1 && (
+                        <span className="ml-2">
+                          {t('referral_level_short').replace('{n}', ref.level)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {ref.total_earned_points > 0 && (
+                    <span className="text-sm font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>
+                      {t('referral_earned_points').replace('{n}', ref.total_earned_points)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   )

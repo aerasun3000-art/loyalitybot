@@ -593,7 +593,11 @@ export const getReferralPartnerInfo = async (clientChatId) => {
       return null
     }
 
-    const partnerChatId = user.referral_source
+    // referral_source: "partner_123" -> chat_id "123"; "ref_ABC" не даёт партнёра
+    let partnerChatId = user.referral_source
+    if (typeof partnerChatId === 'string' && partnerChatId.startsWith('partner_')) {
+      partnerChatId = partnerChatId.slice(8)
+    }
 
     // Получаем информацию о партнере
     const { data: partner, error: partnerError } = await supabase
@@ -1894,6 +1898,24 @@ export const getReferralStats = async (chatId) => {
       console.error('Error fetching referrals:', referralsError)
     }
 
+    // Обогатить referrals именами из users
+    const referredIds = [...new Set((referrals || []).map(r => r.referred_chat_id).filter(Boolean))]
+    let namesMap = {}
+    if (referredIds.length > 0) {
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('chat_id, name')
+        .in('chat_id', referredIds)
+      namesMap = (usersData || []).reduce((acc, u) => {
+        acc[u.chat_id] = u.name || '—'
+        return acc
+      }, {})
+    }
+    const referralsWithNames = (referrals || []).map(r => ({
+      ...r,
+      referred_name: namesMap[r.referred_chat_id] || '—'
+    }))
+
     // Получаем последние награды
     const { data: rewards, error: rewardsError } = await supabase
       .from('referral_rewards')
@@ -1912,7 +1934,7 @@ export const getReferralStats = async (chatId) => {
       active_referrals: userData.active_referrals || 0,
       total_earnings: userData.total_referral_earnings || 0,
       referral_level: userData.referral_level || 'bronze',
-      referrals_list: referrals || [],
+      referrals_list: referralsWithNames,
       recent_rewards: rewards || []
     }
   } catch (error) {
