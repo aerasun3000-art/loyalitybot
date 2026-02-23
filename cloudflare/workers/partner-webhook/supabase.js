@@ -1378,8 +1378,9 @@ function isValidChatIdForBroadcast(cid) {
  */
 export async function getPartnerClientChatIdsForBroadcast(env, partnerChatId, limit = 500) {
   try {
+    const referralSource = `partner_${partnerChatId}`;
     const result = await supabaseRequest(env,
-      `users?referral_source=eq.${encodeURIComponent(partnerChatId)}&select=chat_id&limit=${limit * 3}`
+      `users?referral_source=eq.${encodeURIComponent(referralSource)}&select=chat_id&limit=${limit * 3}`
     );
     const seen = new Set();
     const chatIds = [];
