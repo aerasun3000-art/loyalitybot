@@ -1,0 +1,1 @@
+ALTER TABLE nps_ratings ADD COLUMN IF NOT EXISTS feedback TEXT;
