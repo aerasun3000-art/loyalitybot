@@ -108,43 +108,41 @@ function Community() {
         <h1 className="text-xl font-bold pt-2">{t('referral_title')}</h1>
 
         {/* Уровень и статистика */}
-        {referralStats && (
-          <div
-            className="rounded-2xl p-4"
-            style={{
-              background: 'linear-gradient(135deg, var(--tg-theme-button-color), color-mix(in srgb, var(--tg-theme-button-color) 60%, rgb(var(--sakura-deep))))',
-            }}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-3xl">{levelInfo.emoji}</span>
-              <div>
-                <div className="text-white/80 text-sm">{t('referral_your_level')}</div>
-                <div className="text-white font-bold text-lg">{levelInfo.name}</div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-3">
-                <div className="text-xl font-bold text-white">
-                  {referralStats.total_referrals || 0}
-                </div>
-                <div className="text-white/70 text-[11px] mt-0.5">{t('referral_total')}</div>
-              </div>
-              <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-3">
-                <div className="text-xl font-bold text-white">
-                  {referralStats.active_referrals || 0}
-                </div>
-                <div className="text-white/70 text-[11px] mt-0.5">{t('referral_active')}</div>
-              </div>
-              <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-3">
-                <div className="text-xl font-bold text-white">
-                  {referralStats.total_earnings || 0}
-                </div>
-                <div className="text-white/70 text-[11px] mt-0.5">{t('referral_earned')}</div>
-              </div>
+        <div
+          className="rounded-2xl p-4"
+          style={{
+            background: 'linear-gradient(135deg, var(--tg-theme-button-color), color-mix(in srgb, var(--tg-theme-button-color) 60%, rgb(var(--sakura-deep))))',
+          }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-3xl">{levelInfo.emoji}</span>
+            <div>
+              <div className="text-white/80 text-sm">{t('referral_your_level')}</div>
+              <div className="text-white font-bold text-lg">{levelInfo.name}</div>
             </div>
           </div>
-        )}
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-3">
+              <div className="text-xl font-bold text-white">
+                {referralStats?.total_referrals ?? 0}
+              </div>
+              <div className="text-white/70 text-[11px] mt-0.5">{t('referral_total')}</div>
+            </div>
+            <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-3">
+              <div className="text-xl font-bold text-white">
+                {referralStats?.active_referrals ?? 0}
+              </div>
+              <div className="text-white/70 text-[11px] mt-0.5">{t('referral_active')}</div>
+            </div>
+            <div className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-3">
+              <div className="text-xl font-bold text-white">
+                {referralStats?.total_earnings ?? 0}
+              </div>
+              <div className="text-white/70 text-[11px] mt-0.5">{t('referral_earned')}</div>
+            </div>
+          </div>
+        </div>
 
         {/* Реферальная ссылка */}
         <div
