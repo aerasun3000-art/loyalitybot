@@ -332,7 +332,7 @@ const Services = () => {
     
     const hasPartnersInCategory = services.some(service => {
       // Скрываем конкурентов
-      if (isCompetitor(service, referralPartnerInfo, isPartnerUser)) {
+      if (isCompetitor(service, referralPartnerInfo, isPartnerUser, isPartnerUser ? chatId : null)) {
         return false
       }
       
@@ -430,7 +430,7 @@ const Services = () => {
       
       const hasPartnersInCategory = services.some(service => {
         // Скрываем конкурентов
-        if (isCompetitor(service, referralPartnerInfo, isPartnerUser)) {
+        if (isCompetitor(service, referralPartnerInfo, isPartnerUser, isPartnerUser ? chatId : null)) {
           return false
         }
         
@@ -480,12 +480,12 @@ const Services = () => {
       groups = groups.filter(group => normalizeCategoryCode(group.categoryCode) === canonical)
     }
 
-    // Скрываем конкурентов (кроме партнёра, который добавил клиента)
+    // Скрываем конкурентов: клиенты видят только реферера; партнёры видят себя + реферера
     groups = groups.filter(group => !isCompetitor({
       partner: group.partner,
       partner_chat_id: group.partnerId,
       category: group.categoryCode
-    }, referralPartnerInfo, isPartnerUser))
+    }, referralPartnerInfo, isPartnerUser, isPartnerUser ? chatId : null))
 
     if (filter === 'my_district') {
       // Город: только локальные или гибрид в этом городе (без чисто-онлайн)
@@ -539,6 +539,8 @@ const Services = () => {
     categoryGroupParam,
     partnersMetrics,
     referralPartnerInfo,
+    isPartnerUser,
+    chatId,
     favoritePartnerIdsSet,
     normalizeCategoryCode,
     getCategorySortValue,

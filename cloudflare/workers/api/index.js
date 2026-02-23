@@ -734,6 +734,50 @@ async function getDistrictAvailability(env, city) {
 }
 
 /**
+ * Проверить, может ли амбассадор добавить партнёра («честное продвижение»).
+ * Возвращает { canAdd: boolean, reason: string, message: string }
+ */
+async function canAmbassadorAddPartnerCheck(env, ambassadorChatId, partnerChatId) {
+  if (ambassadorChatId === partnerChatId) {
+    return { canAdd: false, reason: 'self_add_forbidden', message: 'Нельзя добавить себя в магазин.' };
+  }
+
+  const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  const existing = await supabaseRequest(env,
+    `ambassador_partners?ambassador_chat_id=eq.${encodeURIComponent(ambassadorChatId)}&partner_chat_id=eq.${encodeURIComponent(partnerChatId)}&select=id`);
+  if (existing?.length > 0) {
+    return { canAdd: false, reason: 'already_added', message: 'Этот партнёр уже в вашем магазине.' };
+  }
+
+  const amb = await supabaseRequest(env,
+    `ambassadors?chat_id=eq.${encodeURIComponent(ambassadorChatId)}&select=max_partners`);
+  const maxPartners = amb?.[0]?.max_partners ?? 3;
+  const currentCount = await supabaseRequest(env,
+    `ambassador_partners?ambassador_chat_id=eq.${encodeURIComponent(ambassadorChatId)}&select=id`);
+  if ((currentCount?.length ?? 0) >= maxPartners) {
+    return { canAdd: false, reason: 'limit_reached', message: `Достигнут лимит партнёров (${maxPartners}).` };
+  }
+
+  const promoTxns = await supabaseRequest(env,
+    `transactions?client_chat_id=eq.${encodeURIComponent(ambassadorChatId)}&partner_chat_id=eq.${encodeURIComponent(partnerChatId)}&spent_points=gt.0&date_time=gte.${since}&select=id&limit=1`);
+  if (promoTxns?.length > 0) {
+    return { canAdd: true, reason: 'promotion_used', message: 'Отлично! Вы использовали акцию этого партнёра.' };
+  }
+
+  const anyTxns = await supabaseRequest(env,
+    `transactions?client_chat_id=eq.${encodeURIComponent(ambassadorChatId)}&partner_chat_id=eq.${encodeURIComponent(partnerChatId)}&date_time=gte.${since}&select=id&limit=1`);
+  const nps10 = await supabaseRequest(env,
+    `nps_ratings?client_chat_id=eq.${encodeURIComponent(ambassadorChatId)}&partner_chat_id=eq.${encodeURIComponent(partnerChatId)}&rating=eq.10&created_at=gte.${since}&select=id&limit=1`);
+  if (anyTxns?.length > 0 && nps10?.length > 0) {
+    return { canAdd: true, reason: 'client_nps10', message: 'Отлично! Вы были клиентом и поставили оценку 10.' };
+  }
+
+  return { canAdd: false, reason: 'qualification_required',
+    message: 'Чтобы добавить партнёра, воспользуйтесь его акцией или совершите покупку и поставьте оценку 10.' };
+}
+
+/**
  * JSON response helper
  */
 function jsonResponse(data, status = 200) {
@@ -960,6 +1004,35 @@ export default {
         const city = urlParams.get('city') || 'New York';
         const result = await getDistrictAvailability(env, city);
         return jsonResponse(result);
+      }
+
+      // GET /api/ambassador/can-add-partner?ambassador_chat_id=X&partner_chat_id=Y
+      if (path === '/api/ambassador/can-add-partner' && request.method === 'GET') {
+        const ambassadorChatId = url.searchParams.get('ambassador_chat_id');
+        const partnerChatId = url.searchParams.get('partner_chat_id');
+        if (!ambassadorChatId || !partnerChatId) {
+          return jsonResponse({ error: 'Missing parameters' }, 400);
+        }
+        const result = await canAmbassadorAddPartnerCheck(env, ambassadorChatId, partnerChatId);
+        return jsonResponse(result);
+      }
+
+      // POST /api/ambassador/add-partner Body: { ambassador_chat_id, partner_chat_id }
+      if (path === '/api/ambassador/add-partner' && request.method === 'POST') {
+        const body = await request.json();
+        const { ambassador_chat_id, partner_chat_id } = body;
+        if (!ambassador_chat_id || !partner_chat_id) {
+          return jsonResponse({ error: 'Missing parameters' }, 400);
+        }
+        const check = await canAmbassadorAddPartnerCheck(env, ambassador_chat_id, partner_chat_id);
+        if (!check.canAdd) {
+          return jsonResponse(check, 403);
+        }
+        await supabaseRequest(env, 'ambassador_partners', {
+          method: 'POST',
+          body: JSON.stringify({ ambassador_chat_id, partner_chat_id }),
+        });
+        return jsonResponse({ success: true, reason: check.reason });
       }
       
       // Verify tg_auth token for "open in browser" (returns chat_id)

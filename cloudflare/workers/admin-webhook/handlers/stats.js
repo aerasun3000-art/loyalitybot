@@ -15,27 +15,44 @@ import {
 import { getAllPartnerApplications, getAllApprovedPartners } from './partners.js';
 
 /**
- * Handle admin stats (extended version)
+ * Handle admin stats — menu
  */
 export async function handleAdminStats(env, callbackQuery) {
   const chatId = String(callbackQuery.message.chat.id);
-  console.log('[handleAdminStats] Called for chatId:', chatId);
-  
+  const keyboard = [
+    [{ text: '📊 Общая статистика', callback_data: 'stats_general' }],
+    [{ text: '🏅 Тиры пользователей', callback_data: 'stats_tiers' }],
+    [{ text: '🌱 Карма пользователей', callback_data: 'stats_karma' }],
+    [{ text: '◀️  Назад', callback_data: 'back_to_main' }],
+  ];
+  await editMessageText(
+    env.ADMIN_BOT_TOKEN, chatId, callbackQuery.message.message_id,
+    '📊 **Статистика**\n\nВыберите раздел:',
+    keyboard,
+    { parseMode: 'Markdown' }
+  );
+  return { success: true, handled: true, action: 'stats_menu' };
+}
+
+/**
+ * Handle general stats (partners, services, news, ugc, promoters, deals)
+ */
+export async function handleStatsGeneral(env, callbackQuery) {
+  const chatId = String(callbackQuery.message.chat.id);
   try {
     const allApplications = await getAllPartnerApplications(env);
     const allPartners = await getAllApprovedPartners(env);
-    
+
     const totalPartners = allPartners.length;
     const approved = allApplications.filter(p => (p.status || '').toLowerCase() === 'approved').length;
     const pending = allApplications.filter(p => (p.status || 'pending').toLowerCase() === 'pending').length;
-    
-    // Get additional stats
+
     const services = await supabaseRequest(env, 'services?select=approval_status');
     const news = await supabaseRequest(env, 'news?select=is_published');
     const ugc = await supabaseRequest(env, 'ugc_content?select=status');
     const promoters = await supabaseRequest(env, 'promoters?select=id');
     const deals = await supabaseRequest(env, 'partner_deals?select=status');
-    
+
     const servicesTotal = services?.length || 0;
     const servicesPending = services?.filter(s => s.approval_status === 'Pending').length || 0;
     const newsTotal = news?.length || 0;
@@ -45,7 +62,7 @@ export async function handleAdminStats(env, callbackQuery) {
     const promotersTotal = promoters?.length || 0;
     const dealsTotal = deals?.length || 0;
     const dealsPending = deals?.filter(d => d.status === 'pending').length || 0;
-    
+
     const text = (
       '📊 *Расширенная статистика*\n\n' +
       `*ПАРТНЁРЫ:*\n` +
@@ -66,11 +83,11 @@ export async function handleAdminStats(env, callbackQuery) {
       `├─ Всего: ${dealsTotal}\n` +
       `└─ На модерации: ${dealsPending}`
     );
-    
-    const keyboard = [[{ text: '◀️ Назад', callback_data: 'back_to_main' }]];
-    
+
+    const keyboard = [[{ text: '◀️  Назад', callback_data: 'admin_stats' }]];
+
     await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id);
-    
+
     await editMessageText(
       env.ADMIN_BOT_TOKEN,
       chatId,
@@ -79,10 +96,114 @@ export async function handleAdminStats(env, callbackQuery) {
       keyboard,
       { parseMode: 'Markdown' }
     );
-    
-    return { success: true, handled: true, action: 'admin_stats' };
+
+    return { success: true, handled: true, action: 'stats_general' };
   } catch (error) {
-    logError('handleAdminStats', error, { chatId });
+    logError('handleStatsGeneral', error, { chatId });
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка при загрузке статистики', show_alert: true });
+    throw error;
+  }
+}
+
+/**
+ * Handle tiers stats
+ */
+export async function handleStatsTiers(env, callbackQuery) {
+  const chatId = String(callbackQuery.message.chat.id);
+  try {
+    const users = await supabaseRequest(env, 'users?select=tier');
+    const total = users?.length || 0;
+
+    const counts = {
+      bronze: 0,
+      silver: 0,
+      gold: 0,
+      platinum: 0,
+      diamond: 0,
+    };
+    for (const u of users || []) {
+      const t = (u.tier || '').toLowerCase();
+      if (counts[t] !== undefined) counts[t]++;
+    }
+
+    const pct = (n) => total === 0 ? 0 : Math.round(n / total * 100);
+    const text = (
+      '🏅 **ТИРЫ ПОЛЬЗОВАТЕЛЕЙ**\n\n' +
+      `Всего пользователей: ${total}\n\n` +
+      `🥉 Bronze  (<500 баллов):   ${counts.bronze} (${pct(counts.bronze)}%)\n` +
+      `🥈 Silver  (500–1999):       ${counts.silver} (${pct(counts.silver)}%)\n` +
+      `🥇 Gold    (2000–4999):      ${counts.gold} (${pct(counts.gold)}%)\n` +
+      `💎 Platinum (5000–9999):     ${counts.platinum} (${pct(counts.platinum)}%)\n` +
+      `💠 Diamond  (≥10000):        ${counts.diamond} (${pct(counts.diamond)}%)`
+    );
+
+    const keyboard = [[{ text: '◀️  Назад', callback_data: 'admin_stats' }]];
+
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id);
+
+    await editMessageText(
+      env.ADMIN_BOT_TOKEN,
+      chatId,
+      callbackQuery.message.message_id,
+      text,
+      keyboard,
+      { parseMode: 'Markdown' }
+    );
+
+    return { success: true, handled: true, action: 'stats_tiers' };
+  } catch (error) {
+    logError('handleStatsTiers', error, { chatId });
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка при загрузке статистики', show_alert: true });
+    throw error;
+  }
+}
+
+/**
+ * Handle karma stats
+ */
+export async function handleStatsKarma(env, callbackQuery) {
+  const chatId = String(callbackQuery.message.chat.id);
+  try {
+    const users = await supabaseRequest(env, 'users?select=karma_level,karma_score');
+    const total = users?.length || 0;
+
+    const counts = { sprout: 0, reliable: 0, regular: 0, golden: 0 };
+    let sumScore = 0;
+    for (const u of users || []) {
+      const l = (u.karma_level || 'reliable').toLowerCase();
+      if (counts[l] !== undefined) counts[l]++;
+      const s = parseFloat(u.karma_score);
+      if (!isNaN(s)) sumScore += s;
+    }
+
+    const pct = (n) => total === 0 ? 0 : Math.round(n / total * 100);
+    const avg = total === 0 ? '—' : (sumScore / total).toFixed(1);
+    const text = (
+      '🌱 **КАРМА ПОЛЬЗОВАТЕЛЕЙ**\n\n' +
+      `Всего пользователей: ${total}\n\n` +
+      `🌱 Росток   (0–25):   ${counts.sprout} (${pct(counts.sprout)}%)\n` +
+      `🌿 Надёжный (26–50):  ${counts.reliable} (${pct(counts.reliable)}%)\n` +
+      `🌳 Постоянник (51–75): ${counts.regular} (${pct(counts.regular)}%)\n` +
+      `👑 Золотой  (76–100): ${counts.golden} (${pct(counts.golden)}%)\n\n` +
+      `Средний karma_score: ${avg}`
+    );
+
+    const keyboard = [[{ text: '◀️  Назад', callback_data: 'admin_stats' }]];
+
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id);
+
+    await editMessageText(
+      env.ADMIN_BOT_TOKEN,
+      chatId,
+      callbackQuery.message.message_id,
+      text,
+      keyboard,
+      { parseMode: 'Markdown' }
+    );
+
+    return { success: true, handled: true, action: 'stats_karma' };
+  } catch (error) {
+    logError('handleStatsKarma', error, { chatId });
     await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка при загрузке статистики', show_alert: true });
     throw error;
   }

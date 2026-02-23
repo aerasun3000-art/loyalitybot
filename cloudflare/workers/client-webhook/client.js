@@ -28,6 +28,7 @@ import {
   getAmbassadorPartners,
   getAmbassadorEarnings,
   getPartnersForAmbassadorSelection,
+  canAmbassadorAddPartner,
 } from './supabase.js';
 
 /** Return level info based on referral count */
@@ -494,7 +495,9 @@ async function handleAmbassadorCommand(env, chatId) {
   ]);
   keyboard.push([{ text: '✅ Готово', callback_data: 'amb_confirm' }]);
   await sendTelegramMessageWithKeyboard(env.TOKEN_CLIENT, chatId,
-    `🌟 Выберите до ${maxPartners} партнёров, которых будете продвигать:\n\nНажмите на партнёра, чтобы добавить. Затем «Готово».`,
+    `🌟 Выберите до ${maxPartners} партнёров, которых будете продвигать:\n\n` +
+    `⚠️  <b>Честное продвижение:</b> добавить можно только партнёров, у которых вы были клиентом (акция или покупка + оценка 10) за последние 12 месяцев.\n\n` +
+    `Нажмите на партнёра, чтобы добавить. Затем «Готово».`,
     keyboard,
     { parseMode: 'HTML' }
   );
@@ -552,7 +555,9 @@ export async function handleAmbassador(env, update) {
       keyboard.push([{ text: '✅ Готово', callback_data: 'amb_confirm' }]);
       await editMessageText(
         env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
-        `🌟 Выберите до ${maxPartners} партнёров, которых будете продвигать:\n\nНажмите на партнёра, чтобы добавить. Затем «Готово».`,
+        `🌟 Выберите до ${maxPartners} партнёров, которых будете продвигать:\n\n` +
+        `⚠️  <b>Честное продвижение:</b> добавить можно только партнёров, у которых вы были клиентом (акция или покупка + оценка 10) за последние 12 месяцев.\n\n` +
+        `Нажмите на партнёра, чтобы добавить. Затем «Готово».`,
         { parseMode: 'HTML', reply_markup: { inline_keyboard: keyboard } }
       );
       return { success: true };
@@ -569,20 +574,49 @@ export async function handleAmbassador(env, update) {
         );
         return { success: true };
       }
+
+      const addedPartners = [];
+      const rejectedPartners = [];
+      for (const pid of selectedPartners) {
+        const check = await canAmbassadorAddPartner(env, chatId, pid);
+        if (check.canAdd) {
+          addedPartners.push(pid);
+        } else {
+          rejectedPartners.push({ pid, reason: check.reason, message: check.message });
+        }
+      }
+
+      if (addedPartners.length === 0) {
+        const firstRejection = rejectedPartners[0];
+        await editMessageText(
+          env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+          `❌ <b>Партнёры не добавлены</b>\n\n${firstRejection.message}\n\n` +
+          `Условия для добавления партнёра:\n` +
+          `• Воспользуйтесь акцией партнёра (оплата баллами)\n` +
+          `• ИЛИ совершите покупку и поставьте оценку 10`,
+          { parseMode: 'HTML' }
+        );
+        return { success: true };
+      }
+
       const created = await createAmbassador(env, chatId, tierAtSignup);
       const ambRow = Array.isArray(created) ? created[0] : created;
       const ambassadorCode = ambRow?.ambassador_code || 'amb_unknown';
-      for (const pid of selectedPartners) {
+      const botUsername = (env.CLIENT_BOT_USERNAME || 'mindbeatybot').replace('@', '');
+
+      for (const pid of addedPartners) {
         await addAmbassadorPartner(env, chatId, pid).catch(() => {});
       }
+
       await clearBotState(env, chatId);
-      const botUsername = (env.CLIENT_BOT_USERNAME || 'mindbeatybot').replace('@', '');
-      const link = `https://t.me/${botUsername}?start=${ambassadorCode}`;
+      let resultMsg = `✅ <b>Добавлено партнёров: ${addedPartners.length}</b>\n\n`;
+      if (rejectedPartners.length > 0) {
+        resultMsg += `⚠️  Не добавлено: ${rejectedPartners.length} (не выполнены условия «честного продвижения»)\n\n`;
+      }
+      resultMsg += `🔗 Ваша ссылка: <code>https://t.me/${botUsername}?start=${ambassadorCode}</code>`;
       await editMessageText(
         env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
-        `✅ Вы зарегистрированы как амбассадор!\n\n` +
-        `🔗 Ваша ссылка:\n<code>${link}</code>\n\n` +
-        `Делитесь ссылкой — получайте % с покупок привлечённых клиентов.`,
+        resultMsg,
         { parseMode: 'HTML' }
       );
       return { success: true };

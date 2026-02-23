@@ -58,6 +58,51 @@ export const getClientBalance = async (chatId) => {
   return data || { balance: 0, name: '', status: 'inactive' }
 }
 
+export const getClientKarma = async (chatId) => {
+  if (!chatId) return { karmaScore: 50, karmaLevel: 'reliable' }
+
+  const [
+    { data: userData },
+    { data: npsData },
+    { data: referralData },
+  ] = await Promise.all([
+    supabase.from('users').select('karma_score, karma_level').eq('chat_id', chatId).maybeSingle(),
+    supabase.from('nps_ratings').select('rating').eq('client_chat_id', chatId),
+    supabase.from('referral_tree').select('total_transactions').eq('referrer_chat_id', chatId).gt('total_transactions', 0),
+  ])
+
+  let score = 50
+
+  if (npsData) {
+    for (const { rating } of npsData) {
+      if (rating >= 9) score += 15
+      else if (rating >= 7) score += 5
+      else if (rating <= 6) score -= 10
+    }
+  }
+
+  if (referralData) {
+    score += referralData.length * 25
+  }
+
+  score = Math.max(0, Math.min(100, score))
+
+  let level = 'sprout'
+  if (score > 75) level = 'golden'
+  else if (score > 50) level = 'regular'
+  else if (score > 25) level = 'reliable'
+
+  if (userData && (userData.karma_score !== score || userData.karma_level !== level)) {
+    supabase
+      .from('users')
+      .update({ karma_score: score, karma_level: level })
+      .eq('chat_id', chatId)
+      .then(() => {})
+  }
+
+  return { karmaScore: score, karmaLevel: level }
+}
+
 /**
  * Проверить, что пользователь уже закрыл онбординг («Больше не показывать»)
  * @param {string} chatId - Chat ID пользователя

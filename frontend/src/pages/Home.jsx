@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTelegramUser, getChatId, hapticFeedback, openTelegramLink } from '../utils/telegram'
 import QRCode from 'qrcode'
-import { getClientBalance, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage, getReferralPartnerInfo, getReferralStats, getOrCreateReferralCode, getOnboardingSeen, setOnboardingSeen, isApprovedPartner } from '../services/supabase'
+import { getClientBalance, getClientKarma, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage, getReferralPartnerInfo, getReferralStats, getOrCreateReferralCode, getOnboardingSeen, setOnboardingSeen, isApprovedPartner } from '../services/supabase'
 import { getServiceIcon, getMainPageCategories, getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
 import { filterCompetitors } from '../utils/categoryHelpers'
 import { useTranslation, translateDynamicContent, declinePoints } from '../utils/i18n'
@@ -26,6 +26,7 @@ import Toast from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 import Layout from '../components/Layout'
 import LoyaltyCard from '../components/LoyaltyCard'
+import KarmaIndicator from '../components/KarmaIndicator'
 import CategoryGridNeo, { buildCategoriesFromServiceTiles } from '../components/CategoryGridNeo'
 import NewsCarouselNeo from '../components/NewsCarouselNeo'
 // BottomNav теперь глобально в App.jsx
@@ -125,6 +126,8 @@ const Home = () => {
   const [showQrModal, setShowQrModal] = useState(false)
   const [qrImage, setQrImage] = useState(null)
   const [qrLoading, setQrLoading] = useState(false)
+  const [karmaScore, setKarmaScore] = useState(50)
+  const [karmaLevel, setKarmaLevel] = useState('reliable')
   const carouselRef = useRef(null)
   const isScrollingRef = useRef(false)
 
@@ -316,17 +319,19 @@ const Home = () => {
       ])
       setReferralPartnerInfo(partnerInfo)
       
-      // Загружаем данные параллельно
-      const [balanceData, promotionsData, servicesData, newsData, popularCats] = await Promise.all([
+      const [balanceData, karmaData, promotionsData, servicesData, newsData, popularCats] = await Promise.all([
         getClientBalance(chatId),
+        getClientKarma(chatId).catch(() => ({ karmaScore: 50, karmaLevel: 'reliable' })),
         getActivePromotions(),
         getApprovedServices(),
         getPublishedNews(),
-        getClientPopularCategories(chatId).catch(() => null) // Получаем персональные категории
+        getClientPopularCategories(chatId).catch(() => null)
       ])
       
       setBalance(balanceData?.balance || 0)
       setUserName(balanceData?.name || user?.first_name || t('profile_guest'))
+      setKarmaScore(karmaData?.karmaScore ?? 50)
+      setKarmaLevel(karmaData?.karmaLevel ?? 'reliable')
       setPromotions(promotionsData.slice(0, 5))
       setNews(newsData.slice(0, 5))
       
@@ -337,8 +342,8 @@ const Home = () => {
       }
       setPopularCategories(categories || [])
       
-      // Фильтруем конкурентов перед сортировкой (для партнёров ограничения не применяем — показываем все услуги)
-      const filteredServices = filterCompetitors(servicesData, isPartnerUser ? null : partnerInfo)
+      // Фильтруем конкурентов: клиенты видят только реферера в его категории; партнёры видят себя + реферера
+      const filteredServices = filterCompetitors(servicesData, partnerInfo, isPartnerUser, isPartnerUser ? chatId : null)
       
       // Сортируем услуги по популярности категорий
       const sortedServices = sortServicesByPopularity(filteredServices, categories)
@@ -773,6 +778,9 @@ const Home = () => {
             t={t}
             lang={language}
           />
+          <div className="rounded-xl p-4 shadow-sm" style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}>
+            <KarmaIndicator karmaScore={karmaScore} karmaLevel={karmaLevel} />
+          </div>
           <QuickActions
             onScanQr={handleShowQr}
             onInvite={() => { hapticFeedback('light'); navigate('/community') }}

@@ -21,6 +21,8 @@ import * as promoters from './handlers/promoters.js';
 import * as leaderboard from './handlers/leaderboard.js';
 import * as mlm from './handlers/mlm.js';
 import * as b2b from './handlers/b2b.js';
+import * as ambassadors from './handlers/ambassadors.js';
+import * as refCommissions from './handlers/referral_commissions.js';
 
 /**
  * Check if user is admin
@@ -59,6 +61,12 @@ export async function showMainMenu(env, chatId) {
       [
         { text: '💎 MLM Revenue Share', callback_data: 'admin_mlm' },
         { text: '🤝 B2B Сделки', callback_data: 'admin_b2b_deals' },
+      ],
+      [
+        { text: '🌟 Амбассадоры', callback_data: 'admin_ambassadors' },
+      ],
+      [
+        { text: '💳 Реф. комиссии', callback_data: 'admin_ref_commissions' },
       ],
       [
         { text: '📈 Дашборд', callback_data: 'admin_dashboard' },
@@ -278,6 +286,15 @@ export async function handleCallbackQuery(env, update) {
     if (data === 'admin_stats') {
       return await stats.handleAdminStats(env, callbackQuery);
     }
+    if (data === 'stats_general') {
+      return await stats.handleStatsGeneral(env, callbackQuery);
+    }
+    if (data === 'stats_tiers') {
+      return await stats.handleStatsTiers(env, callbackQuery);
+    }
+    if (data === 'stats_karma') {
+      return await stats.handleStatsKarma(env, callbackQuery);
+    }
     if (data === 'admin_dashboard') {
       return await stats.handleDashboard(env, callbackQuery);
     }
@@ -420,6 +437,76 @@ export async function handleCallbackQuery(env, update) {
       const dealId = data.replace('b2b_reject_', '');
       return await b2b.handleDealAction(env, callbackQuery, dealId, 'reject');
     }
+
+    // Ambassadors
+    if (data === 'admin_ambassadors') {
+      return await ambassadors.handleAmbassadorsMenu(env, callbackQuery);
+    }
+    if (data === 'admin_amb_list') {
+      return await ambassadors.handleAmbassadorsList(env, callbackQuery);
+    }
+    if (data === 'admin_amb_pending_payout') {
+      return await ambassadors.handlePendingPayouts(env, callbackQuery);
+    }
+    if (data.startsWith('amb_detail_')) {
+      const ambassadorChatId = data.replace('amb_detail_', '');
+      return await ambassadors.handleAmbassadorDetail(env, callbackQuery, ambassadorChatId);
+    }
+    if (data.startsWith('amb_payout_confirm_')) {
+      const ambassadorChatId = data.replace('amb_payout_confirm_', '');
+      return await ambassadors.handleAmbassadorPayoutConfirm(env, callbackQuery, ambassadorChatId);
+    }
+    if (data.startsWith('amb_payout_')) {
+      const ambassadorChatId = data.replace('amb_payout_', '');
+      return await ambassadors.handleAmbassadorPayout(env, callbackQuery, ambassadorChatId);
+    }
+    if (data.startsWith('amb_set_limit_')) {
+      const ambassadorChatId = data.replace('amb_set_limit_', '');
+      return await ambassadors.handleAmbassadorSetLimit(env, callbackQuery, ambassadorChatId);
+    }
+    if (data.startsWith('amb_suspend_')) {
+      const ambassadorChatId = data.replace('amb_suspend_', '');
+      return await ambassadors.handleAmbassadorToggleStatus(env, callbackQuery, ambassadorChatId, 'suspended');
+    }
+    if (data.startsWith('amb_activate_')) {
+      const ambassadorChatId = data.replace('amb_activate_', '');
+      return await ambassadors.handleAmbassadorToggleStatus(env, callbackQuery, ambassadorChatId, 'active');
+    }
+
+    // Referral Commissions
+    if (data === 'admin_ref_commissions') {
+      return await refCommissions.handleRefCommissionsMenu(env, callbackQuery);
+    }
+    if (data === 'ref_comm_stats') {
+      return await refCommissions.handleRefCommissionsStats(env, callbackQuery);
+    }
+    if (data === 'ref_comm_pending') {
+      return await refCommissions.handleRefCommissionsPending(env, callbackQuery);
+    }
+    if (data === 'ref_comm_failed') {
+      return await refCommissions.handleRefCommissionsFailed(env, callbackQuery);
+    }
+    if (data === 'ref_comm_search') {
+      return await refCommissions.handleRefCommissionSearch(env, callbackQuery);
+    }
+    if (data.startsWith('ref_pay_single_')) {
+      const rewardId = data.replace('ref_pay_single_', '');
+      return await refCommissions.handleRefCommissionPaySingle(env, callbackQuery, rewardId);
+    }
+    if (data.startsWith('ref_pay_confirm_')) {
+      const rewardId = data.replace('ref_pay_confirm_', '');
+      return await refCommissions.handleRefCommissionPayConfirm(env, callbackQuery, rewardId);
+    }
+    if (data === 'ref_pay_all_pending') {
+      return await refCommissions.handleRefCommissionPayAllPending(env, callbackQuery);
+    }
+    if (data === 'ref_pay_all_confirm') {
+      return await refCommissions.handleRefCommissionPayAllConfirm(env, callbackQuery);
+    }
+    if (data.startsWith('ref_retry_')) {
+      const rewardId = data.replace('ref_retry_', '');
+      return await refCommissions.handleRefCommissionRetry(env, callbackQuery, rewardId);
+    }
     
     // Default: show main menu
     await showMainMenu(env, chatId);
@@ -477,6 +564,12 @@ export async function routeUpdate(env, update) {
           }
           if (state.state.startsWith('mlm_')) {
             return await mlm.handleMessage(env, update, state.data);
+          }
+          if (state.state.startsWith('amb_')) {
+            return await ambassadors.handleMessage(env, update, state.data);
+          }
+          if (state.state.startsWith('ref_comm_')) {
+            return await refCommissions.handleMessage(env, update, state.data);
           }
         }
       }

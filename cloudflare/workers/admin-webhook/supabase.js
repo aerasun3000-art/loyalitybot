@@ -721,3 +721,51 @@ export async function updateDealStatus(env, id, status) {
     throw error;
   }
 }
+
+/** Get all ambassadors with optional filter */
+export async function getAmbassadors(env, filter = '') {
+  const query = filter
+    ? `ambassadors?${filter}&select=*&order=total_earnings.desc`
+    : `ambassadors?select=*&order=total_earnings.desc`;
+  const result = await supabaseRequest(env, query);
+  return result || [];
+}
+
+/** Get ambassador by chat_id */
+export async function getAmbassadorByChatId(env, chatId) {
+  const result = await supabaseRequest(env, `ambassadors?chat_id=eq.${chatId}&select=*`);
+  return result && result.length > 0 ? result[0] : null;
+}
+
+/** Get partners of ambassador */
+export async function getAmbassadorPartners(env, ambassadorChatId) {
+  const result = await supabaseRequest(env,
+    `ambassador_partners?ambassador_chat_id=eq.${ambassadorChatId}&select=partner_chat_id,created_at`);
+  return result || [];
+}
+
+/** Update ambassador fields */
+export async function updateAmbassador(env, chatId, data) {
+  const result = await supabaseRequest(env, `ambassadors?chat_id=eq.${chatId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+  return result && result.length > 0;
+}
+
+/** Get referral rewards/commissions with filter */
+export async function getRefCommissions(env, filter = '') {
+  const qs = filter ? `&${filter}` : '';
+  const result = await supabaseRequest(env,
+    `referral_rewards?reward_type=in.(commission_l1,commission_l2,commission_l3)${qs}&order=created_at.desc`);
+  return result || [];
+}
+
+/** Update referral reward status */
+export async function updateRefRewardStatus(env, id, status) {
+  const result = await supabaseRequest(env, `referral_rewards?id=eq.${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+  return result && result.length > 0;
+}

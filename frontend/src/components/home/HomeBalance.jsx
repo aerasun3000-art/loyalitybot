@@ -1,6 +1,6 @@
-import LoyaltyProgress from '../LoyaltyProgress'
+import KarmaIndicator from '../KarmaIndicator'
 
-const HomeBalance = ({ balance, pointsToNextReward, language, t, navigate, declinePoints }) => {
+const HomeBalance = ({ balance, pointsToNextReward, language, t, navigate, declinePoints, karmaScore = 50, karmaLevel = 'reliable' }) => {
   return (
     <div className="rounded-xl p-4 shadow-sm"
       style={{ backgroundColor: 'var(--tg-theme-secondary-bg-color)' }}
@@ -39,8 +39,7 @@ const HomeBalance = ({ balance, pointsToNextReward, language, t, navigate, decli
         </button>
       </div>
 
-      {/* Прогресс-бар статуса лояльности */}
-      <LoyaltyProgress balance={balance} />
+      <KarmaIndicator karmaScore={karmaScore} karmaLevel={karmaLevel} />
 
       <p className="text-xs mt-3" style={{ color: 'var(--tg-theme-hint-color)' }}>
         {t('home_balance_slogan')}
