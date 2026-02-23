@@ -2712,15 +2712,22 @@ export async function handleCallback(env, update) {
       if (botState?.state === 'awaiting_promo_tier' && botState.data) {
         const tierVal = callbackData.replace('promo_tier_', '');
         if (tierVal === 'all') {
+          const partnerStatus = await checkPartnerStatus(env, chatId);
+          if (partnerStatus.status !== 'Approved') {
+            await clearBotState(env, chatId);
+            await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
+              '❌ Акции могут создавать только одобренные партнёры. Ваша заявка ещё на рассмотрении.'
+            );
+            return { success: false };
+          }
           const promoData = {
-            partner_chat_id: chatId,
+            partner_chat_id: String(chatId),
             title: botState.data.title,
             description: botState.data.description,
             discount_value: botState.data.discount_value,
             end_date: botState.data.end_date,
             is_active: true,
             promotion_type: 'discount',
-            min_tier: null,
             tier_visibility: 'all',
           };
           try {
@@ -2733,9 +2740,13 @@ export async function handleCallback(env, update) {
             );
             return await handlePromotionsMenu(env, chatId);
           } catch (err) {
-            console.error('[promo_tier_all]', err);
+            console.error('[promo_tier_all]', err?.message || err, err);
             await clearBotState(env, chatId);
-            await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.');
+            const errMsg = (err?.message || '').toLowerCase();
+            const hint = errMsg.includes('foreign key') || errMsg.includes('violates')
+              ? '\n\nВозможно, партнёр не найден в системе. Обратитесь к администратору.'
+              : '';
+            await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.' + hint);
             return { success: false };
           }
         }
@@ -2761,8 +2772,16 @@ export async function handleCallback(env, update) {
       const botState = await getBotState(env, chatId);
       if (botState?.state === 'awaiting_promo_visibility' && botState.data?.promo_min_tier) {
         const visVal = callbackData.replace('promo_vis_', '');
+        const partnerStatus = await checkPartnerStatus(env, chatId);
+        if (partnerStatus.status !== 'Approved') {
+          await clearBotState(env, chatId);
+          await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
+            '❌ Акции могут создавать только одобренные партнёры. Ваша заявка ещё на рассмотрении.'
+          );
+          return { success: false };
+        }
         const promoData = {
-          partner_chat_id: chatId,
+          partner_chat_id: String(chatId),
           title: botState.data.title,
           description: botState.data.description,
           discount_value: botState.data.discount_value,
@@ -2782,9 +2801,13 @@ export async function handleCallback(env, update) {
           );
           return await handlePromotionsMenu(env, chatId);
         } catch (err) {
-          console.error('[promo_vis]', err);
+          console.error('[promo_vis]', err?.message || err, err);
           await clearBotState(env, chatId);
-          await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.');
+          const errMsg = (err?.message || '').toLowerCase();
+          const hint = errMsg.includes('foreign key') || errMsg.includes('violates')
+            ? '\n\nВозможно, партнёр не найден в системе. Обратитесь к администратору.'
+            : '';
+          await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.' + hint);
           return { success: false };
         }
       }
