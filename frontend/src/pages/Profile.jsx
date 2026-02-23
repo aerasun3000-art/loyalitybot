@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getClientAnalytics, isApprovedPartner, getReferralStats, getOrCreateReferralCode, updateUserCurrency } from '../services/supabase'
-import { getTelegramUser, getChatId, hapticFeedback, closeApp, openTelegramLink } from '../utils/telegram'
+import { getTelegramUser, getChatId, getStoredChatId, hapticFeedback, closeApp, openTelegramLink } from '../utils/telegram'
 import { useTranslation } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
 import useCurrencyStore from '../store/currencyStore'
@@ -75,7 +75,12 @@ const Profile = () => {
 
   const handleOpenDashboard = () => {
     hapticFeedback('medium')
-    navigate(`/partner/analytics?partner_id=${chatId}`)
+    const id = chatId || getStoredChatId()
+    if (!id) {
+      console.error('[Profile] Cannot open dashboard: chatId not available')
+      return
+    }
+    navigate(`/partner/analytics?partner_id=${id}`)
   }
 
   const handleCurrencySelect = async (currencyCode) => {

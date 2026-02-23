@@ -103,8 +103,14 @@
           // Перезагружаем только если это Telegram Web App
           if (window.Telegram?.WebApp) {
             setTimeout(function() {
-              var url = window.location.href.split('?')[0]
-              window.location.href = url + '?v=' + Date.now() + '&_reload=1&_v12=1&_buttons_removed=1&_nocache=' + Date.now()
+              var base = window.location.href.split('?')[0]
+              var params = new URLSearchParams(window.location.search)
+              var partnerId = params.get('partner_id')
+              var tgAuth = params.get('tg_auth')
+              var q = 'v=' + Date.now() + '&_reload=1&_v12=1&_buttons_removed=1&_nocache=' + Date.now()
+              if (partnerId) q += '&partner_id=' + encodeURIComponent(partnerId)
+              if (tgAuth) q += '&tg_auth=' + encodeURIComponent(tgAuth)
+              window.location.href = base + '?' + q
             }, 100)
           }
         }
