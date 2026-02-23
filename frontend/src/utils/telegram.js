@@ -8,6 +8,7 @@ export const getTelegramWebApp = () => {
 }
 
 const STORAGE_KEY = 'loyality_chat_id'
+const STORAGE_NAME_KEY = 'loyality_user_name'
 
 // Получить Chat ID из sessionStorage (для "В браузере" с tg_auth)
 export const getStoredChatId = () => {
@@ -26,12 +27,29 @@ export const setStoredChatId = (chatId) => {
   } catch {}
 }
 
+// Сохранить имя пользователя (из API verify при "В браузере")
+export const setStoredUserName = (name) => {
+  try {
+    if (name) sessionStorage.setItem(STORAGE_NAME_KEY, String(name))
+    else sessionStorage.removeItem(STORAGE_NAME_KEY)
+  } catch {}
+}
+
+// Получить сохранённое имя пользователя
+export const getStoredUserName = () => {
+  try {
+    return sessionStorage.getItem(STORAGE_NAME_KEY) || null
+  } catch {
+    return null
+  }
+}
+
 // Получить данные пользователя из Telegram
 export const getTelegramUser = () => {
   const tg = getTelegramWebApp()
   if (tg?.initDataUnsafe?.user) return tg.initDataUnsafe.user
   const stored = getStoredChatId()
-  if (stored) return { id: parseInt(stored, 10), first_name: null, username: null }
+  if (stored) return { id: parseInt(stored, 10), first_name: getStoredUserName(), username: null }
   return null
 }
 

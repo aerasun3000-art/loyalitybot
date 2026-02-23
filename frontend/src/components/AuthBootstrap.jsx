@@ -3,7 +3,7 @@
  * Вызывает API для верификации, сохраняет chat_id в sessionStorage.
  */
 import { useState, useEffect } from 'react'
-import { setStoredChatId, getTelegramWebApp } from '../utils/telegram'
+import { setStoredChatId, setStoredUserName, getTelegramWebApp } from '../utils/telegram'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -39,6 +39,7 @@ export default function AuthBootstrap({ children }) {
         }
         if (data.chat_id) {
           setStoredChatId(data.chat_id)
+          if (data.name) setStoredUserName(data.name)
           const url = new URL(window.location.href)
           url.searchParams.delete('tg_auth')
           window.history.replaceState({}, '', url.toString())

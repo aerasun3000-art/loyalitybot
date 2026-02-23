@@ -3,7 +3,7 @@
  * Handles API requests for transactions, balance, and other operations
  */
 
-import { supabaseRequest, getUserByChatId, getPartnerByChatId, getAmbassadorChatIdByCode, isPartnerInAmbassadorList, createAmbassadorEarning, attributeTransactionToAmbassador } from './supabase.js';
+import { supabaseRequest, getUserByChatId, getPartnerByChatId, getAmbassadorChatIdByCode, isPartnerInAmbassadorList, createAmbassadorEarning, attributeTransactionToAmbassador, recalculateKarma } from './supabase.js';
 import { logError } from './common.js';
 
 /**
@@ -233,6 +233,9 @@ async function executeTransaction(env, clientChatId, partnerChatId, txnType, raw
         console.error('[executeTransaction] cashback deposit deduction failed:', e);
       }
     }
+
+    // Пересчёт кармы (fire-and-forget, не блокирует ответ)
+    recalculateKarma(env, clientChatId).catch(() => {});
 
     return {
       success: true,
@@ -856,7 +859,21 @@ export default {
             error: 'Сумма должна быть больше 0',
           }, 400);
         }
-        
+
+        if (!Number.isFinite(Number(amount))) {
+          return jsonResponse({
+            success: false,
+            error: 'Сумма должна быть числом',
+          }, 400);
+        }
+
+        if (Number(amount) > 1_000_000) {
+          return jsonResponse({
+            success: false,
+            error: 'Сумма не может превышать 1 000 000',
+          }, 400);
+        }
+
         const result = await executeTransaction(
           env,
           client_chat_id,
@@ -1075,7 +1092,8 @@ export default {
           if (!valid) {
             return jsonResponse({ error: 'Invalid signature' }, 400);
           }
-          return jsonResponse({ chat_id: chatId });
+          const user = await getUserByChatId(env, chatId);
+          return jsonResponse({ chat_id: chatId, name: user?.name || null });
         } catch (err) {
           logError('auth/verify', err, {});
           return jsonResponse({ error: 'Verification failed' }, 400);
