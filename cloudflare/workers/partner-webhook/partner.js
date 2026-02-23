@@ -2709,9 +2709,15 @@ export async function handleCallback(env, update) {
     // Tier selection during promo creation
     if (callbackData.startsWith('promo_tier_')) {
       const botState = await getBotState(env, chatId);
-      if (botState?.state === 'awaiting_promo_tier' && botState.data) {
-        const tierVal = callbackData.replace('promo_tier_', '');
-        if (tierVal === 'all') {
+      if (botState?.state !== 'awaiting_promo_tier' || !botState.data) {
+        await clearBotState(env, chatId);
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
+          '❌ Сессия создания акции истекла. Начните создание заново.'
+        );
+        return await handlePromotionsMenu(env, chatId);
+      }
+      const tierVal = callbackData.replace('promo_tier_', '');
+      if (tierVal === 'all') {
           const partnerStatus = await checkPartnerStatus(env, chatId);
           if (partnerStatus.status !== 'Approved') {
             await clearBotState(env, chatId);
@@ -2750,22 +2756,21 @@ export async function handleCallback(env, update) {
             return { success: false };
           }
         }
-        // Specific tier: ask visibility
-        await setBotState(env, chatId, 'awaiting_promo_visibility', {
-          ...botState.data,
-          promo_min_tier: tierVal,
-        });
-        const visKeyboard = [
-          [{ text: '👁 Видна всем (с замком)', callback_data: 'promo_vis_all' }],
-          [{ text: '🔒 Только для выбранного уровня', callback_data: 'promo_vis_tier_only' }],
-        ];
-        await sendTelegramMessageWithKeyboard(env.TOKEN_PARTNER, chatId,
-          '✍️ <b>Создание акции (Шаг 6 из 6):</b>\n\n6. Видимость акции:',
-          visKeyboard,
-          { parseMode: 'HTML' }
-        );
-        return { success: true, handled: true };
-      }
+      // Specific tier: ask visibility
+      await setBotState(env, chatId, 'awaiting_promo_visibility', {
+        ...botState.data,
+        promo_min_tier: tierVal,
+      });
+      const visKeyboard = [
+        [{ text: '👁 Видна всем (с замком)', callback_data: 'promo_vis_all' }],
+        [{ text: '🔒 Только для выбранного уровня', callback_data: 'promo_vis_tier_only' }],
+      ];
+      await sendTelegramMessageWithKeyboard(env.TOKEN_PARTNER, chatId,
+        '✍️ <b>Создание акции (Шаг 6 из 6):</b>\n\n6. Видимость акции:',
+        visKeyboard,
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
     }
 
     if (callbackData.startsWith('promo_vis_')) {
