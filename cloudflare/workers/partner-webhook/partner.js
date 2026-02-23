@@ -2749,9 +2749,12 @@ export async function handleCallback(env, update) {
             console.error('[promo_tier_all]', err?.message || err, err);
             await clearBotState(env, chatId);
             const errMsg = (err?.message || '').toLowerCase();
-            const hint = errMsg.includes('foreign key') || errMsg.includes('violates')
-              ? '\n\nВозможно, партнёр не найден в системе. Обратитесь к администратору.'
-              : '';
+            let hint = '';
+            if (errMsg.includes('foreign key') || errMsg.includes('violates')) {
+              hint = '\n\nВозможно, партнёр не найден в системе. Обратитесь к администратору.';
+            } else if (errMsg.includes('min_tier') || errMsg.includes('tier_visibility') || errMsg.includes('migration_required') || (errMsg.includes('column') && errMsg.includes('does not exist'))) {
+              hint = '\n\nВыполните миграцию add_tier_to_promotions в Supabase SQL Editor.';
+            }
             await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.' + hint);
             return { success: false };
           }
@@ -2775,7 +2778,14 @@ export async function handleCallback(env, update) {
 
     if (callbackData.startsWith('promo_vis_')) {
       const botState = await getBotState(env, chatId);
-      if (botState?.state === 'awaiting_promo_visibility' && botState.data?.promo_min_tier) {
+      if (botState?.state !== 'awaiting_promo_visibility' || !botState.data?.promo_min_tier) {
+        await clearBotState(env, chatId);
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
+          '❌ Сессия создания акции истекла. Начните создание заново.'
+        );
+        return await handlePromotionsMenu(env, chatId);
+      }
+      {
         const visVal = callbackData.replace('promo_vis_', '');
         const partnerStatus = await checkPartnerStatus(env, chatId);
         if (partnerStatus.status !== 'Approved') {
@@ -2809,9 +2819,12 @@ export async function handleCallback(env, update) {
           console.error('[promo_vis]', err?.message || err, err);
           await clearBotState(env, chatId);
           const errMsg = (err?.message || '').toLowerCase();
-          const hint = errMsg.includes('foreign key') || errMsg.includes('violates')
-            ? '\n\nВозможно, партнёр не найден в системе. Обратитесь к администратору.'
-            : '';
+          let hint = '';
+          if (errMsg.includes('foreign key') || errMsg.includes('violates')) {
+            hint = '\n\nВозможно, партнёр не найден в системе. Обратитесь к администратору.';
+          } else if (errMsg.includes('min_tier') || errMsg.includes('tier_visibility') || errMsg.includes('migration_required') || (errMsg.includes('column') && errMsg.includes('does not exist'))) {
+            hint = '\n\nВыполните миграцию add_tier_to_promotions в Supabase SQL Editor.';
+          }
           await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.' + hint);
           return { success: false };
         }

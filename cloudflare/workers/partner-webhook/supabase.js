@@ -610,7 +610,7 @@ export async function addPromotion(env, promotionData) {
     console.log('[addPromotion] Result:', JSON.stringify(finalResult));
     return finalResult;
   } catch (error) {
-    console.error('[addPromotion] Error:', error);
+    console.error('[addPromotion] Error:', error?.message || error);
     throw error;
   }
 }
