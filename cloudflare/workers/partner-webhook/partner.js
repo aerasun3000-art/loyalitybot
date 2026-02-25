@@ -4015,7 +4015,7 @@ export async function handleStateBasedMessage(env, update, botState) {
     
     // ==================== PROMOTION CREATION STATES ====================
     
-    if (state === 'awaiting_promo_tier' || state === 'awaiting_promo_visibility') {
+    if (state === 'awaiting_promo_tier' || state === 'awaiting_promo_visibility' || state === 'awaiting_promo_audience') {
       await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '👆 Выберите вариант кнопкой выше.');
       return { success: true, handled: true };
     }
