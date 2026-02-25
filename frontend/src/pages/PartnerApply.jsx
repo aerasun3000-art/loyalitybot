@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { createPartnerApplication } from '../services/supabase'
+import { createPartnerApplication, getAvailableCities, submitCityRequest } from '../services/supabase'
 import { getChatId, hapticFeedback, getTelegramUser, getStartParam } from '../utils/telegram'
 import { getPartnerCitiesList, getDistrictsByCity, isOnlineService } from '../utils/locations'
 import { getCategoriesByGroup } from '../utils/serviceIcons'
@@ -31,7 +31,10 @@ const PartnerApply = () => {
     referralCommissionPercent: 10 // Процент комиссии системе за реферала
   })
   const [errors, setErrors] = useState({})
-  const [cities] = useState(getPartnerCitiesList())
+  const [cities, setCities] = useState([])
+  const [showCityInput, setShowCityInput] = useState(false)
+  const [customCity, setCustomCity] = useState('')
+  const [cityRequestSent, setCityRequestSent] = useState(false)
   const [districts, setDistricts] = useState([])
   const [showSuccess, setShowSuccess] = useState(false)
   const serviceCategories = getCategoriesByGroup(formData.categoryGroup)
@@ -49,6 +52,23 @@ const PartnerApply = () => {
         console.log('📎 Обнаружен пригласивший партнер:', referrerChatId)
       }
     }
+  }, [])
+
+  useEffect(() => {
+    const loadCities = async () => {
+      const dbCities = await getAvailableCities()
+      const staticCities = getPartnerCitiesList()
+      const dbNames = new Set(dbCities)
+      const merged = [
+        ...dbCities.map(name => {
+          const staticMatch = staticCities.find(c => c.value === name)
+          return staticMatch || { value: name, label: name }
+        }),
+        ...staticCities.filter(c => !dbNames.has(c.value)),
+      ]
+      setCities(merged)
+    }
+    loadCities()
   }, [])
 
   useEffect(() => {
@@ -99,13 +119,35 @@ const PartnerApply = () => {
 
   const handleCityChange = (e) => {
     const city = e.target.value
+    if (city === '__request__') {
+      setShowCityInput(true)
+      setFormData(prev => ({ ...prev, city: '', district: '' }))
+      return
+    }
+    setShowCityInput(false)
     setFormData(prev => ({
       ...prev,
       city,
-      district: '' // Сбрасываем район при смене города
+      district: ''
     }))
     if (errors.city) {
       setErrors(prev => ({ ...prev, city: '' }))
+    }
+  }
+
+  const handleCityRequest = async () => {
+    if (!customCity.trim()) return
+    try {
+      await submitCityRequest({
+        chatId,
+        cityName: customCity,
+        requesterName: formData.name || user?.first_name || null,
+      })
+      setCityRequestSent(true)
+      setShowCityInput(false)
+      setCustomCity('')
+    } catch (err) {
+      console.error('City request error:', err)
     }
   }
 
@@ -517,24 +559,53 @@ const PartnerApply = () => {
               <label className="block font-semibold mb-2" style={{ color: 'var(--tg-theme-text-color)' }}>
                 {t('partner_city')} {t('required_field')}
               </label>
-            <select
-              name="city"
-              value={formData.city}
-              onChange={handleCityChange}
-              className="w-full px-4 py-3 rounded-xl focus:outline-none"
-              style={inputStyle(errors.city)}
-            >
-              <option value="">{t('partner_city_placeholder')}</option>
-              {cities.map((city) => (
-                <option key={city.value} value={city.value}>
-                  {city.label}
+              <select
+                name="city"
+                value={formData.city}
+                onChange={handleCityChange}
+                className="w-full px-4 py-3 rounded-xl focus:outline-none"
+                style={inputStyle(errors.city)}
+              >
+                <option value="">{t('partner_city_placeholder')}</option>
+                {cities.map((city) => (
+                  <option key={city.value} value={city.value}>
+                    {city.label}
+                  </option>
+                ))}
+                <option value="__request__">
+                  {language === 'ru' ? '+ Предложить мой город' : '+ Suggest my city'}
                 </option>
-              ))}
-            </select>
-            {errors.city && (
-              <p className="text-red-500 text-sm mt-1">{errors.city}</p>
-            )}
-          </div>
+              </select>
+              {showCityInput && (
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="text"
+                    value={customCity}
+                    onChange={e => setCustomCity(e.target.value)}
+                    className="flex-1 px-4 py-3 rounded-xl focus:outline-none"
+                    style={inputStyle(false)}
+                    placeholder={language === 'ru' ? 'Название города' : 'City name'}
+                    maxLength={100}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCityRequest}
+                    className="px-4 py-3 rounded-xl font-semibold"
+                    style={{ backgroundColor: 'var(--tg-theme-button-color)', color: 'var(--tg-theme-button-text-color, #fff)' }}
+                  >
+                    {language === 'ru' ? 'Отправить' : 'Send'}
+                  </button>
+                </div>
+              )}
+              {cityRequestSent && (
+                <p className="text-sm mt-2" style={{ color: 'var(--tg-theme-button-color)' }}>
+                  {language === 'ru'
+                    ? '✅ Заявка на добавление города отправлена! Мы уведомим вас о решении.'
+                    : '✅ City request sent! We will notify you of our decision.'}
+                </p>
+              )}
+              {errors.city && <p className="text-red-500 text-sm mt-1">{errors.city}</p>}
+            </div>
           )}
 
           {/* Процент комиссии системе */}

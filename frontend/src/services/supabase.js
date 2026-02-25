@@ -2223,3 +2223,35 @@ export const getPartnerCashbackStats = async (partnerChatId, period = 'month') =
   }
 }
 
+/**
+ * Получить список доступных городов из таблицы available_cities
+ */
+export const getAvailableCities = async () => {
+  const { data, error } = await supabase
+    .from('available_cities')
+    .select('name')
+    .order('name', { ascending: true })
+  if (error) {
+    console.error('Error fetching available_cities:', error)
+    return []
+  }
+  return (data || []).map(row => row.name)
+}
+
+/**
+ * Отправить заявку на добавление нового города
+ */
+export const submitCityRequest = async ({ chatId, cityName, requesterName }) => {
+  const { data, error } = await supabase
+    .from('city_requests')
+    .insert([{
+      chat_id: String(chatId),
+      city_name: cityName.trim(),
+      requester_name: requesterName || null,
+    }])
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+

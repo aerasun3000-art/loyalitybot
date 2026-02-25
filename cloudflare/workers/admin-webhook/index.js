@@ -33,8 +33,28 @@ export default {
       });
     }
 
-    // Register webhook: GET /setup-webhook?key=<WEBHOOK_SECRET_TOKEN>
     const url = new URL(request.url);
+
+    // Supabase Database Webhook — новые заявки на города
+    if (request.method === 'POST' && url.pathname === '/db-webhook') {
+      const secret = url.searchParams.get('secret');
+      if (!env.DB_WEBHOOK_SECRET || secret !== env.DB_WEBHOOK_SECRET) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+      try {
+        const payload = await request.json();
+        if (payload.table === 'city_requests' && payload.type === 'INSERT' && payload.record) {
+          const { notifyAdminNewCityRequest } = await import('./handlers/city_requests.js');
+          await notifyAdminNewCityRequest(env, payload.record);
+        }
+        return new Response('OK', { status: 200 });
+      } catch (err) {
+        console.error('[db-webhook] Error:', err);
+        return new Response('Error', { status: 500 });
+      }
+    }
+
+    // Register webhook: GET /setup-webhook?key=<WEBHOOK_SECRET_TOKEN>
     if (request.method === 'GET' && url.pathname === '/setup-webhook') {
       const key = url.searchParams.get('key');
       if (!env.WEBHOOK_SECRET_TOKEN || key !== env.WEBHOOK_SECRET_TOKEN) {

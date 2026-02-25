@@ -24,6 +24,7 @@ import * as mlm from './handlers/mlm.js';
 import * as b2b from './handlers/b2b.js';
 import * as ambassadors from './handlers/ambassadors.js';
 import * as refCommissions from './handlers/referral_commissions.js';
+import * as cityRequests from './handlers/city_requests.js';
 
 /**
  * Check if user is admin
@@ -47,6 +48,9 @@ export async function showMainMenu(env, chatId) {
       [
         { text: '🤝 Заявки Партнеров', callback_data: 'admin_partners' },
         { text: '🛠 Услуги Партнёров', callback_data: 'admin_manage_services' },
+      ],
+      [
+        { text: '🌍 Заявки на города', callback_data: 'admin_city_requests' },
       ],
       [
         { text: '✨ Модерация Услуг', callback_data: 'admin_services' },
@@ -512,6 +516,14 @@ export async function handleCallbackQuery(env, update) {
     // Referral Commissions
     if (data === 'admin_ref_commissions') {
       return await refCommissions.handleRefCommissionsMenu(env, callbackQuery);
+    }
+    if (data === 'admin_city_requests') {
+      await cityRequests.showCityRequests(env, chatId);
+      return { success: true, handled: true, action: 'city_requests' };
+    }
+    if (data.startsWith('city_req_approve_') || data.startsWith('city_req_reject_')) {
+      await cityRequests.handleCityRequestCallback(env, callbackQuery);
+      return { success: true, handled: true, action: 'city_request_callback' };
     }
     if (data === 'ref_comm_stats') {
       return await refCommissions.handleRefCommissionsStats(env, callbackQuery);
