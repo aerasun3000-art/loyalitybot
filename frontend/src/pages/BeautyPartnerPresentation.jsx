@@ -33,7 +33,7 @@ const BeautyPartnerPresentation = () => {
           <div className="flex items-center gap-2">
             <span className="text-2xl">💅</span>
             <span className="font-bold text-lg" style={{ color: 'var(--tg-theme-text-color)' }}>
-              {isRu ? 'LoyalityBot для Бьюти' : 'LoyalityBot for Beauty'}
+              {isRu ? 'Sarafano.io для Бьюти' : 'Sarafano.io for Beauty'}
             </span>
           </div>
           <button
@@ -293,7 +293,7 @@ const BeautyPartnerPresentation = () => {
                     {isRu ? 'Функция' : 'Feature'}
                   </th>
                   <th className="text-center py-4 px-4 font-bold" style={{ color: 'var(--tg-theme-button-color)' }}>
-                    {isRu ? 'LoyalityBot' : 'LoyalityBot'}
+                    {isRu ? 'Sarafano.io' : 'Sarafano.io'}
                   </th>
                   <th className="text-center py-4 px-4 font-bold" style={{ color: 'var(--tg-theme-hint-color)' }}>
                     Yclients
@@ -633,8 +633,8 @@ const BeautyPartnerPresentation = () => {
           </h2>
           <p className="text-xl mb-8 max-w-2xl mx-auto" style={{ color: 'var(--tg-theme-button-text-color, #fff)', opacity: 0.9 }}>
             {isRu
-              ? 'Присоединяйтесь к 500+ партнерам, которые уже используют LoyalityBot для роста бизнеса'
-              : 'Join 500+ partners already using LoyalityBot to grow their business'}
+              ? 'Присоединяйтесь к 500+ партнерам, которые уже используют Sarafano.io для роста бизнеса'
+              : 'Join 500+ partners already using Sarafano.io to grow their business'}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
@@ -677,8 +677,8 @@ const BeautyPartnerPresentation = () => {
       >
         <p className="text-sm" style={{ opacity: 0.8 }}>
           {isRu
-            ? '© 2025 LoyalityBot. Все права защищены.'
-            : '© 2025 LoyalityBot. All rights reserved.'}
+            ? '© 2025 Sarafano.io. Все права защищены.'
+            : '© 2025 Sarafano.io. All rights reserved.'}
         </p>
       </footer>
     </div>

@@ -42,24 +42,24 @@ const TermsOfService = () => {
               <section className="mb-6">
                 <h2 className="text-xl font-bold text-gray-800 mb-3">Введение</h2>
                 <p className="text-gray-600 text-sm leading-relaxed mb-3">
-                  Добро пожаловать в <strong>LoyaltyBot</strong>!
+                  Добро пожаловать в <strong>Sarafano.io</strong>!
                 </p>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   Эти Условия использования ("Условия") регулируют использование нашей программы лояльности через Telegram бота и веб-приложение.
                 </p>
                 <p className="text-gray-600 text-sm leading-relaxed mt-3 font-semibold">
-                  Используя LoyaltyBot, вы соглашаетесь с этими Условиями. Если вы не согласны, пожалуйста, не используйте сервис.
+                  Используя Sarafano.io, вы соглашаетесь с этими Условиями. Если вы не согласны, пожалуйста, не используйте сервис.
                 </p>
               </section>
 
               <section className="mb-6">
                 <h2 className="text-xl font-bold text-gray-800 mb-3">1. Определения</h2>
                 <ul className="list-none text-gray-600 text-sm space-y-2">
-                  <li><strong>Сервис</strong> — программа лояльности LoyaltyBot (Telegram бот + веб-приложение)</li>
+                  <li><strong>Сервис</strong> — программа лояльности Sarafano.io (Telegram бот + веб-приложение)</li>
                   <li><strong>Пользователь</strong> / <strong>Клиент</strong> — любой человек, использующий сервис</li>
                   <li><strong>Партнер</strong> — бизнес или физическое лицо, предлагающее услуги через программу</li>
                   <li><strong>Баллы</strong> — виртуальная валюта, используемая в программе</li>
-                  <li><strong>Администрация</strong> — команда LoyaltyBot, управляющая сервисом</li>
+                  <li><strong>Администрация</strong> — команда Sarafano.io, управляющая сервисом</li>
                   <li><strong>Аккаунт</strong> — ваш профиль в системе, привязанный к Telegram</li>
                 </ul>
               </section>
@@ -241,14 +241,14 @@ const TermsOfService = () => {
                 <ul className="list-none text-gray-600 text-sm space-y-1">
                   <li><strong>Telegram:</strong> команда <code className="bg-sakura-cream px-1 rounded">/support</code> в боте</li>
                   <li><strong>Email:</strong> support@loyalitybot.com</li>
-                  <li><strong>Поддержка:</strong> @LoyaltyBot_Support</li>
+                  <li><strong>Поддержка:</strong> @Sarafanoio_Support</li>
                 </ul>
               </section>
 
               <section>
                 <h2 className="text-xl font-bold text-gray-800 mb-3">10. Принятие условий</h2>
                 <p className="text-gray-600 text-sm leading-relaxed mb-3 font-semibold">
-                  Используя LoyaltyBot, вы подтверждаете, что:
+                  Используя Sarafano.io, вы подтверждаете, что:
                 </p>
                 <ul className="list-disc pl-5 text-gray-600 text-sm space-y-1 mb-3">
                   <li>Вы прочитали и поняли эти Условия</li>
@@ -257,7 +257,7 @@ const TermsOfService = () => {
                   <li>Предоставленная вами информация точна</li>
                 </ul>
                 <p className="text-gray-600 text-sm leading-relaxed font-bold text-center mt-4">
-                  Спасибо за использование LoyaltyBot! 🎉
+                  Спасибо за использование Sarafano.io! 🎉
                 </p>
               </section>
             </div>
@@ -267,24 +267,24 @@ const TermsOfService = () => {
               <section className="mb-6">
                 <h2 className="text-xl font-bold text-gray-800 mb-3">Introduction</h2>
                 <p className="text-gray-600 text-sm leading-relaxed mb-3">
-                  Welcome to <strong>LoyaltyBot</strong>!
+                  Welcome to <strong>Sarafano.io</strong>!
                 </p>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   These Terms of Service ("Terms") govern your use of our loyalty program through the Telegram bot and web application.
                 </p>
                 <p className="text-gray-600 text-sm leading-relaxed mt-3 font-semibold">
-                  By using LoyaltyBot, you agree to these Terms. If you do not agree, please do not use the service.
+                  By using Sarafano.io, you agree to these Terms. If you do not agree, please do not use the service.
                 </p>
               </section>
 
               <section className="mb-6">
                 <h2 className="text-xl font-bold text-gray-800 mb-3">1. Definitions</h2>
                 <ul className="list-none text-gray-600 text-sm space-y-2">
-                  <li><strong>Service</strong> — LoyaltyBot loyalty program (Telegram bot + web application)</li>
+                  <li><strong>Service</strong> — Sarafano.io loyalty program (Telegram bot + web application)</li>
                   <li><strong>User</strong> / <strong>Client</strong> — any person using the service</li>
                   <li><strong>Partner</strong> — business or individual offering services through the program</li>
                   <li><strong>Points</strong> — virtual currency used in the program</li>
-                  <li><strong>Administration</strong> — LoyaltyBot team managing the service</li>
+                  <li><strong>Administration</strong> — Sarafano.io team managing the service</li>
                   <li><strong>Account</strong> — your profile in the system linked to Telegram</li>
                 </ul>
               </section>
@@ -466,14 +466,14 @@ const TermsOfService = () => {
                 <ul className="list-none text-gray-600 text-sm space-y-1">
                   <li><strong>Telegram:</strong> <code className="bg-sakura-cream px-1 rounded">/support</code> command in the bot</li>
                   <li><strong>Email:</strong> support@loyalitybot.com</li>
-                  <li><strong>Support:</strong> @LoyaltyBot_Support</li>
+                  <li><strong>Support:</strong> @Sarafanoio_Support</li>
                 </ul>
               </section>
 
               <section>
                 <h2 className="text-xl font-bold text-gray-800 mb-3">10. Acceptance of Terms</h2>
                 <p className="text-gray-600 text-sm leading-relaxed mb-3 font-semibold">
-                  By using LoyaltyBot, you confirm that:
+                  By using Sarafano.io, you confirm that:
                 </p>
                 <ul className="list-disc pl-5 text-gray-600 text-sm space-y-1 mb-3">
                   <li>You have read and understood these Terms</li>
@@ -482,7 +482,7 @@ const TermsOfService = () => {
                   <li>The information you provided is accurate</li>
                 </ul>
                 <p className="text-gray-600 text-sm leading-relaxed font-bold text-center mt-4">
-                  Thank you for using LoyaltyBot! 🎉
+                  Thank you for using Sarafano.io! 🎉
                 </p>
               </section>
             </div>
@@ -491,7 +491,7 @@ const TermsOfService = () => {
 
         {/* Footer Note */}
         <div className="mt-4 text-center text-xs text-gray-500">
-          <p>LoyaltyBot © 2025</p>
+          <p>Sarafano.io © 2025</p>
         </div>
       </div>
     </div>

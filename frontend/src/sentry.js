@@ -19,7 +19,7 @@ export function initSentry() {
     environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || 'production',
     
     // Версия релиза
-    release: `loyaltybot-frontend@${import.meta.env.VITE_APP_VERSION || '1.0.0'}`,
+    release: `sarafano-frontend@${import.meta.env.VITE_APP_VERSION || '1.0.0'}`,
     
     // Трассировка производительности
     integrations: [

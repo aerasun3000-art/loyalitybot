@@ -33,8 +33,8 @@ const About = () => {
         </div>
 
         <div className="text-center" style={{ color: 'var(--tg-theme-button-text-color, #fff)' }}>
-          <span className="text-6xl leading-none mx-auto mb-4">❤️</span>
-          <h2 className="text-2xl font-bold mb-2">LoyaltyBot</h2>
+          <img src="/logo.svg" alt="" className="w-16 h-16 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Sarafano.io</h2>
           <p className="text-sm opacity-90">{t('about_subtitle')}</p>
         </div>
       </div>
@@ -132,7 +132,7 @@ const About = () => {
             </div>
             <div className="flex justify-between">
               <span>{t('about_support')}</span>
-              <span className="font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>support@loyaltybot.com</span>
+              <span className="font-semibold" style={{ color: 'var(--tg-theme-button-color)' }}>support@sarafano.io</span>
             </div>
           </div>
         </div>

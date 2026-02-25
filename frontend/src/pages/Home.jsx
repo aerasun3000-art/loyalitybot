@@ -742,7 +742,7 @@ const Home = () => {
                   hapticFeedback('light')
                   const link = buildReferralLink(referralCode)
                   await shareReferralLink(link, {
-                    title: 'LoyaltyBot',
+                    title: 'Sarafano.io',
                     text: t('home_referral_subtitle'),
                     onSuccess: () => showToast(t('toast_link_copied')),
                     onError: () => showToast(t('toast_copy_failed')),

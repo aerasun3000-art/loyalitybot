@@ -27,7 +27,7 @@ export const shareReferralLink = async (referralLink, { title = '', text = '', o
       // Ссылка всегда в text — многие приложения (Telegram и др.) не подставляют url
       const shareText = text ? `${text}\n\n${referralLink}` : referralLink
       await navigator.share({
-        title: title || 'LoyaltyBot',
+        title: title || 'Sarafano.io',
         text: shareText,
         url: referralLink
       })

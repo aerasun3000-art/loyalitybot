@@ -302,8 +302,8 @@ const translations = {
     // About Page
     about_title: 'О приложении',
     about_subtitle: 'Программа лояльности нового поколения',
-    about_what_is: 'Что такое LoyaltyBot?',
-    about_description: 'LoyaltyBot — это современная программа лояльности, которая объединяет клиентов и партнеров. Получайте баллы за покупки, обменивайте их на услуги и наслаждайтесь эксклюзивными привилегиями!',
+    about_what_is: 'Что такое Sarafano.io?',
+    about_description: 'Sarafano.io — это современная программа лояльности, которая объединяет клиентов и партнеров. Получайте баллы за покупки, обменивайте их на услуги и наслаждайтесь эксклюзивными привилегиями!',
     about_earn_points: 'Зарабатывайте баллы',
     about_get_rewards: 'Получайте награды',
     about_vip_status: 'VIP статусы',
@@ -644,8 +644,8 @@ const translations = {
     // About Page
     about_title: 'About',
     about_subtitle: 'Next Generation Loyalty Program',
-    about_what_is: 'What is LoyaltyBot?',
-    about_description: 'LoyaltyBot is a modern loyalty program that connects customers and partners. Earn points for purchases, redeem them for services, and enjoy exclusive benefits!',
+    about_what_is: 'What is Sarafano.io?',
+    about_description: 'Sarafano.io is a modern loyalty program that connects customers and partners. Earn points for purchases, redeem them for services, and enjoy exclusive benefits!',
     about_earn_points: 'Earn Points',
     about_get_rewards: 'Get Rewards',
     about_vip_status: 'VIP Status',

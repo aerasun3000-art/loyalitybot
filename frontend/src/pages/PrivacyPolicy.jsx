@@ -42,7 +42,7 @@ const PrivacyPolicy = () => {
               <section className="mb-6">
                 <h2 className="text-xl font-bold text-gray-800 mb-3">Введение</h2>
                 <p className="text-gray-600 text-sm leading-relaxed mb-3">
-                  Добро пожаловать в <strong>LoyaltyBot</strong>!
+                  Добро пожаловать в <strong>Sarafano.io</strong>!
                 </p>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   Эта Политика конфиденциальности описывает, как мы собираем, используем, храним и защищаем ваши персональные данные при использовании нашей программы лояльности через Telegram бота и веб-приложение.
@@ -149,14 +149,14 @@ const PrivacyPolicy = () => {
                 </p>
                 <ul className="list-none text-gray-600 text-sm space-y-1">
                   <li><strong>Email:</strong> support@loyalitybot.com</li>
-                  <li><strong>Telegram:</strong> @LoyaltyBot_Support</li>
+                  <li><strong>Telegram:</strong> @Sarafanoio_Support</li>
                 </ul>
               </section>
 
               <section>
                 <h2 className="text-xl font-bold text-gray-800 mb-3">7. Согласие</h2>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  <strong>Используя LoyaltyBot, вы соглашаетесь с этой Политикой конфиденциальности.</strong>
+                  <strong>Используя Sarafano.io, вы соглашаетесь с этой Политикой конфиденциальности.</strong>
                 </p>
                 <p className="text-gray-600 text-sm leading-relaxed mt-2">
                   Если вы не согласны, пожалуйста, не используйте наш сервис.
@@ -169,7 +169,7 @@ const PrivacyPolicy = () => {
               <section className="mb-6">
                 <h2 className="text-xl font-bold text-gray-800 mb-3">Introduction</h2>
                 <p className="text-gray-600 text-sm leading-relaxed mb-3">
-                  Welcome to <strong>LoyaltyBot</strong>!
+                  Welcome to <strong>Sarafano.io</strong>!
                 </p>
                 <p className="text-gray-600 text-sm leading-relaxed">
                   This Privacy Policy describes how we collect, use, store, and protect your personal data when you use our loyalty program through the Telegram bot and web application.
@@ -276,14 +276,14 @@ const PrivacyPolicy = () => {
                 </p>
                 <ul className="list-none text-gray-600 text-sm space-y-1">
                   <li><strong>Email:</strong> support@loyalitybot.com</li>
-                  <li><strong>Telegram:</strong> @LoyaltyBot_Support</li>
+                  <li><strong>Telegram:</strong> @Sarafanoio_Support</li>
                 </ul>
               </section>
 
               <section>
                 <h2 className="text-xl font-bold text-gray-800 mb-3">7. Consent</h2>
                 <p className="text-gray-600 text-sm leading-relaxed">
-                  <strong>By using LoyaltyBot, you agree to this Privacy Policy.</strong>
+                  <strong>By using Sarafano.io, you agree to this Privacy Policy.</strong>
                 </p>
                 <p className="text-gray-600 text-sm leading-relaxed mt-2">
                   If you do not agree, please do not use our service.
@@ -295,7 +295,7 @@ const PrivacyPolicy = () => {
 
         {/* Footer Note */}
         <div className="mt-4 text-center text-xs text-gray-500">
-          <p>LoyaltyBot © 2025</p>
+          <p>Sarafano.io © 2025</p>
         </div>
       </div>
     </div>

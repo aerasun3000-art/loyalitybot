@@ -287,7 +287,7 @@ const Profile = () => {
                 onClick={async () => {
                   const link = buildReferralLink(referralCode)
                   await shareReferralLink(link, {
-                    title: 'LoyaltyBot',
+                    title: 'Sarafano.io',
                     text: t('home_referral_subtitle'),
                     onSuccess: () => {
                       setReferralToast(t('toast_link_copied'))

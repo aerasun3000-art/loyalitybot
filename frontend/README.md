@@ -1,4 +1,4 @@
-# 🎨 LoyalityBot Frontend
+# 🎨 Sarafano.io Frontend
 
 Telegram Mini App для системы лояльности партнёров и клиентов.
 
