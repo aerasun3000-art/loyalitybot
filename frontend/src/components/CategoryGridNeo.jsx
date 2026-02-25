@@ -103,9 +103,12 @@ const CategoryGridNeo = ({ categories = DEFAULT_CATEGORIES, onSelect }) => {
           className="flex flex-col items-center gap-2 transition-transform active:scale-90"
         >
           <div
-            className={`w-16 h-16 ${cat.bgColor} rounded-2xl flex items-center justify-center shadow-sm`}
+            className={`w-16 h-16 ${cat.bgColor || 'bg-gray-100 dark:bg-gray-800'} rounded-2xl flex items-center justify-center shadow-sm`}
           >
-            {cat.icon('w-6 h-6')}
+            {typeof cat.icon === 'function'
+              ? cat.icon('w-6 h-6')
+              : <span className="text-3xl">{cat.emoji || '⭐'}</span>
+            }
           </div>
           <span
             className="text-[13px] font-medium opacity-90"

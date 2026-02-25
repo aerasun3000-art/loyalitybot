@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getTelegramUser, getChatId, hapticFeedback, openTelegramLink } from '../utils/telegram'
 import QRCode from 'qrcode'
 import { getClientBalance, getClientKarma, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getCategoryPartnerCounts, getBackgroundImage, getReferralPartnerInfo, getReferralStats, getOrCreateReferralCode, getOnboardingSeen, setOnboardingSeen, isApprovedPartner } from '../services/supabase'
-import { getServiceIcon, getMainPageCategories, getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
+import { getServiceIcon, serviceCategories } from '../utils/serviceIcons'
 import { filterCompetitors } from '../utils/categoryHelpers'
 import { useTranslation, translateDynamicContent, declinePoints } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
@@ -27,7 +27,7 @@ import { useToast } from '../hooks/useToast'
 import Layout from '../components/Layout'
 import LoyaltyCard from '../components/LoyaltyCard'
 import KarmaIndicator from '../components/KarmaIndicator'
-import CategoryGridNeo, { buildCategoriesFromServiceTiles } from '../components/CategoryGridNeo'
+import CategoryGridNeo from '../components/CategoryGridNeo'
 import NewsCarouselNeo from '../components/NewsCarouselNeo'
 // BottomNav теперь глобально в App.jsx
 import ThemeSwitcher from '../components/ThemeSwitcher'
@@ -487,101 +487,6 @@ const Home = () => {
     }
   }, [translatedPromotions.length])
 
-  // Функция для получения дефолтных услуг, отсортированных по популярности
-  const getDefaultServicesByPopularity = () => {
-    const mainCategories = getMainPageCategories()
-    
-    if (popularCategories.length > 0) {
-      // Сортируем категории по популярности
-      const categoryIndex = {}
-      popularCategories.forEach((cat, index) => {
-        categoryIndex[cat] = index
-      })
-      
-      return [...mainCategories]
-        .sort((a, b) => {
-          const aIndex = categoryIndex[a.code] ?? 999
-          const bIndex = categoryIndex[b.code] ?? 999
-          return aIndex - bIndex
-        })
-        .slice(0, 8)
-    }
-    
-    // Если нет данных о популярности, используем стандартный порядок (первые 8)
-    return mainCategories.slice(0, 8)
-  }
-
-  // Возвращает ровно 8 плиток услуг: сначала реальные услуги (уже отсортированы по популярности),
-  // затем – дефолтные иконки по глобальной популярности, чтобы добить до 8 без повторов
-  const getServiceTiles = () => {
-    // Фильтруем услуги по выбранной category_group, если она выбрана
-    let filteredServices = services
-    if (selectedCategoryGroup) {
-      filteredServices = services.filter(service => {
-        const partnerCategoryGroup = service.partner?.category_group || 'beauty'
-        return partnerCategoryGroup === selectedCategoryGroup
-      })
-    }
-    
-    const tiles = []
-    const addedCodes = new Set()
-    const normalizeCode = (code) => {
-      if (!code) return null
-      return String(code).trim().toLowerCase()
-    }
-    const getShortLabel = (categoryData) => {
-      const code = normalizeCode(categoryData.code)
-      const shortMap = language === 'ru'
-        ? {
-            brow_design: 'Брови',
-            hair_salon: 'Прически',
-            lash_services: 'Реснички',
-            makeup_pmu: 'Макияж'
-          }
-        : {
-            brow_design: 'Brows',
-            hair_salon: 'Hairstyles',
-            lash_services: 'Lashes',
-            makeup_pmu: 'Makeup'
-          }
-      return shortMap[code] || (language === 'ru' ? categoryData.name : categoryData.nameEn || categoryData.name)
-    }
-    const addCategory = (code) => {
-      const normalized = normalizeCode(code)
-      if (!normalized) return
-      const categoryData = getCategoryByCode(normalized) || serviceCategories[normalized]
-      if (!categoryData) return
-      const canonicalCode = normalizeCode(categoryData.code || normalized)
-      if (!canonicalCode || addedCodes.has(canonicalCode)) return
-      tiles.push({ type: 'category', code: canonicalCode, data: { ...categoryData, shortLabel: getShortLabel(categoryData) } })
-      addedCodes.add(canonicalCode)
-    }
- 
-    if (filteredServices && filteredServices.length > 0) {
-      filteredServices.forEach(service => {
-        let categoryCode = service.partner?.business_type || service.category || null
-        if (!categoryCode) {
-          const inferredCode = getServiceIcon(service.title)
-          if (inferredCode) {
-            categoryCode = inferredCode
-          }
-        }
-
-        addCategory(categoryCode)
-      })
-    }
-
-    if (tiles.length < 8) {
-      const defaults = getDefaultServicesByPopularity()
-      for (const def of defaults) {
-        addCategory(def.code || def.icon)
-        if (tiles.length >= 8) break
-      }
-    }
-
-    return tiles.slice(0, 8)
-  }
-
   const handlePromotionClick = (promoId) => {
     hapticFeedback('light')
     if (!promoId) {
@@ -714,23 +619,40 @@ const Home = () => {
         }))
       : []
     const carouselItems = [...promoItems, ...newsItems]
-    const serviceTiles = getServiceTiles()
-    const neoCategories = buildCategoriesFromServiceTiles(serviceTiles)
-    const CATEGORY_KEYS = [
-      'category_beauty',
-      'category_food',
-      'category_sport',
-      'category_health',
-      'category_shopping',
-      'category_coffee',
-      'category_gaming',
-      'category_travel',
-      'category_more',
-    ]
-    const localizedCategories = neoCategories.map((cat, index) => ({
-      ...cat,
-      name: t(CATEGORY_KEYS[index] || 'category_more'),
-    }))
+    const dynamicCategories = (() => {
+      const sorted = Object.entries(categoryPartnerCounts)
+        .sort(([, a], [, b]) => b - a)
+        .map(([code]) => code)
+
+      const fallback = Object.values(serviceCategories)
+        .filter(c => c.isMainPage)
+        .sort((a, b) => (a.displayOrder || 999) - (b.displayOrder || 999))
+        .map(c => c.code)
+
+      const orderedCodes = sorted.length > 0 ? sorted : fallback
+
+      const tiles = orderedCodes.slice(0, 8).map((code, index) => {
+        const cat = serviceCategories[code]
+        if (!cat) return null
+        return {
+          id: index + 1,
+          name: language === 'ru' ? cat.name : (cat.nameEn || cat.name),
+          emoji: cat.emoji || '⭐',
+          bgColor: 'bg-tg-secondary-bg',
+          serviceCode: code,
+        }
+      }).filter(Boolean)
+
+      tiles.push({
+        id: 9,
+        name: language === 'ru' ? 'Еще' : 'More',
+        emoji: '→',
+        bgColor: 'bg-tg-secondary-bg',
+        serviceCode: null,
+      })
+
+      return tiles
+    })()
     const handleQuickAction = (cat) => {
       hapticFeedback('light')
       if (cat.nameKey === 'support') {
@@ -884,7 +806,7 @@ const Home = () => {
           <section className="space-y-3 pb-20">
             <h2 className="text-sm font-semibold text-tg-text">{t('home_services')}</h2>
             <CategoryGridNeo
-              categories={localizedCategories}
+              categories={dynamicCategories}
               onSelect={(cat) => {
                 if (cat?.id === 9) {
                   navigate('/categories')
