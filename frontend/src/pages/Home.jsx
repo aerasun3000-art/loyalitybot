@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTelegramUser, getChatId, hapticFeedback, openTelegramLink } from '../utils/telegram'
 import QRCode from 'qrcode'
-import { getClientBalance, getClientKarma, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getBackgroundImage, getReferralPartnerInfo, getReferralStats, getOrCreateReferralCode, getOnboardingSeen, setOnboardingSeen, isApprovedPartner } from '../services/supabase'
+import { getClientBalance, getClientKarma, getActivePromotions, getApprovedServices, getPublishedNews, getClientPopularCategories, getGlobalPopularCategories, getCategoryPartnerCounts, getBackgroundImage, getReferralPartnerInfo, getReferralStats, getOrCreateReferralCode, getOnboardingSeen, setOnboardingSeen, isApprovedPartner } from '../services/supabase'
 import { getServiceIcon, getMainPageCategories, getCategoryByCode, serviceCategories } from '../utils/serviceIcons'
 import { filterCompetitors } from '../utils/categoryHelpers'
 import { useTranslation, translateDynamicContent, declinePoints } from '../utils/i18n'
@@ -121,6 +121,7 @@ const Home = () => {
   const [referralToast, setReferralToast] = useState(null)
   const [referralLoading, setReferralLoading] = useState(false)
   const [selectedCategoryGroup, setSelectedCategoryGroup] = useState(null)
+  const [categoryPartnerCounts, setCategoryPartnerCounts] = useState({})
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [onboardingStep, setOnboardingStep] = useState(1)
   const [showQrModal, setShowQrModal] = useState(false)
@@ -319,14 +320,16 @@ const Home = () => {
       ])
       setReferralPartnerInfo(partnerInfo)
       
-      const [balanceData, karmaData, promotionsData, servicesData, newsData, popularCats] = await Promise.all([
+      const [balanceData, karmaData, promotionsData, servicesData, newsData, popularCats, partnerCounts] = await Promise.all([
         getClientBalance(chatId),
         getClientKarma(chatId).catch(() => ({ karmaScore: 50, karmaLevel: 'reliable' })),
         getActivePromotions(),
         getApprovedServices(),
         getPublishedNews(),
-        getClientPopularCategories(chatId).catch(() => null)
+        getClientPopularCategories(chatId).catch(() => null),
+        getCategoryPartnerCounts().catch(() => ({}))
       ])
+      setCategoryPartnerCounts(partnerCounts || {})
       
       setBalance(balanceData?.balance || 0)
       setUserName(balanceData?.name || user?.first_name || t('profile_guest'))
@@ -346,7 +349,7 @@ const Home = () => {
       const filteredServices = filterCompetitors(servicesData, partnerInfo, isPartnerUser, isPartnerUser ? chatId : null)
       
       // Сортируем услуги по популярности категорий
-      const sortedServices = sortServicesByPopularity(filteredServices, categories)
+      const sortedServices = sortServicesByPopularity(filteredServices, categories, partnerCounts || {})
       setServices(sortedServices.slice(0, 8))
 
       setPointsToNextReward(
@@ -363,30 +366,27 @@ const Home = () => {
   // normalizeCategoryCode, isCompetitor, filterCompetitors → utils/categoryHelpers.js
 
   // Функция для сортировки услуг по популярности категорий
-  const sortServicesByPopularity = (servicesList, categoryOrder) => {
-    if (!categoryOrder || categoryOrder.length === 0) {
-      return servicesList
-    }
-    
-    // Создаём индекс категорий для быстрого поиска
-    const categoryIndex = {}
-    categoryOrder.forEach((cat, index) => {
-      categoryIndex[cat] = index
-    })
-    
-    // Сортируем услуги: сначала по популярности категории, потом по дате создания
+  const sortServicesByPopularity = (servicesList, personalCategoryOrder, partnerCounts = {}) => {
     return [...servicesList].sort((a, b) => {
-      const aCategory = a.category || getServiceIcon(a.title) || 'default'
-      const bCategory = b.category || getServiceIcon(b.title) || 'default'
-      
-      const aIndex = categoryIndex[aCategory] ?? 999
-      const bIndex = categoryIndex[bCategory] ?? 999
-      
-      if (aIndex !== bIndex) {
-        return aIndex - bIndex
+      const aCategory = a.partner?.business_type || a.category || getServiceIcon(a.title) || 'default'
+      const bCategory = b.partner?.business_type || b.category || getServiceIcon(b.title) || 'default'
+
+      const aPartnerScore = partnerCounts[aCategory] ?? 0
+      const bPartnerScore = partnerCounts[bCategory] ?? 0
+
+      if (aPartnerScore !== bPartnerScore) {
+        return bPartnerScore - aPartnerScore
       }
-      
-      // Если категория одинаковая, сортируем по дате (новые первыми)
+
+      const aPersonalRank = personalCategoryOrder?.indexOf(aCategory) ?? -1
+      const bPersonalRank = personalCategoryOrder?.indexOf(bCategory) ?? -1
+      const aPersonalScore = aPersonalRank === -1 ? 0 : (personalCategoryOrder?.length || 0) - aPersonalRank
+      const bPersonalScore = bPersonalRank === -1 ? 0 : (personalCategoryOrder?.length || 0) - bPersonalRank
+
+      if (aPersonalScore !== bPersonalScore) {
+        return bPersonalScore - aPersonalScore
+      }
+
       const aDate = new Date(a.created_at || 0)
       const bDate = new Date(b.created_at || 0)
       return bDate - aDate

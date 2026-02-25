@@ -1363,10 +1363,12 @@ export async function handlePromotionsList(env, chatId) {
     const keyboard = [];
     
     for (const promo of promotions) {
-      const statusEmoji = promo.is_active ? '✅' : '⏸️';
+      const approvalStatus = promo.approval_status || 'Approved';
+      const statusEmoji = approvalStatus === 'Pending' ? '⏳' : (approvalStatus === 'Rejected' ? '❌' : (promo.is_active ? '✅' : '⏸️'));
+      const statusText = approvalStatus === 'Pending' ? 'На модерации' : (approvalStatus === 'Rejected' ? 'Отклонена' : (promo.is_active ? 'Активна' : 'Приостановлена'));
       const endDate = promo.end_date ? new Date(promo.end_date).toLocaleDateString('ru-RU') : '—';
       
-      messageText += `${statusEmoji} <b>${promo.title || 'Без названия'}</b>\n`;
+      messageText += `${statusEmoji} <b>${promo.title || 'Без названия'}</b> (${statusText})\n`;
       messageText += `   📅 До: ${endDate}\n`;
       messageText += `   💰 ${promo.discount_value || '—'}\n\n`;
       
@@ -1424,7 +1426,8 @@ export async function handlePromotionView(env, chatId, promotionId) {
       return { success: false };
     }
     
-    const statusEmoji = promo.is_active ? '✅ Активна' : '⏸️ Приостановлена';
+    const approvalStatus = promo.approval_status || 'Approved';
+    const statusEmoji = approvalStatus === 'Pending' ? '⏳ На модерации' : (approvalStatus === 'Rejected' ? '❌ Отклонена' : (promo.is_active ? '✅ Активна' : '⏸️ Приостановлена'));
     const startDate = promo.start_date ? new Date(promo.start_date).toLocaleDateString('ru-RU') : '—';
     const endDate = promo.end_date ? new Date(promo.end_date).toLocaleDateString('ru-RU') : '—';
     
@@ -1437,12 +1440,12 @@ export async function handlePromotionView(env, chatId, promotionId) {
       `🏷️ Тип: ${promo.promotion_type || 'discount'}`;
     
     const toggleText = promo.is_active ? '⏸️ Приостановить' : '▶️ Активировать';
-    
+    const canToggle = approvalStatus === 'Approved';
     const keyboard = [
-      [
+      ...(canToggle ? [[
         { text: toggleText, callback_data: `promo_toggle_${promotionId}` },
         { text: '✏️ Редактировать', callback_data: `promo_edit_${promotionId}` }
-      ],
+      ]] : [[{ text: '✏️ Редактировать', callback_data: `promo_edit_${promotionId}` }]]),
       [
         { text: '🗑️ Удалить', callback_data: `promo_delete_${promotionId}` }
       ],
@@ -2732,7 +2735,8 @@ export async function handleCallback(env, update) {
             description: botState.data.description,
             discount_value: botState.data.discount_value,
             end_date: botState.data.end_date,
-            is_active: true,
+            is_active: false,
+            approval_status: 'Pending',
             promotion_type: 'discount',
             tier_visibility: 'all',
           };
@@ -2740,8 +2744,9 @@ export async function handleCallback(env, update) {
             await addPromotion(env, promoData);
             await clearBotState(env, chatId);
             await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
-              '✅ <b>Акция успешно создана!</b>\n\n' +
-              `📝 ${promoData.title}\n💰 ${promoData.discount_value}\n📅 До: ${botState.data.date_text}`,
+              '✅ <b>Акция отправлена на модерацию!</b>\n\n' +
+              `📝 ${promoData.title}\n💰 ${promoData.discount_value}\n📅 До: ${botState.data.date_text}\n\n` +
+              'Ожидайте одобрения администратором.',
               { parseMode: 'HTML' }
             );
             return await handlePromotionsMenu(env, chatId);
@@ -2801,7 +2806,8 @@ export async function handleCallback(env, update) {
           description: botState.data.description,
           discount_value: botState.data.discount_value,
           end_date: botState.data.end_date,
-          is_active: true,
+          is_active: false,
+          approval_status: 'Pending',
           promotion_type: 'discount',
           min_tier: botState.data.promo_min_tier,
           tier_visibility: visVal === 'tier_only' ? 'tier_only' : 'all',
@@ -2810,8 +2816,9 @@ export async function handleCallback(env, update) {
           await addPromotion(env, promoData);
           await clearBotState(env, chatId);
           await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
-            '✅ <b>Акция успешно создана!</b>\n\n' +
-            `📝 ${promoData.title}\n💰 ${promoData.discount_value}\n📅 До: ${botState.data.date_text}`,
+            '✅ <b>Акция отправлена на модерацию!</b>\n\n' +
+            `📝 ${promoData.title}\n💰 ${promoData.discount_value}\n📅 До: ${botState.data.date_text}\n\n` +
+            'Ожидайте одобрения администратором.',
             { parseMode: 'HTML' }
           );
           return await handlePromotionsMenu(env, chatId);

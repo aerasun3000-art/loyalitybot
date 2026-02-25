@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { getResolvedApiUrl } from '../utils/apiResolver'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -189,6 +190,7 @@ export const getActivePromotions = async (userTier = 'bronze') => {
       partners(name, company_name, booking_url, google_maps_link)
     `)
     .eq('is_active', true)
+    .eq('approval_status', 'Approved')
     .gte('end_date', today)
 
   // tier_visibility=all — показываем всем; tier_only — только если min_tier <= userTier
@@ -220,6 +222,7 @@ export const getPromotionById = async (id) => {
       partners(name, company_name, booking_url, google_maps_link)
     `)
     .eq('id', id)
+    .eq('approval_status', 'Approved')
     .single()
   
   if (error) {
@@ -268,13 +271,14 @@ export const getPromotionsForService = async (serviceId) => {
       return []
     }
     
-    // Фильтруем активные акции
+    // Фильтруем активные одобренные акции
     const today = new Date().toISOString().split('T')[0]
     const activePromotions = promotionServices
       .map(ps => ps.promotions)
       .filter(p => 
         p && 
         p.is_active && 
+        (p.approval_status || 'Approved') === 'Approved' &&
         p.start_date <= today && 
         p.end_date >= today
       )
@@ -1796,6 +1800,36 @@ export const getClientPopularCategories = async (chatId) => {
 }
 
 /**
+ * Получить количество партнёров по категориям (business_type)
+ * Таблица partners содержит только одобренных партнёров
+ * @returns {Promise<Object>} { [business_type]: number }
+ */
+export const getCategoryPartnerCounts = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('partners')
+      .select('business_type')
+
+    if (error) {
+      console.error('Error fetching category partner counts:', error)
+      return {}
+    }
+
+    const counts = {}
+    ;(data || []).forEach(row => {
+      const bt = row.business_type
+      if (bt) {
+        counts[bt] = (counts[bt] || 0) + 1
+      }
+    })
+    return counts
+  } catch (err) {
+    console.error('Error in getCategoryPartnerCounts:', err)
+    return {}
+  }
+}
+
+/**
  * Получить глобальную статистику популярных категорий услуг
  * Используется как fallback если у клиента нет истории транзакций
  */
@@ -2033,16 +2067,20 @@ export const getOrCreateReferralCode = async (chatId) => {
  * Получить базовый URL API
  */
 const getApiBaseUrl = () => {
-  // Приоритет 1: переменная окружения
+  // Приоритет 1: resolved URL (из apiResolver, после health-check)
+  const resolved = getResolvedApiUrl()
+  if (resolved) return resolved
+
+  // Приоритет 2: переменная окружения
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL
   }
-  
-  // Приоритет 2: localhost для разработки
+
+  // Приоритет 3: localhost для разработки
   if (typeof window !== 'undefined' && window.location.origin.includes('localhost')) {
     return 'http://localhost:8001'
   }
-  
+
   // Fallback: пустая строка
   console.warn('⚠️ VITE_API_URL не установлен! Установите переменную окружения.')
   return ''

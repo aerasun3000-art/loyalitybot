@@ -29,6 +29,9 @@ import {
   getAmbassadorEarnings,
   getPartnersForAmbassadorSelection,
   canAmbassadorAddPartner,
+  recalculateKarma,
+  createPayoutRequest,
+  getAmbassadorBalance,
 } from './supabase.js';
 
 /** Return level info based on referral count */
@@ -267,6 +270,8 @@ export async function handleNpsRating(env, update) {
 
     const partnerChatId = await getClientLastPartner(env, chatId);
     const ratingId = await saveNpsRating(env, { clientChatId: chatId, partnerChatId, rating });
+    // Пересчёт кармы (fire-and-forget)
+    recalculateKarma(env, chatId).catch(() => {});
 
     await editMessageText(
       env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
@@ -287,6 +292,61 @@ export async function handleNpsRating(env, update) {
 export async function handleNpsReview(env, chatId, text) {
   try {
     const stateRow = await getBotState(env, chatId);
+
+    // Обработка ввода суммы выплаты
+    if (stateRow && stateRow.state === 'ambassador_payout_amount') {
+      const amount = parseFloat(text.replace(',', '.'));
+      const maxAmount = stateRow.data?.balance || 0;
+      if (!Number.isFinite(amount) || amount < 500 || amount > maxAmount) {
+        await sendTelegramMessage(
+          env.TOKEN_CLIENT, chatId,
+          `❌ Введите сумму от 500 до ${Math.floor(maxAmount)} ₽:`
+        );
+        return true;
+      }
+      await setBotState(env, chatId, 'ambassador_payout_method', { ...stateRow.data, amount });
+      await sendTelegramMessage(
+        env.TOKEN_CLIENT, chatId,
+        '💳 Выберите способ получения:',
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '💳 Карта', callback_data: 'payout_method_card' }],
+              [{ text: '📱 СБП (по номеру телефона)', callback_data: 'payout_method_sbp' }],
+              [{ text: '₿ Крипто', callback_data: 'payout_method_crypto' }],
+            ]
+          }
+        }
+      );
+      return true;
+    }
+
+    // Обработка ввода реквизитов выплаты
+    if (stateRow && stateRow.state === 'ambassador_payout_details') {
+      const { amount, method, balance } = stateRow.data || {};
+      await clearBotState(env, chatId);
+      const req = await createPayoutRequest(env, {
+        ambassadorChatId: chatId,
+        amount,
+        paymentMethod: method,
+        paymentDetails: text.trim(),
+      });
+      await sendTelegramMessage(
+        env.TOKEN_CLIENT, chatId,
+        `✅ Заявка на выплату <b>${Math.floor(amount)} ₽</b> принята!\n\nМы обработаем её в течение 3 рабочих дней.`,
+        { parseMode: 'HTML' }
+      );
+      if (env.ADMIN_CHAT_ID) {
+        const methodLabel = { card: 'Карта', sbp: 'СБП', crypto: 'Крипто' }[method] || method;
+        sendTelegramMessage(
+          env.TOKEN_CLIENT, env.ADMIN_CHAT_ID,
+          `📋 Новая заявка на выплату амбассадора\nID: ${chatId}\nСумма: ${Math.floor(amount)} ₽\nСпособ: ${methodLabel}`,
+          { parseMode: 'HTML' }
+        ).catch(() => {});
+      }
+      return true;
+    }
+
     if (!stateRow || stateRow.state !== 'awaiting_nps_review') return false;
 
     const { ratingId, partnerChatId } = stateRow.data || {};
@@ -687,9 +747,35 @@ export async function handleAmbassador(env, update) {
     }
 
     if (data === 'ambassador_payout') {
+      const pendingBalance = await getAmbassadorBalance(env, chatId);
+      if (pendingBalance < 500) {
+        await editMessageText(
+          env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+          `💳 Минимальная сумма выплаты — 500 ₽.\nВаш баланс к выплате: <b>${Math.floor(pendingBalance)} ₽</b>`,
+          { parseMode: 'HTML' }
+        );
+        return { success: true };
+      }
+      await setBotState(env, chatId, 'ambassador_payout_amount', { balance: pendingBalance });
       await editMessageText(
         env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
-        '💳 Запрос выплаты — в разработке. Обратитесь в поддержку.'
+        `💳 Введите сумму для вывода (от 500 до ${Math.floor(pendingBalance)} ₽):`
+      );
+      return { success: true };
+    }
+
+    if (data === 'payout_method_card' || data === 'payout_method_sbp' || data === 'payout_method_crypto') {
+      const stateRow = await getBotState(env, chatId);
+      if (!stateRow || stateRow.state !== 'ambassador_payout_method') {
+        return { success: false };
+      }
+      const methodMap = { payout_method_card: 'card', payout_method_sbp: 'sbp', payout_method_crypto: 'crypto' };
+      const labelMap = { payout_method_card: 'Номер карты (16 цифр)', payout_method_sbp: 'Номер телефона для СБП', payout_method_crypto: 'Адрес крипто-кошелька' };
+      const method = methodMap[data];
+      await setBotState(env, chatId, 'ambassador_payout_details', { ...stateRow.data, method });
+      await editMessageText(
+        env.TOKEN_CLIENT, chatId, callbackQuery.message.message_id,
+        `📝 Введите реквизиты:\n${labelMap[data]}`
       );
       return { success: true };
     }
@@ -817,7 +903,9 @@ export async function routeUpdate(env, update) {
     if (callbackData === 'become_ambassador' || callbackData === 'ambassador_cabinet' ||
         callbackData === 'amb_confirm' || callbackData?.startsWith('amb_partner_') ||
         callbackData === 'ambassador_earnings' || callbackData === 'ambassador_add_partner' ||
-        callbackData === 'ambassador_payout') {
+        callbackData === 'ambassador_payout' ||
+        callbackData === 'payout_method_card' || callbackData === 'payout_method_sbp' ||
+        callbackData === 'payout_method_crypto') {
       return await handleAmbassador(env, update);
     }
     return { success: true, handled: false };

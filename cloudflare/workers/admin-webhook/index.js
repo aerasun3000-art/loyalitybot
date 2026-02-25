@@ -33,30 +33,48 @@ export default {
       });
     }
 
+    // Register webhook: GET /setup-webhook?key=<WEBHOOK_SECRET_TOKEN>
+    const url = new URL(request.url);
+    if (request.method === 'GET' && url.pathname === '/setup-webhook') {
+      const key = url.searchParams.get('key');
+      if (!env.WEBHOOK_SECRET_TOKEN || key !== env.WEBHOOK_SECRET_TOKEN) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+      const webhookUrl = `${url.origin}/`;
+      const res = await fetch(`https://api.telegram.org/bot${env.ADMIN_BOT_TOKEN}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: webhookUrl,
+          secret_token: env.WEBHOOK_SECRET_TOKEN,
+          allowed_updates: ['message', 'callback_query', 'edited_message'],
+        }),
+      });
+      const result = await res.json();
+      return new Response(JSON.stringify(result, null, 2), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // Only accept POST requests
     if (request.method !== 'POST') {
       return errorResponse('Method not allowed', 405);
     }
 
     try {
-      // Validate webhook secret token (optional - only if configured and sent by Telegram)
+      // Validate webhook secret token
       const secretToken = env.WEBHOOK_SECRET_TOKEN;
-      const receivedToken = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
-      
-      // Only validate if both secret token is configured AND Telegram sends it
-      // If Telegram doesn't send the token header, we skip validation
-      if (secretToken && receivedToken) {
+      if (secretToken) {
+        const receivedToken = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
         if (receivedToken !== secretToken) {
-          console.error('[Webhook] Invalid secret token');
+          console.error('[Webhook] Invalid or missing secret token');
           await logError('Webhook validation', new Error('Invalid secret token'), {
             url: request.url,
             method: request.method,
           }, request, env);
           return errorResponse('Unauthorized', 401);
         }
-        console.log('[Webhook] Secret token validated successfully');
-      } else {
-        console.log('[Webhook] Secret token validation skipped (not configured or not sent by Telegram)');
+        console.log('[Webhook] Secret token validated');
       }
 
       // Parse Telegram update

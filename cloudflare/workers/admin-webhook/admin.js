@@ -18,6 +18,7 @@ import * as stats from './handlers/stats.js';
 import * as news from './handlers/news.js';
 import * as ugc from './handlers/ugc.js';
 import * as promoters from './handlers/promoters.js';
+import * as promotionMod from './handlers/promotions.js';
 import * as leaderboard from './handlers/leaderboard.js';
 import * as mlm from './handlers/mlm.js';
 import * as b2b from './handlers/b2b.js';
@@ -46,6 +47,10 @@ export async function showMainMenu(env, chatId) {
       [
         { text: '🤝 Заявки Партнеров', callback_data: 'admin_partners' },
         { text: '🛠 Услуги Партнёров', callback_data: 'admin_manage_services' },
+      ],
+      [
+        { text: '✨ Модерация Услуг', callback_data: 'admin_services' },
+        { text: '🌟 Модерация Акций', callback_data: 'admin_promotions' },
       ],
       [
         { text: '📊 Общая статистика', callback_data: 'admin_stats' },
@@ -182,6 +187,37 @@ export async function handleCallbackQuery(env, update) {
     // Services - moderation
     if (data === 'admin_services') {
       return await services.handleAdminServices(env, callbackQuery);
+    }
+    if (data.startsWith('svc_mod_edit_')) {
+      const serviceId = data.replace('svc_mod_edit_', '');
+      return await services.handleModerationEditServiceStart(env, callbackQuery, serviceId);
+    }
+    // Promotions moderation
+    if (data === 'admin_promotions') {
+      return await promotionMod.handleAdminPromotions(env, callbackQuery);
+    }
+    if (data.startsWith('promo_mod_edit_')) {
+      const promotionId = data.replace('promo_mod_edit_', '');
+      return await promotionMod.handleModerationEditPromotionStart(env, callbackQuery, promotionId);
+    }
+    if (data.startsWith('promo_approve_')) {
+      const promotionId = data.replace('promo_approve_', '');
+      return await promotionMod.handlePromotionApproval(env, callbackQuery, promotionId, 'Approved');
+    }
+    if (data.startsWith('promo_reject_')) {
+      const promotionId = data.replace('promo_reject_', '');
+      return await promotionMod.handlePromotionApproval(env, callbackQuery, promotionId, 'Rejected');
+    }
+    if (data.startsWith('promo_edit_field_')) {
+      const rest = data.replace('promo_edit_field_', '');
+      const fieldMatch = rest.match(/^(title|description|discount|end_date)_(.+)$/);
+      if (fieldMatch) {
+        const [, field, promotionId] = fieldMatch;
+        return await promotionMod.handlePromotionEditField(env, callbackQuery, field, promotionId);
+      }
+    }
+    if (data === 'promo_mod_cancel') {
+      return await promotionMod.handlePromotionModerationCancel(env, callbackQuery);
     }
     if (data.startsWith('service_approve_')) {
       const serviceId = data.replace('service_approve_', '');
@@ -570,6 +606,9 @@ export async function routeUpdate(env, update) {
           }
           if (state.state.startsWith('ref_comm_')) {
             return await refCommissions.handleMessage(env, update, state.data);
+          }
+          if (state.state.startsWith('promo_')) {
+            return await promotionMod.handleMessage(env, update, state.data);
           }
         }
       }

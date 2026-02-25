@@ -66,6 +66,7 @@ export async function getAllApprovedPartners(env) {
 
 /**
  * Update partner status
+ * @returns {{ success: boolean, application?: object, alreadyProcessed?: boolean, currentStatus?: string }}
  */
 async function updatePartnerStatus(env, partnerId, newStatus) {
   try {
@@ -74,7 +75,13 @@ async function updatePartnerStatus(env, partnerId, newStatus) {
     const checkResult = await supabaseRequest(env, `partner_applications?chat_id=eq.${partnerIdStr}&select=*`);
     if (!checkResult || checkResult.length === 0) {
       logError('updatePartnerStatus', new Error('Application not found'), { partnerId: partnerIdStr });
-      return false;
+      return { success: false };
+    }
+    
+    const application = checkResult[0];
+    const currentStatus = (application.status || 'Pending').toLowerCase();
+    if (currentStatus !== 'pending') {
+      return { success: false, alreadyProcessed: true, currentStatus: application.status, application };
     }
     
     const config = {
@@ -103,10 +110,46 @@ async function updatePartnerStatus(env, partnerId, newStatus) {
       await ensurePartnerRecord(env, partnerIdStr);
     }
     
-    return true;
+    return { success: true, application };
   } catch (error) {
     logError('updatePartnerStatus', error, { partnerId, newStatus });
-    return false;
+    return { success: false };
+  }
+}
+
+/**
+ * Notify admins that a partner application was approved/rejected.
+ * If ADMIN_GROUP_CHAT_ID is set — send one message to the group (visible to all).
+ * Otherwise — send to each admin from ADMIN_CHAT_ID (except the one who acted).
+ */
+async function notifyOtherAdmins(env, adminWhoActedChatId, application, newStatus) {
+  const statusText = newStatus === 'Approved' ? 'Одобрена' : 'Отклонена';
+  const text = (
+    `📋 **Заявка на партнёрство обработана**\n\n` +
+    `ID: ${application.chat_id}\n` +
+    `Компания: ${application.company_name || '—'}\n` +
+    `Статус: ${statusText}\n` +
+    `Обработал: админ ${adminWhoActedChatId}`
+  );
+
+  const groupChatId = (env.ADMIN_GROUP_CHAT_ID || '').trim();
+  if (groupChatId) {
+    try {
+      await sendTelegramMessage(env.ADMIN_BOT_TOKEN, groupChatId, text);
+    } catch (e) {
+      logError('notifyOtherAdmins', e, { groupChatId });
+    }
+    return;
+  }
+
+  const adminIds = (env.ADMIN_CHAT_ID || '').split(',').map(id => String(id.trim())).filter(Boolean);
+  for (const adminChatId of adminIds) {
+    if (adminChatId === String(adminWhoActedChatId)) continue;
+    try {
+      await sendTelegramMessage(env.ADMIN_BOT_TOKEN, adminChatId, text);
+    } catch (e) {
+      logError('notifyOtherAdmins', e, { adminChatId });
+    }
   }
 }
 
@@ -291,9 +334,25 @@ export async function handlePartnerApproval(env, callbackQuery, partnerId, newSt
   const chatId = String(callbackQuery.message.chat.id);
   
   try {
-    const success = await updatePartnerStatus(env, partnerId, newStatus);
+    const result = await updatePartnerStatus(env, partnerId, newStatus);
     
-    if (success) {
+    if (result.alreadyProcessed) {
+      const statusText = (result.currentStatus || '').toLowerCase() === 'approved' ? 'одобрена' : 'отклонена';
+      const originalText = callbackQuery.message.text || '';
+      const processedText = originalText.split('\n')[0];
+      const keyboard = [[{ text: '◀️ Назад', callback_data: 'admin_partners' }]];
+      await editMessageText(
+        env.ADMIN_BOT_TOKEN,
+        chatId,
+        callbackQuery.message.message_id,
+        `${processedText}\n\n⚠️ Заявка уже обработана (${statusText} другим админом).`,
+        keyboard
+      );
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Уже обработана' });
+      return { success: true, handled: true, action: 'already_processed' };
+    }
+    
+    if (result.success && result.application) {
       const resultText = newStatus === 'Approved' ? '🟢 Одобрена' : '🔴 Отклонена';
       const originalText = callbackQuery.message.text || '';
       const processedText = originalText.split('\n')[0];
@@ -319,12 +378,14 @@ export async function handlePartnerApproval(env, callbackQuery, partnerId, newSt
         );
       }
       
+      await notifyOtherAdmins(env, chatId, result.application, newStatus);
+      
       await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: resultText });
       return { success: true, handled: true, action: 'partner_updated', status: newStatus };
-    } else {
-      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка при обновлении статуса в БД', show_alert: true });
-      return { success: false, handled: true, action: 'partner_update_failed' };
     }
+    
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Ошибка при обновлении статуса в БД', show_alert: true });
+    return { success: false, handled: true, action: 'partner_update_failed' };
   } catch (error) {
     logError('handlePartnerApproval', error, { partnerId, newStatus });
     await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Произошла ошибка', show_alert: true });

@@ -128,6 +128,19 @@ import {
 import { sendPartnerNotification } from './partners.js';
 import { showMainMenu } from '../admin.js';
 
+const TELEGRAM_MAX_MESSAGE_LENGTH = 4000;
+
+function splitLongText(text, maxLen = TELEGRAM_MAX_MESSAGE_LENGTH) {
+  if (!text || text.length <= maxLen) return [text || ''];
+  const chunks = [];
+  let remaining = text;
+  while (remaining.length > 0) {
+    chunks.push(remaining.slice(0, maxLen));
+    remaining = remaining.slice(maxLen);
+  }
+  return chunks;
+}
+
 /**
  * Handle service moderation menu
  */
@@ -150,17 +163,29 @@ export async function handleAdminServices(env, callbackQuery) {
     }
     
     for (const service of pendingServices) {
-      const messageText = (
+      const header = (
         `**Новая услуга на модерации**\n\n` +
         `🆔 ID: ${service.id}\n` +
         `📝 Название: ${service.title || '—'}\n` +
-        `📄 Описание: ${service.description || '—'}\n` +
         `💰 Цена: ${service.price || '—'}\n` +
         `📂 Категория: ${service.category || '—'}\n` +
-        `👤 Партнёр: ${service.partner_chat_id || '—'}`
+        `👤 Партнёр: ${service.partner_chat_id || '—'}\n\n` +
+        `📄 Описание:\n`
       );
+      const fullDesc = service.description || '—';
+      const descChunks = splitLongText(fullDesc, TELEGRAM_MAX_MESSAGE_LENGTH - header.length - 50);
+      const firstChunk = descChunks[0];
+      const messageText = header + firstChunk;
+      if (descChunks.length > 1) {
+        for (let i = 1; i < descChunks.length; i++) {
+          await sendTelegramMessage(env.ADMIN_BOT_TOKEN, chatId, descChunks[i]);
+        }
+      }
       
       const keyboard = [
+        [
+          { text: '✏️ Редактировать', callback_data: `svc_mod_edit_${service.id}` },
+        ],
         [
           { text: '🟢 Одобрить', callback_data: `service_approve_${service.id}` },
           { text: '🔴 Отклонить', callback_data: `service_reject_${service.id}` },
@@ -701,11 +726,62 @@ export async function handleEditServiceField(env, callbackQuery, field, serviceI
   const currentState = await getBotState(env, chatId);
   await setBotState(env, chatId, 'svc_waiting_new_value', {
     partner_chat_id: currentState?.data?.partner_chat_id,
+    from_moderation: currentState?.data?.from_moderation,
     editing_service_id: serviceId,
     editing_field: field,
   });
   
   return { success: true, handled: true, action: 'edit_field_prompt' };
+}
+
+/**
+ * Handle edit service from moderation - show field selection
+ */
+export async function handleModerationEditServiceStart(env, callbackQuery, serviceId) {
+  const chatId = String(callbackQuery.message.chat.id);
+  
+  try {
+    const service = await getServiceById(env, serviceId);
+    
+    if (!service) {
+      await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id, { text: 'Услуга не найдена', show_alert: true });
+      return { success: false, handled: true };
+    }
+    
+    const keyboard = [
+      [{ text: '📝 Название', callback_data: `svc_edit_field_title_${serviceId}` }],
+      [{ text: '📄 Описание', callback_data: `svc_edit_field_description_${serviceId}` }],
+      [{ text: '💰 Цена', callback_data: `svc_edit_field_price_${serviceId}` }],
+      [{ text: '📂 Категория', callback_data: `svc_edit_field_category_${serviceId}` }],
+      [{ text: '◀️ К модерации', callback_data: 'admin_services' }],
+    ];
+    
+    const text = (
+      `✏️ **Редактирование услуги (модерация)**\n\n` +
+      `📝 Название: ${service.title || '—'}\n` +
+      `📄 Описание: ${(service.description || '—').slice(0, 500)}${(service.description || '').length > 500 ? '...' : ''}\n` +
+      `💰 Цена: ${service.price || '—'}\n` +
+      `📂 Категория: ${service.category || '—'}\n\n` +
+      `Выберите поле для изменения:`
+    );
+    
+    await editMessageText(
+      env.ADMIN_BOT_TOKEN,
+      chatId,
+      callbackQuery.message.message_id,
+      text,
+      keyboard,
+      { parseMode: 'Markdown' }
+    );
+    
+    await setBotState(env, chatId, 'svc_mod_editing', { from_moderation: true, editing_service_id: serviceId });
+    
+    await answerCallbackQuery(env.ADMIN_BOT_TOKEN, callbackQuery.id);
+    return { success: true, handled: true, action: 'moderation_edit_menu' };
+  } catch (error) {
+    logError('handleModerationEditServiceStart', error, { chatId, serviceId });
+    throw error;
+  }
 }
 
 /**
@@ -859,7 +935,29 @@ export async function handleMessage(env, update, stateData) {
       if (success) {
         await sendTelegramMessage(env.ADMIN_BOT_TOKEN, chatId, `✅ Поле "${field}" обновлено!`);
         
-        if (partnerChatId) {
+        if (currentState?.data?.from_moderation) {
+          const service = await getServiceById(env, serviceId);
+          if (service) {
+            const header = (
+              `**Услуга на модерации (обновлено)**\n\n` +
+              `🆔 ID: ${service.id}\n` +
+              `📝 Название: ${service.title || '—'}\n` +
+              `💰 Цена: ${service.price || '—'}\n` +
+              `📂 Категория: ${service.category || '—'}\n` +
+              `👤 Партнёр: ${service.partner_chat_id || '—'}\n\n` +
+              `📄 Описание: ${(service.description || '—').slice(0, 3500)}${(service.description || '').length > 3500 ? '...' : ''}`
+            );
+            const keyboard = [
+              [{ text: '✏️ Редактировать', callback_data: `svc_mod_edit_${serviceId}` }],
+              [
+                { text: '🟢 Одобрить', callback_data: `service_approve_${service.id}` },
+                { text: '🔴 Отклонить', callback_data: `service_reject_${service.id}` },
+              ],
+            ];
+            await sendTelegramMessageWithKeyboard(env.ADMIN_BOT_TOKEN, chatId, header, keyboard, { parseMode: 'Markdown' });
+          }
+          await clearBotState(env, chatId);
+        } else if (partnerChatId) {
           await showPartnerServicesMenu(env, chatId, partnerChatId);
         } else {
           await clearBotState(env, chatId);

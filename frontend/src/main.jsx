@@ -4,6 +4,7 @@ import App from './App.jsx'
 import AuthBootstrap from './components/AuthBootstrap'
 import './styles/index.css'
 import { initSentry } from './sentry'
+import { resolveApiUrl } from './utils/apiResolver'
 
 // Инициализация Sentry для отслеживания ошибок (не блокирует загрузку)
 try {
@@ -82,10 +83,12 @@ if (window.Telegram?.WebApp) {
 
 // Тема применяется через index.html (раннее) и themeStore onRehydrateStorage (с inline-стилями)
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <AuthBootstrap>
-      <App />
-    </AuthBootstrap>
-  </React.StrictMode>,
-)
+resolveApiUrl().catch(() => {}).then(() => {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <AuthBootstrap>
+        <App />
+      </AuthBootstrap>
+    </React.StrictMode>,
+  )
+})

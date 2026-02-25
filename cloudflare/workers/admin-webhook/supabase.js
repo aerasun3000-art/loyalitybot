@@ -769,3 +769,68 @@ export async function updateRefRewardStatus(env, id, status) {
   });
   return result && result.length > 0;
 }
+
+/**
+ * Get pending promotions for moderation
+ */
+export async function getPendingPromotions(env) {
+  try {
+    const result = await supabaseRequest(env,
+      'promotions?approval_status=eq.Pending&select=*&order=created_at.desc');
+    return result || [];
+  } catch (error) {
+    console.error('[getPendingPromotions] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Get promotion by ID
+ */
+export async function getPromotionById(env, promotionId) {
+  try {
+    const result = await supabaseRequest(env, `promotions?id=eq.${promotionId}&select=*`);
+    return result && result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error('[getPromotionById] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Update promotion
+ */
+export async function updatePromotion(env, promotionId, updateData) {
+  try {
+    const result = await supabaseRequest(env, `promotions?id=eq.${promotionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updateData),
+    });
+    return result && result.length > 0;
+  } catch (error) {
+    console.error('[updatePromotion] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update promotion approval status
+ */
+export async function updatePromotionApprovalStatus(env, promotionId, newStatus) {
+  try {
+    const updateData = { approval_status: newStatus };
+    if (newStatus === 'Approved') {
+      updateData.is_active = true;
+    } else if (newStatus === 'Rejected') {
+      updateData.is_active = false;
+    }
+    const result = await supabaseRequest(env, `promotions?id=eq.${promotionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updateData),
+    });
+    return result && result.length > 0;
+  } catch (error) {
+    console.error('[updatePromotionApprovalStatus] Error:', error);
+    throw error;
+  }
+}

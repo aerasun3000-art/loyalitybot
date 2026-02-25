@@ -39,6 +39,29 @@ export default {
       });
     }
 
+    // Register webhook: GET /setup-webhook?key=<WEBHOOK_SECRET_TOKEN>
+    const url = new URL(request.url);
+    if (request.method === 'GET' && url.pathname === '/setup-webhook') {
+      const key = url.searchParams.get('key');
+      if (!env.WEBHOOK_SECRET_TOKEN || key !== env.WEBHOOK_SECRET_TOKEN) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+      const webhookUrl = `${url.origin}/`;
+      const res = await fetch(`https://api.telegram.org/bot${env.TOKEN_PARTNER}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: webhookUrl,
+          secret_token: env.WEBHOOK_SECRET_TOKEN,
+          allowed_updates: ['message', 'callback_query', 'edited_message'],
+        }),
+      });
+      const result = await res.json();
+      return new Response(JSON.stringify(result, null, 2), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // Only accept POST requests
     if (request.method !== 'POST') {
       console.log('[Worker] Invalid method:', request.method);

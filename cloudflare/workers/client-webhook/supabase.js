@@ -282,14 +282,39 @@ export async function resolveReferralSourceToChatId(env, referralSource) {
 }
 
 /**
+ * Ensure referrer exists in users. If partner (from partner_ link) is not in users
+ * but exists in partners, create minimal user record so referral_tree FK is satisfied.
+ */
+async function ensureReferrerInUsers(env, directReferrerChatId) {
+  const inUsers = await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(directReferrerChatId)}&select=chat_id`);
+  if (inUsers && inUsers.length > 0) return true;
+  const inPartners = await supabaseRequest(env, `partners?chat_id=eq.${encodeURIComponent(directReferrerChatId)}&select=chat_id,name,company_name`);
+  if (!inPartners || inPartners.length === 0) return false;
+  const p = inPartners[0];
+  await supabaseRequest(env, 'users', {
+    method: 'POST',
+    headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify({
+      chat_id: String(directReferrerChatId),
+      name: p.company_name || p.name || 'Партнёр',
+      reg_date: new Date().toISOString(),
+      balance: 0,
+      status: 'active',
+    }),
+  });
+  return true;
+}
+
+/**
  * Create referral_tree links for levels 1-3.
  * Referrer must exist in users (referral_tree FK).
+ * For partner_ links: creates user record from partners if missing.
  */
 export async function createReferralTreeLinks(env, newUserChatId, directReferrerChatId) {
   if (!directReferrerChatId) return;
   try {
-    const referrerExists = await supabaseRequest(env, `users?chat_id=eq.${encodeURIComponent(directReferrerChatId)}&select=chat_id`);
-    if (!referrerExists || referrerExists.length === 0) return;
+    const referrerReady = await ensureReferrerInUsers(env, directReferrerChatId);
+    if (!referrerReady) return;
 
     const insertLink = async (referrerId, referredId, level) => {
       const existing = await supabaseRequest(env, `referral_tree?referrer_chat_id=eq.${encodeURIComponent(referrerId)}&referred_chat_id=eq.${encodeURIComponent(referredId)}&select=id`);
@@ -603,4 +628,63 @@ export async function canAmbassadorAddPartner(env, ambassadorChatId, partnerChat
 
   return { canAdd: false, reason: 'qualification_required',
     message: 'Чтобы добавить партнёра, воспользуйтесь его акцией или совершите покупку и поставьте оценку 10.' };
+}
+
+/**
+ * Recalculate karma score for user (non-blocking RPC call)
+ */
+export async function recalculateKarma(env, chatId) {
+  try {
+    const config = getSupabaseConfig(env);
+    const response = await fetch(`${config.url}/rest/v1/rpc/recalculate_karma`, {
+      method: 'POST',
+      headers: {
+        'apikey': config.key,
+        'Authorization': `Bearer ${config.key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_chat_id: String(chatId) }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('[recalculateKarma] RPC failed:', err);
+    }
+  } catch (e) {
+    console.error('[recalculateKarma] error:', e);
+  }
+}
+
+/**
+ * Create ambassador payout request
+ */
+export async function createPayoutRequest(env, { ambassadorChatId, amount, paymentMethod, paymentDetails }) {
+  try {
+    const result = await supabaseRequest(env, 'ambassador_payout_requests', {
+      method: 'POST',
+      body: JSON.stringify({
+        ambassador_chat_id: String(ambassadorChatId),
+        amount: Number(amount),
+        payment_method: paymentMethod,
+        payment_details: paymentDetails,
+      }),
+    });
+    return result && result[0] ? result[0] : null;
+  } catch (e) {
+    console.error('[createPayoutRequest]', e);
+    return null;
+  }
+}
+
+/**
+ * Get ambassador pending balance
+ */
+export async function getAmbassadorBalance(env, chatId) {
+  try {
+    const rows = await supabaseRequest(env,
+      `ambassadors?chat_id=eq.${encodeURIComponent(chatId)}&select=balance_pending`);
+    return rows && rows[0] ? (rows[0].balance_pending || 0) : 0;
+  } catch (e) {
+    console.error('[getAmbassadorBalance]', e);
+    return 0;
+  }
 }

@@ -134,3 +134,27 @@ export async function attributeTransactionToAmbassador(env, transactionId, ambas
     body: JSON.stringify({ ambassador_chat_id: ambassadorChatId }),
   });
 }
+
+/**
+ * Recalculate karma score for user (non-blocking RPC call)
+ */
+export async function recalculateKarma(env, chatId) {
+  try {
+    const config = getSupabaseConfig(env);
+    const response = await fetch(`${config.url}/rest/v1/rpc/recalculate_karma`, {
+      method: 'POST',
+      headers: {
+        'apikey': config.key,
+        'Authorization': `Bearer ${config.key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_chat_id: String(chatId) }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('[recalculateKarma] RPC failed:', err);
+    }
+  } catch (e) {
+    console.error('[recalculateKarma] error:', e);
+  }
+}
