@@ -187,7 +187,7 @@ export const getActivePromotions = async (userTier = 'bronze') => {
     .from('promotions')
     .select(`
       *,
-      partners(name, company_name, booking_url, google_maps_link)
+      partners(name, company_name, booking_url, google_maps_link, business_type, chat_id)
     `)
     .eq('is_active', true)
     .eq('approval_status', 'Approved')

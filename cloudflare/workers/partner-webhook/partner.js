@@ -2729,40 +2729,22 @@ export async function handleCallback(env, update) {
             );
             return { success: false };
           }
-          const promoData = {
-            partner_chat_id: String(chatId),
-            title: botState.data.title,
-            description: botState.data.description,
-            discount_value: botState.data.discount_value,
-            end_date: botState.data.end_date,
-            is_active: false,
-            approval_status: 'Pending',
-            promotion_type: 'discount',
+          await setBotState(env, chatId, 'awaiting_promo_audience', {
+            ...botState.data,
             tier_visibility: 'all',
-          };
-          try {
-            await addPromotion(env, promoData);
-            await clearBotState(env, chatId);
-            await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
-              '✅ <b>Акция отправлена на модерацию!</b>\n\n' +
-              `📝 ${promoData.title}\n💰 ${promoData.discount_value}\n📅 До: ${botState.data.date_text}\n\n` +
-              'Ожидайте одобрения администратором.',
-              { parseMode: 'HTML' }
-            );
-            return await handlePromotionsMenu(env, chatId);
-          } catch (err) {
-            console.error('[promo_tier_all]', err?.message || err, err);
-            await clearBotState(env, chatId);
-            const errMsg = (err?.message || '').toLowerCase();
-            let hint = '';
-            if (errMsg.includes('foreign key') || errMsg.includes('violates')) {
-              hint = '\n\nВозможно, партнёр не найден в системе. Обратитесь к администратору.';
-            } else if (errMsg.includes('min_tier') || errMsg.includes('tier_visibility') || errMsg.includes('migration_required') || (errMsg.includes('column') && errMsg.includes('does not exist'))) {
-              hint = '\n\nВыполните миграцию add_tier_to_promotions в Supabase SQL Editor.';
-            }
-            await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.' + hint);
-            return { success: false };
-          }
+          });
+          const audienceKeyboard1 = [
+            [{ text: '🌐 Всем', callback_data: 'promo_audience_public' }],
+            [{ text: '🙈 Скрыть от конкурентов', callback_data: 'promo_audience_hide' }],
+          ];
+          await sendTelegramMessageWithKeyboard(env.TOKEN_PARTNER, chatId,
+            '✍️ <b>Последний шаг — видимость:</b>\n\nКому показывать эту акцию?\n\n' +
+            '🌐 <b>Всем</b> — видна всем пользователям\n' +
+            '🙈 <b>Скрыть от конкурентов</b> — скрыта от партнёров той же категории',
+            audienceKeyboard1,
+            { parseMode: 'HTML' }
+          );
+          return { success: true, handled: true };
         }
       // Specific tier: ask visibility
       await setBotState(env, chatId, 'awaiting_promo_visibility', {
@@ -2800,41 +2782,78 @@ export async function handleCallback(env, update) {
           );
           return { success: false };
         }
-        const promoData = {
-          partner_chat_id: String(chatId),
-          title: botState.data.title,
-          description: botState.data.description,
-          discount_value: botState.data.discount_value,
-          end_date: botState.data.end_date,
-          is_active: false,
-          approval_status: 'Pending',
-          promotion_type: 'discount',
-          min_tier: botState.data.promo_min_tier,
+        await setBotState(env, chatId, 'awaiting_promo_audience', {
+          ...botState.data,
           tier_visibility: visVal === 'tier_only' ? 'tier_only' : 'all',
-        };
-        try {
-          await addPromotion(env, promoData);
-          await clearBotState(env, chatId);
-          await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
-            '✅ <b>Акция отправлена на модерацию!</b>\n\n' +
-            `📝 ${promoData.title}\n💰 ${promoData.discount_value}\n📅 До: ${botState.data.date_text}\n\n` +
-            'Ожидайте одобрения администратором.',
-            { parseMode: 'HTML' }
-          );
-          return await handlePromotionsMenu(env, chatId);
-        } catch (err) {
-          console.error('[promo_vis]', err?.message || err, err);
-          await clearBotState(env, chatId);
-          const errMsg = (err?.message || '').toLowerCase();
-          let hint = '';
-          if (errMsg.includes('foreign key') || errMsg.includes('violates')) {
-            hint = '\n\nВозможно, партнёр не найден в системе. Обратитесь к администратору.';
-          } else if (errMsg.includes('min_tier') || errMsg.includes('tier_visibility') || errMsg.includes('migration_required') || (errMsg.includes('column') && errMsg.includes('does not exist'))) {
-            hint = '\n\nВыполните миграцию add_tier_to_promotions в Supabase SQL Editor.';
-          }
-          await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.' + hint);
-          return { success: false };
+        });
+        const audienceKeyboard2 = [
+          [{ text: '🌐 Всем', callback_data: 'promo_audience_public' }],
+          [{ text: '🙈 Скрыть от конкурентов', callback_data: 'promo_audience_hide' }],
+        ];
+        await sendTelegramMessageWithKeyboard(env.TOKEN_PARTNER, chatId,
+          '✍️ <b>Последний шаг — видимость:</b>\n\nКому показывать эту акцию?\n\n' +
+          '🌐 <b>Всем</b> — видна всем пользователям\n' +
+          '🙈 <b>Скрыть от конкурентов</b> — скрыта от партнёров той же категории',
+          audienceKeyboard2,
+          { parseMode: 'HTML' }
+        );
+        return { success: true, handled: true };
+      }
+    }
+
+    if (callbackData.startsWith('promo_audience_')) {
+      const botState = await getBotState(env, chatId);
+      if (botState?.state !== 'awaiting_promo_audience' || !botState.data) {
+        await clearBotState(env, chatId);
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
+          '❌ Сессия создания акции истекла. Начните создание заново.'
+        );
+        return await handlePromotionsMenu(env, chatId);
+      }
+      const visibilityMode = callbackData === 'promo_audience_hide' ? 'hide_competitors' : 'public';
+      const partnerStatus = await checkPartnerStatus(env, chatId);
+      if (partnerStatus.status !== 'Approved') {
+        await clearBotState(env, chatId);
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
+          '❌ Акции могут создавать только одобренные партнёры. Ваша заявка ещё на рассмотрении.'
+        );
+        return { success: false };
+      }
+      const promoData = {
+        partner_chat_id: String(chatId),
+        title: botState.data.title,
+        description: botState.data.description,
+        discount_value: botState.data.discount_value,
+        end_date: botState.data.end_date,
+        is_active: false,
+        approval_status: 'Pending',
+        promotion_type: 'discount',
+        min_tier: botState.data.promo_min_tier,
+        tier_visibility: botState.data.tier_visibility ?? 'all',
+        visibility_mode: visibilityMode,
+      };
+      try {
+        await addPromotion(env, promoData);
+        await clearBotState(env, chatId);
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId,
+          '✅ <b>Акция отправлена на модерацию!</b>\n\n' +
+          `📝 ${promoData.title}\n💰 ${promoData.discount_value}\n📅 До: ${botState.data.date_text}\n\n` +
+          'Ожидайте одобрения администратором.',
+          { parseMode: 'HTML' }
+        );
+        return await handlePromotionsMenu(env, chatId);
+      } catch (err) {
+        console.error('[promo_audience]', err?.message || err, err);
+        await clearBotState(env, chatId);
+        const errMsg = (err?.message || '').toLowerCase();
+        let hint = '';
+        if (errMsg.includes('foreign key') || errMsg.includes('violates')) {
+          hint = '\n\nВозможно, партнёр не найден в системе. Обратитесь к администратору.';
+        } else if (errMsg.includes('visibility_mode') || errMsg.includes('migration_required') || (errMsg.includes('column') && errMsg.includes('does not exist'))) {
+          hint = '\n\nВыполните миграцию add_visibility_mode_to_promotions в Supabase SQL Editor.';
         }
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при создании акции.' + hint);
+        return { success: false };
       }
     }
 

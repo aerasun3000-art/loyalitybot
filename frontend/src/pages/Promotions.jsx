@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getActivePromotions, getClientBalance } from '../services/supabase'
+import { getActivePromotions, getClientBalance, getReferralPartnerInfo, isApprovedPartner } from '../services/supabase'
+import { filterCompetitors } from '../utils/categoryHelpers'
 import { getChatId, hapticFeedback } from '../utils/telegram'
 import { useTranslation, translateDynamicContent } from '../utils/i18n'
 import useLanguageStore from '../store/languageStore'
@@ -38,6 +39,8 @@ const Promotions = () => {
   const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [timeRemaining, setTimeRemaining] = useState({})
+  const [referralPartnerInfo, setReferralPartnerInfo] = useState(null)
+  const [isPartnerUser, setIsPartnerUser] = useState(false)
 
   const formatTimeRemaining = (milliseconds) => {
     const days = Math.floor(milliseconds / (1000 * 60 * 60 * 24))
@@ -136,12 +139,31 @@ const Promotions = () => {
     return () => clearInterval(interval)
   }, [promotions])
 
+  const applyPromotionFilters = (data, referralInfo, isPartner, userChatId) => {
+    let result = filterCompetitors(data, referralInfo, isPartner, isPartner ? String(userChatId) : null)
+    if (isPartner && referralInfo) {
+      result = result.filter(promo => {
+        if (promo.partner_chat_id === String(userChatId)) return true
+        const isCompetitorPartner = promo.partner?.business_type === referralInfo.businessType
+        if (isCompetitorPartner && promo.visibility_mode === 'hide_competitors') return false
+        return true
+      })
+    }
+    return result
+  }
+
   const loadPromotions = async () => {
     try {
-      const tier = chatId
-        ? getTierFromBalance((await getClientBalance(chatId))?.balance)
-        : 'bronze'
+      const [balance, referralInfo, partnerStatus] = await Promise.all([
+        chatId ? getClientBalance(chatId) : Promise.resolve(null),
+        getReferralPartnerInfo(chatId),
+        chatId ? isApprovedPartner(chatId) : Promise.resolve(false),
+      ])
+
+      const tier = getTierFromBalance(balance?.balance)
       setUserTier(tier)
+      setReferralPartnerInfo(referralInfo)
+      setIsPartnerUser(!!partnerStatus)
 
       const cacheKey = `promotions_cache_${tier}`
       const cached = sessionStorage.getItem(cacheKey)
@@ -149,15 +171,15 @@ const Promotions = () => {
         try {
           const parsed = JSON.parse(cached)
           if (Array.isArray(parsed)) {
-            setPromotions(parsed)
+            setPromotions(applyPromotionFilters(parsed, referralInfo, !!partnerStatus, chatId))
             setLoading(false)
           }
         } catch {}
       }
 
       const data = await getActivePromotions(tier)
-      setPromotions(data)
       sessionStorage.setItem(cacheKey, JSON.stringify(data))
+      setPromotions(applyPromotionFilters(data, referralInfo, !!partnerStatus, chatId))
     } catch (error) {
       console.error('Error loading promotions:', error)
     } finally {

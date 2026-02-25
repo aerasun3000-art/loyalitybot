@@ -57,6 +57,7 @@ export async function handleAdminPromotions(env, callbackQuery) {
 
     for (const promo of pendingPromotions) {
       const partner = promo.partner_chat_id ? await getPartnerByChatId(env, promo.partner_chat_id) : null;
+      const visibilityLabel = { 'public': '🌐 Всем', 'hide_competitors': '🙈 Скрыто от конкурентов' }[promo.visibility_mode] ?? '🌐 Всем';
       const header = (
         `**Новая акция на модерации**\n\n` +
         `🆔 ID: ${promo.id}\n` +
@@ -64,7 +65,8 @@ export async function handleAdminPromotions(env, callbackQuery) {
         `💰 Скидка/Стоимость: ${promo.discount_value || promo.service_price || '—'}\n` +
         `🏷️ Тип: ${promo.promotion_type || 'discount'}\n` +
         `📅 До: ${(promo.end_date || '—').toString().slice(0, 10)}\n` +
-        `👤 Партнёр: ${partner?.name || promo.partner_chat_id || '—'}\n\n` +
+        `👤 Партнёр: ${partner?.name || promo.partner_chat_id || '—'}\n` +
+        `👁 Видимость: ${visibilityLabel}\n\n` +
         `📄 Описание:\n`
       );
       const fullDesc = promo.description || '—';
