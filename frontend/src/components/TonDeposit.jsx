@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import QRCode from 'qrcode'
-import { getApiBaseUrl } from '../services/supabase'
+import { getResolvedApiUrl } from '../utils/apiResolver'
 
 export default function TonDeposit({ partnerChatId, onClose }) {
   const [info, setInfo] = useState(null)
@@ -10,7 +10,7 @@ export default function TonDeposit({ partnerChatId, onClose }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
-    const apiBase = getApiBaseUrl()
+    const apiBase = getResolvedApiUrl() || import.meta.env.VITE_API_URL
     if (!apiBase) { setLoading(false); return }
     fetch(`${apiBase}/api/ton/deposit-info?partner_chat_id=${encodeURIComponent(partnerChatId)}`)
       .then(r => r.ok ? r.json() : null)

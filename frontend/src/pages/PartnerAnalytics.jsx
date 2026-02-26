@@ -1367,16 +1367,16 @@ const PartnerAnalytics = () => {
           </div>
         </div>
       )}
-    </div>
 
-    {/* Модалка пополнения USDT */}
-    {showTonDeposit && partnerId && (
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm shadow-xl overflow-y-auto max-h-[90vh]">
-          <TonDeposit partnerChatId={partnerId} onClose={() => setShowTonDeposit(false)} />
+      {/* Модалка пополнения USDT */}
+      {showTonDeposit && partnerId && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm shadow-xl overflow-y-auto max-h-[90vh]">
+            <TonDeposit partnerChatId={partnerId} onClose={() => setShowTonDeposit(false)} />
+          </div>
         </div>
-      </div>
-    )}
+      )}
+    </div>
   );
 };
 
