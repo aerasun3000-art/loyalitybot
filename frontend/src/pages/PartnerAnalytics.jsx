@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import TonDeposit from '../components/TonDeposit';
 import { supabase, getPartnerInfo, updatePartnerInfo, getPartnerReactivationSettings, updatePartnerReactivationSettings, getReactivationStats, getPartnerCashbackStats } from '../services/supabase';
 import { formatCurrencySimple } from '../utils/currency';
 import Loader from '../components/Loader';
@@ -36,6 +37,8 @@ const PartnerAnalytics = () => {
     cooldown_days: 14,
     message_template: ''
   });
+  const [showTonDeposit, setShowTonDeposit] = useState(false);
+
   const [reactivationStats, setReactivationStats] = useState({
     sent: 0,
     failed: 0,
@@ -902,12 +905,20 @@ const PartnerAnalytics = () => {
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <MetricCard
-                icon={cashbackStats.deposit_balance >= 0 ? '🟢' : '🔴'}
-                title="Депозит"
-                value={cashbackStats.deposit_balance.toLocaleString('ru-RU')}
-                subtitle="Текущий остаток (баллы)"
-              />
+              <div className="relative">
+                <MetricCard
+                  icon={cashbackStats.deposit_balance >= 0 ? '🟢' : '🔴'}
+                  title="Депозит"
+                  value={cashbackStats.deposit_balance.toLocaleString('ru-RU')}
+                  subtitle="Текущий остаток (баллы)"
+                />
+                <button
+                  onClick={() => setShowTonDeposit(true)}
+                  className="mt-2 w-full py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium"
+                >
+                  💰 Пополнить (USDT)
+                </button>
+              </div>
               <MetricCard
                 icon="🎁"
                 title="Выдано кэшбэка"
@@ -1357,6 +1368,15 @@ const PartnerAnalytics = () => {
         </div>
       )}
     </div>
+
+    {/* Модалка пополнения USDT */}
+    {showTonDeposit && partnerId && (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm shadow-xl overflow-y-auto max-h-[90vh]">
+          <TonDeposit partnerChatId={partnerId} onClose={() => setShowTonDeposit(false)} />
+        </div>
+      </div>
+    )}
   );
 };
 

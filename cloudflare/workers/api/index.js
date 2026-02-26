@@ -1185,6 +1185,140 @@ export default {
         }
       }
 
+      // ========== TON/USDT DEPOSITS ==========
+
+      const USDT_JETTON_MASTER = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
+      const PLATFORM_WALLET = 'UQAbgQW227xOvhlsLi-ybHyXFRh3ddJBDxQCLTGLiqjSHOIw';
+      // Raw address (without UQ/EQ prefix) for webhook comparison
+      const PLATFORM_WALLET_RAW = '1b8105b6dbbc4ebe196c2e2fb26c7c9715187775d2410f14022d318b8aa8d21c';
+
+      // GET /api/ton/deposit-info?partner_chat_id=xxx
+      if (path === '/api/ton/deposit-info' && request.method === 'GET') {
+        const partnerChatId = url.searchParams.get('partner_chat_id');
+        if (!partnerChatId) return jsonResponse({ error: 'Missing partner_chat_id' }, 400);
+
+        const partners = await supabaseRequest(env, `partners?chat_id=eq.${encodeURIComponent(partnerChatId)}&select=chat_id,deposit_balance`);
+        if (!partners || partners.length === 0) return jsonResponse({ error: 'Partner not found' }, 404);
+
+        const usdRubRate = parseFloat(env.USD_RUB_RATE || '90');
+        return jsonResponse({
+          platform_address: PLATFORM_WALLET,
+          usdt_contract: USDT_JETTON_MASTER,
+          comment: partnerChatId,
+          current_deposit: partners[0].deposit_balance || 0,
+          usd_rub_rate: usdRubRate,
+        });
+      }
+
+      // POST /api/ton/webhook — TonAPI webhook handler
+      if (path === '/api/ton/webhook' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization');
+        const webhookSecret = env.TONAPI_WEBHOOK_SECRET;
+        if (webhookSecret && authHeader !== `Bearer ${webhookSecret}`) {
+          return new Response('Unauthorized', { status: 401 });
+        }
+
+        let payload;
+        try {
+          payload = await request.json();
+        } catch (_) {
+          return new Response('Bad Request', { status: 400 });
+        }
+
+        // TonAPI отправляет {account_id, tx_hash, lt} — подгружаем полное событие
+        let actions = payload?.event?.actions || payload?.actions || [];
+        if (actions.length === 0 && payload?.tx_hash && payload?.account_id) {
+          try {
+            const evResp = await fetch(
+              `https://tonapi.io/v2/accounts/${encodeURIComponent(payload.account_id)}/events?before_lt=${payload.lt + 1}&limit=1`,
+              { headers: { Authorization: `Bearer ${env.TONAPI_KEY}` } }
+            );
+            if (evResp.ok) {
+              const evData = await evResp.json();
+              actions = evData?.events?.[0]?.actions || [];
+            }
+          } catch (_) { /* продолжаем с пустым actions */ }
+        }
+
+        for (const action of actions) {
+          if (action.type !== 'JettonTransfer' || action.status !== 'ok') continue;
+
+          const jt = action.JettonTransfer;
+          if (!jt) continue;
+
+          // Only USDT
+          if (jt.jetton?.address !== USDT_JETTON_MASTER) continue;
+
+          // Only incoming to platform wallet
+          const recipientRaw = jt.recipient?.address || '';
+          if (!recipientRaw.toLowerCase().includes(PLATFORM_WALLET_RAW)) continue;
+
+          const comment = (jt.comment || '').trim();
+          if (!comment) continue;
+
+          const partners = await supabaseRequest(env, `partners?chat_id=eq.${encodeURIComponent(comment)}&select=chat_id,deposit_balance`);
+          if (!partners || partners.length === 0) continue;
+
+          const usdtAmount = parseInt(jt.amount || '0') / 1e6;
+          if (usdtAmount <= 0) continue;
+
+          const usdRubRate = parseFloat(env.USD_RUB_RATE || '90');
+          const depositPoints = Math.round(usdtAmount * usdRubRate);
+
+          const txHash = payload?.event?.event_id || payload?.event_id || null;
+
+          // Idempotency check
+          if (txHash) {
+            const existing = await supabaseRequest(env, `ton_payments?ton_tx_hash=eq.${encodeURIComponent(txHash)}&select=id`);
+            if (existing && existing.length > 0) continue;
+          }
+
+          // Insert payment record
+          await fetch(`${env.SUPABASE_URL}/rest/v1/ton_payments`, {
+            method: 'POST',
+            headers: {
+              apikey: env.SUPABASE_KEY,
+              Authorization: `Bearer ${env.SUPABASE_KEY}`,
+              'Content-Type': 'application/json',
+              Prefer: 'return=minimal',
+            },
+            body: JSON.stringify({
+              partner_chat_id: comment,
+              payment_type: 'deposit',
+              direction: 'incoming',
+              token_type: 'usdt',
+              usdt_amount: usdtAmount,
+              amount_usd: usdtAmount,
+              amount_nano: parseInt(jt.amount || '0'),
+              ton_amount: 0,
+              exchange_rate: usdRubRate,
+              to_address: PLATFORM_WALLET,
+              sender_address: jt.sender?.address || null,
+              ton_tx_hash: txHash,
+              comment: comment,
+              status: 'confirmed',
+              confirmed_at: new Date().toISOString(),
+              jetton_master: USDT_JETTON_MASTER,
+            }),
+          });
+
+          // Update partner deposit_balance
+          const currentBalance = parseFloat(partners[0].deposit_balance || 0);
+          await fetch(`${env.SUPABASE_URL}/rest/v1/partners?chat_id=eq.${encodeURIComponent(comment)}`, {
+            method: 'PATCH',
+            headers: {
+              apikey: env.SUPABASE_KEY,
+              Authorization: `Bearer ${env.SUPABASE_KEY}`,
+              'Content-Type': 'application/json',
+              Prefer: 'return=minimal',
+            },
+            body: JSON.stringify({ deposit_balance: currentBalance + depositPoints }),
+          });
+        }
+
+        return new Response('OK', { status: 200 });
+      }
+
       // 404 for unknown routes
       return jsonResponse({ error: 'Not found' }, 404);
     } catch (error) {

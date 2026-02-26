@@ -14,6 +14,13 @@ compatibility_date = "2024-01-01"
 # SENTRY_WEBHOOK_SECRET - Optional secret for Sentry webhook validation
 # AUTH_SECRET - Secret for tg_auth verification (optional, falls back to SUPABASE_KEY)
 # SENTRY_DSN - Sentry DSN for error tracking (optional)
+# TON/USDT интеграция (Фаза 3+):
+# TONAPI_KEY - TonAPI ключ (tonconsole.com)
+# TONAPI_WEBHOOK_SECRET - токен вебхука TonAPI (webhook_id=22978, token=163d7ed56b23477aafb3801c7cea0098)
+# USD_RUB_RATE - курс конвертации USDT→баллы (по умолчанию 90)
+
+[vars]
+USD_RUB_RATE = "90"
 
 # Note: CPU limits are not supported on Free plan
 # Remove [limits] section for Free plan deployments
