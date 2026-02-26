@@ -1,0 +1,7 @@
+# RU API Proxy — деплоить на отдельный аккаунт/регион без блокировок Cloudflare
+name = "loyalitybot-ru-proxy"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# TARGET_API_URL - задать через wrangler secret put TARGET_API_URL
+# Пример: https://loyalitybot-api.YOUR_SUBDOMAIN.workers.dev
