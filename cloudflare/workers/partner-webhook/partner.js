@@ -1169,6 +1169,8 @@ export async function handleSettingsMenu(env, chatId) {
   ], [
     { text: '🌟 Комиссия для амбассадоров', callback_data: 'settings_ambassador_commission' }
   ], [
+    { text: '💳 Кошелёк для выплат', callback_data: 'settings_wallet' }
+  ], [
     { text: toggleText, callback_data: 'settings_toggle_messages' }
   ], [
     { text: '⬅️ Назад', callback_data: 'more_menu' }
@@ -1183,6 +1185,47 @@ export async function handleSettingsMenu(env, chatId) {
   );
 
   return { success: true };
+}
+
+/**
+ * Handle Wallet Settings
+ */
+export async function handleWalletSettings(env, chatId) {
+  try {
+    const partner = await getPartnerByChatId(env, chatId);
+    const currentWallet = partner?.ton_wallet_address;
+    const paymentMethod = partner?.payment_method || 'bank';
+
+    let text = '💳 <b>Кошелёк для выплат (TON/USDT)</b>\n\n';
+    if (currentWallet) {
+      text += `Текущий адрес:\n<code>${currentWallet}</code>\n\n`;
+      text += `Метод выплат: <b>${paymentMethod === 'ton' ? 'TON/USDT' : paymentMethod === 'both' ? 'Банк + TON' : 'Банк'}</b>\n\n`;
+    } else {
+      text += '⚠️ Кошелёк не указан. Выплаты через TON недоступны.\n\n';
+    }
+    text += 'Введите TON-адрес кошелька (начинается с EQ или UQ) для получения выплат в USDT.';
+
+    const keyboard = [];
+    if (currentWallet) {
+      keyboard.push([{ text: '✏️ Изменить адрес', callback_data: 'wallet_set' }]);
+      if (paymentMethod !== 'ton') {
+        keyboard.push([{ text: '🔄 Переключить на TON выплаты', callback_data: 'wallet_method_ton' }]);
+      }
+      if (paymentMethod !== 'bank') {
+        keyboard.push([{ text: '🔄 Переключить на Банк', callback_data: 'wallet_method_bank' }]);
+      }
+    } else {
+      keyboard.push([{ text: '➕ Указать кошелёк', callback_data: 'wallet_set' }]);
+    }
+    keyboard.push([{ text: '⬅️ Назад', callback_data: 'menu_settings' }]);
+
+    await sendTelegramMessageWithKeyboard(env.TOKEN_PARTNER, chatId, text, keyboard, { parseMode: 'HTML' });
+    return { success: true };
+  } catch (error) {
+    logError('handleWalletSettings', error, { chatId });
+    await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при загрузке настроек кошелька.');
+    return { success: false };
+  }
 }
 
 /**
@@ -3142,8 +3185,50 @@ export async function handleCallback(env, update) {
       return { success: true, handled: true };
     }
     
+    if (callbackData === 'settings_wallet') {
+      return await handleWalletSettings(env, chatId);
+    }
+
+    if (callbackData === 'wallet_set') {
+      await setBotState(env, chatId, 'awaiting_wallet_address', {});
+      await sendTelegramMessage(
+        env.TOKEN_PARTNER, chatId,
+        '💳 Введите ваш TON-адрес кошелька (начинается с <b>EQ</b> или <b>UQ</b>, длина ~48 символов):\n\nОтправьте /cancel для отмены.',
+        { parseMode: 'HTML' }
+      );
+      return { success: true, handled: true };
+    }
+
+    if (callbackData === 'wallet_method_ton') {
+      try {
+        await supabaseRequest(env, `partners?chat_id=eq.${chatId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ payment_method: 'ton', ton_payments_enabled: true }),
+        });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '✅ Метод выплат переключён на <b>TON/USDT</b>.', { parseMode: 'HTML' });
+      } catch (error) {
+        logError('wallet_method_ton', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при обновлении метода выплат.');
+      }
+      return await handleWalletSettings(env, chatId);
+    }
+
+    if (callbackData === 'wallet_method_bank') {
+      try {
+        await supabaseRequest(env, `partners?chat_id=eq.${chatId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ payment_method: 'bank', ton_payments_enabled: false }),
+        });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '✅ Метод выплат переключён на <b>Банк</b>.', { parseMode: 'HTML' });
+      } catch (error) {
+        logError('wallet_method_bank', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при обновлении метода выплат.');
+      }
+      return await handleWalletSettings(env, chatId);
+    }
+
     // ==================== END SETTINGS CALLBACKS ====================
-    
+
     // ==================== OPERATIONS CALLBACKS ====================
     
     if (callbackData === 'menu_add_points') {
@@ -4567,8 +4652,47 @@ export async function handleStateBasedMessage(env, update, botState) {
       return { success: true, handled: true };
     }
     
+    if (state === 'awaiting_wallet_address') {
+      const input = text.trim();
+
+      if (input === '/cancel') {
+        await clearBotState(env, chatId);
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ввод адреса отменён.');
+        await handleWalletSettings(env, chatId);
+        return { success: true, handled: true };
+      }
+
+      const isTonAddress = (input.startsWith('EQ') || input.startsWith('UQ')) && input.length >= 46 && input.length <= 50;
+      if (!isTonAddress) {
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER, chatId,
+          '❌ Неверный формат адреса. TON-адрес начинается с <b>EQ</b> или <b>UQ</b> и содержит 48 символов. Попробуйте ещё раз или отправьте /cancel:',
+          { parseMode: 'HTML' }
+        );
+        return { success: true, handled: true };
+      }
+
+      await clearBotState(env, chatId);
+      try {
+        await supabaseRequest(env, `partners?chat_id=eq.${chatId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ ton_wallet_address: input }),
+        });
+        await sendTelegramMessage(
+          env.TOKEN_PARTNER, chatId,
+          `✅ Кошелёк сохранён:\n<code>${input}</code>\n\nТеперь вы можете переключить метод выплат на TON в настройках кошелька.`,
+          { parseMode: 'HTML' }
+        );
+      } catch (error) {
+        logError('awaiting_wallet_address', error, { chatId });
+        await sendTelegramMessage(env.TOKEN_PARTNER, chatId, '❌ Ошибка при сохранении кошелька. Попробуйте позже.');
+      }
+      await handleWalletSettings(env, chatId);
+      return { success: true, handled: true };
+    }
+
     // ==================== END SETTINGS EDIT STATES ====================
-    
+
     return { success: true, handled: false };
   } catch (error) {
     logError('handleStateBasedMessage', error, { chatId, state });

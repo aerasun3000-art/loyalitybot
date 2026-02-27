@@ -1188,9 +1188,9 @@ export default {
       // ========== TON/USDT DEPOSITS ==========
 
       const USDT_JETTON_MASTER = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
-      const PLATFORM_WALLET = 'UQAbgQW227xOvhlsLi-ybHyXFRh3ddJBDxQCLTGLiqjSHOIw';
+      const PLATFORM_WALLET = 'UQCdiz8-tpuz6Hp9cGniE0m2oPaOpRcj6x9hhzm_R77N9jdX';
       // Raw address (without UQ/EQ prefix) for webhook comparison
-      const PLATFORM_WALLET_RAW = '1b8105b6dbbc4ebe196c2e2fb26c7c9715187775d2410f14022d318b8aa8d21c';
+      const PLATFORM_WALLET_RAW = '9d8b3f3eb69bb3e87a7d7069e21349b6a0f68ea51723eb1f618739bf47becdf6';
 
       // GET /api/ton/deposit-info?partner_chat_id=xxx
       if (path === '/api/ton/deposit-info' && request.method === 'GET') {
