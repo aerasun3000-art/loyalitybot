@@ -6,6 +6,8 @@ compatibility_date = "2024-01-01"
 
 # Public environment variables
 [vars]
+USD_RUB_RATE = "90"
+PLATFORM_WALLET = "UQCdiz8-tpuz6Hp9cGniE0m2oPaOpRcj6x9hhzm_R77N9jdX"
 DASHBOARD_URL = "https://loyalitybot-frontend.pages.dev/admin/analytics"
 ONEPAGER_PARTNER_URL = "https://loyalitybot-frontend.pages.dev/onepager/partner"
 ONEPAGER_CLIENT_URL = "https://loyalitybot-frontend.pages.dev/onepager/client"

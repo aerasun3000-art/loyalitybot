@@ -251,18 +251,59 @@ export async function handlePaymentAction(env, callbackQuery, paymentId, action)
         { parseMode: 'Markdown' }
       );
       
-      // Notify partner
+      // Notify partner + create TON payout if applicable
       const payments = await supabaseRequest(env, `revenue_share_payments?id=eq.${paymentId}&select=*`);
       if (payments && payments.length > 0) {
         const payment = payments[0];
         if (action === 'approve') {
-          await sendPartnerNotification(
-            env,
-            payment.partner_chat_id,
-            `✅ **Выплата одобрена!**\n\n` +
-            `💰 Сумма: ${payment.amount || 0} ₸\n` +
-            `Деньги будут переведены в ближайшее время.`
-          );
+          // Check if partner wants TON payouts
+          const partner = await getPartnerByChatId(env, payment.partner_chat_id);
+          const hasTonWallet = partner?.ton_wallet_address && (partner?.payment_method === 'ton' || partner?.payment_method === 'both');
+
+          if (hasTonWallet) {
+            const usdRubRate = parseFloat(env.USD_RUB_RATE || '90');
+            const usdtAmount = Math.round((Number(payment.amount || 0) / usdRubRate) * 1000000) / 1000000;
+
+            try {
+              await supabaseRequest(env, 'ton_payments', {
+                method: 'POST',
+                body: JSON.stringify({
+                  partner_chat_id: payment.partner_chat_id,
+                  payment_type: 'revenue_share',
+                  direction: 'outgoing',
+                  status: 'pending',
+                  token_type: 'usdt',
+                  usdt_amount: usdtAmount,
+                  amount_usd: usdtAmount,
+                  amount_nano: 0,
+                  ton_amount: 0,
+                  exchange_rate: usdRubRate,
+                  to_address: partner.ton_wallet_address,
+                  from_address: env.PLATFORM_WALLET || 'UQCdiz8-tpuz6Hp9cGniE0m2oPaOpRcj6x9hhzm_R77N9jdX',
+                  comment: `Revenue share payment #${paymentId}`,
+                }),
+              });
+              console.log(`[mlm] Created TON payout ${usdtAmount} USDT → ${partner.ton_wallet_address}`);
+            } catch (tonErr) {
+              console.error('[mlm] Failed to create ton_payments record:', tonErr.message);
+            }
+
+            await sendPartnerNotification(
+              env,
+              payment.partner_chat_id,
+              `✅ **Выплата одобрена!**\n\n` +
+              `💰 Сумма: ${payment.amount || 0} ₸ (≈${usdtAmount.toFixed(2)} USDT)\n` +
+              `💳 Будет отправлено на ваш TON-кошелёк в течение 5 минут.`
+            );
+          } else {
+            await sendPartnerNotification(
+              env,
+              payment.partner_chat_id,
+              `✅ **Выплата одобрена!**\n\n` +
+              `💰 Сумма: ${payment.amount || 0} ₸\n` +
+              `Деньги будут переведены в ближайшее время.`
+            );
+          }
         } else {
           await sendPartnerNotification(
             env,
