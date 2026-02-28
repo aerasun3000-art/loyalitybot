@@ -21,7 +21,7 @@ export async function resolveApiUrl() {
 
   try {
     const res = await fetch(`${PRIMARY_URL}/health`, {
-      signal: AbortSignal.timeout(3000)
+      signal: AbortSignal.timeout(1500)
     })
     if (res.ok) {
       resolvedUrl = PRIMARY_URL
