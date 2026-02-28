@@ -10,7 +10,7 @@
  */
 
 import { mnemonicToPrivateKey } from '@ton/crypto';
-import { WalletContractV4, TonClient4, Address, toNano, internal, beginCell } from '@ton/ton';
+import { WalletContractV4, TonClient4, Address, toNano, internal, beginCell, JettonMaster } from '@ton/ton';
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
@@ -59,11 +59,9 @@ async function tonapi(path) {
 
 // ─── Get jetton wallet address for platform wallet ────────────────────────────
 
-async function getPlatformJettonWallet() {
-  const data = await tonapi(`/accounts/${encodeURIComponent(PLATFORM_RAW)}/jettons/${encodeURIComponent(USDT_MASTER)}`);
-  const addr = data?.wallet_address?.address;
-  if (!addr) throw new Error('Cannot get platform jetton wallet address from TonAPI');
-  return Address.parse(addr);
+async function getPlatformJettonWallet(client) {
+  const jettonMaster = client.open(JettonMaster.create(Address.parse(USDT_MASTER)));
+  return await jettonMaster.getWalletAddress(Address.parse(PLATFORM_WALLET));
 }
 
 // ─── Build USDT transfer body (TEP-74) ───────────────────────────────────────
@@ -124,7 +122,7 @@ async function main() {
   }
 
   // 4. Get platform jetton wallet address
-  const jettonWalletAddr = await getPlatformJettonWallet();
+  const jettonWalletAddr = await getPlatformJettonWallet(client);
   console.log(`[ton-payout] Platform jetton wallet: ${jettonWalletAddr.toString()}`);
 
   // 5. Get current seqno
