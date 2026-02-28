@@ -17,6 +17,7 @@ compatibility_date = "2024-01-01"
 
 [vars]
 PARTNER_BOT_USERNAME = "ghbipartnerbot"
+FRONTEND_URL = "https://sarafano24.ru"
 
 [env.production]
 name = "loyalitybot-partner-webhook"
